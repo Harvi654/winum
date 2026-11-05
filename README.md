@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/brand/winum-banner.svg" alt="winum - Fortified Wine for engineering software" width="100%">
+  <img src="docs/brand/winum-wordmark.png" alt="winum - Fortified Wine for engineering software" width="100%">
 </p>
 
 **winum** is a build of [Wine](https://www.winehq.org/) with fixes for
