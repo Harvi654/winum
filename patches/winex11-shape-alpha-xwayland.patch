@@ -1,0 +1,156 @@
+diff --git a/dlls/winex11.drv/bitblt.c b/dlls/winex11.drv/bitblt.c
+index 1f910400..6b19ea32 100644
+--- a/dlls/winex11.drv/bitblt.c
++++ b/dlls/winex11.drv/bitblt.c
+@@ -1797,6 +1797,7 @@ static BOOL x11drv_surface_flush( struct window_surface *window_surface, const R
+     XImage *ximage = surface->image->ximage;
+     const unsigned char *src = color_bits;
+     unsigned char *dst = (unsigned char *)ximage->data;
++    BOOL alpha_shape;
+ 
+     if (alpha_bits == -1)
+     {
+@@ -1829,11 +1830,32 @@ static BOOL x11drv_surface_flush( struct window_surface *window_surface, const R
+                 ptr[x] |= alpha_bits;
+     }
+ 
++    /* Xwayland and Wayland compositors don't apply the X11 bounding shape
++     * when they draw a window. With a 32-bit ARGB visual (see
++     * X11DRV_SetWindowRgn), make the pixels outside the shape transparent;
++     * the shape then only limits input - as a bounding shape it would also
++     * clip our transparent pixels out of the window's contents. */
++    alpha_shape = ximage->depth == 32 && ximage->bits_per_pixel == 32 && is_xwayland();
++    if (shape_bits && alpha_shape)
++    {
++        UINT shape_stride = shape_info->bmiHeader.biSizeImage / abs( shape_info->bmiHeader.biHeight );
++        int x, y, stride = ximage->bytes_per_line / sizeof(ULONG);
++        const BYTE *shape = (const BYTE *)shape_bits + dirty->top * shape_stride;
++        ULONG *ptr = (ULONG *)dst + dirty->top * stride;
++
++        for (y = dirty->top; y < dirty->bottom; y++, ptr += stride, shape += shape_stride)
++            for (x = dirty->left; x < dirty->right; x++)
++                if (!(shape[x / 8] & (0x80 >> (x & 7)))) ptr[x] = 0;
++    }
++
+     if (shape_changed)
+     {
+ #ifdef HAVE_LIBXSHAPE
+         if (!shape_bits)
++        {
+             XShapeCombineMask( gdi_display, surface->window, ShapeBounding, 0, 0, None, ShapeSet );
++            if (alpha_shape) XShapeCombineMask( gdi_display, surface->window, ShapeInput, 0, 0, None, ShapeSet );
++        }
+         else
+         {
+             struct gdi_image_bits bits = {.ptr = (void *)shape_bits};
+@@ -1842,7 +1864,12 @@ static BOOL x11drv_surface_flush( struct window_surface *window_surface, const R
+ 
+             vis.depth = 1;
+             shape = create_pixmap_from_image( 0, &vis, shape_info, &bits, DIB_RGB_COLORS );
+-            XShapeCombineMask( gdi_display, surface->window, ShapeBounding, 0, 0, shape, ShapeSet );
++            if (alpha_shape)
++            {
++                XShapeCombineMask( gdi_display, surface->window, ShapeBounding, 0, 0, None, ShapeSet );
++                XShapeCombineMask( gdi_display, surface->window, ShapeInput, 0, 0, shape, ShapeSet );
++            }
++            else XShapeCombineMask( gdi_display, surface->window, ShapeBounding, 0, 0, shape, ShapeSet );
+             XFreePixmap( gdi_display, shape );
+         }
+ #endif /* HAVE_LIBXSHAPE */
+diff --git a/dlls/winex11.drv/window.c b/dlls/winex11.drv/window.c
+index d7df0a85..d5ca6373 100644
+--- a/dlls/winex11.drv/window.c
++++ b/dlls/winex11.drv/window.c
+@@ -3430,12 +3430,80 @@ void X11DRV_SetWindowIcons( HWND hwnd, HICON icon, const ICONINFO *ii, HICON ico
+  *
+  * Assign specified region to window (for non-rectangular windows)
+  */
++/* Xwayland draws a window's whole rectangle, ignoring its bounding shape;
++ * a shaped window needs an ARGB visual so the shape can be made of alpha.
++ * Only for plain owned dialog popups (e.g. Inventor's HUD input boxes):
++ * windows that also draw outside the window surface (Vulkan/GL children,
++ * direct X drawing) break with a 32-bit visual (BadMatch).
++ * WINE_X11_SHAPE_ALPHA=0 turns it off, =2 also switches visible windows. */
++BOOL is_xwayland(void)
++{
++    static int xwayland = -1;
++    int opcode, event, error;
++
++    if (xwayland == -1) xwayland = XQueryExtension( gdi_display, "XWAYLAND", &opcode, &event, &error );
++    return xwayland;
++}
++
++static BOOL needs_argb_for_shape( struct x11drv_win_data *data )
++{
++    static const WCHAR dialog_classW[] = {'#','3','2','7','7','0',0};
++    static int enabled = -1;
++    WCHAR buffer[16];
++    UNICODE_STRING name = {.Buffer = buffer, .MaximumLength = sizeof(buffer)};
++    DWORD style, ex_style;
++
++    if (enabled == -1)
++    {
++        const char *env = getenv( "WINE_X11_SHAPE_ALPHA" );
++        enabled = env ? atoi( env ) : 1;
++        if (!is_xwayland()) enabled = 0;
++    }
++    if (!enabled || !client_side_graphics || !argb_visual.visualid) return FALSE;
++    if (data->embedded || data->client_window || data->layered) return FALSE;
++    if (!data->whole_window || data->whole_window == root_window) return FALSE;
++
++    style = NtUserGetWindowLongW( data->hwnd, GWL_STYLE );
++    ex_style = NtUserGetWindowLongW( data->hwnd, GWL_EXSTYLE );
++    if (!(style & WS_POPUP) || (style & WS_CAPTION) == WS_CAPTION) return FALSE;
++    /* changing the visual re-creates the X window: by default only while
++     * the window is hidden (WINE_X11_SHAPE_ALPHA=2: also when visible) */
++    if ((style & WS_VISIBLE) && enabled < 2) return FALSE;
++    if (ex_style & (WS_EX_LAYERED | WS_EX_NOREDIRECTIONBITMAP)) return FALSE;
++    if (!NtUserGetWindowRelative( data->hwnd, GW_OWNER )) return FALSE;
++    if (!NtUserGetClassName( data->hwnd, FALSE, &name )) return FALSE;
++    return !wcscmp( buffer, dialog_classW );
++}
++
+ void X11DRV_SetWindowRgn( HWND hwnd, HRGN hrgn, BOOL redraw )
+ {
+     struct x11drv_win_data *data;
+ 
+     if ((data = get_win_data( hwnd )))
+     {
++        if (hrgn && TRACE_ON(x11drv))
++        {
++            WCHAR cls[64], title[64];
++            UNICODE_STRING name = {.Buffer = cls, .MaximumLength = sizeof(cls)};
++            cls[0] = title[0] = 0;
++            NtUserGetClassName( hwnd, FALSE, &name );
++            NtUserInternalGetWindowText( hwnd, title, ARRAY_SIZE(title) );
++            TRACE( "region for hwnd %p class %s title %s style %#x ex_style %#x owner %p parent %p embedded %u client_window %lx layered %u\n",
++                  hwnd, debugstr_w(cls), debugstr_w(title), (UINT)NtUserGetWindowLongW( hwnd, GWL_STYLE ),
++                  (UINT)NtUserGetWindowLongW( hwnd, GWL_EXSTYLE ), NtUserGetWindowRelative( hwnd, GW_OWNER ),
++                  NtUserGetAncestor( hwnd, GA_PARENT ), data->embedded, data->client_window, data->layered );
++        }
++        if (hrgn && needs_argb_for_shape( data ))
++        {
++            WCHAR title[64];
++            title[0] = 0;
++            NtUserInternalGetWindowText( hwnd, title, ARRAY_SIZE(title) );
++            TRACE( "hwnd %p %s style %#x ex_style %#x owner %p visible %u: shaped window under Xwayland, using an ARGB visual\n",
++                  hwnd, debugstr_w(title), (UINT)NtUserGetWindowLongW( hwnd, GWL_STYLE ),
++                  (UINT)NtUserGetWindowLongW( hwnd, GWL_EXSTYLE ), NtUserGetWindowRelative( hwnd, GW_OWNER ),
++                  !!(NtUserGetWindowLongW( hwnd, GWL_STYLE ) & WS_VISIBLE) );
++            set_window_visual( data, &argb_visual, data->use_alpha );
++        }
+         sync_window_region( data, hrgn );
+         release_win_data( data );
+     }
+diff --git a/dlls/winex11.drv/x11drv.h b/dlls/winex11.drv/x11drv.h
+index 22462df6..fa1e1ca5 100644
+--- a/dlls/winex11.drv/x11drv.h
++++ b/dlls/winex11.drv/x11drv.h
+@@ -746,6 +746,7 @@ extern Window create_client_window( HWND hwnd, RECT client_rect, const XVisualIn
+ extern void detach_client_window( struct x11drv_win_data *data, Window client_window );
+ extern void attach_client_window( struct x11drv_win_data *data, Window client_window );
+ extern void destroy_client_window( HWND hwnd, Window client_window );
++extern BOOL is_xwayland(void);
+ extern void set_window_visual( struct x11drv_win_data *data, const XVisualInfo *vis, BOOL use_alpha );
+ extern void change_systray_owner( Display *display, Window systray_window );
+ extern BOOL update_clipboard( HWND hwnd );

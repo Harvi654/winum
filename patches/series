@@ -1,2 +1,32 @@
-# Patches of a normal winum build, applied in this order to vanilla Wine $WINE_VERSION.
-# Empty until the first patches move here (see AGENTS.md).
+# Patches of a normal winum build, applied in this order to vanilla Wine $WINE_VERSION
+# (wine/version.env). One name per line; '#' starts a comment. Nothing else in
+# patches/ is applied. Order of winum-11.20-1 = the Inventor project's
+# wine-11.20-6 (alphabetical), so the first release changes nothing for Inventor.
+
+combase-stub-activation-context.patch
+comctl32-statusbar-erase-background.patch
+comctl32-toolbar-padding-height.patch
+comctl32-toolbar-setrows-wrapable.patch
+kernelbase-account-domain-sid.patch
+msi-transform-null-stream.patch
+mspatcha-pa19-32bit-and-large-files.patch
+msxml3-domdoc-importnode.patch
+ntdll-actctx-threadingmodel-case.patch
+ntdll-locate-xstate-feature-enabled.patch
+ole32-storage-thread-lock.patch
+ole32-transacted-truncate-dirty.patch
+oleaut32-typedesc-pointee.patch
+oleaut32-typedesc-z-offsets.patch
+riched20-caret-rewrap.patch
+riched20-scf-word-insertion-point.patch
+riched20-textfont-applytmp.patch
+rpcrt4-ndrstubcall3.patch
+server-mousemove-on-show-hide.patch
+shell32-folderview-selection.patch
+shell32-getimage.patch
+urlmon-maptozone-null-terminate.patch
+urlmon-res-zone-local-machine.patch
+wbemprox-timezone.patch
+winex11-flush-putimage.patch
+winex11-shape-alpha-xwayland.patch
+winex11-xinput-bad-device.patch

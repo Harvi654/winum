@@ -9,9 +9,10 @@ and published as versioned releases.
 
 *Winum* is how the Romans pronounced *vinum*, wine.
 
-> **Status: being set up (November 2026).** The patches still live in the
-> projects that use them. They move here one by one, each with its test and
-> its write-up; the first release will be `winum-11.20-1`.
+> **Status: being set up (November 2026).** `patches/series` holds the 27
+> patches of the Inventor project's `wine-11.20-6`, unchanged, so the first
+> release `winum-11.20-1` changes nothing for Inventor. The SOLIDWORKS
+> patches follow one by one, each with its test and its write-up.
 
 ## Who uses it
 
@@ -37,6 +38,14 @@ was tested with. No program of theirs is part of this repository.
 Release names are `winum-<Wine version>-<build>`, for example
 `winum-11.20-1`. The build number goes up whenever the patches change; a
 published release is never replaced.
+
+Every push to `main` builds the series in public (GitHub Actions, "Build
+Wine") as a check. A release is made only when the maintainer pushes a
+signed tag `winum-<version>-<build>` that matches `wine/version.env`; the
+workflow then builds from the tag and publishes the binary, the source and
+a signed provenance attestation. To build it yourself:
+`bash scripts/build-wine.sh` (Wine's build dependencies and mingw-w64,
+about 10 GB and 1-2 hours).
 
 ## How a patch gets in
 
