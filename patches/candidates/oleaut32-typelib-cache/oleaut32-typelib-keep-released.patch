@@ -47,6 +47,10 @@ a type info, the type info holds its library), so the final Release that
 reads the flag cannot run at the same time, and taking the cache lock
 there could only add a lock-order risk.
 
+v2.2 (2026-11-06, after Codex's re-review): two references may ask for
+the creator interfaces at the same time, so both QueryInterface paths
+clear the flag with InterlockedExchange; the field is a LONG for that.
+
 Written with AI help (Claude); not submitted to Wine. LGPL 2.1 or later.
 
 diff --git a/dlls/oleaut32/tests/typelib.c b/dlls/oleaut32/tests/typelib.c
@@ -176,7 +180,7 @@ index 535b97e..b6edac9 100644
      test_LoadRegTypeLib();
      test_GetLibAttr();
 diff --git a/dlls/oleaut32/typelib.c b/dlls/oleaut32/typelib.c
-index 82720de..6874045 100644
+index 82720de..4a816aa 100644
 --- a/dlls/oleaut32/typelib.c
 +++ b/dlls/oleaut32/typelib.c
 @@ -1106,6 +1106,13 @@ typedef struct tagITypeLibImpl
@@ -184,7 +188,7 @@ index 82720de..6874045 100644
      WCHAR *path;
      INT index;
 +    /* the file it was read from, to tell whether a released library can be used again */
-+    BOOL reusable;
++    LONG reusable;
 +    ULONGLONG file_size;
 +    FILETIME file_time;
 +    /* in released_tlbs while nobody holds a reference */
@@ -273,18 +277,19 @@ index 82720de..6874045 100644
  
          /* FIXME: check if it has added already in the meantime */
          EnterCriticalSection(&cache_section);
-@@ -4841,6 +4893,10 @@ static HRESULT WINAPI ITypeLib2_fnQueryInterface(ITypeLib2 *iface, REFIID riid,
+@@ -4841,6 +4893,11 @@ static HRESULT WINAPI ITypeLib2_fnQueryInterface(ITypeLib2 *iface, REFIID riid,
      else if(IsEqualIID(riid, &IID_ICreateTypeLib) ||
               IsEqualIID(riid, &IID_ICreateTypeLib2))
      {
 +        /* Edits are not written to the file: never use this object again
 +         * after its last Release. No lock: the caller holds a reference, so
-+         * the final Release, which reads the flag, comes later. */
-+        This->reusable = FALSE;
++         * the final Release, which reads the flag, comes later; interlocked
++         * because other references may be asking at the same time. */
++        InterlockedExchange(&This->reusable, FALSE);
          *ppv = &This->ICreateTypeLib2_iface;
      }
      else
-@@ -4861,84 +4917,124 @@ static ULONG WINAPI ITypeLib2_fnAddRef( ITypeLib2 *iface)
+@@ -4861,84 +4918,124 @@ static ULONG WINAPI ITypeLib2_fnAddRef( ITypeLib2 *iface)
  
      TRACE("%p, refcount %lu.\n", iface, ref);
  
@@ -469,19 +474,19 @@ index 82720de..6874045 100644
      }
  
      LeaveCriticalSection(&cache_section);
-@@ -5709,7 +5805,11 @@ static HRESULT WINAPI ITypeInfo_fnQueryInterface(
+@@ -5709,7 +5806,11 @@ static HRESULT WINAPI ITypeInfo_fnQueryInterface(
          *ppvObject = &This->ITypeInfo2_iface;
      else if(IsEqualIID(riid, &IID_ICreateTypeInfo) ||
               IsEqualIID(riid, &IID_ICreateTypeInfo2))
 +    {
 +        /* see ITypeLib2_fnQueryInterface; a type info holds its library */
-+        This->pTypeLib->reusable = FALSE;
++        InterlockedExchange(&This->pTypeLib->reusable, FALSE);
          *ppvObject = &This->ICreateTypeInfo2_iface;
 +    }
      else if(IsEqualIID(riid, &IID_ITypeComp))
          *ppvObject = &This->ITypeComp_iface;
  
-@@ -7997,6 +8097,8 @@ static HRESULT WINAPI ITypeInfo_fnGetRefTypeInfo(
+@@ -7997,6 +8098,8 @@ static HRESULT WINAPI ITypeInfo_fnGetRefTypeInfo(
                  EnterCriticalSection(&cache_section);
                  LIST_FOR_EACH_ENTRY(entry, &tlb_cache, ITypeLibImpl, entry)
                  {
