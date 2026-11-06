@@ -57,8 +57,13 @@ git -C "$HERE" archive --format=tar "$COMMIT" -- "${paths[@]}" | tar -x -C "$EXP
 # shellcheck disable=SC1091
 source "$HERE/scripts/lib/wine-patches.sh"
 find "$EXP/patches" -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
+# The names are read once into a set: "wine_series | grep -q" broke under
+# pipefail once the series was long enough for grep to exit before
+# wine_series had written everything (SIGPIPE), and then removed patches.
+declare -A in_series=()
+while IFS= read -r f; do in_series["$f"]=1; done < <(wine_series "$EXP/patches")
 while IFS= read -r f; do
-    [ "$f" = series ] || wine_series "$EXP/patches" | grep -qxF "$f" || rm -f "$EXP/patches/$f"
+    [ "$f" = series ] || [ -n "${in_series[$f]:-}" ] || rm -f "$EXP/patches/$f"
 done < <(ls -1 "$EXP/patches")
 # shellcheck disable=SC1091
 source "$EXP/wine/version.env"

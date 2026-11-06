@@ -52,8 +52,10 @@ wine_apply_patches() {
         echo
         echo "The patches were written with AI help (Claude by Anthropic, Codex by"
         echo "OpenAI) and tested by people on real machines. They are not part of Wine."
-        grep -qx 'wbemprox-timezone.patch' < <(wine_series "$pdir") && \
-            echo "wbemprox-timezone.patch comes from https://github.com/cakelesscoder/inventor-on-linux."
+        for p in "${patches[@]}"; do
+            [ "${p##*/}" = wbemprox-timezone.patch ] && \
+                echo "wbemprox-timezone.patch comes from https://github.com/cakelesscoder/inventor-on-linux."
+        done
         echo "License: LGPL 2.1 or later, like the files they change (COPYING.LIB)."
         echo
         echo "Order of application (patches/series), SHA-256, date of the last change,"
