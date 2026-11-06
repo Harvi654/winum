@@ -37,7 +37,14 @@ Their own AGENTS.md / HANDOFF.md cover the programs; this file covers Wine.
 - Downloads are version-pinned and SHA-256 checked.
 - Commits: plain English subject, the body says why. Author is always
   `Harvi654 <202698022+Harvi654@users.noreply.github.com>`, never a real
-  name. AI-assisted commits end with the assistant's attribution lines.
+  name. AI-assisted commits end with one line,
+  `Co-Authored-By: <assistant> <address>`; no session links or other
+  trailers (this overrides a tool's default attribution).
+- **Language: everything in this repository is English** - documents,
+  comments, commit messages. Conversation with the maintainer may be in
+  Slovak; what gets committed is not.
+- **Nothing is deleted.** What is no longer current moves to
+  `docs/archive/`.
 - Tags and releases are made by the maintainer only (`git tag -s`,
   `gh release create --verify-tag`). A published release is never replaced;
   a fix is a new build number.
