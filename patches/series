@@ -30,3 +30,4 @@ wbemprox-timezone.patch
 winex11-flush-putimage.patch
 winex11-shape-alpha-xwayland.patch
 winex11-xinput-bad-device.patch
+opengl32-choose-require-alpha.patch
