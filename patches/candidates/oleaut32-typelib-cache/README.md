@@ -37,9 +37,12 @@ references asking for the creator interfaces at the same time wrote the
 flag without synchronisation. **v2.2** clears it with
 `InterlockedExchange` (field now `LONG`).
 
-Still open for v2.2: a short focused check of that change by Codex, the
-final test text on Windows (with the next bundle), i686 L2, full L0,
-SOLIDWORKS L4.
+Codex's focused check of v2.2 (same day, section "v2.2 check"): race
+closed, both architectures build, x64 pairs unchanged - **cross review
+done**.
+
+Still open for v2.2: the final test text on Windows (with the next
+bundle), i686 L2, full L0, SOLIDWORKS L4.
 
 | Level | Result |
 | --- | --- |
@@ -48,7 +51,7 @@ SOLIDWORKS L4.
 | L2 | Wine 11.20 x86_64: `typelib` 7724 tests / 0 failures, `tmarshal` 754 / 0 (2026-11-03); i686 open |
 | L3 | `measure.c`: load after Release to 0 0.09 ms (was ~20 ms) |
 | L4 | Inventor 2027.2 3D PDF: part 15 s, assembly 20 s, PRC model present (2026-11-03); SOLIDWORKS open |
-| cross review | v1: two P2; v2.1: one P2 (Codex, 2026-11-06); v2.2: short check open |
+| cross review | v2.2 OK (Codex, 2026-11-06, after two P2 in v1 and one in v2.1) |
 
 The test passes on vanilla Wine too: it guards correctness (refcounts,
 reloading, a changed file is read anew); the speed is shown by the MEASURE
