@@ -15,8 +15,8 @@ Evidence: [docs/wine-repro/opengl32-pixel-format-alpha/](../../../docs/wine-repr
 
 | Level | Result |
 | --- | --- |
-| L0 | applies without fuzz on Wine 11.20 + series; build: test branch `topic/gpu-rt-colorbits` |
-| L1 | open: `scripts/build-l1-opengl-color-bits.sh` (also run under vanilla Wine: must fail) |
+| L0 | full build with the series, both architectures, no fuzz: `topic/gpu-rt-colorbits`, CI run 42196690304 (2026-11-06) |
+| L1 | Windows open. Wine, RX 6400, GLX (2026-11-06): vanilla Wine 11.20 252 checks / 244 failures; with the patch (test build `topic/gpu-rt-colorbits`, CI run 42196690304) 252 / 0 |
 | L2 | open: opengl32 tests, paired |
 | L4 | open: Inventor 2027 GPU ray tracing on the RX 6400; SOLIDWORKS (OpenGL viewport) |
 | cross review | open (written by Claude) |
