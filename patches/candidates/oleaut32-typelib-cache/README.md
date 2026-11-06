@@ -41,13 +41,16 @@ Codex's focused check of v2.2 (same day, section "v2.2 check"): race
 closed, both architectures build, x64 pairs unchanged - **cross review
 done**.
 
-Still open for v2.2: the final test text on Windows (with the next
-bundle), i686 L2, full L0, SOLIDWORKS L4.
+Final v2.2 test text on Windows 10 (2026-11-06,
+`docs/wine-repro/oleaut32-typelib-cache/windows-2026-11-06-v2.2/`): 35
+checks, 0 failures on x86_64 and i686.
+
+Still open for v2.2: i686 L2, full L0, SOLIDWORKS L4.
 
 | Level | Result |
 | --- | --- |
 | L0 | applies without fuzz on Wine 11.20 + winum `series` (incl. `oleaut32-typedesc-pointee` v2); full build pending |
-| L1 | v2 passed 2026-11-06 (33/0, both arch.); v1 passed 2026-11-06, Windows 10 x86_64 and i686: 26 tests, 0 failures each (`docs/wine-repro/oleaut32-typelib-cache/windows-2026-11-06/`). Windows also lets the file be deleted right after the last Release. |
+| L1 | v2.2 passed 2026-11-06 (35/0, both arch.); v2 33/0; v1 passed 2026-11-06, Windows 10 x86_64 and i686: 26 tests, 0 failures each (`docs/wine-repro/oleaut32-typelib-cache/windows-2026-11-06/`). Windows also lets the file be deleted right after the last Release. |
 | L2 | Wine 11.20 x86_64: `typelib` 7724 tests / 0 failures, `tmarshal` 754 / 0 (2026-11-03); i686 open |
 | L3 | `measure.c`: load after Release to 0 0.09 ms (was ~20 ms) |
 | L4 | Inventor 2027.2 3D PDF: part 15 s, assembly 20 s, PRC model present (2026-11-03); SOLIDWORKS open |
