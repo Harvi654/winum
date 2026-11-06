@@ -168,3 +168,160 @@ scope leak.** The intended alpha-selection sequence succeeds in the local
 standalone tests and the x64 EGL suite, and context restoration works.
 Those results do not establish that bitmap descriptors should change on
 Windows, nor close the incomplete paired-suite coverage.
+
+## v2 re-review
+
+Reviewed `f7efc4d032d616735cd850cf8f696b1808238522` after updating `main`.
+Read the complete replacement
+`patches/candidates/opengl-window-color-bits/opengl32-window-format-color-bits.patch`,
+its dated v2 explanation, updated candidate README and script/series changes.
+Patch SHA-256:
+`4fe64162323a5ce80cc2468cfff2197be60e9aef272f59738016bf04813259a2`.
+Only this review document is changed. The public Wine reference and clean-room
+constraints above still apply. Line numbers below are from v2-applied source.
+
+### Ordinary DCs: the original scope problem is fixed
+
+The normalization now runs after fetching a private copy in
+`opengl32/wgl.c:1692-1707`, only in the non-memory-DC branch. Neither the
+driver's formats nor win32u's shared descriptors are modified. Repeating the
+same public-API probe with a selected 4x4, 24-bit DIB gave:
+
+| Observation | S: series | C: series + v2 |
+| --- | ---: | ---: |
+| GLX memory DC: RGB888/0 bitmap formats, colour 24 / 32 | 16 / 0 | 16 / 0 |
+| GLX memory DC: bitmap choice index / colour | 10 / 24 | 10 / 24 |
+| EGL memory DC: RGB888/0 bitmap formats, colour 24 / 32 | 80 / 0 | 80 / 0 |
+| EGL memory DC: bitmap choice index / colour | 15 / 24 | 15 / 24 |
+| GLX window DC: RGB888/0 window formats, colour 24 / 32 | 48 / 0 | 0 / 48 |
+| EGL window DC: RGB888/0 window formats, colour 24 / 32 | 60 / 0 | 0 / 60 |
+| Selected DIB bits per pixel, both backends | 24 | 24 |
+
+No integer/float attribute versus descriptor mismatch was observed on either
+DC type. Five hundred window/memory alternations, each including repeated
+descriptor reads and an integer attribute read, produced zero cache mismatches
+on both S and C, GLX and EGL. C consistently returned window colour 32 and
+memory colour 24. P2-1 is resolved for ordinary, full HDC values.
+
+### Format consumers and pbuffer paths
+
+- `wglDescribePixelFormat` (`wgl.c:2171`) gets the per-DC copy directly;
+  `wglChoosePixelFormat` (`1453`) enumerates through that function.
+- `wglChoosePixelFormatARB` (`2101`) filters and sorts pointers into the same
+  copy. `wglGetPixelFormatAttribivARB` (`2191`) also calls `get_pixel_formats`;
+  its float counterpart (`2237`) delegates to the integer function. Thus
+  `WGL_COLOR_BITS_ARB` and legacy descriptions agree for the same DC/index.
+- Pbuffer creation is different: `wglCreatePbufferARB` (`wgl.c:257`) passes
+  the unchanged format index to `wrap_wglCreatePbufferARB`
+  (`unix_wgl.c:731`) and the backend. It does not reinterpret the normalized
+  colour size or allocate storage from it. Subsequent format queries on a
+  pbuffer DC use the same per-DC query path described above.
+- `win32u/opengl.c:2237`, `pbuffer_create`, opens a display DC through
+  `NtGdiOpenDCW`; `wglGetPbufferDCARB` returns that DC. It is `OBJ_DC`, not
+  `OBJ_MEMDC`, so v2 also normalizes its window-capable onscreen records.
+  This is consistent with the header's non-memory-DC rule. Offscreen-only
+  records remain unchanged. The scope probe created 4x4 pbuffers successfully:
+  GLX index 9 and EGL index 11 stayed the same; their descriptor/ARB colour
+  changed 24 to 32 and their DC type was 3 (`OBJ_DC`).
+- The cache is one entry per thread, in `NtCurrentTeb()->glReserved1`, keyed
+  by HDC. For full Wine handles, DC and memory-DC type bits differ
+  (`ntgdi.h:65,80`; `win32u/gdiobj.c:52`). A normal DC switch misses the cache
+  and builds a fresh copy. Different threads do not share this client cache.
+  However, the following accepted-handle boundary prevents a blanket claim
+  that the HDC key can never mix the two DC types.
+
+### P2-2: a short HDC alias can reuse a window cache entry for a memory DC
+
+**Fix before series.** At `opengl32/wgl.c:1678-1683`, a cache hit compares
+only the supplied HDC value. Although `NtGdiIsMemDC` is queried immediately
+before that comparison, its current result is not checked against the cached
+DC kind. The new memory-DC branch is bypassed on a hit.
+
+Wine deliberately accepts GDI handles with a zero high word:
+`win32u/gdiobj.c:58`, `handle_entry`, accepts either no high word or the
+matching full `Unique` value. Such a short alias has only the table slot,
+without generation/type bits. After deleting a display DC and reusing its
+slot for a memory DC, the short alias still compares equal to the cache key.
+The handle validates as a memory DC but receives the old normalized window
+descriptors. Full returned HDCs were not affected in the probes above.
+
+Independent public-API reproduction, with a 24-bit DIB selected into the
+replacement memory DC, succeeded on both GLX and EGL:
+
+| Current memory-DC query | S colour / format count | C colour / format count |
+| --- | --- | --- |
+| GLX, cached short alias | 24 / 80 | 32 / 80 |
+| GLX, full returned HDC (cache miss) | 24 / 240 | 24 / 240 |
+| EGL, cached short alias | 24 / 150 | 32 / 150 |
+| EGL, full returned HDC (cache miss) | 24 / 200 | 24 / 200 |
+
+Steps to verify in one thread, on a fresh prefix/display:
+
+1. `dc = CreateDCA("DISPLAY", NULL, NULL, NULL)`;
+   `alias = (HDC)((ULONG_PTR)dc & 0xffff)`.
+2. Enumerate `DescribePixelFormat(alias, ...)` and retain an RGB888/0 format
+   supporting both windows and bitmaps. This primes the window cache.
+3. `DeleteDC(dc)`; `mem = CreateCompatibleDC(NULL)`. Check that the low 16
+   bits of `mem` equal the old alias; otherwise retry with a newly primed DC.
+4. Select a 4x4, 24-bit DIB into `mem`. `GetObjectType(mem)` is 10
+   (`OBJ_MEMDC`) and the selected bitmap reports 24 bits per pixel.
+5. Describe the retained index using `alias` first and the full `mem` second.
+   C returns colour 32 then 24 for the same current DC and format index.
+
+The stale format-count cache problem predates v2, as the S counts show.
+V2 newly makes that stale entry carry normalized colour bits into a memory
+DC, violating its scope guarantee. No Windows short-handle behaviour is
+assumed or used as an expected value. Canonicalize cache identity to the
+validated full handle, avoid caching short aliases, or at least include the
+validated DC kind in cache-hit eligibility; add the reuse sequence to coverage.
+
+### P3 test changes
+
+The earlier capability/restore follow-up is addressed for the exercised
+catalogs. `opengl32/tests/opengl.c:1079-1087` now requires double buffering,
+non-generic RGB888/alpha8, depth24/stencil8 before comparing choices, and
+`1110-1113` checks both restoration and context deletion return values.
+The normal suite call site's original draw/read binding remains ordinary.
+
+The unchanged extracted v2 test body, with two external assertions checking
+the saved current HGLRC/HDC after return, gave GLX 64 checks, 52 failures to
+0, and EGL 76 checks, 64 failures to 0. Both external restoration checks
+passed on both engines. An additional synthetic catalog wrapper removed
+double-buffer support from alpha-bearing descriptors: C took the intended
+skip with zero failures (GLX 51 checks / 1 skip; EGL 63 / 1), and retained
+the original context. This checks guard control flow, not native Windows
+values. The committed Windows L1 results are still for v1, not a new v2 L1.
+
+### Builds and paired suites (2026-11-06)
+
+Applied v2 after the unchanged 27-patch series with `--fuzz=0`, no candidate
+offsets. GCC/MinGW 14 in the same Debian 13 container successfully compiled
+and linked `opengl32.dll` and `opengl32_test.exe` for x86_64 and i386.
+Used the same component-runtime pairing as the first review, with the shared
+Unix components restored to S. Complete-tree comparison found differences
+only in the x86_64/i386 PE `opengl32.dll` files. This is not a fresh full
+release-runtime L0 build. Both sides ran identical v2 test executables in
+new private Xvfb displays and fresh prefix/HOME/XDG directories; all eight
+suite runs completed server cleanup.
+
+| Full `opengl32_test.exe opengl` pair | S | C | Assessment |
+| --- | --- | --- | --- |
+| x64 EGL | 9625 checks, 64 failures, 65 todo, 39 skipped; exit 64 | 9917 checks, 0 failures, 65 todo, 39 skipped; exit 0 | Completed; no observed new failures, coverage increased by 292 checks |
+| x64 GLX | 180 s timeout, exit -9, no final summary | Same | Incomplete; identical 59 interim failures at 43 locations |
+| i386 GLX and EGL | exit 1, no test summary | Same | Incomplete; no suite pass established |
+
+All 64 EGL baseline failures are in the added test: `opengl.c:1076` (60),
+`1097`, `1098`, `1109`, `1115` (one each). C has no failing locations.
+GLX again reached the thread-wait failure in `test_window_dc` (`4442`),
+before the added test. These results do not close GLX/i386 L2 or establish
+identical assertion coverage. No native measurements or application smokes
+were performed by this re-review.
+
+### v2 verdict
+
+**Not ready for series: P2-2 still allows a window cache entry to reach a
+memory DC through an accepted short HDC after slot reuse.** Ordinary full-HDC
+memory behaviour and the original P3 follow-up are fixed; window colour-bit
+normalization, pbuffer creation and context restoration work in the probes.
+The completed x64 EGL pair has zero candidate failures, subject to the
+component-runtime and coverage limits above.
