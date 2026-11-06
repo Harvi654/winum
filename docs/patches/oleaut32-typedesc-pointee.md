@@ -29,7 +29,7 @@ named the method. Details in Autodesk-Inventor-for-Linux,
 | --- | --- | --- |
 | L0 | v1 in Inventor `wine-11.20-6`; v2 in winum CI on push | 2026-10-16 (v1); v2 pending |
 | L1 | no Wine test yet | open |
-| L2 | v1: oleaut32 tests in the Inventor build; v2: `typelib`, `tmarshal` to run | v2 pending |
+| L2 | v2 x86_64: `typelib` 7724/0, `tmarshal` 754/0 (Codex review build, same results with and without the cache candidate); i686 open | 2026-11-06 |
 | L4 | v1: Design Accelerator Shaft works in Inventor 2026/2027 | 2026-10 |
 | L5 | v1: in use since October 2026 | |
 
@@ -38,7 +38,10 @@ named the method. Details in Autodesk-Inventor-for-Linux,
 - A Wine test with a type library that has such a pointee (needs a
   synthetic `.tlb`, made with our own tools, and a MEASURE of what Windows
   returns from `GetFuncDesc` for it).
-- Cross review of v2 by an assistant that did not write it.
+- Cross review of v2: done 2026-11-06 by Codex, "OK for series"
+  ([cross-review-2026-11-06-oleaut32.md](../wine-repro/cross-review-2026-11-06-oleaut32.md)).
+  Its inherited P3-1 (`MSFT_GetTdesc` does not check `ctTypeDesc`) is a
+  separate hardening task.
 
 ## Notes for a Wine bug report
 

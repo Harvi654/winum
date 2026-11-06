@@ -30,13 +30,23 @@ reloading after the last Release, refcounts, and that another library
 written to the same file is read anew. It passes without the change too;
 the speed-up is shown by the MEASURE program (L3).
 
+v2 (2026-11-06, after Codex's cross review): a library is no longer kept
+after anyone asked it for ICreateTypeLib(2) or one of its type infos for
+ICreateTypeInfo(2): edits are not written to the file, so a later load
+would have returned them (review P2-1). The file's size and time are taken
+before opening it and again after closing it; the library is kept only if
+both agree, so a file replaced while it was being read is not reused with
+the new file's stamp (review P2-2). The test checks that an edited name is
+not seen by the next load; it traces whether Windows offers ICreateTypeLib2
+on a loaded library at all.
+
 Written with AI help (Claude); not submitted to Wine. LGPL 2.1 or later.
 
 diff --git a/dlls/oleaut32/tests/typelib.c b/dlls/oleaut32/tests/typelib.c
-index 535b97e..50527d9 100644
+index 535b97e..17a3dad 100644
 --- a/dlls/oleaut32/tests/typelib.c
 +++ b/dlls/oleaut32/tests/typelib.c
-@@ -7373,6 +7373,84 @@ static void test_LoadTypeLib(void)
+@@ -7373,6 +7373,116 @@ static void test_LoadTypeLib(void)
      ok(tl == (void *)0xdeadbeef, "Got %p.\n", tl);
  }
  
@@ -73,6 +83,8 @@ index 535b97e..50527d9 100644
 +    static const GUID guid2 = {0x6c1f0a11, 0x3b2e, 0x4d7a, {0x9a, 0x51, 0x0f, 0x2c, 0x5e, 0xa1, 0x00, 0x20}};
 +    char filenameA[MAX_PATH];
 +    WCHAR filenameW[MAX_PATH];
++    ICreateTypeLib2 *ctl;
++    BSTR name, edited_name;
 +    ITypeInfo *ti;
 +    ITypeLib *tl;
 +    HRESULT hr;
@@ -100,6 +112,36 @@ index 535b97e..50527d9 100644
 +    ref = ITypeLib_Release(tl);
 +    ok(!ref, "Got refcount %lu.\n", ref);
 +
++    /* changes made through ICreateTypeLib2 are not saved, so a later load
++     * must see the file's name again */
++    hr = LoadTypeLib(filenameW, &tl);
++    ok(hr == S_OK, "Got hr %#lx.\n", hr);
++    name = NULL;
++    hr = ITypeLib_GetDocumentation(tl, -1, &name, NULL, NULL, NULL);
++    ok(hr == S_OK, "Got hr %#lx.\n", hr);
++    hr = ITypeLib_QueryInterface(tl, &IID_ICreateTypeLib2, (void **)&ctl);
++    trace("ICreateTypeLib2 of a loaded library: hr %#lx.\n", hr);
++    if (SUCCEEDED(hr))
++    {
++        hr = ICreateTypeLib2_SetName(ctl, (WCHAR *)L"edited");
++        trace("SetName: hr %#lx.\n", hr);
++        ICreateTypeLib2_Release(ctl);
++    }
++    ref = ITypeLib_Release(tl);
++    ok(!ref, "Got refcount %lu.\n", ref);
++
++    hr = LoadTypeLib(filenameW, &tl);
++    ok(hr == S_OK, "Got hr %#lx.\n", hr);
++    edited_name = NULL;
++    hr = ITypeLib_GetDocumentation(tl, -1, &edited_name, NULL, NULL, NULL);
++    ok(hr == S_OK, "Got hr %#lx.\n", hr);
++    ok((!name && !edited_name) || (name && edited_name && !lstrcmpW(name, edited_name)),
++       "Got name %s, expected %s.\n", wine_dbgstr_w(edited_name), wine_dbgstr_w(name));
++    SysFreeString(name);
++    SysFreeString(edited_name);
++    ref = ITypeLib_Release(tl);
++    ok(!ref, "Got refcount %lu.\n", ref);
++
 +    /* another library written to the same file is read, not the released one */
 +    ok(DeleteFileA(filenameA), "Failed to delete %s, error %lu.\n", filenameA, GetLastError());
 +    write_reload_typelib(filenameW, &guid2, 3);
@@ -121,7 +163,7 @@ index 535b97e..50527d9 100644
  static void test_SetVarHelpContext(void)
  {
      static OLECHAR nameW[] = {'n','a','m','e',0};
-@@ -8847,6 +8925,7 @@ START_TEST(typelib)
+@@ -8847,6 +8957,7 @@ START_TEST(typelib)
      test_register_typelib_64();
      test_create_typelibs();
      test_LoadTypeLib();
@@ -130,7 +172,7 @@ index 535b97e..50527d9 100644
      test_LoadRegTypeLib();
      test_GetLibAttr();
 diff --git a/dlls/oleaut32/typelib.c b/dlls/oleaut32/typelib.c
-index b72a005..846a268 100644
+index 82720de..8188712 100644
 --- a/dlls/oleaut32/typelib.c
 +++ b/dlls/oleaut32/typelib.c
 @@ -1106,6 +1106,13 @@ typedef struct tagITypeLibImpl
@@ -184,7 +226,17 @@ index b72a005..846a268 100644
  static CRITICAL_SECTION cache_section;
  static CRITICAL_SECTION_DEBUG cache_section_debug =
  {
-@@ -3337,6 +3374,12 @@ static HRESULT TLB_ReadTypeLib(LPCWSTR pszFileName, LPWSTR pszPath, UINT cchPath
+@@ -3288,6 +3325,9 @@ static HRESULT TLB_ReadTypeLib(LPCWSTR pszFileName, LPWSTR pszPath, UINT cchPath
+     LPVOID pBase = NULL;
+     DWORD dwTLBLength = 0;
+     IUnknown *pFile = NULL;
++    ULONGLONG stamp_size;
++    FILETIME stamp_time;
++    BOOL stamp_ok;
+     HANDLE h;
+ 
+     *ppTypeLib = NULL;
+@@ -3337,6 +3377,12 @@ static HRESULT TLB_ReadTypeLib(LPCWSTR pszFileName, LPWSTR pszPath, UINT cchPath
      {
          if (!wcsicmp(entry->path, pszPath) && entry->index == index)
          {
@@ -197,15 +249,39 @@ index b72a005..846a268 100644
              TRACE("cache hit\n");
              *ppTypeLib = &entry->ITypeLib2_iface;
              ITypeLib2_AddRef(*ppTypeLib);
-@@ -3380,6 +3423,7 @@ static HRESULT TLB_ReadTypeLib(LPCWSTR pszFileName, LPWSTR pszPath, UINT cchPath
+@@ -3348,6 +3394,10 @@ static HRESULT TLB_ReadTypeLib(LPCWSTR pszFileName, LPWSTR pszPath, UINT cchPath
+ 
+     /* now actually load and parse the typelib */
+ 
++    /* The file must look the same before opening and after closing it,
++     * otherwise what was parsed may not be what the stamp describes. */
++    stamp_ok = get_file_info(pszPath, &stamp_size, &stamp_time);
++
+     ret = TLB_PEFile_Open(pszPath, index, &pBase, &dwTLBLength, &pFile);
+     if (ret == TYPE_E_CANTLOADLIBRARY)
+         ret = TLB_NEFile_Open(pszPath, index, &pBase, &dwTLBLength, &pFile);
+@@ -3380,6 +3430,8 @@ static HRESULT TLB_ReadTypeLib(LPCWSTR pszFileName, LPWSTR pszPath, UINT cchPath
  	impl->path = wcsdup(pszPath);
  	/* We should really canonicalise the path here. */
          impl->index = index;
-+        impl->reusable = get_file_info(pszPath, &impl->file_size, &impl->file_time);
++        impl->reusable = stamp_ok && get_file_info(pszPath, &impl->file_size, &impl->file_time)
++                         && impl->file_size == stamp_size && !CompareFileTime(&impl->file_time, &stamp_time);
  
          /* FIXME: check if it has added already in the meantime */
          EnterCriticalSection(&cache_section);
-@@ -4818,84 +4862,124 @@ static ULONG WINAPI ITypeLib2_fnAddRef( ITypeLib2 *iface)
+@@ -4841,6 +4893,11 @@ static HRESULT WINAPI ITypeLib2_fnQueryInterface(ITypeLib2 *iface, REFIID riid,
+     else if(IsEqualIID(riid, &IID_ICreateTypeLib) ||
+              IsEqualIID(riid, &IID_ICreateTypeLib2))
+     {
++        /* Edits are not written to the file: never use this object again
++         * after its last Release. */
++        EnterCriticalSection(&cache_section);
++        This->reusable = FALSE;
++        LeaveCriticalSection(&cache_section);
+         *ppv = &This->ICreateTypeLib2_iface;
+     }
+     else
+@@ -4861,84 +4918,124 @@ static ULONG WINAPI ITypeLib2_fnAddRef( ITypeLib2 *iface)
  
      TRACE("%p, refcount %lu.\n", iface, ref);
  
@@ -390,7 +466,21 @@ index b72a005..846a268 100644
      }
  
      LeaveCriticalSection(&cache_section);
-@@ -7954,6 +8038,8 @@ static HRESULT WINAPI ITypeInfo_fnGetRefTypeInfo(
+@@ -5709,7 +5806,13 @@ static HRESULT WINAPI ITypeInfo_fnQueryInterface(
+         *ppvObject = &This->ITypeInfo2_iface;
+     else if(IsEqualIID(riid, &IID_ICreateTypeInfo) ||
+              IsEqualIID(riid, &IID_ICreateTypeInfo2))
++    {
++        /* see ITypeLib2_fnQueryInterface */
++        EnterCriticalSection(&cache_section);
++        This->pTypeLib->reusable = FALSE;
++        LeaveCriticalSection(&cache_section);
+         *ppvObject = &This->ICreateTypeInfo2_iface;
++    }
+     else if(IsEqualIID(riid, &IID_ITypeComp))
+         *ppvObject = &This->ITypeComp_iface;
+ 
+@@ -7997,6 +8100,8 @@ static HRESULT WINAPI ITypeInfo_fnGetRefTypeInfo(
                  EnterCriticalSection(&cache_section);
                  LIST_FOR_EACH_ENTRY(entry, &tlb_cache, ITypeLibImpl, entry)
                  {

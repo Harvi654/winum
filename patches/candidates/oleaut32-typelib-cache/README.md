@@ -11,16 +11,30 @@ there `b2bce4e`, results `34d626a`), unchanged.
 
 ## State (2026-11-06)
 
-Next: cross review, i686 L2, full L0, SOLIDWORKS L4.
+Cross review 2026-11-06 (Codex,
+[cross-review-2026-11-06-oleaut32.md](../../../docs/wine-repro/cross-review-2026-11-06-oleaut32.md)):
+two P2 findings, both addressed in **v2** (same day):
+
+- P2-1, unsaved edits survived the last Release: a library that was asked
+  for `ICreateTypeLib(2)`, or whose type info was asked for
+  `ICreateTypeInfo(2)`, is no longer kept. The test now edits the name of a
+  loaded library and checks that the next load sees the file's name.
+- P2-2, a file replaced while it was read got the new file's stamp: size
+  and time are taken before opening and after closing; the library is kept
+  only if both agree.
+
+v2 needs: L1 again (the test changed; it also traces whether Windows offers
+`ICreateTypeLib2` on a loaded library), Codex's two probes rerun on v2, then
+i686 L2, full L0, SOLIDWORKS L4.
 
 | Level | Result |
 | --- | --- |
 | L0 | applies without fuzz on Wine 11.20 + winum `series` (incl. `oleaut32-typedesc-pointee` v2); full build pending |
-| L1 | passed 2026-11-06, Windows 10 x86_64 and i686: 26 tests, 0 failures each (`docs/wine-repro/oleaut32-typelib-cache/windows-2026-11-06/`). Windows also lets the file be deleted right after the last Release. |
+| L1 | v1 passed 2026-11-06, Windows 10 x86_64 and i686: 26 tests, 0 failures each (`docs/wine-repro/oleaut32-typelib-cache/windows-2026-11-06/`). Windows also lets the file be deleted right after the last Release. |
 | L2 | Wine 11.20 x86_64: `typelib` 7724 tests / 0 failures, `tmarshal` 754 / 0 (2026-11-03); i686 open |
 | L3 | `measure.c`: load after Release to 0 0.09 ms (was ~20 ms) |
 | L4 | Inventor 2027.2 3D PDF: part 15 s, assembly 20 s, PRC model present (2026-11-03); SOLIDWORKS open |
-| cross review | open (written by Claude, so Codex reviews) |
+| cross review | v1: two P2 (Codex, 2026-11-06); v2: open |
 
 The test passes on vanilla Wine too: it guards correctness (refcounts,
 reloading, a changed file is read anew); the speed is shown by the MEASURE
