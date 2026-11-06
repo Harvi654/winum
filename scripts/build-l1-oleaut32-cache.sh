@@ -55,6 +55,13 @@ head = '''/* Standalone build of test_LoadTypeLib_released from the winum candid
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #endif
 
+/* wine_dbgstr_w() needs this; Wine's own test runner provides it. The
+ * strings are only printed, a few bytes are left allocated. */
+const char * __cdecl __wine_dbg_strdup(const char *str)
+{
+    return _strdup(str);
+}
+
 '''
 tail = '''
 
