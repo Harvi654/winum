@@ -31,6 +31,14 @@ now checks that the exact accelerated double-buffered format the ARB
 request asks for exists before it compares the two choices, and checks
 the return values of restoring the previous context.
 
+v3 (2026-11-06, after Codex's re-review): the formats are cached per
+thread by HDC. A handle without its high word names only a GDI table
+slot, and after a display DC is deleted a memory DC can take that slot,
+so such an alias could get the cached window descriptions. Short
+handles are now never used as the cache key. There is no Wine test for
+this: what Windows does with such aliases is not measured; Codex's
+reproducer is in docs/wine-repro/cross-review-2026-11-06-opengl-color-bits.md.
+
 diff --git a/dlls/opengl32/tests/opengl.c b/dlls/opengl32/tests/opengl.c
 index 2f25f57..a5ff111 100644
 --- a/dlls/opengl32/tests/opengl.c
@@ -152,10 +160,30 @@ index 2f25f57..a5ff111 100644
      test_choosepixelformat_flag_is_ignored_when_unset( PFD_DRAW_TO_BITMAP );
      test_choosepixelformat_flag_is_ignored_when_unset( PFD_SUPPORT_GDI );
 diff --git a/dlls/opengl32/wgl.c b/dlls/opengl32/wgl.c
-index ff4c5c2..37e4863 100644
+index ff4c5c2..d882157 100644
 --- a/dlls/opengl32/wgl.c
 +++ b/dlls/opengl32/wgl.c
-@@ -1690,6 +1690,21 @@ static struct wgl_pixel_format *get_pixel_formats( HDC hdc, UINT *num_formats,
+@@ -1667,6 +1667,10 @@ static struct wgl_pixel_format *get_pixel_formats( HDC hdc, UINT *num_formats,
+     PVOID *glReserved = NtCurrentTeb()->glReserved1;
+     NTSTATUS status;
+     DWORD is_memdc;
++    /* A handle without its high word names only a table slot, which a DC of
++     * another kind may reuse; the descriptions depend on the kind, so such a
++     * handle is never looked up in, or stored as, the cache key. */
++    BOOL cacheable = !!((ULONG_PTR)hdc >> 16);
+ 
+     *num_formats = *num_onscreen_formats = 0;
+     if (!NtGdiGetDCDword( hdc, NtGdiIsMemDC, &is_memdc ))
+@@ -1675,7 +1679,7 @@ static struct wgl_pixel_format *get_pixel_formats( HDC hdc, UINT *num_formats,
+         return NULL;
+     }
+ 
+-    if (glReserved[WINE_GL_RESERVED_FORMATS_HDC] == hdc)
++    if (cacheable && glReserved[WINE_GL_RESERVED_FORMATS_HDC] == hdc)
+     {
+         *num_formats = PtrToUlong( glReserved[WINE_GL_RESERVED_FORMATS_NUM] );
+         *num_onscreen_formats = PtrToUlong( glReserved[WINE_GL_RESERVED_FORMATS_ONSCREEN] );
+@@ -1690,12 +1694,27 @@ static struct wgl_pixel_format *get_pixel_formats( HDC hdc, UINT *num_formats,
      if ((status = UNIX_CALL( get_pixel_formats, &args ))) goto error;
  
      if (is_memdc) args.num_onscreen_formats = args.num_formats;
@@ -177,3 +205,10 @@ index ff4c5c2..37e4863 100644
  
      *num_formats = args.num_formats;
      *num_onscreen_formats = args.num_onscreen_formats;
+ 
+     free( glReserved[WINE_GL_RESERVED_FORMATS_PTR] );
+-    glReserved[WINE_GL_RESERVED_FORMATS_HDC] = hdc;
++    glReserved[WINE_GL_RESERVED_FORMATS_HDC] = cacheable ? hdc : NULL;
+     glReserved[WINE_GL_RESERVED_FORMATS_PTR] = args.formats;
+     glReserved[WINE_GL_RESERVED_FORMATS_NUM] = ULongToPtr( args.num_formats );
+     glReserved[WINE_GL_RESERVED_FORMATS_ONSCREEN] = ULongToPtr( args.num_onscreen_formats );

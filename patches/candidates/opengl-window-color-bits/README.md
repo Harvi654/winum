@@ -23,6 +23,13 @@ points (check the exact format before the ARB comparison, check the
 restore return values) are done. The results below are v1's unless
 marked v2.
 
+## v3 (2026-11-06)
+
+Codex's re-review of v2 (section "v2 re-review"): memory DCs and the
+test points are fixed, but a short HDC alias (low 16 bits only) could hit
+the per-thread cache entry of a deleted window DC whose slot a memory DC
+reused: P2-2. v3 never uses short handles as the cache key.
+
 ## State (2026-11-06)
 
 | Level | Result |
