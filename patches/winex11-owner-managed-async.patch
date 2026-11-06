@@ -1,0 +1,14 @@
+--- a/dlls/winex11.drv/window.c
++++ b/dlls/winex11.drv/window.c
+@@ -1206,7 +1206,10 @@
+     if (!(owner = NtUserGetWindowRelative( hwnd, GW_OWNER ))) return;
+     if (is_managed( owner )) return;
+ 
+-    NtUserSetWindowPos( owner, 0, 0, 0, 0, 0, flags );
++    /* The owner thread may be waiting for this window to finish creation. */
++    NtUserSetWindowPos( owner, 0, 0, 0, 0, 0,
++                        flags | (NtUserGetWindowThread( owner, NULL ) != GetCurrentThreadId()
++                                 ? SWP_ASYNCWINDOWPOS : 0) );
+ }
+ 
+ 

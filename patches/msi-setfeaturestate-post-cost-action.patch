@@ -1,0 +1,527 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Preserve post-cost Local feature requests for execution.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+
+A successful immediate CA Local request after CostFinalize must update
+Action as well as ActionRequest. In level mode propagate it through all
+children (FP and non-FP), as measured in Windows v10, but do not implicitly
+select descendants in ADDLOCAL mode.
+Other states and pre-cost requests retain their previous behavior.
+
+v2 (2026-11-05, Claude P2-1 review): restrict local_after_cost to
+fresh installs (!Installed). Maintenance keeps vanilla Action, ancestor
+and child propagation behavior. The maintenance test is MEASURE until
+Windows x64/i686 values are supplied; no native states are guessed.
+
+v3 (2026-11-05, native maintenance MEASURE from bundle b0ddb67):
+Windows 10 x64/i686 reported Installed="00:00:00" and CostingComplete="0".
+The CA now records property strings and return codes without requiring
+literal "1" values or aborting the measurement. The sequence condition
+Installed AND NOT REMOVE is unchanged. No production MSI logic or native
+feature-state expectations change; v2 aborted before feature Set/Get.
+
+The v7 and isolated v8 cases distinguish parent selection from CA updates
+and verify final published states. Apply after the A and A2 patches.
+Not in series pending full validation and clean-F L4.
+
+V10 confirms immediate non-FP propagation in level mode and no propagation
+in ADDLOCAL mode. All 60 additional final states are conformance assertions.
+Post-cost Absent/Source requests are outside this fix.
+
+diff --git a/dlls/msi/install.c b/dlls/msi/install.c
+--- a/dlls/msi/install.c
++++ b/dlls/msi/install.c
+@@ -914,6 +914,7 @@
+ 
+ UINT MSI_SetFeatureStateW( MSIPACKAGE *package, LPCWSTR szFeature, INSTALLSTATE iState )
+ {
++    BOOL local_after_cost;
+     UINT rc = ERROR_SUCCESS;
+     MSIFEATURE *feature, *child;
+ 
+@@ -931,10 +932,25 @@
+     }
+ 
+     feature->ActionRequest = iState;
++    local_after_cost = iState == INSTALLSTATE_LOCAL && msi_get_property_int( package->db, L"CostingComplete", 0 ) && !msi_get_property_int( package->db, L"Installed", 0 );
++    if (local_after_cost) feature->Action = iState;
+ 
+     ACTION_UpdateComponentStates( package, feature );
+ 
+-    /* update all the features that are children of this feature */
++    /* Unlike the default-level guard in MSI_SetFeatureStates(), this is
++     * limited to measured ADDLOCAL behavior. Preselected includes other
++     * overrides whose post-cost propagation has not been measured. */
++    if (local_after_cost)
++    {
++        WCHAR *addlocal = msi_dup_property( package->db, L"ADDLOCAL" );
++        BOOL explicit_selection = addlocal && *addlocal;
++
++        free( addlocal );
++        /* An immediate CA does not implicitly extend an ADDLOCAL selection. */
++        if (explicit_selection) return rc;
++    }
++
++    /* In level mode a post-cost Local request propagates to all children (v10). */
+     LIST_FOR_EACH_ENTRY( child, &package->features, MSIFEATURE, entry )
+     {
+         if (child->Feature_Parent && !wcscmp( szFeature, child->Feature_Parent ))
+diff --git a/dlls/msi/tests/selection.c b/dlls/msi/tests/selection.c
+--- a/dlls/msi/tests/selection.c
++++ b/dlls/msi/tests/selection.c
+@@ -109,7 +109,7 @@
+  * Standalone --strict checks the patched engine without any expected failures.
+  */
+ #ifndef SELECTION_FIXED_RULES
+-#define SELECTION_FIXED_RULES 3
++#define SELECTION_FIXED_RULES 7
+ #endif
+ static const INSTALLSTATE expected_states[][15] =
+ {
+--- a/dlls/msi/tests/Makefile.in
++++ b/dlls/msi/tests/Makefile.in
+@@ -24,4 +24,9 @@
+ 	selfreg.spec \
+ 	source.c \
+ 	suminfo.c \
+-	typelib.idl
++	typelib.idl \
++	maintenance.c \
++	maintenance_ca.c \
++	maintenance_ca.spec
++
++maintenance_ca_IMPORTS = msi
+--- /dev/null
++++ b/dlls/msi/tests/maintenance.c
+@@ -0,0 +1,363 @@
++/*
++ * Copyright 2026 Harvi654
++ *
++ * Maintenance Local MEASURE fixture, AI-assisted (Codex); no vendor code.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++#define _WIN32_MSI 300
++#include <windows.h>
++#include <msi.h>
++#include <msiquery.h>
++#include <ole2.h>
++#include <stdio.h>
++#include <ctype.h>
++#include "wine/test.h"
++
++struct feature
++{
++    const char *name, *parent;
++    unsigned int level, attributes;
++};
++
++static const struct feature features[] =
++{
++    {"Root", NULL, 100, 0},
++    {"Anchor", "Root", 100, 24},
++    {"Branch", "Root", 100, 26},
++    {"UpperParent", "Branch", 200, 10},
++    {"Parent", "UpperParent", 200, 10},
++    {"Grandchild", "Parent", 200, 8},
++    {"Sibling", "Parent", 100, 10},
++    {"PlainSibling", "Parent", 100, 8},
++    {"Leaf", "Grandchild", 200, 8}
++};
++
++struct variant
++{
++    const char *name, *selection;
++    BOOL set;
++    unsigned int parent_level;
++};
++
++static const struct variant variants[] =
++{
++    {"maintenance-level", "", TRUE, 200},
++    {"maintenance-addlocal", "ADDLOCAL=Anchor", TRUE, 200}
++};
++static BOOL chain = TRUE;
++
++static BOOL active_feature(unsigned int index)
++{
++    return chain || strcmp(features[index].name, "UpperParent");
++}
++
++#ifndef STANDALONE
++static char own_ca_path[MAX_PATH];
++#endif
++
++static UINT execute(MSIHANDLE db, const char *sql)
++{
++    MSIHANDLE view = 0;
++    UINT result = MsiDatabaseOpenViewA(db, sql, &view);
++    if (!result) result = MsiViewExecute(view, 0);
++    if (view) MsiCloseHandle(view);
++    return result;
++}
++
++static BOOL new_guid(char *text)
++{
++    GUID guid;
++    WCHAR wide[39];
++    HRESULT hr = CoCreateGuid(&guid);
++    ok(hr == S_OK, "CoCreateGuid returned %#lx\n", hr);
++    if (hr != S_OK) return FALSE;
++    StringFromGUID2(&guid, wide, ARRAY_SIZE(wide));
++    return !!WideCharToMultiByte(CP_ACP, 0, wide, -1, text, 39, NULL, NULL);
++}
++
++static UINT insert_feature(MSIHANDLE db, const struct variant *variant, unsigned int index)
++{
++    const struct feature *f = features + index;
++    const char *parent = !chain && !strcmp(f->name, "Parent") ? "Branch" : f->parent;
++    char sql[1024];
++    unsigned int level = (!strcmp(f->name, "Parent") || !strcmp(f->name, "UpperParent")) ? variant->parent_level : f->level;
++    if (parent)
++        snprintf(sql, sizeof(sql), "INSERT INTO `Feature` (`Feature`,`Feature_Parent`,`Title`,`Display`,`Level`,`Directory_`,`Attributes`) VALUES ('%s','%s','%s',%u,%u,'PROBEDIR',%u)",
++                 f->name, parent, f->name, index + 1, level, f->attributes);
++    else
++        snprintf(sql, sizeof(sql), "INSERT INTO `Feature` (`Feature`,`Title`,`Display`,`Level`,`Directory_`,`Attributes`) VALUES ('%s','%s',%u,%u,'PROBEDIR',%u)",
++                 f->name, f->name, index + 1, level, f->attributes);
++    return execute(db, sql);
++}
++
++static UINT insert_own_ca(MSIHANDLE db)
++{
++    char path[MAX_PATH], *slash;
++    MSIHANDLE view = 0, record = 0;
++    UINT result;
++#ifdef STANDALONE
++    DWORD size = GetModuleFileNameA(NULL, path, sizeof(path));
++    if (!size || size >= sizeof(path) || !(slash = strrchr(path, '\\'))) return ERROR_INVALID_DATA;
++    *++slash = 0;
++    if (strlen(path) + 40 >= sizeof(path)) return ERROR_INVALID_DATA;
++    strcat(path, sizeof(void *) == 8 ? "msi-maintenance-ca-x86_64.dll" : "msi-maintenance-ca-i686.dll");
++#else
++    (void)slash;
++    strcpy(path, own_ca_path);
++#endif
++    result = execute(db, "CREATE TABLE `Binary` (`Name` CHAR(72) NOT NULL, `Data` OBJECT NOT NULL PRIMARY KEY `Name`)");
++    if (!result) result = execute(db, "CREATE TABLE `CustomAction` (`Action` CHAR(72) NOT NULL, `Type` SHORT NOT NULL, `Source` CHAR(72), `Target` CHAR(255) PRIMARY KEY `Action`)");
++    if (result) return result;
++    result = MsiDatabaseOpenViewA(db, "INSERT INTO `Binary` (`Name`,`Data`) VALUES ('OwnFeatureStateCA', ?)", &view);
++    if (result) goto done;
++    record = MsiCreateRecord(1);
++    if (!record) { result = ERROR_OUTOFMEMORY; goto done; }
++    result = MsiRecordSetStreamA(record, 1, path);
++    if (!result) result = MsiViewExecute(view, record);
++    if (!result) result = execute(db, "INSERT INTO `CustomAction` (`Action`,`Type`,`Source`,`Target`) VALUES ('OwnSetFeatures',1,'OwnFeatureStateCA','ProbeMaintenance')");
++    if (!result) result = execute(db, "INSERT INTO `InstallExecuteSequence` (`Action`,`Condition`,`Sequence`) VALUES ('OwnSetFeatures','Installed AND NOT REMOVE',1100)");
++done:
++    if (record) MsiCloseHandle(record);
++    if (view) MsiCloseHandle(view);
++    return result;
++}
++
++static BOOL create_package(const char *path, const char *product, const struct variant *variant)
++{
++    static const char *schema[] =
++    {
++        "CREATE TABLE `Property` (`Property` CHAR(72) NOT NULL, `Value` CHAR(0) LOCALIZABLE PRIMARY KEY `Property`)",
++        "CREATE TABLE `Directory` (`Directory` CHAR(72) NOT NULL, `Directory_Parent` CHAR(72), `DefaultDir` CHAR(255) NOT NULL PRIMARY KEY `Directory`)",
++        "CREATE TABLE `Feature` (`Feature` CHAR(38) NOT NULL, `Feature_Parent` CHAR(38), `Title` CHAR(64), `Description` CHAR(255), `Display` SHORT, `Level` SHORT, `Directory_` CHAR(72), `Attributes` SHORT PRIMARY KEY `Feature`)",
++        "CREATE TABLE `Component` (`Component` CHAR(72) NOT NULL, `ComponentId` CHAR(38), `Directory_` CHAR(72), `Attributes` SHORT, `Condition` CHAR(255), `KeyPath` CHAR(72) PRIMARY KEY `Component`)",
++        "CREATE TABLE `FeatureComponents` (`Feature_` CHAR(38) NOT NULL, `Component_` CHAR(72) NOT NULL PRIMARY KEY `Feature_`, `Component_`)",
++        /* Windows' RegisterProduct reads Media (2228 without it); one empty disk. */
++        "CREATE TABLE `Media` (`DiskId` SHORT NOT NULL, `LastSequence` SHORT NOT NULL, `DiskPrompt` CHAR(64), `Cabinet` CHAR(255), `VolumeLabel` CHAR(32), `Source` CHAR(72) PRIMARY KEY `DiskId`)",
++        "INSERT INTO `Media` (`DiskId`,`LastSequence`) VALUES (1,0)",
++        "CREATE TABLE `InstallExecuteSequence` (`Action` CHAR(72) NOT NULL, `Condition` CHAR(255), `Sequence` SHORT PRIMARY KEY `Action`)",
++        "INSERT INTO `Property` (`Property`,`Value`) VALUES ('ProductName','Synthetic feature selection probe')",
++        "INSERT INTO `Property` (`Property`,`Value`) VALUES ('Manufacturer','Synthetic MSI tests')",
++        "INSERT INTO `Property` (`Property`,`Value`) VALUES ('ProductVersion','1.0.0')",
++        "INSERT INTO `Property` (`Property`,`Value`) VALUES ('ProductLanguage','1033')",
++        "INSERT INTO `Property` (`Property`,`Value`) VALUES ('INSTALLLEVEL','100')",
++        "INSERT INTO `Directory` (`Directory`,`DefaultDir`) VALUES ('TARGETDIR','SourceDir')",
++        "INSERT INTO `Directory` (`Directory`,`Directory_Parent`,`DefaultDir`) VALUES ('PROBEDIR','TARGETDIR','FeatureProbe')"
++    };
++    static const struct { const char *name; unsigned int sequence; } actions[] =
++    {
++        {"CostInitialize", 800}, {"FileCost", 900}, {"CostFinalize", 1000},
++        {"InstallValidate", 1400}, {"InstallInitialize", 1500},
++        {"ProcessComponents", 1600}, {"UnpublishFeatures", 1800},
++        {"RegisterProduct", 6100}, {"PublishFeatures", 6300},
++        {"PublishProduct", 6400}, {"InstallFinalize", 6600}
++    };
++    MSIHANDLE db = 0, summary = 0;
++    char sql[1024], guid[39];
++    unsigned int i, count = ARRAY_SIZE(features);
++    const struct feature *feature;
++    UINT result;
++    BOOL success = FALSE;
++
++    result = MsiOpenDatabaseA(path, (LPCSTR)MSIDBOPEN_CREATE, &db);
++    ok(result == ERROR_SUCCESS, "create database returned %u\n", result);
++    if (result) return FALSE;
++#define EXEC_SQL(statement) do { result = execute(db, statement); \
++    ok(result == ERROR_SUCCESS, "database statement returned %u\n", result); \
++    if (result) goto done; } while (0)
++    for (i = 0; i < ARRAY_SIZE(schema); ++i) EXEC_SQL(schema[i]);
++    sprintf(sql, "INSERT INTO `Property` (`Property`,`Value`) VALUES ('ProductCode','%s')", product);
++    EXEC_SQL(sql);
++    for (i = 0; i < count; ++i)
++    {
++        if (!active_feature(i)) continue;
++        feature = features + i;
++        result = insert_feature(db, variant, i);
++        ok(!result, "feature row returned %u\n", result);
++        if (result) goto done;
++        if (!new_guid(guid)) goto done;
++        /* Empty components: directory key path, unique GUID, no File/Registry rows. */
++        sprintf(sql, "INSERT INTO `Component` (`Component`,`ComponentId`,`Directory_`,`Attributes`) VALUES ('C_%s','%s','PROBEDIR',0)", feature->name, guid);
++        EXEC_SQL(sql);
++        sprintf(sql, "INSERT INTO `FeatureComponents` (`Feature_`,`Component_`) VALUES ('%s','C_%s')", feature->name, feature->name);
++        EXEC_SQL(sql);
++    }
++    for (i = 0; i < ARRAY_SIZE(actions); ++i)
++    {
++        sprintf(sql, "INSERT INTO `InstallExecuteSequence` (`Action`,`Sequence`) VALUES ('%s',%u)", actions[i].name, actions[i].sequence);
++        EXEC_SQL(sql);
++    }
++    if (variant->set)
++    {
++        result = insert_own_ca(db);
++        ok(!result, "embed our synthetic CA returned %u\n", result);
++        if (result) goto done;
++    }
++#undef EXEC_SQL
++    if (!new_guid(guid)) goto done;
++    result = MsiGetSummaryInformationA(db, NULL, 5, &summary);
++    ok(!result, "open summary returned %u\n", result);
++    if (result) goto done;
++#define SUMMARY(call) do { result = (call); ok(!result, "summary returned %u\n", result); if (result) goto done; } while (0)
++    SUMMARY(MsiSummaryInfoSetPropertyA(summary, 7, VT_LPSTR, 0, NULL, sizeof(void *) == 8 ? "x64;1033" : "Intel;1033"));
++    SUMMARY(MsiSummaryInfoSetPropertyA(summary, 9, VT_LPSTR, 0, NULL, guid));
++    SUMMARY(MsiSummaryInfoSetPropertyA(summary, 14, VT_I4, 200, NULL, NULL));
++    SUMMARY(MsiSummaryInfoSetPropertyA(summary, 15, VT_I4, 0, NULL, NULL));
++    SUMMARY(MsiSummaryInfoPersist(summary));
++    SUMMARY(MsiDatabaseCommit(db));
++#undef SUMMARY
++    success = TRUE;
++done:
++    if (summary) MsiCloseHandle(summary);
++    MsiCloseHandle(db);
++    return success;
++}
++
++static unsigned int observations, sets, flags;
++static INT CALLBACK ui_handler(void *context, UINT type, const char *message)
++{
++    (void)context; (void)type;
++    if (!message) return 0;
++    if (!strncmp(message, "P21OBS ", 7)) { observations++; trace("MEASURE %s\n", message); }
++    if (!strncmp(message, "P21SET ", 7)) { sets++; trace("MEASURE %s\n", message); }
++    if (!strncmp(message, "P21FLAGS ", 9)) { flags++; trace("MEASURE %s\n", message); }
++    return 0;
++}
++
++static void test_variant(const char *directory, const struct variant *variant)
++{
++    char path[MAX_PATH], command[2 * MAX_PATH], product[39];
++    UINT result;
++    unsigned int i;
++    winetest_push_context("%s", variant->name);
++    if (!new_guid(product)) goto done;
++    snprintf(path, sizeof(path), "%s\\probe.msi", directory);
++    if (!create_package(path, product, variant)) goto remove_file;
++    snprintf(command, sizeof(command), "ALLUSERS=1 INSTALLLEVEL=100 ADDLOCAL=Anchor PROBEDIR=\"%s\\empty\"", directory);
++    observations = sets = flags = 0;
++    result = MsiInstallProductA(path, command);
++    ok(!result, "initial registration rc=%u\n", result);
++    ok(!observations && !sets && !flags, "maintenance CA ran during fresh install\n");
++    if (result) goto uninstall;
++    snprintf(command, sizeof(command), "ALLUSERS=1 INSTALLLEVEL=100 %s PROBEDIR=\"%s\\empty\"", variant->selection, directory);
++    result = MsiInstallProductA(path, command);
++    ok(!result, "maintenance rc=%u\n", result);
++    ok(flags == 1 && sets == 1 && observations == 2 * ARRAY_SIZE(features),
++       "incomplete maintenance capture: flags=%u sets=%u observations=%u\n", flags, sets, observations);
++    /* No native state expectations yet. Record all public published states. */
++    for (i = 0; i < ARRAY_SIZE(features); i++)
++        trace("MEASURE P21PUBLISH name=%s state=%d\n", features[i].name,
++              MsiQueryFeatureStateA(product, features[i].name));
++ uninstall:
++    snprintf(command, sizeof(command), "ALLUSERS=1 REMOVE=ALL PROBEDIR=\"%s\\empty\"", directory);
++    result = MsiConfigureProductExA(product, INSTALLLEVEL_DEFAULT, INSTALLSTATE_ABSENT, command);
++    ok(!result, "uninstall rc=%u\n", result);
++    ok(MsiQueryProductStateA(product) == INSTALLSTATE_UNKNOWN, "synthetic product still registered\n");
++ remove_file:
++    ok(DeleteFileA(path), "remove synthetic MSI rc=%lu\n", GetLastError());
++ done:
++    winetest_pop_context();
++}
++
++#ifndef STANDALONE
++void restart_as_admin_elevated(void);
++#endif
++
++static BOOL is_process_limited(void)
++{
++    SID_IDENTIFIER_AUTHORITY authority = SECURITY_NT_AUTHORITY;
++    TOKEN_ELEVATION_TYPE type = TokenElevationTypeDefault;
++    HANDLE token;
++    PSID administrators;
++    DWORD size;
++    BOOL member = FALSE;
++
++    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return TRUE;
++    GetTokenInformation(token, TokenElevationType, &type, sizeof(type), &size);
++    CloseHandle(token);
++    if (type == TokenElevationTypeLimited) return TRUE;
++
++    /* A standard user without a linked UAC token also cannot install ALLUSERS. */
++    if (!AllocateAndInitializeSid(&authority, 2, SECURITY_BUILTIN_DOMAIN_RID,
++                                 DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &administrators))
++        return TRUE;
++    CheckTokenMembership(NULL, administrators, &member);
++    FreeSid(administrators);
++    return !member;
++}
++
++START_TEST(maintenance)
++{
++    char directory[MAX_PATH], temp[MAX_PATH], exe[MAX_PATH];
++    DWORD length;
++    unsigned int i;
++    INSTALLUILEVEL previous;
++    INSTALLUI_HANDLERA previous_handler;
++
++#ifndef STANDALONE
++    restart_as_admin_elevated();
++#endif
++    if (is_process_limited())
++    {
++        skip("ALLUSERS installation requires an administrator token\n");
++        return;
++    }
++
++#ifdef STANDALONE
++    length = GetModuleFileNameA(NULL,exe,sizeof(exe));
++    ok(length && length < sizeof(exe) && !strnicmp(exe,"C:\\",3),"copy the whole bundle to C: before running\n");
++    if (!length || length >= sizeof(exe) || strnicmp(exe,"C:\\",3)) return;
++#else
++    (void)exe;
++#endif
++    length = GetTempPathA(sizeof(temp),temp);
++    ok(length && length < sizeof(temp),"temporary directory unavailable\n");
++    if (!length || length >= sizeof(temp)) return;
++    if (!GetTempFileNameA(temp,"anc",0,directory)) { ok(0,"unique directory rc=%lu\n",GetLastError()); return; }
++    if (!DeleteFileA(directory) || !CreateDirectoryA(directory,NULL)) { ok(0,"create scratch directory rc=%lu\n",GetLastError()); return; }
++#ifndef STANDALONE
++    {
++        HRSRC resource = FindResourceA(NULL, "maintenance_ca.dll", "TESTDLL");
++        HANDLE file;
++        DWORD written, size;
++        const void *data;
++        ok(!!resource, "own CA resource missing\n");
++        if (!resource) goto cleanup;
++        data = LockResource(LoadResource(NULL, resource));
++        size = SizeofResource(NULL, resource);
++        snprintf(own_ca_path, sizeof(own_ca_path), "%s\\own-ca.dll", directory);
++        file = CreateFileA(own_ca_path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
++        ok(file != INVALID_HANDLE_VALUE, "create own CA file rc=%lu\n", GetLastError());
++        if (file == INVALID_HANDLE_VALUE) goto cleanup;
++        if (!WriteFile(file,data,size,&written,NULL) || written != size)
++        { ok(0, "write own CA resource failed\n"); CloseHandle(file); goto cleanup; }
++        CloseHandle(file);
++    }
++#endif
++    winetest_mute_threshold = 1000;
++    if (winetest_debug < 1) winetest_debug = 1;
++    previous = MsiSetInternalUI(INSTALLUILEVEL_NONE,NULL);
++    previous_handler = MsiSetExternalUIA(ui_handler,INSTALLLOGMODE_INFO | INSTALLLOGMODE_ACTIONSTART,NULL);
++    trace("Maintenance MEASURE only, native states unknown, bits=%u\n",
++          (unsigned int)(8 * sizeof(void *)));
++    for (i = 0; i < ARRAY_SIZE(variants); ++i) test_variant(directory,variants + i);
++    MsiSetExternalUIA(previous_handler,0,NULL);
++    MsiSetInternalUI(previous,NULL);
++#ifndef STANDALONE
++cleanup:
++    DeleteFileA(own_ca_path);
++#endif
++    ok(RemoveDirectoryA(directory),"remove scratch directory rc=%lu\n",GetLastError());
++}
+--- /dev/null
++++ b/dlls/msi/tests/maintenance_ca.c
+@@ -0,0 +1,60 @@
++/* Copyright 2026 Harvi654.
++ * Original AI-assisted (Codex), LGPL-2.1-or-later. Public MSI API only.
++ * MEASURE: native maintenance feature-state expectations are not yet known. */
++#if 0
++#pragma makedep testdll
++#endif
++
++#include <windows.h>
++#include <msi.h>
++#include <msiquery.h>
++#include <string.h>
++
++static void observe(MSIHANDLE package, const char *stage)
++{
++    static const char *names[] = {"Root", "Anchor", "Branch", "UpperParent", "Parent",
++                                 "Grandchild", "Sibling", "PlainSibling", "Leaf"};
++    unsigned int i;
++    for (i = 0; i < sizeof(names) / sizeof(names[0]); i++)
++    {
++        INSTALLSTATE installed = -99, request = -99;
++        UINT rc = MsiGetFeatureStateA(package, names[i], &installed, &request);
++        MSIHANDLE record = MsiCreateRecord(5);
++        MsiRecordSetStringA(record, 0, "P21OBS stage=[1] name=[2] rc=[3] installed=[4] request=[5]");
++        MsiRecordSetStringA(record, 1, stage);
++        MsiRecordSetStringA(record, 2, names[i]);
++        MsiRecordSetInteger(record, 3, rc);
++        MsiRecordSetInteger(record, 4, installed);
++        MsiRecordSetInteger(record, 5, request);
++        MsiProcessMessage(package, INSTALLMESSAGE_INFO, record);
++        MsiCloseHandle(record);
++    }
++}
++
++UINT __stdcall ProbeMaintenance(MSIHANDLE package)
++{
++    char installed[16] = "", costing[16] = "";
++    DWORD ni = sizeof(installed), nc = sizeof(costing);
++    UINT ri = MsiGetPropertyA(package, "Installed", installed, &ni);
++    UINT rc = MsiGetPropertyA(package, "CostingComplete", costing, &nc), result;
++    MSIHANDLE record = MsiCreateRecord(5);
++    MsiRecordSetStringA(record, 0, "P21FLAGS stage=[1] installed_rc=[2] installed=[3] costing_rc=[4] costing=[5]");
++    MsiRecordSetStringA(record, 1, "maintenance");
++    MsiRecordSetInteger(record, 2, ri);
++    MsiRecordSetStringA(record, 3, installed);
++    MsiRecordSetInteger(record, 4, rc);
++    MsiRecordSetStringA(record, 5, costing);
++    MsiProcessMessage(package, INSTALLMESSAGE_INFO, record);
++    MsiCloseHandle(record);
++    /* Properties are MEASURE only; the sequence condition selects maintenance. */
++    observe(package, "before");
++    result = MsiSetFeatureStateA(package, "Grandchild", INSTALLSTATE_LOCAL);
++    record = MsiCreateRecord(2);
++    MsiRecordSetStringA(record, 0, "P21SET target=[1] requested=3 rc=[2]");
++    MsiRecordSetStringA(record, 1, "Grandchild");
++    MsiRecordSetInteger(record, 2, result);
++    MsiProcessMessage(package, INSTALLMESSAGE_INFO, record);
++    MsiCloseHandle(record);
++    observe(package, "after");
++    return ERROR_SUCCESS;
++}
+--- /dev/null
++++ b/dlls/msi/tests/maintenance_ca.spec
+@@ -0,0 +1 @@
++@ stdcall ProbeMaintenance(long)

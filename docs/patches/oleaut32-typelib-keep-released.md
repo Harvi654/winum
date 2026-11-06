@@ -4,7 +4,7 @@
 stays in oleaut32's cache after its last Release (up to 8), holding no
 references, and is used again if its file did not change. Made for
 Inventor's 3D PDF export: ~7 minutes before, 15 s with it. Background,
-Windows measurements and results: [docs/wine-repro/oleaut32-typelib-cache/](../../../docs/wine-repro/oleaut32-typelib-cache/README.md).
+Windows measurements and results: [docs/wine-repro/oleaut32-typelib-cache/](../wine-repro/oleaut32-typelib-cache/README.md).
 
 Moved here from Autodesk-Inventor-for-Linux `patches/drafts/` (last change
 there `b2bce4e`, results `34d626a`), unchanged.
@@ -12,7 +12,7 @@ there `b2bce4e`, results `34d626a`), unchanged.
 ## State (2026-11-06)
 
 Cross review 2026-11-06 (Codex,
-[cross-review-2026-11-06-oleaut32.md](../../../docs/wine-repro/cross-review-2026-11-06-oleaut32.md)):
+[cross-review-2026-11-06-oleaut32.md](../wine-repro/cross-review-2026-11-06-oleaut32.md)):
 two P2 findings, both addressed in **v2** (same day):
 
 - P2-1, unsaved edits survived the last Release: a library that was asked

@@ -1,0 +1,23 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Keep measured required attr26 selections after costing.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+
+Windows v14 stable preparation returns success for Absent on an attr26
+Local child without deselecting it. Unknown/Absent targets are not extended.
+Do not generalize UIDisallowAbsent to all
+attributes: existing package.c lyra (attr16) must still accept Absent.
+Shared v14 stable before/after/publish assertions; RULE_API. Maintenance
+and other combinations keep the old behavior.
+
+--- a/dlls/msi/install.c
++++ b/dlls/msi/install.c
+@@ -1030,6 +1030,8 @@
+         BOOL required = feature->Attributes == (msidbFeatureAttributesFollowParent |
+             msidbFeatureAttributesDisallowAdvertise | msidbFeatureAttributesUIDisallowAbsent);
+ 
++        if (after_cost && iState == INSTALLSTATE_ABSENT && required &&
++            feature->ActionRequest == INSTALLSTATE_LOCAL) return ERROR_SUCCESS;
+         if ((iState == INSTALLSTATE_SOURCE && required) ||
+             (after_cost && iState == INSTALLSTATE_ADVERTISED && required &&
+              feature->ActionRequest == INSTALLSTATE_LOCAL))

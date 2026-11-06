@@ -1,0 +1,80 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Reject feature trees deeper than 16 levels at CostFinalize.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+
+Windows 10 x64/i686 depth measurement: Root->DeepRoot->N succeeds for
+N=1..14 (3..16 levels). N=15 (17 levels) and all larger measured chains
+fail1603 in CostFinalize; CostInitialize and FileCost succeed throughout.
+The supplied Design MSI maximum depth7 does not reach this limit.
+
+Extend the cycle validator's existing per-call parent index and colors to
+compute depth once per node, reusing a completed ancestor's depth. Root
+depth is one. O(features+child edges), no recursive walk or guessed bound.
+CostInitialize still checks only cycles; CostFinalize imposes the measured
+limit before recursive costing. Only msi.dll changes.
+
+Apply after msi-reject-cyclic-feature-parents.patch. V15 tests add explicit
+16/17-level assertions, using the same contained graph fixture as v14.
+The separate UI request reset requires the measured ExecuteAction transfer
+candidate. This depth patch itself does not implement the UI handoff.
+
+--- a/dlls/msi/action.c
++++ b/dlls/msi/action.c
+@@ -1384,13 +1384,14 @@
+ }
+ 
+ /* Validate parent cycles before the recursive costing helpers can run.
+- * This is graph validity, not an assumed Windows feature-depth limit. */
+-static UINT validate_feature_cycles( MSIPACKAGE *package )
++ * CostInitialize checks only cycles; CostFinalize additionally enforces the
++ * measured Windows limit of 16 levels, counting each root as level one. */
++static UINT validate_feature_graph( MSIPACKAGE *package, unsigned int max_depth )
+ {
+     struct feature_parent
+     {
+         struct feature_parent *parent;
+-        unsigned int state;
++        unsigned int state, depth;
+     } *nodes, *node, *next;
+     unsigned int count = list_count( &package->features ), i = 0;
+     MSIFEATURE *feature;
+@@ -1404,13 +1405,18 @@
+             nodes[child->feature->selection_index].parent = &nodes[feature->selection_index];
+     for (i = 0; i < count; ++i)
+     {
++        unsigned int depth = 0;
++
+         node = &nodes[i];
+-        while (node && !node->state) { node->state = 1; node = node->parent; }
++        while (node && !node->state) { node->state = 1; ++depth; node = node->parent; }
+         if (node && node->state == 1) { free( nodes ); return ERROR_INSTALL_FAILURE; }
++        if (node) depth += node->depth;
++        if (max_depth && depth > max_depth) { free( nodes ); return ERROR_INSTALL_FAILURE; }
+         node = &nodes[i];
+         while (node && node->state == 1)
+         {
+             next = node->parent;
++            node->depth = depth--;
+             node->state = 2;
+             node = next;
+         }
+@@ -1429,7 +1435,7 @@
+     load_all_folders( package );
+     msi_load_all_components( package );
+     msi_load_all_features( package );
+-    if ((rc = validate_feature_cycles( package ))) return rc;
++    if ((rc = validate_feature_graph( package, 0 ))) return rc;
+     load_all_files( package );
+     load_all_patches( package );
+     mark_patched_components( package );
+@@ -2357,6 +2363,9 @@
+     MSIQUERY *view;
+     WCHAR *level, *primary_key, *primary_folder;
+     UINT rc;
++
++    /* Windows accepts 16 feature levels, rejects the 17th at CostFinalize. */
++    if ((rc = validate_feature_graph( package, 16 ))) return rc;
+ 
+     TRACE("Building directory properties\n");
+     msi_resolve_target_folder( package, L"TARGETDIR", TRUE );

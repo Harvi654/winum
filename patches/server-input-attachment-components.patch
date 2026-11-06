@@ -1,0 +1,130 @@
+Wine 11.20: preserve connected input components when detaching one edge.
+
+Experimental, developed with AI assistance; not submitted to upstream Wine.
+License: LGPL-2.1-or-later, matching the modified Wine source.
+
+A WebView GUI thread can be attached to two host GUI threads. Unparenting
+one embedded window must not separate it from its remaining host. Keep
+cycles connected and keep the active window on the original input object
+so desktop foreground routing is retained. Restore the removed edge on
+allocation failure. The detach-all/desktop-change path is unchanged.
+
+--- a/server/queue.c
++++ b/server/queue.c
+@@ -1451,11 +1451,91 @@
+     release_object( old_input );
+ }
+ 
++/* Return the queues reachable through the remaining undirected attachments. */
++static size_t collect_input_component( struct thread_input *input, struct msg_queue *seed,
++                                       struct msg_queue **queues )
++{
++    struct attachment *attach;
++    struct msg_queue *other;
++    size_t count = 1, i, j;
++
++    queues[0] = seed;
++    for (i = 0; i < count; ++i)
++    {
++        LIST_FOR_EACH_ENTRY( attach, &input->attachments, struct attachment, entry )
++        {
++            if (attach->queue_from == queues[i]) other = attach->queue_to;
++            else if (attach->queue_to == queues[i]) other = attach->queue_from;
++            else continue;
++            for (j = 0; j < count; ++j) if (queues[j] == other) break;
++            if (j == count) queues[count++] = other;
++        }
++    }
++    return count;
++}
++
++/* Split a disconnected component, keeping the active window's input object. */
++static int split_thread_input( struct msg_queue *queue_from, struct msg_queue *queue_to,
++                               struct desktop *desktop )
++{
++    struct thread_input *old_input = queue_from->input, *new_input;
++    struct attachment *attach, *next;
++    struct msg_queue **queues;
++    struct thread *owner;
++    size_t capacity = 1, count, i;
++
++    LIST_FOR_EACH_ENTRY( attach, &old_input->attachments, struct attachment, entry )
++    {
++        if (capacity > ~(size_t)0 / sizeof(*queues) - 2)
++        {
++            set_error( STATUS_NO_MEMORY );
++            return 0;
++        }
++        capacity += 2;
++    }
++    if (!(queues = mem_alloc( capacity * sizeof(*queues) ))) return 0;
++    count = collect_input_component( old_input, queue_from, queues );
++    for (i = 0; i < count; ++i) if (queues[i] == queue_to) break;
++    if (i < count)  /* another path still connects the two endpoints */
++    {
++        free( queues );
++        return 1;
++    }
++
++    /* The foreground desktop still points at old_input. Do not move its active
++     * window's queue to the new object while leaving foreground input behind. */
++    if (old_input->shared->active && (owner = get_window_thread( old_input->shared->active )))
++    {
++        for (i = 0; i < count; ++i) if (queues[i] == owner->queue) break;
++        release_object( owner );
++        if (i < count) count = collect_input_component( old_input, queue_to, queues );
++    }
++    if (!(new_input = create_thread_input( desktop )))
++    {
++        free( queues );
++        return 0;
++    }
++
++    grab_object( old_input );
++    for (i = 0; i < count; ++i) assign_thread_input( queues[i], new_input );
++    LIST_FOR_EACH_ENTRY_SAFE( attach, next, &old_input->attachments, struct attachment, entry )
++    {
++        if (attach->queue_from->input != new_input) continue;
++        assert( attach->queue_to->input == new_input );
++        list_remove( &attach->entry );
++        list_add_tail( &new_input->attachments, &attach->entry );
++    }
++    release_object( old_input );
++    release_object( new_input );
++    free( queues );
++    return 1;
++}
++
+ /* detach two thread input data structures */
+ void detach_thread_input( struct msg_queue *queue_from, struct msg_queue *queue_to, struct desktop *desktop )
+ {
+     struct thread_input *old_input = queue_from->input, *new_input;
+-    struct attachment *attach, *next;
++    struct attachment *attach, *next, *removed = NULL;
+     int count = 0;
+ 
+     LIST_FOR_EACH_ENTRY_SAFE( attach, next, &old_input->attachments, struct attachment, entry )
+@@ -1464,15 +1544,18 @@
+         if (attach->queue_to != queue_from && (!queue_to || attach->queue_to != queue_to)) continue;
+         if (count++ && queue_to) break;
+         list_remove( &attach->entry );
+-        free( attach );
++        if (queue_to) removed = attach;
++        else free( attach );
+     }
+     if (queue_to)
+     {
+         if (!count) return set_error( STATUS_INVALID_PARAMETER );
+-        if (count > 1) return;
+-    }
+-    /* TODO: detaching a thread may create two separate thread input graphs */
+-
++        if (count > 1 || split_thread_input( queue_from, queue_to, desktop )) free( removed );
++        else list_add_tail( &old_input->attachments, &removed->entry );
++        return;
++    }
++
++    /* Moving one queue to another desktop still removes all its attachments. */
+     if (!(new_input = create_thread_input( desktop ))) return;
+     assign_thread_input( queue_from, new_input );
+     release_object( new_input );

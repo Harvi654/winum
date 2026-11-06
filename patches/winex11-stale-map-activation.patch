@@ -1,0 +1,361 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] winex11: Don't let a superseded map activation take the foreground.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted upstream.
+CANDIDATE: cross-review pending, not in series. Test: test_visible_popup_focus
+in dlls/user32/tests/win.c; expected values from Windows 10 x64/i686 runs of
+docs/wine-repro/extrude-edit/popup-focus.c (2026-11-03 15:14).
+
+An application shows an unowned popup with activation (WS_VISIBLE at
+creation or ShowWindow(SW_SHOW)) and gives the focus back to its main
+window a few milliseconds later (SOLIDWORKS suggestion list under the
+Extrude depth field). winex11 maps the popup as a managed window with
+activation and no _NET_WM_USER_TIME. The later activation of the main
+window sends no _NET_ACTIVE_WINDOW request, because the last requested
+window is still the main window. The window manager (KWin) then activates
+the popup; WM_TAKE_FOCUS and _NET_ACTIVE_WINDOW arrive after the
+application has moved on, and X11DRV_GetWindowStateUpdates makes the
+popup the foreground window again. The focus leaves the edit control and
+the following key presses go elsewhere.
+
+When the WM_STATE of a window mapped for activation becomes NormalState
+and that window is no longer the foreground window, request
+_NET_ACTIVE_WINDOW again for the current foreground window of this thread
+and remember the superseded window. While that request is pending:
+_NET_ACTIVE_WINDOW notifications older than it are ignored as old (as
+before); WM_TAKE_FOCUS for a window other than the foreground window is
+ignored when it is older than the request. The window manager may still
+complete the old activation after receiving the request (seen with KWin
+for ShowWindow(SW_SHOW), ~50 ms later, with a newer serial), so one
+_NET_ACTIVE_WINDOW and one WM_TAKE_FOCUS naming the superseded window are
+ignored too, but only when they are not older than the request and
+only within 500 ms of it (checked when such an event arrives; it is not a
+timer for the request itself). Any later event for
+that window is handled as before, so a new activation of it by the user
+or the window manager still ends the pending request. The superseded
+window is forgotten when the request completes, a new request is made,
+both events were ignored, the time is over, the window leaves
+NormalState, or its X window is destroyed on this thread.
+
+Windows keeps the focus in the edit control and the main window active and
+foreground 1.5 s after SetFocus, with one popup activation, for WS_VISIBLE
+at creation and SW_SHOW; SW_SHOWNA never activates the popup. Without a
+window manager the unpatched Wine passes too; under KWin it fails.
+
+v2 (03:25): v1 fixed the WS_VISIBLE-at-creation case of popup-focus.exe
+but not ShowWindow(SW_SHOW), where KWin's _NET_ACTIVE_WINDOW for the popup
+arrived with a serial newer than the request.
+
+v3 (2026-11-04, after cross review): v2 ignored every event for the
+superseded window while the request was pending, also newer ones, and had
+no way out if the window manager never completed the request. v3 ignores
+at most one event of each kind within 500 ms and forgets the window when
+its X window is destroyed. Sequence test of the extracted functions:
+docs/wine-repro/extrude-edit/stale-shim (unpatched 7, v2 5, v3 0 of 24
+failures).
+
+v4 (2026-11-05, second cross review): an old _NET_ACTIVE_WINDOW for the
+superseded window, which is ignored as old anyway, used up its one-time
+exception, so the late completion that followed ended the request early.
+The serial is now checked first, as for WM_TAKE_FOCUS. The window is
+forgotten in destroy_whole_window, so also when set_window_visual or
+DestroyNotify destroys the X window, not only in DestroyWindow.
+Extended sequence test: run-review.py (v3 2, v4 0 of 18 failures).
+---
+diff --git a/dlls/user32/tests/win.c b/dlls/user32/tests/win.c
+index 8de4cdd..44bb46d 100644
+--- a/dlls/user32/tests/win.c
++++ b/dlls/user32/tests/win.c
+@@ -14630,6 +14630,115 @@ static void test_toolwindow_width_clamping_size(void)
+     DestroyWindow( normal );
+ }
+ 
++/* BEGIN visible popup focus reference tests. */
++/* Expected values: Windows 10 x64/i686, docs/wine-repro/extrude-edit/popup-focus.c. */
++static HWND popup_focus_main, popup_focus_edit, popup_focus_popup;
++static int popup_focus_activations;
++
++static LRESULT CALLBACK popup_focus_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam )
++{
++    if (msg == WM_ACTIVATE && LOWORD(wparam) != WA_INACTIVE) popup_focus_activations++;
++    return DefWindowProcW( hwnd, msg, wparam, lparam );
++}
++
++static void popup_focus_pump( DWORD ms )
++{
++    DWORD end = GetTickCount() + ms;
++    MSG msg;
++
++    while ((LONG)(end - GetTickCount()) > 0)
++    {
++        while (PeekMessageW( &msg, 0, 0, 0, PM_REMOVE ))
++        {
++            TranslateMessage( &msg );
++            DispatchMessageW( &msg );
++        }
++        MsgWaitForMultipleObjects( 0, NULL, FALSE, 10, QS_ALLINPUT );
++    }
++}
++
++static void test_visible_popup_focus_case( const char *name, DWORD style, int show, BOOL activates )
++{
++    HWND expect_window = activates ? NULL : popup_focus_edit;
++
++    winetest_push_context( "%s", name );
++    SetFocus( popup_focus_edit );
++    popup_focus_pump( 300 );
++    ok( GetFocus() == popup_focus_edit, "focus %p before\n", GetFocus() );
++    popup_focus_activations = 0;
++
++    popup_focus_popup = CreateWindowExW( WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_WINDOWEDGE, L"popup_focus_popup", L"",
++                                         style, 40, 200, 175, 20, NULL, NULL, GetModuleHandleW( NULL ), NULL );
++    ok( popup_focus_popup != NULL, "CreateWindowExW failed, error %lu\n", GetLastError() );
++    if (show >= 0) ShowWindow( popup_focus_popup, show );
++    if (!expect_window) expect_window = popup_focus_popup;
++    ok( GetFocus() == expect_window, "focus %p after show, expected %p\n", GetFocus(), expect_window );
++    ok( GetActiveWindow() == (activates ? popup_focus_popup : popup_focus_main), "active %p after show\n", GetActiveWindow() );
++    ok( GetForegroundWindow() == (activates ? popup_focus_popup : popup_focus_main), "foreground %p after show\n",
++        GetForegroundWindow() );
++    ok( popup_focus_activations == (activates ? 1 : 0), "%d popup activations after show\n", popup_focus_activations );
++
++    SetFocus( popup_focus_edit );
++    ok( GetFocus() == popup_focus_edit, "focus %p after SetFocus\n", GetFocus() );
++    ok( GetActiveWindow() == popup_focus_main, "active %p after SetFocus\n", GetActiveWindow() );
++    ok( GetForegroundWindow() == popup_focus_main, "foreground %p after SetFocus\n", GetForegroundWindow() );
++
++    /* the window manager must not activate the popup again later */
++    popup_focus_pump( 1500 );
++    ok( GetFocus() == popup_focus_edit, "focus %p after 1.5 s\n", GetFocus() );
++    ok( GetActiveWindow() == popup_focus_main, "active %p after 1.5 s\n", GetActiveWindow() );
++    ok( GetForegroundWindow() == popup_focus_main, "foreground %p after 1.5 s\n", GetForegroundWindow() );
++    ok( popup_focus_activations == (activates ? 1 : 0), "%d popup activations after 1.5 s\n", popup_focus_activations );
++
++    DestroyWindow( popup_focus_popup );
++    popup_focus_popup = NULL;
++    popup_focus_pump( 300 );
++    ok( GetFocus() == popup_focus_edit, "focus %p after DestroyWindow\n", GetFocus() );
++    winetest_pop_context();
++}
++
++static void test_visible_popup_focus(void)
++{
++    WNDCLASSW cls = {0};
++    DWORD start;
++
++    cls.lpfnWndProc = DefWindowProcW;
++    cls.hInstance = GetModuleHandleW( NULL );
++    cls.hCursor = LoadCursorW( NULL, (const WCHAR *)IDC_ARROW );
++    cls.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
++    cls.lpszClassName = L"popup_focus_main";
++    RegisterClassW( &cls );
++    cls.lpfnWndProc = popup_focus_proc;
++    cls.lpszClassName = L"popup_focus_popup";
++    RegisterClassW( &cls );
++
++    popup_focus_main = CreateWindowExW( 0, L"popup_focus_main", L"popup focus", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
++                                        100, 100, 400, 300, NULL, NULL, cls.hInstance, NULL );
++    ok( popup_focus_main != NULL, "CreateWindowExW failed, error %lu\n", GetLastError() );
++    popup_focus_edit = CreateWindowExW( WS_EX_CLIENTEDGE, L"EDIT", L"10.00mm",
++                                        WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
++                                        40, 170, 175, 22, popup_focus_main, (HMENU)304, cls.hInstance, NULL );
++    ok( popup_focus_edit != NULL, "CreateWindowExW failed, error %lu\n", GetLastError() );
++    SetForegroundWindow( popup_focus_main );
++    start = GetTickCount();
++    while (GetForegroundWindow() != popup_focus_main && GetTickCount() - start < 3000) popup_focus_pump( 100 );
++    popup_focus_pump( 300 );
++
++    if (GetForegroundWindow() != popup_focus_main)
++        skip( "the test window is not the foreground window\n" );
++    else
++    {
++        test_visible_popup_focus_case( "WS_VISIBLE", WS_POPUP | WS_VISIBLE | WS_BORDER, -1, TRUE );
++        test_visible_popup_focus_case( "SW_SHOW", WS_POPUP | WS_BORDER, SW_SHOW, TRUE );
++        test_visible_popup_focus_case( "SW_SHOWNA", WS_POPUP | WS_BORDER, SW_SHOWNA, FALSE );
++    }
++
++    DestroyWindow( popup_focus_main );
++    UnregisterClassW( L"popup_focus_main", cls.hInstance );
++    UnregisterClassW( L"popup_focus_popup", cls.hInstance );
++}
++/* END visible popup focus reference tests. */
++
+ START_TEST(win)
+ {
+     char **argv;
+@@ -14836,6 +14945,7 @@ START_TEST(win)
+     test_tile_windows();
+     test_GW_ENABLEDPOPUP();
+     test_toolwindow_width_clamping_size();
++    test_visible_popup_focus();
+ 
+     /* add the tests above this line */
+     if (hhook) UnhookWindowsHookEx(hhook);
+diff --git a/dlls/winex11.drv/event.c b/dlls/winex11.drv/event.c
+index 884814b..37808d4 100644
+--- a/dlls/winex11.drv/event.c
++++ b/dlls/winex11.drv/event.c
+@@ -596,8 +596,17 @@ static void handle_wm_protocols( HWND hwnd, XClientMessageEvent *event )
+     }
+     else if (protocol == x11drv_atom(WM_TAKE_FOCUS))
+     {
+-        HWND last_focus = x11drv_thread_data()->last_focus, foreground = NtUserGetForegroundWindow();
++        struct x11drv_thread_data *thread_data = x11drv_thread_data();
++        HWND last_focus = thread_data->last_focus, foreground = NtUserGetForegroundWindow();
+ 
++        if (hwnd != foreground && thread_data->net_active_window_serial &&
++            ((long)(event->serial - thread_data->net_active_window_serial) < 0 ||
++             is_stale_activation( event->window, STALE_TAKE_FOCUS )))
++        {
++            WARN( "Ignoring window %p/%lx WM_TAKE_FOCUS serial %lu, superseded by _NET_ACTIVE_WINDOW request serial %lu\n",
++                  hwnd, event->window, event->serial, thread_data->net_active_window_serial );
++            return;
++        }
+         if (window_has_pending_wm_state( hwnd, -1 ) || (hwnd != foreground && !window_should_take_focus( foreground, event_time )))
+         {
+             WARN( "Ignoring window %p/%lx WM_TAKE_FOCUS serial %lu, event_time %ld, foreground %p during WM_STATE change\n",
+@@ -1112,6 +1121,7 @@ static void get_window_mwm_hints( Display *display, Window window, MwmHints *hin
+ static void handle_wm_state_notify( HWND hwnd, XPropertyEvent *event )
+ {
+     struct x11drv_win_data *data;
++    HWND foreground;
+     UINT value = 0;
+     BOOL activate;
+ 
+@@ -1121,7 +1131,20 @@ static void handle_wm_state_notify( HWND hwnd, XPropertyEvent *event )
+     activate = value == NormalState && !data->wm_state_serial && data->current_state.activate;
+     release_win_data( data );
+ 
+-    if (hwnd == NtUserGetForegroundWindow() && activate) set_net_active_window( hwnd, 0 );
++    if (value != NormalState && x11drv_thread_data()->net_active_window_stale == event->window)
++        x11drv_thread_data()->net_active_window_stale = None;
++
++    foreground = NtUserGetForegroundWindow();
++    if (hwnd == foreground && activate) set_net_active_window( hwnd, 0 );
++    else if (activate && foreground && !is_virtual_desktop() &&
++             NtUserGetWindowThread( foreground, NULL ) == GetCurrentThreadId())
++    {
++        /* The window was mapped to be activated, but the foreground changed before the window
++         * manager mapped it. The window manager may still activate it, ask it again for the
++         * current foreground window. */
++        TRACE( "window %p mapped for activation, foreground is now %p\n", hwnd, foreground );
++        reset_net_active_window( foreground, hwnd );
++    }
+     NtUserPostMessage( hwnd, WM_WINE_WINDOW_STATE_CHANGED, 0, 0 );
+ }
+ 
+diff --git a/dlls/winex11.drv/window.c b/dlls/winex11.drv/window.c
+index d7df0a8..2882937 100644
+--- a/dlls/winex11.drv/window.c
++++ b/dlls/winex11.drv/window.c
+@@ -1999,9 +1999,18 @@ void net_active_window_notify( unsigned long serial, Window value, Time time )
+ 
+     received = wine_dbg_sprintf( "_NET_ACTIVE_WINDOW %p/%lx serial %lu time %lu", current_hwnd, value, serial, time );
+     expected = *expect_serial ? wine_dbg_sprintf( ", expected %p/%lx serial %lu", pending_hwnd, *pending, *expect_serial ) : "";
++    if (*expect_serial && serial >= *expect_serial && value != *pending &&
++        is_stale_activation( value, STALE_NET_ACTIVE_WINDOW ))
++    {
++        /* the window manager is still completing the activation our pending request supersedes */
++        WARN( "Ignoring superseded %s%s\n", received, expected );
++        *current = value;
++        return;
++    }
+     if (!handle_state_change( serial, expect_serial, sizeof(value), &value, desired, pending,
+                               current, expected, "", received, NULL ))
+         return;
++    data->net_active_window_stale = None;
+ 
+     NtUserPostMessage( NtUserGetForegroundWindow(), WM_WINE_WINDOW_STATE_CHANGED, 0, 0 );
+ }
+@@ -2057,6 +2066,7 @@ void set_net_active_window( HWND hwnd, HWND previous )
+     if (!(window = X11DRV_get_whole_window( hwnd ))) return;
+     if (data->pending_state.net_active_window == window) return;
+     if (window_set_pending_activate( hwnd, &withdrawn )) return;
++    data->net_active_window_stale = None;
+ 
+     xev.xclient.type = ClientMessage;
+     xev.xclient.window = window;
+@@ -2087,6 +2097,45 @@ void set_net_active_window( HWND hwnd, HWND previous )
+                 SubstructureRedirectMask | SubstructureNotifyMask, &xev );
+ }
+ 
++#define STALE_ACTIVATION_TIMEOUT 500 /* ms; KWin was measured to complete it ~50 ms later */
++
++/* request _NET_ACTIVE_WINDOW for hwnd even if it is the last requested window */
++void reset_net_active_window( HWND hwnd, HWND previous )
++{
++    struct x11drv_thread_data *data = x11drv_thread_data();
++    Window pending = data->pending_state.net_active_window;
++    unsigned long serial = data->net_active_window_serial;
++
++    data->pending_state.net_active_window = None;
++    set_net_active_window( hwnd, previous );
++    if (!data->pending_state.net_active_window) data->pending_state.net_active_window = pending;
++    else if (data->net_active_window_serial != serial)
++    {
++        data->net_active_window_stale = X11DRV_get_whole_window( previous );
++        data->net_active_window_stale_time = NtGetTickCount();
++        data->net_active_window_stale_events = STALE_NET_ACTIVE_WINDOW | STALE_TAKE_FOCUS;
++    }
++}
++
++/* the window manager may still complete the activation of the superseded window: ignore its
++ * _NET_ACTIVE_WINDOW and WM_TAKE_FOCUS once each, and only shortly after the new request */
++BOOL is_stale_activation( Window window, UINT event )
++{
++    struct x11drv_thread_data *data = x11drv_thread_data();
++
++    if (!window || window != data->net_active_window_stale) return FALSE;
++    if (!data->net_active_window_serial ||
++        NtGetTickCount() - data->net_active_window_stale_time > STALE_ACTIVATION_TIMEOUT)
++    {
++        data->net_active_window_stale = None;
++        return FALSE;
++    }
++    if (!(data->net_active_window_stale_events & event)) return FALSE;
++    data->net_active_window_stale_events &= ~event;
++    if (!data->net_active_window_stale_events) data->net_active_window_stale = None;
++    return TRUE;
++}
++
+ BOOL window_is_reparenting( HWND hwnd )
+ {
+     struct x11drv_win_data *data;
+@@ -2490,8 +2539,13 @@ done:
+  */
+ static void destroy_whole_window( struct x11drv_win_data *data, BOOL already_destroyed )
+ {
++    struct x11drv_thread_data *thread_data = x11drv_thread_data();
++
+     TRACE( "win %p xwin %lx/%lx\n", data->hwnd, data->whole_window, data->client_window );
+ 
++    if (thread_data && data->whole_window && thread_data->net_active_window_stale == data->whole_window)
++        thread_data->net_active_window_stale = None;
++
+     if (!data->whole_window)
+     {
+         if (data->embedded) return;
+diff --git a/dlls/winex11.drv/x11drv.h b/dlls/winex11.drv/x11drv.h
+index 22462df..6d6f490 100644
+--- a/dlls/winex11.drv/x11drv.h
++++ b/dlls/winex11.drv/x11drv.h
+@@ -440,6 +440,9 @@ struct x11drv_thread_data
+     struct display_state pending_state;       /* display state tracking the pending / requested state */
+     struct display_state current_state;       /* display state tracking the current X11 state */
+     unsigned long net_active_window_serial;   /* serial of last pending _NET_ACTIVE_WINDOW request */
++    Window   net_active_window_stale;         /* window whose activation the pending request supersedes */
++    DWORD    net_active_window_stale_time;    /* tick count when it was superseded */
++    UINT     net_active_window_stale_events;  /* STALE_* events of it still to ignore, once each */
+ };
+ 
+ extern struct x11drv_thread_data *x11drv_init_thread_data(void);
+@@ -732,6 +735,10 @@ extern void window_wm_normal_hints_notify( struct x11drv_win_data *data, unsigne
+ extern void window_configure_notify( struct x11drv_win_data *data, unsigned long serial, const RECT *rect );
+ 
+ extern void set_net_active_window( HWND hwnd, HWND previous );
++extern void reset_net_active_window( HWND hwnd, HWND previous );
++#define STALE_NET_ACTIVE_WINDOW 0x1
++#define STALE_TAKE_FOCUS        0x2
++extern BOOL is_stale_activation( Window window, UINT event );
+ extern Window get_net_active_window( Display *display );
+ extern void net_active_window_notify( unsigned long serial, Window window, Time time );
+ extern void net_active_window_init( struct x11drv_thread_data *data );

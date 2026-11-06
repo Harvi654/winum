@@ -1,0 +1,79 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Respect the install level when following a parent.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+
+Do not select an unrequested FollowParent feature above INSTALLLEVEL on a
+fresh level-based installation. Preserve override and maintenance modes.
+The level-control and CA level-mode controls measure this independently
+of ADDLOCAL and of the immediate CA update. B remains todo_wine.
+Apply after msi-addlocal-feature-ancestors.patch; not in series.
+
+diff --git a/dlls/msi/action.c b/dlls/msi/action.c
+--- a/dlls/msi/action.c
++++ b/dlls/msi/action.c
+@@ -1662,13 +1662,14 @@
+     }
+ }
+ 
+-static void follow_parent( MSIFEATURE *feature )
++static void follow_parent( MSIFEATURE *feature, int level, BOOL limit_level )
+ {
+     FeatureList *fl;
+ 
+     LIST_FOR_EACH_ENTRY( fl, &feature->Children, FeatureList, entry )
+     {
+-        if (fl->feature->Attributes & msidbFeatureAttributesFollowParent)
++        if ((fl->feature->Attributes & msidbFeatureAttributesFollowParent) &&
++            (!limit_level || is_feature_selected( fl->feature, level )))
+         {
+             TRACE("child %s (level %d request %d) follows parent %s (level %d request %d)\n",
+                   debugstr_w(fl->feature->Feature), fl->feature->Level, fl->feature->ActionRequest,
+@@ -1677,14 +1678,14 @@
+             fl->feature->Action = feature->Action;
+             fl->feature->ActionRequest = feature->ActionRequest;
+         }
+-        follow_parent( fl->feature );
++        follow_parent( fl->feature, level, limit_level );
+     }
+ }
+ 
+ UINT MSI_SetFeatureStates(MSIPACKAGE *package)
+ {
+     WCHAR *addlocal;
+-    BOOL fresh_addlocal;
++    BOOL fresh_addlocal, limit_level;
+     int level;
+     MSICOMPONENT* component;
+     MSIFEATURE *feature;
+@@ -1797,13 +1798,17 @@
+     addlocal = msi_dup_property( package->db, L"ADDLOCAL" );
+     fresh_addlocal = addlocal && *addlocal && !msi_get_property_int( package->db, L"Installed", 0 );
+     free( addlocal );
++    /* Apply the level limit only to fresh default selection. Preselected
++     * also covers other overrides; maintenance keeps its existing behavior. */
++    limit_level = !msi_get_property_int( package->db, L"Preselected", 0 ) &&
++                  !msi_get_property_int( package->db, L"Installed", 0 );
+ 
+     /* disable child features of unselected parent or follow parent */
+     LIST_FOR_EACH_ENTRY( feature, &package->features, MSIFEATURE, entry )
+     {
+         if (feature->Feature_Parent) continue;
+         disable_children( feature, level );
+-        if (!fresh_addlocal) follow_parent( feature );
++        if (!fresh_addlocal) follow_parent( feature, level, limit_level );
+     }
+ 
+     /* now we want to set component state based based on feature state */
+diff --git a/dlls/msi/tests/selection.c b/dlls/msi/tests/selection.c
+--- a/dlls/msi/tests/selection.c
++++ b/dlls/msi/tests/selection.c
+@@ -109,7 +109,7 @@
+  * Standalone --strict checks the patched engine without any expected failures.
+  */
+ #ifndef SELECTION_FIXED_RULES
+-#define SELECTION_FIXED_RULES 1
++#define SELECTION_FIXED_RULES 3
+ #endif
+ static const INSTALLSTATE expected_states[][15] =
+ {

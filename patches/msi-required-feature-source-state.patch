@@ -1,0 +1,79 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Report Local for measured required Source selections.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+
+Windows v14 attr26 Source requests become Local, through API before/after
+costing and ADDSOURCE. Restrict coercion to the measured attr26 combination.
+Non-required features and maintenance retain the old behavior. Shared v14
+props and pre-cost/post-seed Get/publish assertions; RULE_API.
+
+--- a/dlls/msi/install.c
++++ b/dlls/msi/install.c
+@@ -1024,6 +1024,15 @@
+     if (!feature)
+         return ERROR_UNKNOWN_FEATURE;
+ 
++    if (!msi_get_property_int( package->db, L"Installed", 0 ))
++    {
++        BOOL required = feature->Attributes == (msidbFeatureAttributesFollowParent |
++            msidbFeatureAttributesDisallowAdvertise | msidbFeatureAttributesUIDisallowAbsent);
++
++        if (iState == INSTALLSTATE_SOURCE && required)
++            iState = INSTALLSTATE_LOCAL;
++    }
++
+     if (iState == INSTALLSTATE_LOCAL && msi_get_property_int( package->db, L"CostingComplete", 0 ) &&
+         !msi_get_property_int( package->db, L"Installed", 0 ))
+         return select_local_feature( package, feature );
+--- a/dlls/msi/action.c
++++ b/dlls/msi/action.c
+@@ -1560,6 +1560,7 @@
+     MSIFEATURE *feature;
+     BOOL remove = !wcscmp(property, L"REMOVE");
+     BOOL reinstall = !wcscmp(property, L"REINSTALL");
++    BOOL fresh = !msi_get_property_int( package->db, L"Installed", 0 );
+ 
+     override = msi_dup_property( package->db, property );
+     if (!override)
+@@ -1567,18 +1568,25 @@
+ 
+     LIST_FOR_EACH_ENTRY( feature, &package->features, MSIFEATURE, entry )
+     {
+-        if (feature->Level <= 0)
+-            continue;
++        INSTALLSTATE selected;
++        BOOL required = feature->Attributes == (msidbFeatureAttributesFollowParent |
++            msidbFeatureAttributesDisallowAdvertise | msidbFeatureAttributesUIDisallowAbsent);
++
++        if (feature->Level <= 0) continue;
+ 
+         if (reinstall)
+             state = (feature->Installed == INSTALLSTATE_ABSENT ? INSTALLSTATE_UNKNOWN : feature->Installed);
+         else if (remove)
+             state = (feature->Installed == INSTALLSTATE_ABSENT ? INSTALLSTATE_UNKNOWN : INSTALLSTATE_ABSENT);
+ 
++        selected = state;
++        if (fresh && required && selected == INSTALLSTATE_SOURCE)
++            selected = INSTALLSTATE_LOCAL;
++
+         if (!wcsicmp( override, L"ALL" ))
+         {
+-            feature->Action = state;
+-            feature->ActionRequest = state;
++            feature->Action = selected;
++            feature->ActionRequest = selected;
+         }
+         else
+         {
+@@ -1592,8 +1600,8 @@
+                 if ((ptr2 && lstrlenW(feature->Feature) == len && !wcsncmp(ptr, feature->Feature, len))
+                     || (!ptr2 && !wcscmp(ptr, feature->Feature)))
+                 {
+-                    feature->Action = state;
+-                    feature->ActionRequest = state;
++                    feature->Action = selected;
++                    feature->ActionRequest = selected;
+                     break;
+                 }
+                 if (ptr2)

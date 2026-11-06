@@ -1,0 +1,71 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Reject cyclic feature parents during CostInitialize.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+
+Windows v14 cycle probes0/1 return1603 at CostInitialize without a crash.
+Validate parent links with a linear three-state walk before recursive costing
+helpers. Reuse E's feature indices, allocate one local parent/color map, never
+follow a malformed cycle without a visited bound. No depth limit is inferred.
+
+Shared v14 contained cycle assertions, RULE_GRAPH. The measured512-deep tree
+is accepted here, just as Windows CostInitialize accepts it. Windows then
+rejects it at CostFinalize; its exact depth boundary remains an explicit
+RULE_DEPTH todo and a separate test-only open issue, not a guessed threshold.
+
+--- a/dlls/msi/action.c
++++ b/dlls/msi/action.c
+@@ -1383,14 +1383,53 @@
+     return r;
+ }
+ 
++/* Validate parent cycles before the recursive costing helpers can run.
++ * This is graph validity, not an assumed Windows feature-depth limit. */
++static UINT validate_feature_cycles( MSIPACKAGE *package )
++{
++    struct feature_parent
++    {
++        struct feature_parent *parent;
++        unsigned int state;
++    } *nodes, *node, *next;
++    unsigned int count = list_count( &package->features ), i = 0;
++    MSIFEATURE *feature;
++    FeatureList *child;
++
++    if (!count) return ERROR_SUCCESS;
++    if (!(nodes = calloc( count, sizeof(*nodes) ))) return ERROR_OUTOFMEMORY;
++    LIST_FOR_EACH_ENTRY( feature, &package->features, MSIFEATURE, entry ) feature->selection_index = i++;
++    LIST_FOR_EACH_ENTRY( feature, &package->features, MSIFEATURE, entry )
++        LIST_FOR_EACH_ENTRY( child, &feature->Children, FeatureList, entry )
++            nodes[child->feature->selection_index].parent = &nodes[feature->selection_index];
++    for (i = 0; i < count; ++i)
++    {
++        node = &nodes[i];
++        while (node && !node->state) { node->state = 1; node = node->parent; }
++        if (node && node->state == 1) { free( nodes ); return ERROR_INSTALL_FAILURE; }
++        node = &nodes[i];
++        while (node && node->state == 1)
++        {
++            next = node->parent;
++            node->state = 2;
++            node = next;
++        }
++    }
++    free( nodes );
++    return ERROR_SUCCESS;
++}
++
+ static UINT ACTION_CostInitialize(MSIPACKAGE *package)
+ {
++    UINT rc;
++
+     msi_set_property( package->db, L"CostingComplete", L"0", -1 );
+     msi_set_property( package->db, L"ROOTDRIVE", L"C:\\", -1 );
+ 
+     load_all_folders( package );
+     msi_load_all_components( package );
+     msi_load_all_features( package );
++    if ((rc = validate_feature_cycles( package ))) return rc;
+     load_all_files( package );
+     load_all_patches( package );
+     mark_patched_components( package );

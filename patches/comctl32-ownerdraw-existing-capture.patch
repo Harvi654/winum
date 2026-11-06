@@ -1,0 +1,11 @@
+--- a/dlls/comctl32_v6/button.c
++++ b/dlls/comctl32_v6/button.c
+@@ -612,5 +612,7 @@
+         }
+ 
+-        SetCapture( hWnd );
++        /* An owner-draw superclass may already have captured this button.
++         * Repeating SetCapture notifies that superclass while DOWN is armed. */
++        if (btn_type != BS_OWNERDRAW || GetCapture() != hWnd) SetCapture( hWnd );
+         SendMessageW( hWnd, BM_SETSTATE, TRUE, 0 );
+         break;

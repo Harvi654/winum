@@ -1,0 +1,80 @@
+--- a/programs/explorer/systray.c
++++ b/programs/explorer/systray.c
+@@ -1206,6 +1206,68 @@
+     sync_taskbar_buttons();
+ }
+ 
++/* Optional task-list parenting hosts for clients which embed taskbar windows.
++ * This does not implement native-host taskbar overlays or change CreateWindowEx
++ * failure semantics. The existing tray remains the owner of this subtree. */
++static LRESULT WINAPI tasklist_host_proc( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp )
++{
++    if (msg == WM_SIZE)
++    {
++        WCHAR name[32];
++        HWND child = GetWindow( hwnd, GW_CHILD );
++        /* Only size our own list host, never an application's overlay child. */
++        if (child && GetClassNameW( hwnd, name, ARRAY_SIZE(name) ) && !lstrcmpW( name, L"MSTaskSwWClass" ))
++            SetWindowPos( child, 0, 0, 0, LOWORD(lp), HIWORD(lp), SWP_NOACTIVATE | SWP_NOZORDER );
++    }
++    return DefWindowProcW( hwnd, msg, wp, lp );
++}
++
++static void initialize_tasklist_hosts( void )
++{
++    static const WCHAR switch_class[] = L"MSTaskSwWClass";
++    static const WCHAR list_class[] = L"MSTaskListWClass";
++    INITCOMMONCONTROLSEX controls = { sizeof(controls), ICC_COOL_CLASSES };
++    WNDCLASSEXW cls = { .cbSize = sizeof(cls), .lpfnWndProc = tasklist_host_proc };
++    REBARBANDINFOW band = { .cbSize = sizeof(band) };
++    HWND rebar = 0, tasks = 0, list = 0;
++    int width = max( icon_cx, 1 ), height = max( icon_cy, 1 );
++    WCHAR enabled[2];
++
++    if (GetEnvironmentVariableW( L"WINE_EXPLORER_TASKLIST_HOST", enabled, ARRAY_SIZE(enabled) ) != 1 ||
++        enabled[0] != '1') return;
++    if (FindWindowExW( tray_window, 0, REBARCLASSNAMEW, 0 )) return;
++    cls.hInstance = GetModuleHandleW( NULL );
++    cls.lpszClassName = switch_class;
++    if (!RegisterClassExW( &cls )) goto failed;
++    cls.lpszClassName = list_class;
++    if (!RegisterClassExW( &cls )) goto failed;
++    if (!InitCommonControlsEx( &controls )) goto failed;
++
++    rebar = CreateWindowExW( 0, REBARCLASSNAMEW, 0,
++                            WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN |
++                            CCS_NOPARENTALIGN | CCS_NORESIZE | CCS_NODIVIDER | RBS_FIXEDORDER,
++                            0, 0, width + 8, height + 8, tray_window, 0, cls.hInstance, 0 );
++    if (!rebar) goto failed;
++    tasks = CreateWindowExW( 0, switch_class, 0, WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
++                            0, 0, width, height, rebar, 0, cls.hInstance, 0 );
++    if (!tasks) goto failed;
++    list = CreateWindowExW( 0, list_class, 0, WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
++                           0, 0, width, height, tasks, 0, cls.hInstance, 0 );
++    if (!list) goto failed;
++    band.fMask = RBBIM_CHILD | RBBIM_CHILDSIZE | RBBIM_STYLE | RBBIM_SIZE;
++    band.fStyle = RBBS_NOGRIPPER;
++    band.hwndChild = tasks;
++    band.cxMinChild = width;
++    band.cyMinChild = height;
++    band.cx = width + 8;
++    if (!SendMessageW( rebar, RB_INSERTBANDW, -1, (LPARAM)&band )) goto failed;
++    TRACE( "task-list parenting hosts ready\n" );
++    return;
++failed:
++    WARN( "task-list parenting host initialization failed, error %lu\n", GetLastError() );
++    if (rebar) DestroyWindow( rebar );
++}
++
+ /* this function creates the listener window */
+ void initialize_systray( BOOL arg_using_root, BOOL arg_enable_shell, BOOL arg_show_systray, BOOL arg_no_tray_items )
+ {
+@@ -1270,6 +1332,8 @@
+         return;
+     }
+ 
++    initialize_tasklist_hosts();
++
+     LoadStringW( NULL, IDS_START_LABEL, start_label, ARRAY_SIZE( start_label ));
+ 
+     add_taskbar_button( 0 );

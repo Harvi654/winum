@@ -10,7 +10,7 @@ umask 022
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source="$(realpath -e -- "$1")"
 output="$(realpath -m -- "$2")"
-patch="$here/patches/candidates/oleaut32-typelib-cache/oleaut32-typelib-keep-released.patch"
+patch="$here/patches/oleaut32-typelib-keep-released.patch"
 if [[ ! -f "$source/include/wine/test.h" ]]; then
     # A source archive has the tree one or two levels down.
     found="$(find "$source" -maxdepth 6 -path '*/include/wine/test.h' -print -quit)"

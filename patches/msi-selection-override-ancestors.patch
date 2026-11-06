@@ -1,0 +1,81 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Preserve ancestor closure for fresh selection overrides.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+
+Windows v14 props: ADDSOURCE/ADVERTISE on required features select their
+ancestors and mandatory siblings before execution. Keep the explicit states
+and later override precedence. Do not discard these requests merely because
+the selected parent has Level above INSTALLLEVEL, nor overwrite Advertised
+children through FollowParent in a fresh override selection.
+
+Measured product-state failure in props-level-control is independent of
+post-cost Local propagation. State coercion is a separate next patch.
+Shared v14 controls/before/after/publish assertions, RULE_OVERRIDES/RULE_API.
+Maintenance and non-required Source/Advertise seeds are not extended.
+
+--- a/dlls/msi/action.c
++++ b/dlls/msi/action.c
+@@ -1531,13 +1531,14 @@
+     }
+ }
+ 
+-static void select_addlocal_parents( MSIPACKAGE *package )
++static void select_override_parents( MSIPACKAGE *package, INSTALLSTATE state )
+ {
+     MSIFEATURE *feature, *parent;
+ 
+     LIST_FOR_EACH_ENTRY( feature, &package->features, MSIFEATURE, entry )
+     {
+-        if (feature->ActionRequest != INSTALLSTATE_LOCAL) continue;
++        if (feature->ActionRequest != INSTALLSTATE_LOCAL &&
++            (feature->ActionRequest != state || !(feature->Attributes & msidbFeatureAttributesUIDisallowAbsent))) continue;
+         parent = feature;
+         while (parent->Feature_Parent)
+         {
+@@ -1605,8 +1606,9 @@
+             }
+         }
+     }
+-    if (!wcscmp( property, L"ADDLOCAL" ) && !msi_get_property_int( package->db, L"Installed", 0 ))
+-        select_addlocal_parents( package );
++    if ((state == INSTALLSTATE_LOCAL || state == INSTALLSTATE_SOURCE || state == INSTALLSTATE_ADVERTISED) &&
++        !msi_get_property_int( package->db, L"Installed", 0 ))
++        select_override_parents( package, state );
+     free(override);
+     return TRUE;
+ }
+@@ -1649,7 +1651,9 @@
+ 
+     LIST_FOR_EACH_ENTRY( fl, &feature->Children, FeatureList, entry )
+     {
+-        if (!is_feature_selected( feature, level ))
++        if (!is_feature_selected( feature, level ) &&
++            feature->ActionRequest != INSTALLSTATE_LOCAL && feature->ActionRequest != INSTALLSTATE_SOURCE &&
++            feature->ActionRequest != INSTALLSTATE_ADVERTISED)
+         {
+             TRACE("child %s (level %d request %d) follows disabled parent %s (level %d request %d)\n",
+                   debugstr_w(fl->feature->Feature), fl->feature->Level, fl->feature->ActionRequest,
+@@ -1685,7 +1689,7 @@
+ 
+ UINT MSI_SetFeatureStates(MSIPACKAGE *package)
+ {
+-    WCHAR *addlocal;
++    WCHAR *addlocal, *addsource, *advertise;
+     BOOL fresh_addlocal, limit_level;
+     int level;
+     MSICOMPONENT* component;
+@@ -1797,7 +1801,12 @@
+     }
+ 
+     addlocal = msi_dup_property( package->db, L"ADDLOCAL" );
+-    fresh_addlocal = addlocal && *addlocal && !msi_get_property_int( package->db, L"Installed", 0 );
++    addsource = msi_dup_property( package->db, L"ADDSOURCE" );
++    advertise = msi_dup_property( package->db, L"ADVERTISE" );
++    fresh_addlocal = ((addlocal && *addlocal) || (addsource && *addsource) || (advertise && *advertise)) &&
++                     !msi_get_property_int( package->db, L"Installed", 0 );
++    free( addsource );
++    free( advertise );
+     free( addlocal );
+     /* Apply the level limit only to fresh default selection. Preselected
+      * also covers other overrides; maintenance keeps its existing behavior. */

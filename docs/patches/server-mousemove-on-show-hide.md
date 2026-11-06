@@ -1,0 +1,40 @@
+# server-mousemove-on-show-hide.patch
+
+*Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
+
+- **DLL:** `server`
+- **Origin:** Autodesk-Inventor-for-Linux, commit `e236679`, first shipped in `wine-11.19-1`
+- **In winum:** `patches/series` from winum-11.20-1
+
+## Problem as the user saw it
+
+Sketch: an edited dimension showed its new value only after the mouse moved.
+
+## Cause and fix
+
+Like Windows, the window under the cursor gets a mouse move when a window is shown or hidden (one per burst, 100 ms later).
+
+## Wine test
+
+None in the patch.
+
+## Validation
+
+| Level | Result |
+| --- | --- |
+| L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
+| L1 | **no Wine test** - needs one, measured on Windows first |
+| L2 | not recorded per patch |
+| L3 | not recorded |
+| L4 | Values update at once. (Inventor, maintainer) |
+| L5 | in Inventor's runtime since `wine-11.19-1` (2026-10-19); a week of use not formally recorded - maintainer to confirm |
+| Cross review | not recorded (written before the cross-review rule) |
+
+## Open points
+
+Wine test missing; the 100 ms delay is empirical.
+
+## Evidence
+
+Autodesk-Inventor-for-Linux [`docs/arch-hyprland.md`](https://github.com/Harvi654/Autodesk-Inventor-for-Linux/blob/main/docs/arch-hyprland.md) (search for the patch name).
+

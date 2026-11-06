@@ -1,0 +1,236 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] win32u: Ignore SetWindowPos with HWND_TOPMOST/NOTOPMOST on child windows.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Windows 10 x64/i686 (own child-topmost MEASURE, a540699/b1fabde): for a
+WS_CHILD window, SetWindowPos with HWND_TOPMOST or HWND_NOTOPMOST and
+without SWP_NOZORDER returns TRUE and changes nothing: no move, no size,
+no WS_EX_TOPMOST, no WM_WINDOWPOSCHANGING/CHANGED/WM_SIZE. With
+SWP_NOZORDER, HWND_TOP or HWND_BOTTOM the geometry is applied as usual.
+Wine applied the geometry and set WS_EX_TOPMOST. SOLIDWORKS sends such a
+call with a negative width after laying out its PropertyManager section
+headers, so on Wine they ended up with width 0 and lost their captions.
+
+Only the measured case is changed: WS_CHILD without WS_POPUP, not
+already WS_EX_TOPMOST, and not combined with SWP_SHOWWINDOW,
+SWP_HIDEWINDOW or SWP_FRAMECHANGED (none of these measured).
+
+v2 (2026-11-04, after cross review): v1 did not check WS_EX_TOPMOST, so a
+child that already had it took the new path too, although the
+documentation said this unmeasured case stays as before. It does now.
+
+The existing test_SetWindowPos child cases lose todo_wine.
+The new test repeats the measured matrix with strict assertions.
+---
+diff --git a/dlls/user32/tests/win.c b/dlls/user32/tests/win.c
+index 8de4cdd..7143eb1 100644
+--- a/dlls/user32/tests/win.c
++++ b/dlls/user32/tests/win.c
+@@ -3273,7 +3273,7 @@ static void test_SetWindowPos(HWND hwnd, HWND hwnd2)
+     ret = SetWindowPos(hwnd_child, HWND_NOTOPMOST, 1, 2, 3, 4, 0);
+     ok(ret, "Got %d.\n", ret);
+     GetWindowRect(hwnd_child, &rc2);
+-    todo_wine ok(EqualRect(&rc1, &rc2), "%s != %s.\n", wine_dbgstr_rect(&rc1), wine_dbgstr_rect(&rc2));
++    ok(EqualRect(&rc1, &rc2), "%s != %s.\n", wine_dbgstr_rect(&rc1), wine_dbgstr_rect(&rc2));
+     check_active_state(hwnd2, hwnd2, hwnd2);
+     SetWindowPos(hwnd_child, HWND_NOTOPMOST, 0, 0, rc1.right - rc1.left, rc1.bottom - rc1.top, 0);
+ 
+@@ -3281,7 +3281,7 @@ static void test_SetWindowPos(HWND hwnd, HWND hwnd2)
+     ret = SetWindowPos(hwnd_child, HWND_TOPMOST, 1, 2, 3, 4, 0);
+     ok(ret, "Got %d.\n", ret);
+     GetWindowRect(hwnd_child, &rc2);
+-    todo_wine ok(EqualRect(&rc1, &rc2), "%s != %s.\n", wine_dbgstr_rect(&rc1), wine_dbgstr_rect(&rc2));
++    ok(EqualRect(&rc1, &rc2), "%s != %s.\n", wine_dbgstr_rect(&rc1), wine_dbgstr_rect(&rc2));
+     check_active_state(hwnd2, hwnd2, hwnd2);
+     SetWindowPos(hwnd_child, HWND_TOPMOST, 0, 0, rc1.right - rc1.left, rc1.bottom - rc1.top, 0);
+ 
+@@ -3388,6 +3388,163 @@ static void test_SetWindowPos(HWND hwnd, HWND hwnd2)
+     DestroyWindow(hwnd_child);
+ }
+ 
++/* BEGIN child TOPMOST reference tests. */
++static WNDPROC child_topmost_button_proc;
++static unsigned int child_topmost_messages;
++
++static LRESULT WINAPI child_topmost_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++    if (msg == WM_WINDOWPOSCHANGING || msg == WM_WINDOWPOSCHANGED || msg == WM_SIZE)
++        child_topmost_messages++;
++    if (child_topmost_button_proc)
++        return CallWindowProcA(child_topmost_button_proc, hwnd, msg, wparam, lparam);
++    return DefWindowProcA(hwnd, msg, wparam, lparam);
++}
++
++static INT_PTR CALLBACK child_topmost_dialog_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++    return msg == WM_INITDIALOG || msg == WM_DRAWITEM;
++}
++
++static void child_topmost_pump(void)
++{
++    MSG msg;
++    while (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE))
++    {
++        TranslateMessage(&msg);
++        DispatchMessageA(&msg);
++    }
++}
++
++static void child_topmost_rect(HWND child, HWND parent, RECT *rect)
++{
++    GetWindowRect(child, rect);
++    MapWindowPoints(NULL, parent, (POINT *)rect, 2);
++}
++
++static void test_SetWindowPos_child_topmost(void)
++{
++    static const struct
++    {
++        HWND after;
++        UINT flags;
++        BOOL small;
++        BOOL ignored;
++    }
++    tests[] =
++    {
++        { HWND_TOPMOST, 0, FALSE, TRUE },
++        { HWND_NOTOPMOST, 0, FALSE, TRUE },
++        { HWND_TOP, 0, FALSE, FALSE },
++        { HWND_BOTTOM, 0, FALSE, FALSE },
++        { HWND_TOPMOST, SWP_NOZORDER | SWP_NOACTIVATE, FALSE, FALSE },
++        { HWND_TOPMOST, 0, TRUE, TRUE },
++        { HWND_TOPMOST, SWP_NOMOVE | SWP_NOSIZE, FALSE, TRUE },
++    };
++    struct
++    {
++        DLGTEMPLATE dialog;
++        WORD menu, window_class, title;
++    } empty;
++    WNDCLASSA cls = {0};
++    unsigned int kind, geometry, i;
++    HWND root, parent, child;
++    RECT rect, start;
++    HDWP batch;
++    DWORD ex_style;
++    BOOL ret;
++
++    memset(&empty, 0, sizeof(empty));
++    cls.lpfnWndProc = child_topmost_proc;
++    cls.hInstance = GetModuleHandleA(NULL);
++    cls.lpszClassName = "child_topmost_class";
++    ret = RegisterClassA(&cls);
++    ok(ret, "RegisterClassA failed, error %lu.\n", GetLastError());
++
++    cls.lpfnWndProc = DefWindowProcA;
++    cls.lpszClassName = "child_topmost_root";
++    ret = RegisterClassA(&cls);
++    ok(ret, "RegisterClassA failed, error %lu.\n", GetLastError());
++
++    root = CreateWindowA("child_topmost_root", "child topmost", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
++                         40, 40, 420, 460, NULL, NULL, cls.hInstance, NULL);
++    ok(root != NULL, "CreateWindowA failed, error %lu.\n", GetLastError());
++    empty.dialog.style = WS_CHILD | WS_VISIBLE | DS_CONTROL;
++    empty.dialog.cx = 220;
++    empty.dialog.cy = 340;
++    parent = CreateDialogIndirectParamA(cls.hInstance, &empty.dialog, root, child_topmost_dialog_proc, 0);
++    ok(parent != NULL, "CreateDialogIndirectParamA failed, error %lu.\n", GetLastError());
++    ret = SetWindowPos(parent, NULL, 5, 5, 217, 339, SWP_NOZORDER | SWP_NOACTIVATE);
++    ok(ret, "SetWindowPos failed, error %lu.\n", GetLastError());
++
++    for (kind = 0; kind < 2; kind++)
++    for (geometry = 0; geometry < 2; geometry++)
++    for (i = 0; i < ARRAY_SIZE(tests); i++)
++    {
++        int x = geometry ? 27 : 4, y = geometry ? 214 : 8, width = geometry ? 186 : 209;
++        int req_x = x + 212, req_y = y, req_width = width - 216, req_height = 17;
++        DWORD start_ex_style = kind ? WS_EX_TRANSPARENT : 0;
++
++        winetest_push_context("kind %u geometry %u test %u", kind, geometry, i);
++        if (tests[i].small)
++        {
++            req_x = 1;
++            req_y = 2;
++            req_width = 3;
++            req_height = 4;
++        }
++
++        child_topmost_button_proc = NULL;
++        child = CreateWindowExA(start_ex_style, kind ? "Button" : "child_topmost_class", "",
++                                WS_CHILD | WS_VISIBLE | (kind ? BS_OWNERDRAW : 0),
++                                x, y, width, 17, parent, (HMENU)53400, cls.hInstance, NULL);
++        ok(child != NULL, "CreateWindowExA failed, error %lu.\n", GetLastError());
++        if (kind)
++            child_topmost_button_proc = (WNDPROC)SetWindowLongPtrA(child, GWLP_WNDPROC,
++                                                                   (LONG_PTR)child_topmost_proc);
++        child_topmost_pump();
++
++        batch = BeginDeferWindowPos(1);
++        batch = DeferWindowPos(batch, child, NULL, x, y, width, 17, SWP_NOZORDER | SWP_NOACTIVATE);
++        ret = EndDeferWindowPos(batch);
++        ok(ret, "EndDeferWindowPos failed, error %lu.\n", GetLastError());
++        child_topmost_pump();
++        child_topmost_rect(child, parent, &start);
++        ok(start.left == x && start.top == y && start.right == x + width && start.bottom == y + 17,
++           "got start rect (%ld,%ld)-(%ld,%ld).\n", start.left, start.top, start.right, start.bottom);
++
++        child_topmost_messages = 0;
++        ret = SetWindowPos(child, tests[i].after, req_x, req_y, req_width, req_height, tests[i].flags);
++        ok(ret, "SetWindowPos failed, error %lu.\n", GetLastError());
++        child_topmost_pump();
++        child_topmost_rect(child, parent, &rect);
++        ex_style = GetWindowLongA(child, GWL_EXSTYLE);
++
++        if (tests[i].ignored)
++        {
++            ok(EqualRect(&rect, &start), "got rect (%ld,%ld)-(%ld,%ld), expected (%ld,%ld)-(%ld,%ld).\n",
++               rect.left, rect.top, rect.right, rect.bottom, start.left, start.top, start.right, start.bottom);
++            ok(!child_topmost_messages, "got %u position/size messages.\n", child_topmost_messages);
++        }
++        else
++        {
++            ok(rect.left == req_x && rect.top == req_y && rect.right == req_x && rect.bottom == req_y + 17,
++               "got rect (%ld,%ld)-(%ld,%ld).\n", rect.left, rect.top, rect.right, rect.bottom);
++            ok(child_topmost_messages, "got no position/size messages.\n");
++        }
++        ok(ex_style == start_ex_style, "got ex_style %#lx, expected %#lx.\n", ex_style, start_ex_style);
++
++        DestroyWindow(child);
++        winetest_pop_context();
++    }
++
++    child_topmost_button_proc = NULL;
++    DestroyWindow(root);
++    UnregisterClassA("child_topmost_class", cls.hInstance);
++    UnregisterClassA("child_topmost_root", cls.hInstance);
++}
++/* END child TOPMOST reference tests. */
++
+ static void test_SetMenu(HWND parent)
+ {
+     HWND child;
+@@ -14765,6 +14922,7 @@ START_TEST(win)
+ 
+     test_icons();
+     test_SetWindowPos(hwndMain, hwndMain2);
++    test_SetWindowPos_child_topmost();
+     test_SetMenu(hwndMain);
+     test_SetFocus(hwndMain);
+     test_SetActiveWindow_0( argv );
+diff --git a/dlls/win32u/window.c b/dlls/win32u/window.c
+index 03ce398..bfe03b9 100644
+--- a/dlls/win32u/window.c
++++ b/dlls/win32u/window.c
+@@ -4120,6 +4120,12 @@ BOOL set_window_pos( WINDOWPOS *winpos, int parent_x, int parent_y )
+         {
+             HWND parent = NtUserGetAncestor( NtUserGetAncestor( winpos->hwnd, GA_ROOT ), GA_PARENT );
+             if (parent == get_hwnd_message_parent()) return TRUE;
++
++            /* child windows ignore the whole call when asked to change their topmost state */
++            if ((get_window_long( winpos->hwnd, GWL_STYLE ) & (WS_POPUP | WS_CHILD)) == WS_CHILD &&
++                !(get_window_long( winpos->hwnd, GWL_EXSTYLE ) & WS_EX_TOPMOST) &&
++                !(winpos->flags & (SWP_SHOWWINDOW | SWP_HIDEWINDOW | SWP_FRAMECHANGED)))
++                return TRUE;
+         }
+         else if (winpos->hwndInsertAfter != HWND_TOP && winpos->hwndInsertAfter != HWND_BOTTOM)
+         {

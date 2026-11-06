@@ -1,0 +1,15 @@
+--- a/dlls/msi/dialog.c
++++ b/dlls/msi/dialog.c
+@@ -634,7 +634,11 @@
+     else if ( !wcscmp( attribute, L"Property" ) )
+     {
+         MSIFEATURE *feature = seltree_get_selected_feature( ctrl );
+-        if (feature) dialog_set_property( dialog->package, ctrl->property, feature->Directory );
++        /* A real directory property contains a resolved path, not another
++         * directory identifier. Keep it intact when the feature changes.
++         * Browse indirection properties still track the selected directory. */
++        if (feature && ctrl->property && !msi_get_loaded_folder( dialog->package, ctrl->property ))
++            dialog_set_property( dialog->package, ctrl->property, feature->Directory );
+     }
+     else if ( !wcscmp( attribute, L"SelectionPath" ) )
+     {

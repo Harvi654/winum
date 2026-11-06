@@ -1,0 +1,180 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] comctl32: Paint themed check boxes through a memory DC.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Windows 10 x64/i686 (own themed-checkbox-dc MEASURE): a themed comctl32 v6
+BS_AUTOCHECKBOX gives its parent a memory DC (OBJ_MEMDC) in WM_ERASEBKGND,
+WM_PRINTCLIENT and WM_CTLCOLORSTATIC. ReleaseDC(parent, that DC) there
+returns 0 and the check box still paints. Wine passed the window's paint DC,
+and ReleaseDC releases a cache DC through any window on Windows too
+(dc-release MEASURE, 25/25), so the following fill, box and label drew
+nothing. SOLIDWORKS calls ReleaseDC(dialog, hdc) in that handler, which is
+why its PropertyManager check boxes vanished with the theme on.
+
+For the themed BS_AUTOCHECKBOX, run the background phase (parent background
+and WM_CTLCOLORSTATIC fill) in a buffered paint memory DC that starts from the
+current content, and copy it back; the box and label are drawn on the
+target DC as before, so the control font stays selected there (existing
+WM_PAINT/WM_PRINTCLIENT font tests). Only the measured button type changes. The new test checks that the parent gets a memory DC in all three messages
+and that ReleaseDC on it fails there, as measured on Windows.
+---
+diff --git a/dlls/comctl32/tests/button.c b/dlls/comctl32/tests/button.c
+index cb54c19..c6dfda7 100644
+--- a/dlls/comctl32/tests/button.c
++++ b/dlls/comctl32/tests/button.c
+@@ -22,6 +22,7 @@
+ 
+ #include <windows.h>
+ #include <commctrl.h>
++#include <uxtheme.h>
+ #include <uiautomationclient.h>
+ 
+ #include "wine/test.h"
+@@ -2443,6 +2444,99 @@ static void test_visual(void)
+     DestroyWindow(parent);
+ }
+ 
++/* BEGIN themed checkbox parent DC tests. */
++static HWND tcd_button;
++static BOOL tcd_active, tcd_releasing;
++static unsigned int tcd_count[3];
++static DWORD tcd_type[3];
++static int tcd_release;
++
++static LRESULT CALLBACK tcd_parent_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++    int idx = msg == WM_ERASEBKGND ? 0 : msg == WM_PRINTCLIENT ? 1 : msg == WM_CTLCOLORSTATIC ? 2 : -1;
++
++    if (idx >= 0 && tcd_active && (idx < 2 || (HWND)lparam == tcd_button))
++    {
++        tcd_count[idx]++;
++        tcd_type[idx] = GetObjectType((HDC)wparam);
++        if (idx == 0 && tcd_releasing)
++            tcd_release = ReleaseDC(hwnd, (HDC)wparam);
++        if (idx == 0) return 1;
++        if (idx == 1) return 0;
++        return (LRESULT)GetSysColorBrush(COLOR_WINDOW);
++    }
++    return DefWindowProcA(hwnd, msg, wparam, lparam);
++}
++
++static void tcd_paint(BOOL releasing)
++{
++    memset(tcd_count, 0, sizeof(tcd_count));
++    memset(tcd_type, 0, sizeof(tcd_type));
++    tcd_release = -1;
++    tcd_releasing = releasing;
++    tcd_active = TRUE;
++    InvalidateRect(tcd_button, NULL, TRUE);
++    UpdateWindow(tcd_button);
++    tcd_active = FALSE;
++}
++
++static void test_themed_checkbox_parent_dc(void)
++{
++    WNDCLASSA cls = {0};
++    HWND parent;
++    int i;
++
++    cls.lpfnWndProc = tcd_parent_proc;
++    cls.hInstance = GetModuleHandleA(NULL);
++    cls.hCursor = LoadCursorA(0, (LPCSTR)IDC_ARROW);
++    cls.hbrBackground = GetSysColorBrush(COLOR_WINDOW);
++    cls.lpszClassName = "tcd_parent_class";
++    RegisterClassA(&cls);
++    parent = CreateWindowA("tcd_parent_class", "Test parent", WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_CLIPCHILDREN,
++                           40, 40, 360, 200, NULL, NULL, cls.hInstance, NULL);
++    ok(parent != NULL, "Failed to create the parent window.\n");
++    tcd_button = CreateWindowExA(WS_EX_NOPARENTNOTIFY, WC_BUTTONA, "For construction",
++                                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX,
++                                 10, 10, 173, 19, parent, (HMENU)2728, cls.hInstance, NULL);
++    ok(tcd_button != NULL, "Failed to create the check box.\n");
++    if (!GetWindowTheme(tcd_button))
++    {
++        skip("Theming is not active.\n");
++        DestroyWindow(parent);
++        UnregisterClassA("tcd_parent_class", cls.hInstance);
++        return;
++    }
++    SendMessageA(tcd_button, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), FALSE);
++    SetForegroundWindow(parent);
++    flush_events();
++
++    tcd_paint(FALSE);
++    for (i = 0; i < 3; i++)
++    {
++        winetest_push_context("message %d", i);
++        ok(tcd_count[i] == 1, "Got %u messages.\n", tcd_count[i]);
++        ok(tcd_type[i] == OBJ_MEMDC, "Got object type %lu.\n", tcd_type[i]);
++        winetest_pop_context();
++    }
++    flush_events();
++
++    /* The parent releases the DC it was given, as some applications do. The
++     * memory DC is not a window DC, so ReleaseDC fails and painting goes on. */
++    tcd_paint(TRUE);
++    ok(tcd_count[0] == 1, "Got %u WM_ERASEBKGND messages.\n", tcd_count[0]);
++    ok(tcd_type[0] == OBJ_MEMDC, "Got object type %lu.\n", tcd_type[0]);
++    ok(tcd_release == 0, "ReleaseDC returned %d.\n", tcd_release);
++    ok(tcd_count[1] == 1, "Got %u WM_PRINTCLIENT messages.\n", tcd_count[1]);
++    ok(tcd_type[1] == OBJ_MEMDC, "Got object type %lu.\n", tcd_type[1]);
++    ok(tcd_count[2] == 1, "Got %u WM_CTLCOLORSTATIC messages.\n", tcd_count[2]);
++    ok(tcd_type[2] == OBJ_MEMDC, "Got object type %lu.\n", tcd_type[2]);
++    flush_events();
++
++    DestroyWindow(parent);
++    UnregisterClassA("tcd_parent_class", cls.hInstance);
++}
++/* END themed checkbox parent DC tests. */
++
+ static void test_radiobutton_focus(void)
+ {
+     HWND hwnd, button;
+@@ -2589,6 +2683,7 @@ START_TEST(button)
+     test_style();
+     test_visual();
+     test_radiobutton_focus();
++    test_themed_checkbox_parent_dc();
+ 
+     uninit_winevent_hook();
+ 
+diff --git a/dlls/comctl32_v6/button.c b/dlls/comctl32_v6/button.c
+index a52fda4..d4d99e9 100644
+--- a/dlls/comctl32_v6/button.c
++++ b/dlls/comctl32_v6/button.c
+@@ -2806,6 +2806,8 @@ static void CB_ThemedPaint(HTHEME theme, const BUTTON_INFO *infoPtr, HDC hDC, in
+     SIZE box_size;
+     HRGN region;
+     HRESULT hr;
++    HPAINTBUFFER buffer = NULL;
++    HDC bg_dc = hDC;
+ 
+     if (dwStyle & BS_PUSHLIKE)
+     {
+@@ -2860,11 +2862,22 @@ static void CB_ThemedPaint(HTHEME theme, const BUTTON_INFO *infoPtr, HDC hDC, in
+     cdrf = SendMessageW(parent, WM_NOTIFY, nmcd.hdr.idFrom, (LPARAM)&nmcd);
+     if (cdrf & CDRF_SKIPDEFAULT) goto cleanup;
+ 
+-    DrawThemeParentBackground(infoPtr->hwnd, hDC, NULL);
++    /* Tests show that a themed check box gives its parent a memory DC for the background,
++     * in WM_ERASEBKGND, WM_PRINTCLIENT and WM_CTLCOLORSTATIC. Start from the current content
++     * so that anything left unpainted stays as it was. */
++    if (btn_type == BS_AUTOCHECKBOX &&
++        (buffer = BeginBufferedPaint(hDC, &client_rect, BPBF_COMPATIBLEBITMAP, NULL, &bg_dc)))
++        BitBlt(bg_dc, client_rect.left, client_rect.top, client_rect.right - client_rect.left,
++               client_rect.bottom - client_rect.top, hDC, client_rect.left, client_rect.top, SRCCOPY);
++    else
++        bg_dc = hDC;
++
++    DrawThemeParentBackground(infoPtr->hwnd, bg_dc, NULL);
+     /* Tests show that the brush from WM_CTLCOLORSTATIC is used for filling background after a
+      * DrawThemeParentBackground() call */
+-    brush = (HBRUSH)SendMessageW(parent, WM_CTLCOLORSTATIC, (WPARAM)hDC, (LPARAM)infoPtr->hwnd);
+-    FillRect(hDC, &client_rect, brush ? brush : GetSysColorBrush(COLOR_BTNFACE));
++    brush = (HBRUSH)SendMessageW(parent, WM_CTLCOLORSTATIC, (WPARAM)bg_dc, (LPARAM)infoPtr->hwnd);
++    FillRect(bg_dc, &client_rect, brush ? brush : GetSysColorBrush(COLOR_BTNFACE));
++    if (buffer) EndBufferedPaint(buffer, TRUE);
+ 
+     if (cdrf & CDRF_NOTIFYPOSTERASE)
+     {

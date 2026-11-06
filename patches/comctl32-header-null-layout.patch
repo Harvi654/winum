@@ -1,0 +1,11 @@
+--- a/dlls/comctl32/header.c
++++ b/dlls/comctl32/header.c
+@@ -1495,6 +1495,8 @@
+ static LRESULT
+ HEADER_Layout (HEADER_INFO *infoPtr, LPHDLAYOUT lpLayout)
+ {
++    if (!lpLayout) return FALSE;
++
+     lpLayout->pwpos->hwndInsertAfter = 0;
+     lpLayout->pwpos->x = lpLayout->prc->left;
+     lpLayout->pwpos->y = lpLayout->prc->top;

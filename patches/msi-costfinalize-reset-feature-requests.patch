@@ -1,0 +1,37 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Reset pre-cost API requests during fresh costing.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+
+UI dependency: apply msi-executeaction-ui-selection-transfer.patch too.
+Windows v15-2/3 now measures the fresh UI handoff. It reconstructs selection
+properties before execute costing, so this request reset can remain unchanged.
+Do not use this reset alone for FULL/REDUCED installs. Native final strict,
+L0, paired local i686 L2 and cross-review are still gates before clean-g6.
+
+Windows v14 seq950 API requests are accepted and visible immediately, but
+none survives the following CostFinalize. Clear fresh requests before
+processing the explicit selection properties; do not change maintenance.
+
+This prevents normalized pre-cost Local requests from becoming unintended
+ADDLOCAL seeds. The unchanged api/none variant pairs assert all before,
+after and published states. Shared v14 conformance, RULE_API.
+
+--- a/dlls/msi/action.c
++++ b/dlls/msi/action.c
+@@ -2338,6 +2338,15 @@
+     /* read components states from the registry */
+     ACTION_GetComponentInstallStates(package);
+     ACTION_GetFeatureInstallStates(package);
++
++    /* Windows v14: pre-cost API requests do not seed fresh costing. */
++    if (!msi_get_property_int( package->db, L"Installed", 0 ))
++    {
++        MSIFEATURE *feature;
++
++        LIST_FOR_EACH_ENTRY( feature, &package->features, MSIFEATURE, entry )
++            feature->Action = feature->ActionRequest = INSTALLSTATE_UNKNOWN;
++    }
+ 
+     if (!process_overrides( package, msi_get_property_int( package->db, L"INSTALLLEVEL", 1 ) ))
+     {

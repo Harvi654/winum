@@ -10,7 +10,7 @@ umask 022
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source="$(realpath -e -- "$1")"
 output="$(realpath -m -- "$2")"
-patch="$here/patches/candidates/opengl-window-color-bits/opengl32-window-format-color-bits.patch"
+patch="$here/patches/opengl32-window-format-color-bits.patch"
 if [[ ! -f "$source/include/wine/test.h" ]]; then
     found="$(find "$source" -maxdepth 6 -path '*/include/wine/test.h' -print -quit)"
     [[ -n "$found" ]] || { echo "No include/wine/test.h in $source" >&2; exit 2; }

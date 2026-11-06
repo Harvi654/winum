@@ -1,0 +1,34 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Keep Level-zero features disabled through costing.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+
+Windows v14 disabled required children remain Request unknown and are not
+published, including controls. Do not replace a child's zero Level with an
+unselected parent's Level or copy a parent's state to it. E's worklist also
+preserves disabled nodes. Shared v14 PDisabled/TDisabled checks, RULE_DISABLED.
+
+Design MSI has no static Level0 feature. Its AddIns condition becomes Level0
+for SWPersonalEdition=1, so this boundary can affect Personal Edition. Premium
+clean-g5 is not modified. Condition-driven coverage remains a separate limit.
+
+--- a/dlls/msi/action.c
++++ b/dlls/msi/action.c
+@@ -1659,7 +1659,7 @@
+ 
+     LIST_FOR_EACH_ENTRY( fl, &feature->Children, FeatureList, entry )
+     {
+-        if (!is_feature_selected( feature, level ) &&
++        if (fl->feature->Level > 0 && !is_feature_selected( feature, level ) &&
+             feature->ActionRequest != INSTALLSTATE_LOCAL && feature->ActionRequest != INSTALLSTATE_SOURCE &&
+             feature->ActionRequest != INSTALLSTATE_ADVERTISED)
+         {
+@@ -1681,7 +1681,7 @@
+ 
+     LIST_FOR_EACH_ENTRY( fl, &feature->Children, FeatureList, entry )
+     {
+-        if ((fl->feature->Attributes & msidbFeatureAttributesFollowParent) &&
++        if (fl->feature->Level > 0 && (fl->feature->Attributes & msidbFeatureAttributesFollowParent) &&
+             (!limit_level || is_feature_selected( fl->feature, level )))
+         {
+             TRACE("child %s (level %d request %d) follows parent %s (level %d request %d)\n",

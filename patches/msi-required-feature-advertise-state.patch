@@ -1,0 +1,36 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Respect required DisallowAdvertise state timing.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+
+Windows v14 attr26 accepts API Advertised before costing, which later resets
+it. Post-cost already Local attr26 stays Local on Advertised. Attr18 remains
+Advertised. Restrict the new coercion to the measured attr26 combination;
+other attributes and maintenance retain their existing behavior. Shared
+v14 pre-cost/post-seed assertions; RULE_API. No property Advertise26 coercion.
+
+--- a/dlls/msi/install.c
++++ b/dlls/msi/install.c
+@@ -1026,11 +1026,21 @@
+ 
+     if (!msi_get_property_int( package->db, L"Installed", 0 ))
+     {
++        BOOL after_cost = msi_get_property_int( package->db, L"CostingComplete", 0 );
+         BOOL required = feature->Attributes == (msidbFeatureAttributesFollowParent |
+             msidbFeatureAttributesDisallowAdvertise | msidbFeatureAttributesUIDisallowAbsent);
+ 
+-        if (iState == INSTALLSTATE_SOURCE && required)
++        if ((iState == INSTALLSTATE_SOURCE && required) ||
++            (after_cost && iState == INSTALLSTATE_ADVERTISED && required &&
++             feature->ActionRequest == INSTALLSTATE_LOCAL))
+             iState = INSTALLSTATE_LOCAL;
++        /* Pre-cost API advertising is accepted; CostFinalize later resets it. */
++        if (!after_cost && iState == INSTALLSTATE_ADVERTISED && required)
++        {
++            feature->ActionRequest = iState;
++            ACTION_UpdateComponentStates( package, feature );
++            return ERROR_SUCCESS;
++        }
+     }
+ 
+     if (iState == INSTALLSTATE_LOCAL && msi_get_property_int( package->db, L"CostingComplete", 0 ) &&

@@ -1,0 +1,259 @@
+MSXML6-only cache namespace adoption with Windows reference tests.
+AI-assisted; LGPL-2.1-or-later. Native MSXML3 XSD and unrelated error mapping differences remain todo_wine.
+
+--- a/dlls/msxml3/schema.c
++++ b/dlls/msxml3/schema.c
+@@ -756,8 +756,26 @@
+
+     link_datatypes(new_doc);
+
+-    /* TODO: if the nsURI is different from the default xmlns or targetNamespace,
+-     *       do we need to do something special here? */
++    /* MSXML6 binds a schema without a target namespace to the cache namespace.
++     * Normalize only our private copy. Explicit target namespaces, including
++     * mismatches, must still be checked by the schema validator. */
++    if (v == MSXML6 && nsURI && *nsURI)
++    {
++        xmlNodePtr root = xmlDocGetRootElement(new_doc);
++
++        if (root && !xmlHasProp(root, BAD_CAST "targetNamespace"))
++        {
++            /* Unprefixed references to global types/elements in a chameleon
++             * schema must resolve in the adopted namespace as well. */
++            if (!xmlSetProp(root, BAD_CAST "targetNamespace", nsURI) ||
++                (!xmlSearchNs(new_doc, root, NULL) && !xmlNewNs(root, nsURI, NULL)))
++            {
++                xmlFreeDoc(new_doc);
++                free(entry);
++                return NULL;
++            }
++        }
++    }
+     entry->type = CacheEntryType_XSD;
+     entry->ref = 0;
+     spctx = xmlSchemaNewDocParserCtxt(new_doc);
+--- a/dlls/msxml3/tests/schema.c
++++ b/dlls/msxml3/tests/schema.c
+@@ -1533,12 +1533,222 @@
+     IXMLDOMSchemaCollection_Release(cache);
+ }
+
++/* BEGIN schema-cache namespace reference tests (synthetic data only). */
++static HRESULT namespace_load_xml( IXMLDOMDocument2 *doc, const WCHAR *xml )
++{
++    BSTR text = SysAllocString( xml );
++    VARIANT_BOOL loaded = VARIANT_FALSE;
++    HRESULT hr;
++
++    if (!text) return E_OUTOFMEMORY;
++    IXMLDOMDocument2_put_async( doc, VARIANT_FALSE );
++    IXMLDOMDocument2_put_validateOnParse( doc, VARIANT_FALSE );
++    IXMLDOMDocument2_put_resolveExternals( doc, VARIANT_FALSE );
++    hr = IXMLDOMDocument2_loadXML( doc, text, &loaded );
++    SysFreeString( text );
++    ok( SUCCEEDED(hr) && loaded == VARIANT_TRUE, "synthetic XML load hr %#lx loaded %d\n", hr, loaded );
++    return SUCCEEDED(hr) && loaded == VARIANT_TRUE ? S_OK : E_FAIL;
++}
++
++static void namespace_unchanged( IXMLDOMDocument2 *doc, BSTR before, const char *what )
++{
++    BSTR after = NULL;
++    HRESULT hr = IXMLDOMDocument2_get_xml( doc, &after );
++
++    ok( SUCCEEDED(hr) && after != NULL, "%s serialization hr %#lx\n", what, hr );
++    if (before && after) ok( !wcscmp(before, after), "%s was modified\n", what );
++    SysFreeString( after );
++}
++
++static void test_schema_cache_namespaces(void)
++{
++    static const struct
++    {
++        const char *name;
++        const WCHAR *uri, *schema, *document;
++        BOOL valid, adopt;
++    } cases[] = {
++        {"explicit-valid", L"urn:fixture:msxml",
++         L"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' targetNamespace='urn:fixture:msxml'><xs:element name='root' type='xs:int'/></xs:schema>",
++         L"<root xmlns='urn:fixture:msxml'>17</root>", TRUE, FALSE},
++        {"explicit-invalid-value", L"urn:fixture:msxml",
++         L"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' targetNamespace='urn:fixture:msxml'><xs:element name='root' type='xs:int'/></xs:schema>",
++         L"<root xmlns='urn:fixture:msxml'>not-an-integer</root>", FALSE, FALSE},
++        {"explicit-mismatch-still-invalid", L"urn:fixture:msxml",
++         L"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' targetNamespace='urn:fixture:other'><xs:element name='root' type='xs:int'/></xs:schema>",
++         L"<root xmlns='urn:fixture:msxml'>17</root>", FALSE, FALSE},
++        {"adopted-namespace", L"urn:fixture:msxml",
++         L"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'><xs:element name='root' type='xs:int'/></xs:schema>",
++         L"<root xmlns='urn:fixture:msxml'>17</root>", TRUE, TRUE},
++        {"adopted-invalid-value", L"urn:fixture:msxml",
++         L"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'><xs:element name='root' type='xs:int'/></xs:schema>",
++         L"<root xmlns='urn:fixture:msxml'>not-an-integer</root>", FALSE, TRUE},
++        {"empty-cache-namespace", L"",
++         L"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'><xs:element name='root' type='xs:int'/></xs:schema>",
++         L"<root>17</root>", TRUE, FALSE},
++        {"named-type-unqualified-child", L"urn:fixture:msxml",
++         L"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'><xs:complexType name='Record'><xs:sequence><xs:element name='value' type='xs:int'/></xs:sequence></xs:complexType><xs:element name='root' type='Record'/></xs:schema>",
++         L"<root xmlns='urn:fixture:msxml'><value xmlns=''>17</value></root>", TRUE, TRUE},
++        {"named-type-wrong-child-namespace", L"urn:fixture:msxml",
++         L"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'><xs:complexType name='Record'><xs:sequence><xs:element name='value' type='xs:int'/></xs:sequence></xs:complexType><xs:element name='root' type='Record'/></xs:schema>",
++         L"<root xmlns='urn:fixture:msxml'><value>17</value></root>", FALSE, TRUE},
++        {"qualified-child-global-ref", L"urn:fixture:msxml",
++         L"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' elementFormDefault='qualified'><xs:element name='value' type='xs:int'/><xs:complexType name='Record'><xs:sequence><xs:element ref='value'/></xs:sequence></xs:complexType><xs:element name='root' type='Record'/></xs:schema>",
++         L"<root xmlns='urn:fixture:msxml'><value>17</value></root>", TRUE, TRUE},
++        {"adopted-wrong-document-namespace", L"urn:fixture:msxml",
++         L"<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'><xs:element name='root' type='xs:int'/></xs:schema>",
++         L"<root xmlns='urn:fixture:other'>17</root>", FALSE, TRUE}
++    };
++    static const struct
++    {
++        const char *name;
++        CLSID document, cache;
++    } versions[] = {
++        {"MSXML3", {0xf5078f32,0xc551,0x11d3,{0x89,0xb9,0,0,0xf8,0x1f,0xe2,0x21}},
++                   {0xf5078f34,0xc551,0x11d3,{0x89,0xb9,0,0,0xf8,0x1f,0xe2,0x21}}},
++        {"MSXML6", {0x88d96a05,0xf192,0x11d4,{0xa6,0x5f,0,0x40,0x96,0x32,0x51,0xe5}},
++                   {0x88d96a07,0xf192,0x11d4,{0xa6,0x5f,0,0x40,0x96,0x32,0x51,0xe5}}}
++    };
++    IXMLDOMDocument2 *schema, *doc;
++    IXMLDOMSchemaCollection *cache;
++    IXMLDOMSchemaCollection2 *cache2;
++    IXMLDOMParseError *error;
++    static const LONG expected_codes[] = {0, (LONG)0xc00ce201, 0, 0, (LONG)0xc00ce201,
++                                          0, 0, (LONG)0xc00ce014, 0, (LONG)0xc00ce224};
++    unsigned int v, i, attempted = 0, validated = 0, rejected = 0;
++    HRESULT hr, result, code_hr, length_hr;
++    BSTR uri, before, document_before;
++    VARIANT value;
++    LONG code, length;
++
++    for (v = 0; v < ARRAY_SIZE(versions); ++v)
++    {
++        doc = NULL;
++        cache = NULL;
++        hr = CoCreateInstance( &versions[v].document, NULL, CLSCTX_INPROC_SERVER,
++                               &IID_IXMLDOMDocument2, (void **)&doc );
++        ok( hr == S_OK, "%s DOMDocument creation hr %#lx\n", versions[v].name, hr );
++        if (FAILED(hr))
++        {
++            continue;
++        }
++        IXMLDOMDocument2_Release( doc );
++        hr = CoCreateInstance( &versions[v].cache, NULL, CLSCTX_INPROC_SERVER,
++                               &IID_IXMLDOMSchemaCollection, (void **)&cache );
++        ok( hr == S_OK, "%s cache creation hr %#lx\n", versions[v].name, hr );
++        if (FAILED(hr))
++        {
++            continue;
++        }
++        cache2 = NULL;
++        hr = IXMLDOMSchemaCollection_QueryInterface( cache, &IID_IXMLDOMSchemaCollection2, (void **)&cache2 );
++        todo_wine_if(!v && hr != E_NOINTERFACE)
++        ok( hr == (v ? S_OK : E_NOINTERFACE), "%s Collection2 QI hr %#lx\n", versions[v].name, hr );
++        todo_wine_if(!v && cache2 != NULL)
++        ok( (cache2 != NULL) == !!v, "%s Collection2 present %u\n", versions[v].name, cache2 != NULL );
++        if (cache2) IXMLDOMSchemaCollection2_Release( cache2 );
++        IXMLDOMSchemaCollection_Release( cache );
++        for (i = 0; i < ARRAY_SIZE(cases); ++i)
++        {
++            winetest_push_context( "%s %s", versions[v].name, cases[i].name );
++            schema = doc = NULL;
++            cache = NULL;
++            error = NULL;
++            before = document_before = NULL;
++            ++attempted;
++            hr = CoCreateInstance( &versions[v].document, NULL, CLSCTX_INPROC_SERVER,
++                                   &IID_IXMLDOMDocument2, (void **)&schema );
++            ok( SUCCEEDED(hr), "schema DOM creation hr %#lx\n", hr );
++            if (FAILED(hr)) goto next;
++            hr = CoCreateInstance( &versions[v].document, NULL, CLSCTX_INPROC_SERVER,
++                                   &IID_IXMLDOMDocument2, (void **)&doc );
++            ok( SUCCEEDED(hr), "instance DOM creation hr %#lx\n", hr );
++            if (FAILED(hr)) goto next;
++            hr = CoCreateInstance( &versions[v].cache, NULL, CLSCTX_INPROC_SERVER,
++                                   &IID_IXMLDOMSchemaCollection, (void **)&cache );
++            ok( SUCCEEDED(hr), "schema cache creation hr %#lx\n", hr );
++            if (FAILED(hr)) goto next;
++            if (FAILED(namespace_load_xml(schema, cases[i].schema)) ||
++                FAILED(namespace_load_xml(doc, cases[i].document))) goto next;
++            hr = IXMLDOMDocument2_get_xml( schema, &before );
++            ok( SUCCEEDED(hr) && before != NULL, "initial schema serialization hr %#lx\n", hr );
++            hr = IXMLDOMDocument2_get_xml( doc, &document_before );
++            ok( SUCCEEDED(hr) && document_before != NULL, "initial instance serialization hr %#lx\n", hr );
++            uri = SysAllocString( cases[i].uri );
++            ok( uri != NULL, "namespace allocation failed\n" );
++            if (!uri) goto next;
++            VariantInit( &value );
++            V_VT(&value) = VT_DISPATCH;
++            V_DISPATCH(&value) = (IDispatch *)schema;
++            hr = IXMLDOMSchemaCollection_add( cache, uri, value );
++            SysFreeString( uri );
++            length = -1;
++            length_hr = IXMLDOMSchemaCollection_get_length( cache, &length );
++            ok( length_hr == S_OK, "cache length hr %#lx\n", length_hr );
++            namespace_unchanged( schema, before, "schema after add" );
++            if (FAILED(hr)) ++rejected;
++            if (!v || i == 2)
++            {
++                /* Native v3 rejects XSD; native v6 rejects a targetNamespace
++                 * mismatch. Preserve these separate Wine differences. */
++                todo_wine_if(hr != E_FAIL)
++                ok( hr == E_FAIL, "cache add hr %#lx expected E_FAIL\n", hr );
++                todo_wine_if(length != 0)
++                ok( length == 0, "rejected schema cache length %ld expected 0\n", length );
++                goto next;
++            }
++            ok( hr == S_OK, "cache add hr %#lx expected S_OK\n", hr );
++            ok( length == 1, "accepted schema cache length %ld expected 1\n", length );
++            if (FAILED(hr)) goto next;
++            V_DISPATCH(&value) = (IDispatch *)cache;
++            hr = IXMLDOMDocument2_putref_schemas( doc, value );
++            ok( SUCCEEDED(hr), "schema attachment failed hr %#lx\n", hr );
++            if (FAILED(hr)) goto next;
++            result = IXMLDOMDocument2_validate( doc, &error );
++            todo_wine_if(cases[i].adopt && cases[i].valid && result != S_OK)
++            ok( result == (cases[i].valid ? S_OK : S_FALSE), "validate hr %#lx expected %#lx\n",
++                result, cases[i].valid ? S_OK : S_FALSE );
++            ok( error != NULL, "validate returned no parseError object\n" );
++            if (!error)
++            {
++                goto next;
++            }
++            code = 0x12345678;
++            code_hr = IXMLDOMParseError_get_errorCode( error, &code );
++            ok( SUCCEEDED(code_hr), "errorCode getter hr %#lx\n", code_hr );
++            if (SUCCEEDED(code_hr))
++            {
++                ++validated;
++                /* Generic libxml-to-MSXML error-code mapping differences are
++                 * independent of namespace adoption and are not fixed here. */
++                todo_wine_if((cases[i].adopt && cases[i].valid && code != 0) ||
++                             (!cases[i].valid && code != expected_codes[i]))
++                ok( code == expected_codes[i], "parseError code %#lx expected %#lx\n", code, expected_codes[i] );
++            }
++            namespace_unchanged( schema, before, "schema after validation" );
++            namespace_unchanged( doc, document_before, "instance after validation" );
++next:
++            SysFreeString( before );
++            SysFreeString( document_before );
++            if (error) IXMLDOMParseError_Release( error );
++            if (cache) IXMLDOMSchemaCollection_Release( cache );
++            if (doc) IXMLDOMDocument2_Release( doc );
++            if (schema) IXMLDOMDocument2_Release( schema );
++            winetest_pop_context();
++        }
++    }
++    trace( "namespace coverage attempted=%u validated=%u cache_rejected=%u\n", attempted, validated, rejected );
++}
++/* END schema-cache namespace reference tests. */
++
+ START_TEST(schema)
+ {
+     HRESULT r;
+
+     r = CoInitialize( NULL );
+     ok( r == S_OK, "failed to init com\n");
++
++    test_schema_cache_namespaces();
+
+     test_schema_refs();
+     test_collection_refs();

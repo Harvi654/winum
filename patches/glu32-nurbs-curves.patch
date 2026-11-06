@@ -1,0 +1,781 @@
+Curve-only NURBS support, AI-assisted; LGPL-2.1-or-later.
+Original implementation from the public de Boor recurrence; no Mesa/SGI code.
+In functional series following Windows reference checks and local CAD L4 validation.
+
+--- a/dlls/glu32/tests/glu.c
++++ b/dlls/glu32/tests/glu.c
+@@ -19,9 +19,19 @@
+  */
+
+ #include <windows.h>
++#include <math.h>
+ #include "wine/test.h"
++#ifdef STANDALONE
++#include <GL/gl.h>
++#include <GL/glext.h>
++#include <GL/glu.h>
++#else
+ #include "wine/wgl.h"
+ #include "wine/glu.h"
++#endif
++#ifndef ARRAY_SIZE
++#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
++#endif
+
+ #define DIMIN   1
+ #define DIMOUT  2
+@@ -85,6 +95,225 @@
+                         DIMOUT, DIMOUT, GL_UNSIGNED_BYTE, bufout);
+     ok(!err, "got %x\n", err);
+     ok(!memcmp(bufout, expect, SIZEOUT), "miscompare\n");
++}
++
++/* Original synthetic NURBS tests; no vendor data. */
++static unsigned int nurbs_errors;
++static GLenum nurbs_error_codes[16];
++
++static void CALLBACK nurbs_error( GLenum error )
++{
++    if (nurbs_errors < ARRAY_SIZE(nurbs_error_codes)) nurbs_error_codes[nurbs_errors] = error;
++    ++nurbs_errors;
++}
++
++static void reset_nurbs_errors(void)
++{
++    nurbs_errors = 0;
++    memset( nurbs_error_codes, 0, sizeof(nurbs_error_codes) );
++}
++
++static void test_nurbs_properties( GLUnurbs *nurbs )
++{
++    static const struct { GLenum property; GLfloat value; } defaults[] =
++    {
++        {GLU_SAMPLING_TOLERANCE, 50.0f}, {GLU_SAMPLING_METHOD, 6.0f},
++        {GLU_DISPLAY_MODE, GLU_FILL}, {GLU_CULLING, GL_FALSE},
++        {GLU_AUTO_LOAD_MATRIX, GL_TRUE}, {GLU_PARAMETRIC_TOLERANCE, 0.5f},
++        {GLU_U_STEP, 100.0f}, {GLU_V_STEP, 100.0f}
++    };
++    static const struct { const char *name; GLfloat value, expected; GLenum error; } methods[] =
++    {
++        {"PATH_LENGTH", GLU_PATH_LENGTH, 6.0f, 0}, {"PARAMETRIC_ERROR", GLU_PARAMETRIC_ERROR, 5.0f, 0},
++        {"DOMAIN_DISTANCE", GLU_DOMAIN_DISTANCE, 2.0f, 0}, {"INVALID", -1.0f, 2.0f, GLU_INVALID_VALUE}
++    };
++    unsigned int i;
++    GLfloat value;
++
++    gluNurbsCallback( nurbs, GLU_ERROR, (void (CALLBACK *)(void))nurbs_error );
++    for (i = 0; i < ARRAY_SIZE(defaults); ++i)
++    {
++        reset_nurbs_errors();
++        value = -1.0f;
++        gluGetNurbsProperty( nurbs, defaults[i].property, &value );
++        ok( !nurbs_errors, "default property %#x callback count %u\n", defaults[i].property, nurbs_errors );
++        ok( value == defaults[i].value, "property %#x default %.8g expected %.8g\n",
++            defaults[i].property, value, defaults[i].value );
++    }
++    gluNurbsProperty( nurbs, GLU_SAMPLING_TOLERANCE, 7.0f );
++    gluGetNurbsProperty( nurbs, GLU_SAMPLING_TOLERANCE, &value );
++    ok( value == 7.0f, "sampling tolerance round trip %.8g\n", value );
++    for (i = 0; i < ARRAY_SIZE(methods); ++i)
++    {
++        reset_nurbs_errors();
++        gluNurbsProperty( nurbs, GLU_SAMPLING_METHOD, methods[i].value );
++        ok( nurbs_errors == !!methods[i].error, "%s set callback count %u\n", methods[i].name, nurbs_errors );
++        if (methods[i].error && nurbs_errors)
++            ok( nurbs_error_codes[0] == methods[i].error, "%s set error %#x expected %#x\n",
++                methods[i].name, nurbs_error_codes[0], methods[i].error );
++        reset_nurbs_errors();
++        value = -1.0f;
++        gluGetNurbsProperty( nurbs, GLU_SAMPLING_METHOD, &value );
++        ok( !nurbs_errors, "%s get callback count %u\n", methods[i].name, nurbs_errors );
++        ok( value == methods[i].expected, "%s get %.8g expected %.8g\n",
++            methods[i].name, value, methods[i].expected );
++    }
++    gluNurbsProperty( nurbs, GLU_SAMPLING_METHOD, GLU_PATH_LENGTH );
++    reset_nurbs_errors();
++}
++
++static void test_nurbs_invalid( GLUnurbs *nurbs )
++{
++    GLfloat knots[] = {0, 0, 1, 1}, descending[] = {0, 1, 0, 1};
++    GLfloat control[] = {-1, 0, 0, 1, 0, 0};
++    GLfloat feedback[64];
++    static const GLenum first_errors[] = {GLU_NURBS_ERROR1, GLU_NURBS_ERROR2, GLU_NURBS_ERROR3};
++    int mode, count;
++
++    gluNurbsCallback( nurbs, GLU_ERROR, (void (CALLBACK *)(void))nurbs_error );
++    for (mode = 0; mode < 3; ++mode)
++    {
++        reset_nurbs_errors();
++        glFeedbackBuffer( ARRAY_SIZE(feedback), GL_3D, feedback );
++        glRenderMode( GL_FEEDBACK );
++        gluBeginCurve( nurbs );
++        gluNurbsCurve( nurbs, mode == 1 ? 3 : 4, mode == 2 ? descending : knots,
++                       3, control, mode == 0 ? 0 : 2, GL_MAP1_VERTEX_3 );
++        ok( nurbs_errors == 1, "invalid case %d after NurbsCurve callbacks %u expected 1\n", mode, nurbs_errors );
++        if (nurbs_errors)
++            ok( nurbs_error_codes[0] == first_errors[mode], "invalid case %d first error %#x expected %#x\n",
++                mode, nurbs_error_codes[0], first_errors[mode] );
++        gluEndCurve( nurbs );
++        count = glRenderMode( GL_RENDER );
++        ok( nurbs_errors == 2, "invalid case %d callback count %u expected 2\n", mode, nurbs_errors );
++        if (nurbs_errors >= 2)
++            ok( nurbs_error_codes[1] == GLU_NURBS_ERROR9, "invalid case %d second error %#x\n",
++                mode, nurbs_error_codes[1] );
++        ok( !count, "invalid case %d emitted %d feedback floats\n", mode, count );
++    }
++}
++
++/* Feedback compares geometry, not implementation-specific segment counts. */
++static void test_nurbs_feedback( GLUnurbs *nurbs )
++{
++    GLfloat linear_knots[] = {0, 0, 1, 1};
++    GLfloat quadratic_knots[] = {0, 0, 0, 1, 1, 1};
++    GLfloat linear[] = {-1, 0, 0, 999, 999, 1, 0, 0, 999, 999};
++    GLfloat quadratic[] = {-1, 0, 0, 0, 1, 0, 1, 0, 0};
++    GLfloat rational[] = {1, 0, 0, 1, 0.70710678f, 0.70710678f, 0, 0.70710678f, 0, 1, 0, 1};
++    static GLfloat feedback[65536];
++    unsigned int curves, vertices, j;
++    int count, i;
++    GLfloat x, y, expected_x, expected_y, last_x = 0, last_y = 0;
++
++    glViewport( 0, 0, 128, 128 );
++    glMatrixMode( GL_PROJECTION );
++    glLoadIdentity();
++    glOrtho( -2, 2, -2, 2, -2, 2 );
++    glMatrixMode( GL_MODELVIEW );
++    glLoadIdentity();
++    gluNurbsProperty( nurbs, GLU_SAMPLING_TOLERANCE, 5.0f );
++    for (curves = 0; curves < 3; ++curves)
++    {
++        nurbs_errors = 0;
++        glFeedbackBuffer( ARRAY_SIZE(feedback), GL_3D, feedback );
++        glRenderMode( GL_FEEDBACK );
++        gluBeginCurve( nurbs );
++        if (!curves) gluNurbsCurve( nurbs, 4, linear_knots, 5, linear, 2, GL_MAP1_VERTEX_3 );
++        else if (curves == 1) gluNurbsCurve( nurbs, 6, quadratic_knots, 3, quadratic, 3, GL_MAP1_VERTEX_3 );
++        else gluNurbsCurve( nurbs, 6, quadratic_knots, 4, rational, 3, GL_MAP1_VERTEX_4 );
++        gluEndCurve( nurbs );
++        count = glRenderMode( GL_RENDER );
++        ok( count > 0, "curve %u feedback count %d\n", curves, count );
++        ok( !nurbs_errors, "curve %u error callbacks %u\n", curves, nurbs_errors );
++        if (count <= 0) continue;
++        vertices = 0;
++        for (i = 0; i < count;)
++        {
++            ok( feedback[i] == GL_LINE_TOKEN || feedback[i] == GL_LINE_RESET_TOKEN,
++                "curve %u unexpected token %.8g\n", curves, feedback[i] );
++            if ((feedback[i] != GL_LINE_TOKEN && feedback[i] != GL_LINE_RESET_TOKEN) || i + 7 > count) break;
++            ++i;
++            for (j = 0; j < 2; ++j, i += 3)
++            {
++                x = (feedback[i] - 64.0f) / 32.0f;
++                y = (feedback[i + 1] - 64.0f) / 32.0f;
++                if (!vertices)
++                {
++                    expected_x = curves == 2 ? 1.0f : -1.0f;
++                    ok( fabs(x - expected_x) < 0.0001 && fabs(y) < 0.0001,
++                        "curve %u first vertex (%.8g, %.8g)\n", curves, x, y );
++                }
++                if (!curves) ok( fabs(y) < 0.0001, "line vertex y %.8g\n", y );
++                else if (curves == 1) ok( fabs(y - (1 - x*x) / 2) < 0.0001,
++                    "quadratic vertex (%.8g, %.8g)\n", x, y );
++                else ok( fabs(x*x + y*y - 1) < 0.0002 && x >= -0.0001 && y >= -0.0001,
++                    "rational vertex (%.8g, %.8g)\n", x, y );
++                ok( fabs(feedback[i + 2] - 0.5f) < 0.0001, "unexpected depth %.8g\n", feedback[i + 2] );
++                last_x = x;
++                last_y = y;
++                ++vertices;
++            }
++        }
++        expected_x = curves == 2 ? 0.0f : 1.0f;
++        expected_y = curves == 2 ? 1.0f : 0.0f;
++        ok( i == count, "curve %u incomplete feedback parse %d/%d\n", curves, i, count );
++        ok( vertices >= (curves ? 4 : 2), "curve %u too few vertices %u\n", curves, vertices );
++        ok( fabs(last_x - expected_x) < 0.0001 && fabs(last_y - expected_y) < 0.0001,
++            "curve %u final vertex (%.8g, %.8g)\n", curves, last_x, last_y );
++    }
++}
++
++/* A camera-plane crossing must be clipped by GL, not reject the NURBS. */
++static void test_nurbs_eye_plane( GLUnurbs *nurbs )
++{
++    GLfloat knots[] = {0, 0, 1, 1};
++    GLfloat control[] = {-0.5f, 0, -2, 1, 0, 2};
++    GLfloat feedback[4096];
++    int count, i;
++
++    glMatrixMode( GL_PROJECTION );
++    glLoadIdentity();
++    glFrustum( -1, 1, -1, 1, 1, 10 );
++    glMatrixMode( GL_MODELVIEW );
++    glLoadIdentity();
++    nurbs_errors = 0;
++    glFeedbackBuffer( ARRAY_SIZE(feedback), GL_3D, feedback );
++    glRenderMode( GL_FEEDBACK );
++    gluBeginCurve( nurbs );
++    gluNurbsCurve( nurbs, 4, knots, 3, control, 2, GL_MAP1_VERTEX_3 );
++    gluEndCurve( nurbs );
++    count = glRenderMode( GL_RENDER );
++    ok( !nurbs_errors, "eye-plane crossing error callbacks %u\n", nurbs_errors );
++    ok( count > 0, "eye-plane crossing emitted %d feedback floats\n", count );
++    if (count > 0)
++        for (i = 0; i < count; ++i)
++            ok( isfinite(feedback[i]), "nonfinite eye-plane feedback at %d\n", i );
++}
++
++static void test_nurbs(void)
++{
++    GLUnurbs *nurbs = gluNewNurbsRenderer();
++
++    todo_wine_if(!nurbs)
++    ok( nurbs != NULL, "gluNewNurbsRenderer returned NULL\n" );
++    if (!nurbs)
++    {
++        skip( "NURBS renderer unavailable; remaining NURBS tests not run\n" );
++        return;
++    }
++    test_nurbs_properties( nurbs );
++    test_nurbs_invalid( nurbs );
++    test_nurbs_feedback( nurbs );
++    test_nurbs_eye_plane( nurbs );
++    gluDeleteNurbsRenderer( nurbs );
++    nurbs = gluNewNurbsRenderer();
++    ok( nurbs != NULL, "second renderer allocation failed\n" );
++    if (nurbs)
++    {
++        test_nurbs_properties( nurbs );
++        gluDeleteNurbsRenderer( nurbs );
++    }
+ }
+
+ START_TEST(glu)
+@@ -149,6 +378,7 @@
+         }
+
+         test_gluScaleImage(hdc, hglrc);
++        test_nurbs();
+
+ cleanup:
+         wglDeleteContext(hglrc);
+--- a/dlls/glu32/glu.c
++++ b/dlls/glu32/glu.c
+@@ -17,7 +17,10 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+  */
+
+-#include <assert.h>
++#include <math.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
+ #include <stdarg.h>
+
+ #include "windef.h"
+@@ -121,13 +124,195 @@
+     return NULL;
+ }
+
++/* Curve-only NURBS implementation, written from the de Boor recurrence.
++ * No Mesa/SGI implementation code is used here. */
++struct nurbs_vertex
++{
++    GLdouble position[3];
++    BOOL start;
++};
++
++struct GLUnurbs
++{
++    GLfloat sampling_tolerance, parametric_tolerance, u_step, v_step;
++    GLenum sampling_method, display_mode;
++    BOOL culling, auto_load_matrix, in_curve, failed;
++    void (CALLBACK *error)(GLenum);
++    GLdouble model[16], projection[16];
++    GLint viewport[4];
++    GLdouble *knots, *control, *work;
++    GLint order, count;
++    struct nurbs_vertex *vertices;
++    SIZE_T vertex_count, vertex_capacity, span_limit;
++};
++
++#define NURBS_MAX_VERTICES 65536
++#define NURBS_MAX_DEPTH 16
++
++static void nurbs_error( GLUnurbs *nobj, GLenum error )
++{
++    nobj->failed = TRUE;
++    if (nobj->error) nobj->error( error );
++}
++
++static void nurbs_clear_curve( GLUnurbs *nobj )
++{
++    free( nobj->knots );
++    free( nobj->control );
++    free( nobj->work );
++    free( nobj->vertices );
++    nobj->knots = nobj->control = nobj->work = NULL;
++    nobj->vertices = NULL;
++    nobj->vertex_count = nobj->vertex_capacity = 0;
++}
++
++/* Evaluate one nonempty knot span in homogeneous coordinates. */
++static BOOL nurbs_evaluate( GLUnurbs *nobj, GLint span, GLdouble t, GLdouble point[3] )
++{
++    GLint i, r, j, component;
++    GLdouble denominator, alpha, *a, *b;
++
++    for (j = 0; j < nobj->order; ++j)
++        memcpy( nobj->work + 4 * (SIZE_T)j, nobj->control + 4 * (SIZE_T)(span - nobj->order + 1 + j), 4 * sizeof(GLdouble) );
++    for (r = 1; r < nobj->order; ++r)
++        for (j = nobj->order - 1; j >= r; --j)
++        {
++            i = span - nobj->order + 1 + j;
++            denominator = nobj->knots[i + nobj->order - r] - nobj->knots[i];
++            alpha = denominator ? (t - nobj->knots[i]) / denominator : 0;
++            a = nobj->work + 4 * (SIZE_T)(j - 1);
++            b = nobj->work + 4 * (SIZE_T)j;
++            for (component = 0; component < 4; ++component) b[component] = (1 - alpha) * a[component] + alpha * b[component];
++        }
++    b = nobj->work + 4 * (SIZE_T)(nobj->order - 1);
++    if (!b[3] || !isfinite(b[3])) return FALSE;
++    for (component = 0; component < 3; ++component)
++    {
++        point[component] = b[component] / b[3];
++        if (!isfinite(point[component])) return FALSE;
++    }
++    return TRUE;
++}
++
++static BOOL nurbs_project( GLUnurbs *nobj, const GLdouble point[3], GLdouble screen[2] )
++{
++    GLdouble eye[4], clip[4];
++    unsigned int i;
++
++    for (i = 0; i < 4; ++i)
++        eye[i] = nobj->model[i] * point[0] + nobj->model[4+i] * point[1] +
++                 nobj->model[8+i] * point[2] + nobj->model[12+i];
++    for (i = 0; i < 4; ++i)
++        clip[i] = nobj->projection[i] * eye[0] + nobj->projection[4+i] * eye[1] +
++                  nobj->projection[8+i] * eye[2] + nobj->projection[12+i] * eye[3];
++    if (!clip[3]) return FALSE;
++    for (i = 0; i < 2; ++i)
++    {
++        screen[i] = clip[i] / clip[3] * nobj->viewport[i+2] * 0.5;
++        if (!isfinite(screen[i])) return FALSE;
++    }
++    return TRUE;
++}
++
++static BOOL nurbs_append( GLUnurbs *nobj, const GLdouble point[3], BOOL start )
++{
++    struct nurbs_vertex *vertices;
++    SIZE_T capacity;
++
++    if (nobj->vertex_count == nobj->vertex_capacity)
++    {
++        if (nobj->vertex_capacity > SIZE_MAX / (2 * sizeof(*vertices))) return FALSE;
++        capacity = nobj->vertex_capacity ? nobj->vertex_capacity * 2 : 128;
++        if (!(vertices = realloc( nobj->vertices, capacity * sizeof(*vertices) ))) return FALSE;
++        nobj->vertices = vertices;
++        nobj->vertex_capacity = capacity;
++    }
++    memcpy( nobj->vertices[nobj->vertex_count].position, point, 3 * sizeof(GLdouble) );
++    nobj->vertices[nobj->vertex_count++].start = start;
++    return TRUE;
++}
++
++/* Fixed parameter subdivision avoids division by clip w at the eye plane.
++ * It is also used for DOMAIN_DISTANCE. OpenGL still performs real clipping. */
++static BOOL nurbs_uniform( GLUnurbs *nobj, GLint span, GLdouble left, GLdouble right, unsigned int segments )
++{
++    GLdouble point[3], t;
++    SIZE_T available = nobj->span_limit - nobj->vertex_count - 1;
++    unsigned int i;
++
++    if (!available) return TRUE;
++    if (segments > available) segments = available;
++    if (!segments) segments = 1;
++    for (i = 1; i <= segments; ++i)
++    {
++        t = i == segments ? right : left + (right - left) * ((GLdouble)i / segments);
++        if (!nurbs_evaluate( nobj, span, t, point ) || !nurbs_append( nobj, point, FALSE )) return FALSE;
++    }
++    return TRUE;
++}
++
++/* PATH_LENGTH bounds projected segment length; quarter-point probes also
++ * detect curvature/inflections. At depth/detail limits retain the endpoint,
++ * trading sampling quality for visibility instead of dropping the curve. */
++static BOOL nurbs_subdivide( GLUnurbs *nobj, GLint span, GLdouble left, GLdouble right,
++                            const GLdouble a[3], const GLdouble b[3], unsigned int depth )
++{
++    GLdouble probes[3][3], screen_a[2], screen_b[2], screen[2], delta, error = 0;
++    GLdouble fraction, length;
++    unsigned int i, j;
++
++    /* Leave one slot for the span's endpoint, appended by EndCurve even if
++     * remaining recursive intervals cannot add any more detail. */
++    if (nobj->vertex_count + 1 >= nobj->span_limit) return TRUE;
++    if (depth == NURBS_MAX_DEPTH ||
++        left + (right - left) * 0.5 == left || left + (right - left) * 0.5 == right)
++        return nurbs_append( nobj, b, FALSE );
++    if (!nurbs_project( nobj, a, screen_a ) || !nurbs_project( nobj, b, screen_b )) goto uniform;
++    for (i = 0; i < 3; ++i)
++    {
++        fraction = (i + 1) * 0.25;
++        if (!nurbs_evaluate( nobj, span, left + (right - left) * fraction, probes[i] )) return FALSE;
++        if (!nurbs_project( nobj, probes[i], screen )) goto uniform;
++        delta = 0;
++        for (j = 0; j < 2; ++j)
++            delta += pow( screen[j] - (screen_a[j] + (screen_b[j] - screen_a[j]) * fraction), 2 );
++        if (delta > error) error = delta;
++    }
++    length = pow( screen_b[0] - screen_a[0], 2 ) + pow( screen_b[1] - screen_a[1], 2 );
++    if ((unsigned int)nobj->order <= (1u << depth) &&
++        (nobj->sampling_method != GLU_PATH_LENGTH || length <= pow(nobj->sampling_tolerance, 2)) &&
++        error <= pow(nobj->sampling_method == GLU_PARAMETRIC_ERROR ? nobj->parametric_tolerance : nobj->sampling_tolerance * 0.25, 2))
++        return nurbs_append( nobj, b, FALSE );
++    return nurbs_subdivide( nobj, span, left, left + (right - left) * 0.5, a, probes[1], depth + 1 ) &&
++           nurbs_subdivide( nobj, span, left + (right - left) * 0.5, right, probes[1], b, depth + 1 );
++uniform:
++    return nurbs_uniform( nobj, span, left, right, nobj->order > 64 ? 256 : nobj->order < 2 ? 8 : nobj->order * 4 );
++}
++
++static void nurbs_unsupported( GLUnurbs *nobj )
++{
++    FIXME( "NURBS surfaces and trimming are not implemented.\n" );
++    if (nobj) nurbs_error( nobj, GLU_NURBS_ERROR35 );
++}
++
+ /***********************************************************************
+  *		gluNewNurbsRenderer (GLU32.@)
+  */
+ GLUnurbs * WINAPI wine_gluNewNurbsRenderer(void)
+ {
+-    ERR( "Nurbs renderer is not supported, please report\n" );
+-    return NULL;
++    GLUnurbs *nobj = calloc( 1, sizeof(*nobj) );
++    unsigned int i;
++
++    if (!nobj) return NULL;
++    nobj->sampling_tolerance = 50.0f;
++    nobj->parametric_tolerance = 0.5f;
++    nobj->sampling_method = GLU_PATH_LENGTH;
++    nobj->display_mode = GLU_FILL;
++    nobj->auto_load_matrix = TRUE;
++    nobj->u_step = nobj->v_step = 100.0f;
++    for (i = 0; i < 16; ++i) nobj->model[i] = nobj->projection[i] = !(i % 5);
++    nobj->viewport[2] = nobj->viewport[3] = 1;
++    return nobj;
+ }
+
+ /***********************************************************************
+@@ -135,16 +320,28 @@
+  */
+ void WINAPI wine_gluDeleteNurbsRenderer( GLUnurbs *nobj )
+ {
+-    assert( 0 );
++    if (!nobj) return;
++    nurbs_clear_curve( nobj );
++    free( nobj );
+ }
+
+ /***********************************************************************
+  *		gluLoadSamplingMatrices (GLU32.@)
+  */
+-void WINAPI wine_gluLoadSamplingMatrices( GLUnurbs *nobj, const GLfloat modelMatrix[16],
+-                                          const GLfloat projMatrix[16], const GLint viewport[4] )
+-{
+-    assert( 0 );
++void WINAPI wine_gluLoadSamplingMatrices( GLUnurbs *nobj, const GLfloat model[16],
++                                         const GLfloat projection[16], const GLint viewport[4] )
++{
++    unsigned int i;
++
++    if (!nobj) return;
++    if (!model || !projection || !viewport) { nurbs_error( nobj, GLU_INVALID_VALUE ); return; }
++    for (i = 0; i < 16; ++i)
++    {
++        if (!isfinite(model[i]) || !isfinite(projection[i])) { nurbs_error( nobj, GLU_INVALID_VALUE ); return; }
++        nobj->model[i] = model[i];
++        nobj->projection[i] = projection[i];
++    }
++    memcpy( nobj->viewport, viewport, sizeof(nobj->viewport) );
+ }
+
+ /***********************************************************************
+@@ -152,7 +349,34 @@
+  */
+ void WINAPI wine_gluNurbsProperty( GLUnurbs *nobj, GLenum property, GLfloat value )
+ {
+-    assert( 0 );
++    if (!nobj) return;
++    if (!isfinite(value)) { nurbs_error( nobj, GLU_INVALID_VALUE ); return; }
++    switch (property)
++    {
++    case GLU_SAMPLING_TOLERANCE:
++    case GLU_PARAMETRIC_TOLERANCE:
++    case GLU_U_STEP:
++    case GLU_V_STEP:
++        if (value <= 0) { nurbs_error( nobj, GLU_INVALID_VALUE ); return; }
++        if (property == GLU_SAMPLING_TOLERANCE) nobj->sampling_tolerance = value;
++        else if (property == GLU_PARAMETRIC_TOLERANCE) nobj->parametric_tolerance = value;
++        else if (property == GLU_U_STEP) nobj->u_step = value;
++        else nobj->v_step = value;
++        return;
++    case GLU_CULLING: nobj->culling = value != 0; return;
++    case GLU_AUTO_LOAD_MATRIX: nobj->auto_load_matrix = value != 0; return;
++    case GLU_SAMPLING_METHOD:
++        if (value == GLU_PATH_LENGTH || value == GLU_PARAMETRIC_ERROR || value == GLU_DOMAIN_DISTANCE)
++        { nobj->sampling_method = value; return; }
++        nurbs_error( nobj, GLU_INVALID_VALUE );
++        return;
++    case GLU_DISPLAY_MODE:
++        if (value == GLU_FILL || value == GLU_OUTLINE_POLYGON || value == GLU_OUTLINE_PATCH)
++        { nobj->display_mode = value; return; }
++        break;
++    default: nurbs_error( nobj, GLU_NURBS_ERROR26 ); return;
++    }
++    nurbs_error( nobj, GLU_INVALID_VALUE );
+ }
+
+ /***********************************************************************
+@@ -160,7 +384,24 @@
+  */
+ void WINAPI wine_gluGetNurbsProperty( GLUnurbs *nobj, GLenum property, GLfloat *value )
+ {
+-    assert( 0 );
++    if (!nobj) return;
++    if (!value) { nurbs_error( nobj, GLU_INVALID_VALUE ); return; }
++    switch (property)
++    {
++    case GLU_SAMPLING_TOLERANCE: *value = nobj->sampling_tolerance; return;
++    case GLU_PARAMETRIC_TOLERANCE: *value = nobj->parametric_tolerance; return;
++    case GLU_SAMPLING_METHOD:
++        /* Windows GLU 1.2 getter encodings measured on Windows 10. */
++        *value = nobj->sampling_method == GLU_PATH_LENGTH ? 6 :
++                 nobj->sampling_method == GLU_PARAMETRIC_ERROR ? 5 : 2;
++        return;
++    case GLU_DISPLAY_MODE: *value = nobj->display_mode; return;
++    case GLU_CULLING: *value = nobj->culling; return;
++    case GLU_AUTO_LOAD_MATRIX: *value = nobj->auto_load_matrix; return;
++    case GLU_U_STEP: *value = nobj->u_step; return;
++    case GLU_V_STEP: *value = nobj->v_step; return;
++    default: nurbs_error( nobj, GLU_NURBS_ERROR26 ); return;
++    }
+ }
+
+ /***********************************************************************
+@@ -168,7 +409,11 @@
+  */
+ void WINAPI wine_gluBeginCurve( GLUnurbs *nobj )
+ {
+-    assert( 0 );
++    if (!nobj) return;
++    if (nobj->in_curve) { nurbs_error( nobj, GLU_NURBS_ERROR6 ); return; }
++    nurbs_clear_curve( nobj );
++    nobj->failed = FALSE;
++    nobj->in_curve = TRUE;
+ }
+
+ /***********************************************************************
+@@ -176,16 +421,124 @@
+  */
+ void WINAPI wine_gluEndCurve( GLUnurbs *nobj )
+ {
+-    assert( 0 );
++    GLdouble a[3], b[3], left, right, steps;
++    GLint span;
++    SIZE_T i;
++    unsigned int spans = 0, segments;
++
++    if (!nobj) return;
++    if (!nobj->in_curve) { nurbs_error( nobj, GLU_NURBS_ERROR7 ); return; }
++    nobj->in_curve = FALSE;
++    if (nobj->failed)
++    {
++        nurbs_clear_curve( nobj );
++        nurbs_error( nobj, GLU_NURBS_ERROR9 );
++        return;
++    }
++    if (!nobj->knots) { nurbs_error( nobj, GLU_NURBS_ERROR8 ); return; }
++    if (nobj->auto_load_matrix)
++    {
++        glGetDoublev( GL_MODELVIEW_MATRIX, nobj->model );
++        glGetDoublev( GL_PROJECTION_MATRIX, nobj->projection );
++        glGetIntegerv( GL_VIEWPORT, nobj->viewport );
++    }
++    for (span = nobj->order - 1; span < nobj->count; ++span)
++        if (nobj->knots[span] != nobj->knots[span + 1]) ++spans;
++    for (span = nobj->order - 1; span < nobj->count; ++span)
++    {
++        left = nobj->knots[span];
++        right = nobj->knots[span + 1];
++        if (left == right) continue;
++        if (!nurbs_evaluate( nobj, span, left, a ) || !nurbs_evaluate( nobj, span, right, b )) goto invalid;
++        nobj->span_limit = nobj->vertex_count + 2 + NURBS_MAX_VERTICES / spans;
++        if (!nurbs_append( nobj, a, TRUE )) goto exhausted;
++        if (nobj->sampling_method == GLU_DOMAIN_DISTANCE)
++        {
++            steps = ceil( (right - left) * nobj->u_step );
++            segments = steps > NURBS_MAX_VERTICES ? NURBS_MAX_VERTICES : steps < 1 ? 1 : steps;
++            if (!nurbs_uniform( nobj, span, left, right, segments )) goto exhausted;
++        }
++        else if (!nurbs_subdivide( nobj, span, left, right, a, b, 0 )) goto exhausted;
++        if ((nobj->vertices[nobj->vertex_count - 1].start ||
++             memcmp( nobj->vertices[nobj->vertex_count - 1].position, b, sizeof(b) )) &&
++            !nurbs_append( nobj, b, FALSE )) goto exhausted;
++    }
++    /* Independent strips avoid bridging discontinuities at repeated knots.
++     * OpenGL performs clipping; CULLING is stored, not an extra hull shortcut.
++     * DISPLAY_MODE affects surfaces only. */
++    for (i = 0; i < nobj->vertex_count; ++i)
++    {
++        if (nobj->vertices[i].start)
++        {
++            if (i) glEnd();
++            glBegin( GL_LINE_STRIP );
++        }
++        glVertex3dv( nobj->vertices[i].position );
++    }
++    if (nobj->vertex_count) glEnd();
++    nurbs_clear_curve( nobj );
++    return;
++invalid:
++    nurbs_clear_curve( nobj );
++    nurbs_error( nobj, GLU_INVALID_VALUE );
++    return;
++exhausted:
++    nurbs_clear_curve( nobj );
++    nurbs_error( nobj, GLU_OUT_OF_MEMORY );
+ }
+
+ /***********************************************************************
+  *		gluNurbsCurve (GLU32.@)
+  */
+-void WINAPI wine_gluNurbsCurve( GLUnurbs *nobj, GLint nknots, GLfloat *knot,
+-                                GLint stride, GLfloat *ctlarray, GLint order, GLenum type )
+-{
+-    assert( 0 );
++void WINAPI wine_gluNurbsCurve( GLUnurbs *nobj, GLint nknots, GLfloat *knots,
++                               GLint stride, GLfloat *control, GLint order, GLenum type )
++{
++    GLint i, j, dimension, multiplicity = 1;
++    SIZE_T count;
++
++    if (!nobj) return;
++    if (!nobj->in_curve) { nurbs_error( nobj, GLU_NURBS_ERROR7 ); return; }
++    if (nobj->failed) return;
++    if (nobj->knots) { nurbs_error( nobj, GLU_NURBS_ERROR23 ); return; }
++    if (type != GL_MAP1_VERTEX_3 && type != GL_MAP1_VERTEX_4)
++    { FIXME( "Unsupported NURBS curve map %#x.\n", type ); nurbs_error( nobj, GLU_NURBS_ERROR35 ); return; }
++    if (order < 1) { nurbs_error( nobj, GLU_NURBS_ERROR1 ); return; }
++    if (nknots < 0 || order > nknots / 2) { nurbs_error( nobj, GLU_NURBS_ERROR2 ); return; }
++    dimension = type == GL_MAP1_VERTEX_3 ? 3 : 4;
++    count = nknots - order;
++    if (!knots || !control) { nurbs_error( nobj, GLU_NURBS_ERROR36 ); return; }
++    if (stride < dimension || (count - 1) > (SIZE_MAX / sizeof(*control) - dimension) / stride)
++    { nurbs_error( nobj, GLU_NURBS_ERROR34 ); return; }
++    for (i = 0; i < nknots; ++i)
++        if (!isfinite(knots[i])) { nurbs_error( nobj, GLU_INVALID_VALUE ); return; }
++    /* Check the active interval first: Windows reports ERROR3 for the
++     * descending fixture whose active domain is already empty. */
++    if (knots[order - 1] >= knots[count]) { nurbs_error( nobj, GLU_NURBS_ERROR3 ); return; }
++    for (i = 1; i < nknots; ++i)
++    {
++        if (knots[i] < knots[i - 1]) { nurbs_error( nobj, GLU_NURBS_ERROR4 ); return; }
++        multiplicity = knots[i] == knots[i - 1] ? multiplicity + 1 : 1;
++        if (multiplicity > order) { nurbs_error( nobj, GLU_NURBS_ERROR5 ); return; }
++    }
++    if ((SIZE_T)nknots > SIZE_MAX / sizeof(*nobj->knots) || count > SIZE_MAX / (4 * sizeof(*nobj->control)) ||
++        (SIZE_T)order > SIZE_MAX / (4 * sizeof(*nobj->work)))
++    { nurbs_error( nobj, GLU_OUT_OF_MEMORY ); return; }
++    nobj->knots = malloc( nknots * sizeof(*nobj->knots) );
++    nobj->control = malloc( count * 4 * sizeof(*nobj->control) );
++    nobj->work = malloc( (SIZE_T)order * 4 * sizeof(*nobj->work) );
++    if (!nobj->knots || !nobj->control || !nobj->work) { nurbs_error( nobj, GLU_OUT_OF_MEMORY ); return; }
++    nobj->order = order;
++    nobj->count = count;
++    for (i = 0; i < nknots; ++i) nobj->knots[i] = knots[i];
++    for (i = 0; i < nobj->count; ++i)
++    {
++        for (j = 0; j < dimension; ++j)
++        {
++            if (!isfinite(control[(SIZE_T)i * stride + j])) { nurbs_error( nobj, GLU_INVALID_VALUE ); return; }
++            nobj->control[4 * (SIZE_T)i + j] = control[(SIZE_T)i * stride + j];
++        }
++        if (dimension == 3) nobj->control[4 * (SIZE_T)i + 3] = 1.0;
++    }
+ }
+
+ /***********************************************************************
+@@ -193,7 +546,7 @@
+  */
+ void WINAPI wine_gluBeginSurface( GLUnurbs *nobj )
+ {
+-    assert( 0 );
++    nurbs_unsupported( nobj );
+ }
+
+ /***********************************************************************
+@@ -201,17 +554,17 @@
+  */
+ void WINAPI wine_gluEndSurface( GLUnurbs *nobj )
+ {
+-    assert( 0 );
++    nurbs_unsupported( nobj );
+ }
+
+ /***********************************************************************
+  *		gluNurbsSurface (GLU32.@)
+  */
+ void WINAPI wine_gluNurbsSurface( GLUnurbs *nobj, GLint sknot_count, float *sknot, GLint tknot_count,
+-                                  GLfloat *tknot, GLint s_stride, GLint t_stride, GLfloat *ctlarray,
+-                                  GLint sorder, GLint torder, GLenum type )
+-{
+-    assert( 0 );
++                                GLfloat *tknot, GLint s_stride, GLint t_stride, GLfloat *control,
++                                GLint sorder, GLint torder, GLenum type )
++{
++    nurbs_unsupported( nobj );
+ }
+
+ /***********************************************************************
+@@ -219,7 +572,7 @@
+  */
+ void WINAPI wine_gluBeginTrim( GLUnurbs *nobj )
+ {
+-    assert( 0 );
++    nurbs_unsupported( nobj );
+ }
+
+ /***********************************************************************
+@@ -227,7 +580,7 @@
+  */
+ void WINAPI wine_gluEndTrim( GLUnurbs *nobj )
+ {
+-    assert( 0 );
++    nurbs_unsupported( nobj );
+ }
+
+ /***********************************************************************
+@@ -235,7 +588,7 @@
+  */
+ void WINAPI wine_gluPwlCurve( GLUnurbs *nobj, GLint count, GLfloat *array, GLint stride, GLenum type )
+ {
+-    assert( 0 );
++    nurbs_unsupported( nobj );
+ }
+
+ /***********************************************************************
+@@ -243,7 +596,9 @@
+  */
+ void WINAPI wine_gluNurbsCallback( GLUnurbs *nobj, GLenum which, void (CALLBACK *fn)(void) )
+ {
+-    assert( 0 );
++    if (!nobj) return;
++    if (which == GLU_ERROR) nobj->error = (void (CALLBACK *)(GLenum))fn;
++    else { FIXME( "Unsupported NURBS callback type %#x.\n", which ); nurbs_error( nobj, GLU_INVALID_ENUM ); }
+ }
+
+ /***********************************************************************

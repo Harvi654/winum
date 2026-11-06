@@ -1,0 +1,218 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] win32u: Preserve signed FIXED values in glyph MAT2 conversion.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+Windows 10 native L1: x64/i686 each 981 tests, no failures/todos/skips
+(a26f4bc, recorded by a743a7b). Retain those assertions without todo_wine.
+
+FIXED contains a signed integer part and an unsigned fractional part.
+Use signed multiplication and addition, avoiding unsigned zero extension
+on LP64 and the undefined left shift of a negative signed value.
+The original GetGlyphOutline regression uses measured identity relations,
+checks both signs and negative fractions, and bounds bitmap fetches.
+The shear bound accounts for glyph width; it is unchanged on the native
+reference inputs and avoids a false failure with wider substitute dots.
+No vendor code or font data. Not submitted upstream.
+
+---
+--- a/dlls/win32u/freetype.c
++++ b/dlls/win32u/freetype.c
+@@ -277,3 +277,3 @@ static inline FT_Fixed FT_FixedFromFIXED(FIXED f)
+ {
+-    return (FT_Fixed)((int)f.value << 16 | (unsigned int)f.fract);
++    return (FT_Fixed)f.value * 0x10000 + f.fract;
+ }
+--- a/dlls/gdi32/tests/font.c
++++ b/dlls/gdi32/tests/font.c
+@@ -4675,3 +4675,176 @@
++/* BEGIN negative MAT2 reference tests.
++ * Original code, AI-assisted (Codex), LGPL-2.1-or-later.
++ * Relations measured on Windows 10 x64/i686, --mat2, height -23, angle 0,
++ * Arial and Century Gothic, four characters, both graphics modes.
++ * Fractional cases use measured bounds, not guessed exact outline pixels.
++ */
++static void negative_mat2_values(DWORD size, const GLYPHMETRICS *gm, LONGLONG *values)
++{
++    values[0] = size;
++    values[1] = gm->gmBlackBoxX;
++    values[2] = gm->gmBlackBoxY;
++    values[3] = gm->gmptGlyphOrigin.x;
++    values[4] = gm->gmptGlyphOrigin.y;
++    values[5] = gm->gmCellIncX;
++    values[6] = gm->gmCellIncY;
++}
++
++static void test_GetGlyphOutline_negative_mat2(void)
++{
++    static const struct
++    {
++        const char *name;
++        MAT2 matrix;
++    } transforms[] =
++    {
++        {"identity", {{0,1}, {0,0}, {0,0}, {0,1}}},
++        {"flip_y", {{0,1}, {0,0}, {0,0}, {0,-1}}},
++        {"flip_x", {{0,-1}, {0,0}, {0,0}, {0,1}}},
++        {"flip_xy", {{0,-1}, {0,0}, {0,0}, {0,-1}}},
++        {"half_y", {{0,1}, {0,0}, {0,0}, {0x8000,-1}}},
++        {"rotate_m12_pos", {{0,0}, {0,1}, {0,-1}, {0,0}}},
++        {"rotate_m12_neg", {{0,0}, {0,-1}, {0,1}, {0,0}}},
++        {"shear_half", {{0,1}, {0x8000,-1}, {0,0}, {0,1}}}
++    };
++    static const char *const fields[] = {"size", "black_x", "black_y", "origin_x", "origin_y", "inc_x", "inc_y"};
++    static const char *const faces[] = {"Arial", "Liberation Sans", "DejaVu Sans"};
++    static const WCHAR chars[] = {'0', '1', '.', 'A'};
++    GLYPHMETRICS base, gm, fetched;
++    LONGLONG baseline[7], low[7], high[7], actual[7], fetched_values[7];
++    BYTE buffer[4096];
++    LOGFONTW lf = {0};
++    HFONT font;
++    HGDIOBJ old;
++    HDC dc;
++    DWORD size, received, base_size;
++    unsigned int f, ch, t, field;
++    int graphics;
++
++    for (f = 0; f < ARRAY_SIZE(faces); ++f)
++        if (is_truetype_font_installed(faces[f])) break;
++    if (f == ARRAY_SIZE(faces))
++    {
++        skip("No Arial, Liberation Sans or DejaVu Sans\n");
++        return;
++    }
++    dc = CreateCompatibleDC(NULL);
++    ok(dc != NULL, "CreateCompatibleDC failed\n");
++    if (!dc) return;
++    lf.lfHeight = -23;
++    lf.lfWeight = FW_NORMAL;
++    lf.lfCharSet = DEFAULT_CHARSET;
++    lf.lfQuality = NONANTIALIASED_QUALITY;
++    MultiByteToWideChar(CP_ACP, 0, faces[f], -1, lf.lfFaceName, LF_FACESIZE);
++    font = CreateFontIndirectW(&lf);
++    ok(font != NULL, "CreateFontIndirectW failed\n");
++    if (!font) { DeleteDC(dc); return; }
++    old = SelectObject(dc, font);
++    ok(old && old != HGDI_ERROR, "SelectObject failed\n");
++    if (!old || old == HGDI_ERROR) { DeleteObject(font); DeleteDC(dc); return; }
++    for (graphics = GM_COMPATIBLE; graphics <= GM_ADVANCED; ++graphics)
++    {
++        ok(SetGraphicsMode(dc, graphics) != 0, "SetGraphicsMode failed\n");
++        for (ch = 0; ch < ARRAY_SIZE(chars); ++ch)
++        {
++            winetest_push_context("graphics %d char %#x", graphics, chars[ch]);
++            memset(&base, 0, sizeof(base));
++            base_size = GetGlyphOutlineW(dc, chars[ch], GGO_BITMAP, &base, 0, NULL, &transforms[0].matrix);
++            ok(base_size != GDI_ERROR && base_size, "Identity query returned %lu\n", base_size);
++            if (base_size == GDI_ERROR || !base_size) { winetest_pop_context(); continue; }
++            ok(base.gmBlackBoxX && base.gmBlackBoxY && base.gmCellIncY == 0,
++               "Unexpected identity metrics %ux%u, inc_y %d\n", base.gmBlackBoxX, base.gmBlackBoxY, base.gmCellIncY);
++            negative_mat2_values(base_size, &base, baseline);
++            for (t = 0; t < ARRAY_SIZE(transforms); ++t)
++            {
++                winetest_push_context("%s", transforms[t].name);
++                memcpy(low, baseline, sizeof(low));
++                memcpy(high, baseline, sizeof(high));
++                switch (t)
++                {
++                case 1: /* y reflection */
++                    low[4] = baseline[2] - baseline[4];
++                    low[6] = -baseline[6];
++                    break;
++                case 2: /* x reflection */
++                    low[3] = -baseline[3] - baseline[1];
++                    low[5] = -baseline[5];
++                    break;
++                case 3: /* both axes */
++                    low[3] = -baseline[3] - baseline[1];
++                    low[4] = baseline[2] - baseline[4];
++                    low[5] = -baseline[5];
++                    low[6] = -baseline[6];
++                    break;
++                case 4: /* negative half, allowing the measured one-pixel rounding */
++                    low[2] = max(1, baseline[2] / 2);
++                    high[2] = (baseline[2] + 1) / 2;
++                    low[0] = ((baseline[1] + 31) / 32) * 4 * low[2];
++                    high[0] = ((baseline[1] + 31) / 32) * 4 * high[2];
++                    low[4] = -baseline[2];
++                    high[4] = baseline[2];
++                    break;
++                case 5: case 6: /* quarter turns exchange the box dimensions */
++                    low[0] = ((baseline[2] + 31) / 32) * 4 * baseline[1];
++                    low[1] = baseline[2];
++                    low[2] = baseline[1];
++                    low[3] = t == 5 ? -baseline[4] : baseline[4] - baseline[2];
++                    low[4] = t == 5 ? baseline[3] + baseline[1] : -baseline[3];
++                    low[5] = 0;
++                    low[6] = t == 5 ? -baseline[5] : baseline[5];
++                    break;
++                case 7: /* measured bounds avoid assuming exact fractional hinting */
++                    low[0] = low[2] = 1;
++                    low[1] = max(1, baseline[1] - 1);
++                    low[3] = baseline[3] - 1;
++                    low[4] = -2 * (baseline[1] + baseline[2]);
++                    low[6] = baseline[5] / 2;
++                    high[0] = ((baseline[1] + 32) / 32) * 4 * 2 * max(baseline[1], baseline[2]);
++                    high[1] = baseline[1] + 1;
++                    high[2] = 2 * max(baseline[1], baseline[2]);
++                    high[3] = baseline[3] + 1;
++                    high[4] = 2 * (baseline[1] + baseline[2]);
++                    high[6] = (baseline[5] + 1) / 2;
++                    break;
++                }
++                if (t != 4 && t != 7) memcpy(high, low, sizeof(high));
++                memset(&gm, 0, sizeof(gm));
++                size = GetGlyphOutlineW(dc, chars[ch], GGO_BITMAP, &gm, 0, NULL, &transforms[t].matrix);
++                ok(size != GDI_ERROR && size, "Query returned %lu\n", size);
++                if (size != GDI_ERROR && size)
++                {
++                    negative_mat2_values(size, &gm, actual);
++                    for (field = 0; field < ARRAY_SIZE(fields); ++field)
++
++                        ok(actual[field] >= low[field] && actual[field] <= high[field],
++                           "%s is %I64d, expected [%I64d,%I64d]\n", fields[field], actual[field], low[field], high[field]);
++                    /* Never send giant dimensions to the rasterizer, even if
++                     * a long thin bitmap fits the small caller buffer. */
++                    if (size <= sizeof(buffer) && gm.gmBlackBoxX <= 256 && gm.gmBlackBoxY <= 256)
++                    {
++                        memset(&fetched, 0, sizeof(fetched));
++                        received = GetGlyphOutlineW(dc, chars[ch], GGO_BITMAP, &fetched,
++                                                    sizeof(buffer), buffer, &transforms[t].matrix);
++                        ok(received == size, "Fetch returned %lu, expected %lu\n", received, size);
++                        if (received != GDI_ERROR)
++                        {
++                            negative_mat2_values(received, &fetched, fetched_values);
++                            for (field = 1; field < ARRAY_SIZE(fields); ++field)
++                                ok(actual[field] == fetched_values[field], "Fetch changed %s\n", fields[field]);
++                        }
++                    }
++                    else trace("Bitmap fetch omitted: size %lu, dimensions %ux%u\n", size, gm.gmBlackBoxX, gm.gmBlackBoxY);
++                }
++                winetest_pop_context();
++            }
++            winetest_pop_context();
++        }
++    }
++    SelectObject(dc, old);
++    DeleteObject(font);
++    DeleteDC(dc);
++}
++/* END negative MAT2 reference tests. */
++
+ static void test_GetGlyphOutline(void)
+ {
+     HDC hdc;
+@@ -8026,4 +8199,6 @@
+         if (!strcmp(argv[2], "AddFontMemResource"))
+             test_AddFontMemResource();
++        else if (!strcmp(argv[2], "negative_mat2"))
++            test_GetGlyphOutline_negative_mat2();
+         return;
+     }
+@@ -8070,6 +8245,7 @@
+     test_RealizationInfo();
+     test_GetTextFace();
+     test_GetGlyphOutline();
++    test_GetGlyphOutline_negative_mat2();
+     test_GetTextMetrics2("Tahoma", -11);
+     test_GetTextMetrics2("Tahoma", -55);
+     test_GetTextMetrics2("Tahoma", -110);

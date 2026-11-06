@@ -1,0 +1,35 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Keep already Local selections and advertised children.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+
+Windows v14 props/post level-parent: repeating Local on an already Local
+feature does not select its optional children. Keep the existing Local
+request unchanged; source/advertised descendants are boundaries when a new
+level-mode explicit target propagates Local. Preserve the measured v10 all-
+children behavior for unselected optional FP/non-FP descendants.
+
+Shared v14 props/post level-parent and stable controls assert immediate Get
+and publish; RULE_REPEAT. Frozen B/D patch artifacts are not edited.
+
+--- a/dlls/msi/install.c
++++ b/dlls/msi/install.c
+@@ -939,6 +939,8 @@
+     WCHAR *addlocal;
+     BOOL explicit_selection;
+ 
++    if (target->ActionRequest == INSTALLSTATE_LOCAL) return ERROR_SUCCESS;
++
+     nodes = calloc( count, sizeof(*nodes) );
+     queue = malloc( count * sizeof(*queue) );
+     if (!nodes || !queue) { free( nodes ); free( queue ); return ERROR_OUTOFMEMORY; }
+@@ -979,7 +981,8 @@
+         LIST_FOR_EACH_ENTRY( child, &node->feature->Children, FeatureList, entry )
+         {
+             struct feature_selection_node *next = &nodes[child->feature->selection_index];
+-            if (next->visited || next->feature->Level <= 0 || next->feature->disabled_at_load) continue;
++            if (next->visited || next->feature->Level <= 0 || next->feature->disabled_at_load || next->feature->ActionRequest == INSTALLSTATE_SOURCE ||
++                next->feature->ActionRequest == INSTALLSTATE_ADVERTISED) continue;
+             next->visited = TRUE;
+             queue[tail++] = next;
+         }

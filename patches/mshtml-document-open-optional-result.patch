@@ -1,0 +1,24 @@
+--- a/dlls/mshtml/htmldoc.c
++++ b/dlls/mshtml/htmldoc.c
+@@ -1443,7 +1443,7 @@
+     TRACE("(%p)->(%s %s %s %s %p)\n", This, debugstr_w(url), debugstr_variant(&name),
+           debugstr_variant(&features), debugstr_variant(&replace), pomWindowResult);
+ 
+-    *pomWindowResult = NULL;
++    if(pomWindowResult) *pomWindowResult = NULL;
+ 
+     if(!This->window || is_detached_window(This->window))
+         return E_FAIL;
+@@ -1479,8 +1479,10 @@
+     release_event_target(&This->node.event_target);
+     doc_init_events(This);
+ 
+-    *pomWindowResult = (IDispatch*)&This->window->base.outer_window->base.IHTMLWindow2_iface;
+-    IHTMLWindow2_AddRef(&This->window->base.outer_window->base.IHTMLWindow2_iface);
++    if(pomWindowResult) {
++        *pomWindowResult = (IDispatch*)&This->window->base.outer_window->base.IHTMLWindow2_iface;
++        IHTMLWindow2_AddRef(&This->window->base.outer_window->base.IHTMLWindow2_iface);
++    }
+     return S_OK;
+ }
+ 

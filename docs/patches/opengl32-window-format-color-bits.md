@@ -8,13 +8,13 @@ and `wglChoosePixelFormatARB`, could not set the second one and greyed the
 option out. A Windows-like replacement for the opt-in
 `WINE_OPENGL_REQUIRE_ALPHA` patch of Autodesk-Inventor-for-Linux PR #3.
 
-Evidence: [docs/wine-repro/opengl32-pixel-format-alpha/](../../../docs/wine-repro/opengl32-pixel-format-alpha/README.md)
+Evidence: [docs/wine-repro/opengl32-pixel-format-alpha/](../wine-repro/opengl32-pixel-format-alpha/README.md)
 (Windows 10 + RX 6400, Wine 11.20 + RX 6400 with EGL and GLX).
 
 ## v2 (2026-11-06)
 
 Codex's cross review of v1
-([cross-review-2026-11-06-opengl-color-bits.md](../../../docs/wine-repro/cross-review-2026-11-06-opengl-color-bits.md))
+([cross-review-2026-11-06-opengl-color-bits.md](../wine-repro/cross-review-2026-11-06-opengl-color-bits.md))
 found that v1, made in win32u's shared descriptors, also changed what a
 memory DC saw (GLX and EGL formats that draw to windows can draw to
 bitmaps too): P2-1. v2 makes the change in opengl32's per-DC copy, only

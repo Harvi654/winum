@@ -1,8 +1,10 @@
 # Patches of a normal winum build, applied in this order to vanilla Wine $WINE_VERSION
 # (wine/version.env). One name per line; '#' starts a comment. Nothing else in
-# patches/ is applied. Order of winum-11.20-1 = the Inventor project's
-# wine-11.20-6 (alphabetical), so the first release changes nothing for Inventor.
+# patches/ is applied. Each patch has a status page in docs/patches/<name>.md
+# with its validation levels; docs/patches/README.md is the overview.
 
+# From Autodesk-Inventor-for-Linux (its wine-11.20-6, alphabetical); the
+# oleaut32 typedesc-pointee patch is v2 here.
 combase-stub-activation-context.patch
 comctl32-statusbar-erase-background.patch
 comctl32-toolbar-padding-height.patch
@@ -30,3 +32,49 @@ wbemprox-timezone.patch
 winex11-flush-putimage.patch
 winex11-shape-alpha-xwayland.patch
 winex11-xinput-bad-device.patch
+
+# From Solidworks-for-Linux (its series order).
+server-input-attachment-components.patch
+msxml3-parseerror-filepos.patch
+wininet-http-same-position-seek.patch
+shell32-automation-zip-copy.patch
+msi-selection-tree-directory-property.patch
+comctl32-header-null-layout.patch
+msxml3-schema-cache-namespace.patch
+explorer-tasklist-parenting-hosts.patch
+comctl32-ownerdraw-existing-capture.patch
+mshtml-document-open-optional-result.patch
+winex11-owner-managed-async.patch
+glu32-nurbs-curves.patch
+win32u-fixed-negative-mat2.patch
+
+# SOLIDWORKS fixes A, B, C (PropertyManager headers, themed checkboxes,
+# Extrude depth field).
+win32u-child-topmost-ignore.patch
+comctl32-themed-checkbox-buffered-paint.patch
+winex11-stale-map-activation.patch
+
+# MSI feature selection (17 patches, written by Codex), in the order they
+# were developed and validated.
+msi-addlocal-feature-ancestors.patch
+msi-follow-parent-install-level.patch
+msi-setfeaturestate-post-cost-action.patch
+msi-setfeaturestate-post-cost-ancestors.patch
+msi-setfeaturestate-required-descendants.patch
+msi-selection-override-ancestors.patch
+msi-required-feature-source-state.patch
+msi-required-feature-advertise-state.patch
+msi-required-feature-absent-state.patch
+msi-costfinalize-reset-feature-requests.patch
+msi-post-cost-local-idempotence.patch
+msi-disabled-feature-selection.patch
+msi-reject-cyclic-feature-parents.patch
+msi-costfinalize-feature-depth.patch
+msi-ui-localonly-source-state.patch
+msi-executeaction-ui-selection-transfer.patch
+msi-source-directory-component-state.patch
+
+# Inventor: type library cache (3D PDF export) and the pixel format
+# description needed for GPU ray tracing.
+oleaut32-typelib-keep-released.patch
+opengl32-window-format-color-bits.patch

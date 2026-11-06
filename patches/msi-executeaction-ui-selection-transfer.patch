@@ -1,0 +1,153 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Transfer fresh UI selection to execute properties.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+
+Windows v15 x64/i686: ADDLOCAL is replaced by every UI Local request;
+REMOVE contains UI Local-to-Absent changes only. Optional Source uses
+ADDSOURCE, genuine Advertised (attr0) uses ADVERTISE, both excluded from
+ADDLOCAL. Mixed Local+Source and Local+Advertised retain both choices.
+Before execute CostFinalize feature states are unknown; normal costing
+restores the selection. Snapshot initial UI Local choices and serialize
+at the INSTALL ExecuteAction boundary. Retain the pre-cost request reset.
+
+Fresh installs only; no maintenance/AdminUI change. DisallowAdvertise
+normalization precedes transfer. No advertising fallback flag is needed:
+all measured requests now have a selection property. Allocation errors
+return before any property changes or request clearing; ordinary property
+errors return before request clearing. Reset derived UI component flags
+so Source is not published as Local. Apply after depth candidate.
+
+--- a/dlls/msi/msipriv.h
++++ b/dlls/msi/msipriv.h
+@@ -512,6 +512,7 @@
+     struct list Children;
+     struct list Components;
+     BOOL disabled_at_load;
++    BOOL ui_was_local; /* selection before post-cost client UI choices */
+     unsigned int selection_index; /* per-call feature worklist index */
+ } MSIFEATURE;
+ 
+--- a/dlls/msi/action.c
++++ b/dlls/msi/action.c
+@@ -2421,6 +2421,15 @@
+ 
+     if ((rc = MSI_SetFeatureStates( package ))) return rc;
+ 
++    if ((package->InWhatSequence & SEQUENCE_UI) && !(package->InWhatSequence & SEQUENCE_EXEC) &&
++        !msi_get_property_int( package->db, L"Installed", 0 ))
++    {
++        MSIFEATURE *feature;
++
++        LIST_FOR_EACH_ENTRY( feature, &package->features, MSIFEATURE, entry )
++            feature->ui_was_local = feature->ActionRequest == INSTALLSTATE_LOCAL;
++    }
++
+     if ((primary_key = msi_dup_property( package->db, L"PRIMARYFOLDER" )))
+     {
+         if ((primary_folder = msi_dup_property( package->db, primary_key )))
+@@ -5494,6 +5503,95 @@
+     return ERROR_SUCCESS;
+ }
+ 
++/* A fresh client UI hands selection properties, not feature requests, to
++ * the execution sequence. Local/Absent/Source/Advertised transfer is measured by Windows v15. */
++static UINT transfer_ui_feature_selection( MSIPACKAGE *package )
++{
++    MSIFEATURE *feature;
++    MSICOMPONENT *component;
++    WCHAR *local, *remove, *source, *advertise, *l, *r, *s, *a;
++    SIZE_T length = 1, size;
++    UINT rc;
++
++    if (!(package->InWhatSequence & SEQUENCE_UI) || (package->InWhatSequence & SEQUENCE_EXEC) ||
++        !msi_get_property_int( package->db, L"CostingComplete", 0 ) ||
++        msi_get_property_int( package->db, L"Installed", 0 )) return ERROR_SUCCESS;
++
++    LIST_FOR_EACH_ENTRY( feature, &package->features, MSIFEATURE, entry )
++    {
++        size = wcslen( feature->Feature ) + 1;
++        if (size > (~(SIZE_T)0 / sizeof(WCHAR)) - length) return ERROR_OUTOFMEMORY;
++        length += size;
++    }
++    local = malloc( length * sizeof(WCHAR) );
++    remove = malloc( length * sizeof(WCHAR) );
++    source = malloc( length * sizeof(WCHAR) );
++    advertise = malloc( length * sizeof(WCHAR) );
++    if (!local || !remove || !source || !advertise)
++    {
++        free( local );
++        free( remove );
++        free( source );
++        free( advertise );
++        return ERROR_OUTOFMEMORY;
++    }
++    l = local;
++    r = remove;
++    s = source;
++    a = advertise;
++    LIST_FOR_EACH_ENTRY( feature, &package->features, MSIFEATURE, entry )
++    {
++        size = wcslen( feature->Feature );
++        if (feature->ActionRequest == INSTALLSTATE_LOCAL)
++        {
++            if (l != local) *l++ = ',';
++            memcpy( l, feature->Feature, size * sizeof(WCHAR) );
++            l += size;
++        }
++        else if (feature->ActionRequest == INSTALLSTATE_SOURCE)
++        {
++            if (s != source) *s++ = ',';
++            memcpy( s, feature->Feature, size * sizeof(WCHAR) );
++            s += size;
++        }
++        else if (feature->ActionRequest == INSTALLSTATE_ADVERTISED)
++        {
++            if (a != advertise) *a++ = ',';
++            memcpy( a, feature->Feature, size * sizeof(WCHAR) );
++            a += size;
++        }
++        else if (feature->ActionRequest == INSTALLSTATE_ABSENT && feature->ui_was_local)
++        {
++            if (r != remove) *r++ = ',';
++            memcpy( r, feature->Feature, size * sizeof(WCHAR) );
++            r += size;
++        }
++    }
++    *l = *r = *s = *a = 0;
++    rc = msi_set_property( package->db, L"ADDLOCAL", local, -1 );
++    if (!rc) rc = msi_set_property( package->db, L"REMOVE", remove, -1 );
++    if (!rc) rc = msi_set_property( package->db, L"ADDSOURCE", source, -1 );
++    if (!rc) rc = msi_set_property( package->db, L"ADVERTISE", advertise, -1 );
++    free( local );
++    free( remove );
++    free( source );
++    free( advertise );
++    if (rc) return rc;
++
++    /* The server starts with unknown feature states before execute costing. */
++    LIST_FOR_EACH_ENTRY( feature, &package->features, MSIFEATURE, entry )
++        feature->Installed = feature->Action = feature->ActionRequest = INSTALLSTATE_UNKNOWN;
++    /* UI costing and SetFeatureState updated these derived component flags.
++     * The execute package must recompute them, particularly Local -> Source. */
++    LIST_FOR_EACH_ENTRY( component, &package->components, MSICOMPONENT, entry )
++    {
++        component->Installed = component->Action = component->ActionRequest = INSTALLSTATE_UNKNOWN;
++        component->hasLocalFeature = component->hasSourceFeature = component->hasAdvertisedFeature = FALSE;
++        component->anyAbsent = FALSE;
++    }
++    return ERROR_SUCCESS;
++}
++
+ static UINT ACTION_ExecuteAction(MSIPACKAGE *package)
+ {
+     WCHAR *productname, *action, *info_template;
+@@ -5575,6 +5673,8 @@
+         MSI_RecordSetStringW(uirow, 2, package->ProductCode);
+         MSI_ProcessMessage(package, INSTALLMESSAGE_INSTALLSTART, uirow);
+         msiobj_release(&uirow->hdr);
++
++        if (!wcscmp( action, L"INSTALL" ) && (rc = transfer_ui_feature_selection( package ))) goto end;
+ 
+         /* Perform the installation. Always use the ExecuteSequence. */
+         package->InWhatSequence |= SEQUENCE_EXEC;

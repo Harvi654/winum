@@ -1,0 +1,43 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Normalize Local-only and FollowParent UI Source requests.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+
+Windows v15-3 x64/i686: UI Set(Source) on Local L100 attr8/10 features
+with only Local-only components returns success and keeps Request Local.
+Optional attr8 preserves Source; Optional attr10 follows its Local parent.
+Limit normalization to fresh post-cost UI calls on already Local features.
+SourceOnly is not generalized. Actual ADDSOURCE serialization is separate.
+
+--- a/dlls/msi/install.c
++++ b/dlls/msi/install.c
+@@ -1048,6 +1048,29 @@
+         }
+     }
+ 
++    /* V15: Local-only components stay Local; an Optional FollowParent
++     * selection follows a Local parent. SourceOnly/non-UI remain unmeasured. */
++    if (iState == INSTALLSTATE_SOURCE && feature->ActionRequest == INSTALLSTATE_LOCAL &&
++        (package->InWhatSequence & SEQUENCE_UI) && !(package->InWhatSequence & SEQUENCE_EXEC) &&
++        msi_get_property_int( package->db, L"CostingComplete", 0 ) &&
++        !msi_get_property_int( package->db, L"Installed", 0 ) && !list_empty( &feature->Components ))
++    {
++        ComponentList *cl;
++        BOOL local_only = TRUE, source_only = FALSE;
++        MSIFEATURE *parent = NULL;
++
++        LIST_FOR_EACH_ENTRY( cl, &feature->Components, ComponentList, entry )
++        {
++            if (cl->component->Attributes & (msidbComponentAttributesSourceOnly | msidbComponentAttributesOptional))
++                local_only = FALSE;
++            if (cl->component->Attributes & msidbComponentAttributesSourceOnly) source_only = TRUE;
++        }
++        if ((feature->Attributes & msidbFeatureAttributesFollowParent) && feature->Feature_Parent)
++            parent = msi_get_loaded_feature( package, feature->Feature_Parent );
++        if (local_only || (!source_only && parent && parent->ActionRequest == INSTALLSTATE_LOCAL))
++            iState = INSTALLSTATE_LOCAL;
++    }
++
+     if (iState == INSTALLSTATE_LOCAL && msi_get_property_int( package->db, L"CostingComplete", 0 ) &&
+         !msi_get_property_int( package->db, L"Installed", 0 ))
+         return select_local_feature( package, feature );

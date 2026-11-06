@@ -1,0 +1,50 @@
+Wine 11.20: implement IXMLDOMParseError::get_filepos.
+
+Experimental, AI-assisted; LGPL-2.1-or-later; not submitted upstream.
+Return the parse-error object's stored position, matching its line/linepos
+getters, and reject a NULL output pointer. This does not make invalid XML
+valid or populate missing parser position metadata. SOLIDWORKS calls this
+getter after loadXML("") fails; the old E_NOTIMPL precedes its C++ exception.
+Application causality and native reference checks remain pending.
+
+--- a/dlls/msxml3/parseerror.c
++++ b/dlls/msxml3/parseerror.c
+@@ -242,8 +242,11 @@
+     LONG *filepos )
+ {
+     parse_error_t *This = impl_from_IXMLDOMParseError2( iface );
+-    FIXME("(%p)->(%p)\n", This, filepos);
+-    return E_NOTIMPL;
++    TRACE("(%p)->(%p)\n", This, filepos);
++    if (!filepos) return E_INVALIDARG;
++
++    *filepos = This->filepos;
++    return S_OK;
+ }
+ 
+ static HRESULT WINAPI parseError_get_errorXPath(
+--- a/dlls/msxml3/tests/domdoc.c
++++ b/dlls/msxml3/tests/domdoc.c
+@@ -12940,6 +12940,7 @@
+     IXMLDOMParseError *error;
+     IXMLDOMDocument *doc;
+     HRESULT hr;
++    LONG filepos;
+ 
+     doc = create_document(&IID_IXMLDOMDocument);
+ 
+@@ -12952,6 +12953,14 @@
+     check_interface(error, &IID_IXMLDOMParseError, TRUE);
+     todo_wine
+     check_interface(error, &IID_IXMLDOMParseError2, FALSE);
++
++    filepos = -1;
++    hr = IXMLDOMParseError_get_filepos(error, &filepos);
++    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++    ok(filepos == 0, "Unexpected file position %ld.\n", filepos);
++
++    hr = IXMLDOMParseError_get_filepos(error, NULL);
++    ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
+ 
+     hr = IXMLDOMParseError_get_line(error, NULL);
+     ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);

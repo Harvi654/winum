@@ -1,0 +1,877 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Select ADDLOCAL ancestors and required descendants.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later.
+
+On a fresh installation, select the ancestors of ADDLOCAL features and
+recursively select UIDisallowAbsent descendants. Optional FollowParent
+children are not implicitly selected in this mode. Keep later overrides
+and existing maintenance selection behavior.
+
+Includes the shared original conformance fixture and its own CA DLL.
+Windows v3-v10 defines 279 states; A2 and B remain separate todo_wine checks.
+No vendor code or binaries. Not in series pending clean-F L4.
+
+V10 covers all 279 measured Windows states, including non-FP descendants.
+
+diff --git a/dlls/msi/action.c b/dlls/msi/action.c
+--- a/dlls/msi/action.c
++++ b/dlls/msi/action.c
+@@ -1513,6 +1513,44 @@
+     return (feature->Level > 0 && feature->Level <= level);
+ }
+ 
++/* ADDLOCAL selects ancestors first, then mandatory descendants.  Do this
++ * before subsequent overrides, so REMOVE/ADDSOURCE keep their precedence. */
++static void select_required_children( MSIFEATURE *feature )
++{
++    FeatureList *child;
++
++    LIST_FOR_EACH_ENTRY( child, &feature->Children, FeatureList, entry )
++    {
++        MSIFEATURE *f = child->feature;
++
++        if (f->Level > 0 && (f->Attributes & msidbFeatureAttributesUIDisallowAbsent) &&
++            f->ActionRequest == INSTALLSTATE_UNKNOWN)
++            f->Action = f->ActionRequest = INSTALLSTATE_LOCAL;
++        if (f->ActionRequest == INSTALLSTATE_LOCAL) select_required_children( f );
++    }
++}
++
++static void select_addlocal_parents( MSIPACKAGE *package )
++{
++    MSIFEATURE *feature, *parent;
++
++    LIST_FOR_EACH_ENTRY( feature, &package->features, MSIFEATURE, entry )
++    {
++        if (feature->ActionRequest != INSTALLSTATE_LOCAL) continue;
++        parent = feature;
++        while (parent->Feature_Parent)
++        {
++            parent = msi_get_loaded_feature( package, parent->Feature_Parent );
++            if (!parent || parent->Level <= 0) break;
++            parent->Action = parent->ActionRequest = INSTALLSTATE_LOCAL;
++        }
++    }
++    LIST_FOR_EACH_ENTRY( feature, &package->features, MSIFEATURE, entry )
++    {
++        if (feature->ActionRequest == INSTALLSTATE_LOCAL) select_required_children( feature );
++    }
++}
++
+ static BOOL process_state_property(MSIPACKAGE* package, int level,
+                                    LPCWSTR property, INSTALLSTATE state)
+ {
+@@ -1566,6 +1604,8 @@
+             }
+         }
+     }
++    if (!wcscmp( property, L"ADDLOCAL" ) && !msi_get_property_int( package->db, L"Installed", 0 ))
++        select_addlocal_parents( package );
+     free(override);
+     return TRUE;
+ }
+@@ -1643,6 +1683,8 @@
+ 
+ UINT MSI_SetFeatureStates(MSIPACKAGE *package)
+ {
++    WCHAR *addlocal;
++    BOOL fresh_addlocal;
+     int level;
+     MSICOMPONENT* component;
+     MSIFEATURE *feature;
+@@ -1752,12 +1794,16 @@
+         }
+     }
+ 
++    addlocal = msi_dup_property( package->db, L"ADDLOCAL" );
++    fresh_addlocal = addlocal && *addlocal && !msi_get_property_int( package->db, L"Installed", 0 );
++    free( addlocal );
++
+     /* disable child features of unselected parent or follow parent */
+     LIST_FOR_EACH_ENTRY( feature, &package->features, MSIFEATURE, entry )
+     {
+         if (feature->Feature_Parent) continue;
+         disable_children( feature, level );
+-        follow_parent( feature );
++        if (!fresh_addlocal) follow_parent( feature );
+     }
+ 
+     /* now we want to set component state based based on feature state */
+diff --git a/dlls/msi/tests/Makefile.in b/dlls/msi/tests/Makefile.in
+--- a/dlls/msi/tests/Makefile.in
++++ b/dlls/msi/tests/Makefile.in
+@@ -1,5 +1,7 @@
+ TESTDLL   = msi.dll
+ IMPORTS   = secur32 cabinet msi shell32 ole32 oleaut32 user32 advapi32 version odbccp32
++
++selection_ca_IMPORTS = msi
+ 
+ custom_IMPORTS = uuid msi ole32 shell32 advapi32 odbccp32 oleaut32
+ 
+@@ -15,6 +17,9 @@
+ 	package.c \
+ 	patch.c \
+ 	record.c \
++	selection.c \
++	selection_ca.c \
++	selection_ca.spec \
+ 	selfreg.c \
+ 	selfreg.spec \
+ 	source.c \
+diff --git a/dlls/msi/tests/selection.c b/dlls/msi/tests/selection.c
+new file mode 100644
+--- /dev/null
++++ b/dlls/msi/tests/selection.c
+@@ -0,0 +1,655 @@
++/*
++ * Copyright 2026 Harvi654
++ *
++ * Original synthetic feature selection tests, AI-assisted; no vendor code.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++#define _WIN32_MSI 300
++#include <windows.h>
++#include <msi.h>
++#include <msiquery.h>
++#include <ole2.h>
++#include <stdio.h>
++#include <ctype.h>
++#include "wine/test.h"
++
++struct feature
++{
++    const char *name, *parent;
++    unsigned int level, attributes;
++};
++
++static const struct feature features[] =
++{
++    {"Root",      NULL,       100, 0},
++    {"PF",        "Root",     100, 18},
++    {"i386PF",    "PF",       100, 18},
++    {"CoreTS",    "i386PF",   100, 24},
++    {"SWFiles",   "i386PF",   100, 24},
++    {"Treehouse", "i386PF",   200, 10},
++    {"Other",     "Root",     100, 18},
++    {"Loose",     "Other",    100, 24},
++    /* An independent root distinguishes global level selection from propagation. */
++    {"Detached",  NULL,       100, 24}
++};
++
++struct variant
++{
++    const char *name, *selection;
++    unsigned int loose_level, swfiles_attributes, loose_attributes, other_attributes;
++    unsigned int chain_order; /* 0: original, 1: parent-first, 2: child-first */
++    unsigned int ca_mode; /* 0: legacy Intel package, 1: matching-arch control, 2: our CA */
++    unsigned int level_probe; /* No ADDLOCAL: CA targets L200, optional without FP. */
++    unsigned int nonfp_probe; /* V10: L100 attr8 descendants, measured on Windows. */
++};
++
++static const struct variant variants[] =
++{
++    {"requested-pair", "ADDLOCAL=CoreTS,Treehouse", 100, 24, 24, 18, 0, 0, 0, 0},
++    {"core-only",      "ADDLOCAL=CoreTS",           100, 24, 24, 18, 0, 0, 0, 0},
++    {"loose-high",     "ADDLOCAL=CoreTS,Treehouse", 200, 24, 24, 18, 0, 0, 0, 0},
++    {"swfiles-fp",     "ADDLOCAL=CoreTS,Treehouse", 100, 26, 24, 18, 0, 0, 0, 0},
++    {"level-control",  "",                         100, 24, 24, 18, 0, 0, 0, 0},
++    /* Complete the Loose L200 FollowParent / UIDisallowAbsent matrix.
++     * All other inputs match loose-high; native v4 results are documented. */
++    {"loose-high-fp",          "ADDLOCAL=CoreTS,Treehouse", 200, 24, 26, 18, 0, 0, 0, 0},
++    {"loose-high-optional",    "ADDLOCAL=CoreTS,Treehouse", 200, 24,  8, 18, 0, 0, 0, 0},
++    {"loose-high-fp-optional", "ADDLOCAL=CoreTS,Treehouse", 200, 24, 10, 18, 0, 0, 0, 0},
++    /* Native v5 measurement: low-Level optional children, then a parent
++     * with FollowParent only, outside the requested features' ancestor path. */
++    {"loose-low-optional",     "ADDLOCAL=CoreTS,Treehouse", 100, 24,  8, 18, 0, 0, 0, 0},
++    {"loose-low-fp-optional",  "ADDLOCAL=CoreTS,Treehouse", 100, 24, 10, 18, 0, 0, 0, 0},
++    {"fp-parent-required-child", "ADDLOCAL=CoreTS,Treehouse", 200, 24, 24, 2, 0, 0, 0, 0},
++    {"chains-parent-first", "ADDLOCAL=CoreTS,FWParent", 100, 24, 24, 18, 1, 0, 0, 0},
++    {"chains-child-first",  "ADDLOCAL=CoreTS,FWParent", 100, 24, 24, 18, 2, 0, 0, 0},
++    {"ca-parent-control", "ADDLOCAL=CoreTS,FWParent", 100, 24, 24, 18, 1, 1, 0, 0},
++    {"ca-child-control",  "ADDLOCAL=CoreTS,FWParent", 100, 24, 24, 18, 2, 1, 0, 0},
++    {"ca-parent-first",   "ADDLOCAL=CoreTS,FWParent", 100, 24, 24, 18, 1, 2, 0, 0},
++    {"ca-child-first",    "ADDLOCAL=CoreTS,FWParent", 100, 24, 24, 18, 2, 2, 0, 0},
++    /* Without FP on the targets, the known high-Level FP bug cannot make
++     * them Local before our CA. All their ancestors remain L100 Local. */
++    {"ca-level-control", "", 100, 24, 24, 18, 1, 1, 1, 0},
++    {"ca-level-set",     "", 100, 24, 24, 18, 1, 2, 1, 0},
++    /* V10 changes only both grandchildren from attr10 to attr8 (L100).
++     * Keep a control for each selection mode; native v10 defines all states. */
++    {"nonfp-addlocal-control", "ADDLOCAL=CoreTS,FWParent", 100, 24, 24, 18, 1, 1, 0, 1},
++    {"nonfp-addlocal-set",     "ADDLOCAL=CoreTS,FWParent", 100, 24, 24, 18, 1, 2, 0, 1},
++    {"nonfp-level-control", "", 100, 24, 24, 18, 1, 1, 1, 1},
++    {"nonfp-level-set",     "", 100, 24, 24, 18, 1, 2, 1, 1}
++};
++
++/* In ADDLOCAL variants DFParent is selected through its required parent link
++ * below Root; FWParent is explicitly requested. FP descendants model both paths.
++ * The names and Display numbers stay fixed while only Feature INSERT order changes. */
++static const struct feature chain_features[] =
++{
++    {"DFParent",     "Root",       100, 26},
++    {"DFChild",      "DFParent",   100, 10},
++    {"DFGrandchild", "DFChild",    100, 10},
++    {"FWParent",     "Root",       100, 26},
++    {"FWChild",      "FWParent",   100, 10},
++    {"FWGrandchild", "FWChild",    100, 10}
++};
++
++/* Windows 10 x64/i686 v3-v10: the same matrix on both architectures.
++ * Bit 1: ADDLOCAL ancestry/required children; 2: level limit; 4: CA action.
++ * Standalone --strict checks the patched engine without any expected failures.
++ */
++#ifndef SELECTION_FIXED_RULES
++#define SELECTION_FIXED_RULES 1
++#endif
++static const INSTALLSTATE expected_states[][15] =
++{
++    {3, 3, 3, 3, 3, 3, 3, 3, 2}, /* requested-pair */
++    {3, 3, 3, 3, 3, 2, 3, 3, 2}, /* core-only */
++    {3, 3, 3, 3, 3, 3, 3, 3, 2}, /* loose-high */
++    {3, 3, 3, 3, 3, 3, 3, 3, 2}, /* swfiles-fp */
++    {3, 3, 3, 3, 3, 2, 3, 3, 3}, /* level-control */
++    {3, 3, 3, 3, 3, 3, 3, 3, 2}, /* loose-high-fp */
++    {3, 3, 3, 3, 3, 3, 3, 2, 2}, /* loose-high-optional */
++    {3, 3, 3, 3, 3, 3, 3, 2, 2}, /* loose-high-fp-optional */
++    {3, 3, 3, 3, 3, 3, 3, 2, 2}, /* loose-low-optional */
++    {3, 3, 3, 3, 3, 3, 3, 2, 2}, /* loose-low-fp-optional */
++    {3, 3, 3, 3, 3, 3, 2, 2, 2}, /* fp-parent-required-child */
++    {3, 3, 3, 3, 3, 2, 3, 3, 2, 3, 2, 2, 3, 2, 2}, /* chains-parent-first */
++    {3, 3, 3, 3, 3, 2, 3, 3, 2, 3, 2, 2, 3, 2, 2}, /* chains-child-first */
++    {3, 3, 3, 3, 3, 2, 3, 3, 2, 3, 2, 2, 3, 2, 2}, /* ca-parent-control */
++    {3, 3, 3, 3, 3, 2, 3, 3, 2, 3, 2, 2, 3, 2, 2}, /* ca-child-control */
++    {3, 3, 3, 3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2}, /* ca-parent-first */
++    {3, 3, 3, 3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2}, /* ca-child-first */
++    {3, 3, 3, 3, 3, 2, 3, 3, 3, 3, 2, 2, 3, 2, 2}, /* ca-level-control */
++    {3, 3, 3, 3, 3, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3}, /* ca-level-set */
++    {3, 3, 3, 3, 3, 2, 3, 3, 2, 3, 2, 2, 3, 2, 2}, /* nonfp-addlocal-control */
++    {3, 3, 3, 3, 3, 2, 3, 3, 2, 3, 3, 2, 3, 3, 2}, /* nonfp-addlocal-set */
++    {3, 3, 3, 3, 3, 2, 3, 3, 3, 3, 2, 2, 3, 2, 2}, /* nonfp-level-control */
++    {3, 3, 3, 3, 3, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3}, /* nonfp-level-set */
++};
++
++static const unsigned int todo_states[][15] =
++{
++    {1, 1, 1, 0, 1, 1, 1, 1, 0}, /* requested-pair */
++    {1, 1, 1, 0, 1, 0, 1, 1, 0}, /* core-only */
++    {1, 1, 1, 0, 1, 1, 1, 1, 0}, /* loose-high */
++    {1, 1, 1, 0, 1, 1, 1, 1, 0}, /* swfiles-fp */
++    {0, 0, 0, 0, 0, 2, 0, 0, 0}, /* level-control */
++    {1, 1, 1, 0, 1, 1, 1, 1, 0}, /* loose-high-fp */
++    {1, 1, 1, 0, 1, 1, 1, 0, 0}, /* loose-high-optional */
++    {1, 1, 1, 0, 1, 1, 1, 0, 0}, /* loose-high-fp-optional */
++    {1, 1, 1, 0, 1, 1, 1, 0, 0}, /* loose-low-optional */
++    {1, 1, 1, 0, 1, 1, 1, 0, 0}, /* loose-low-fp-optional */
++    {1, 1, 1, 0, 1, 1, 0, 0, 0}, /* fp-parent-required-child */
++    {1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0}, /* chains-parent-first */
++    {1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0}, /* chains-child-first */
++    {1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0}, /* ca-parent-control */
++    {1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0}, /* ca-child-control */
++    {1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 4, 0, 1, 4, 0}, /* ca-parent-first */
++    {1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 4, 0, 1, 4, 0}, /* ca-child-first */
++    {0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0}, /* ca-level-control */
++    {0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 4, 4, 0, 4, 4}, /* ca-level-set */
++    {1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0}, /* nonfp-addlocal-control */
++    {1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 4, 0, 1, 4, 0}, /* nonfp-addlocal-set */
++    {0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0}, /* nonfp-level-control */
++    {0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 4, 4, 0, 4, 4}, /* nonfp-level-set */
++};
++
++#ifndef STANDALONE
++static char own_ca_path[MAX_PATH];
++#endif
++
++static unsigned int feature_count(const struct variant *variant)
++{
++    return ARRAY_SIZE(features) + (variant->chain_order ? ARRAY_SIZE(chain_features) : 0);
++}
++
++static const struct feature *get_feature(unsigned int index)
++{
++    return index < ARRAY_SIZE(features) ? features + index : chain_features + index - ARRAY_SIZE(features);
++}
++
++static UINT execute(MSIHANDLE db, const char *sql)
++{
++    MSIHANDLE view = 0;
++    UINT result = MsiDatabaseOpenViewA(db, sql, &view);
++    if (!result) result = MsiViewExecute(view, 0);
++    if (view) MsiCloseHandle(view);
++    return result;
++}
++
++static BOOL new_guid(char *text)
++{
++    GUID guid;
++    WCHAR wide[39];
++    HRESULT hr = CoCreateGuid(&guid);
++    ok(hr == S_OK, "CoCreateGuid returned %#lx\n", hr);
++    if (hr != S_OK) return FALSE;
++    StringFromGUID2(&guid, wide, ARRAY_SIZE(wide));
++    return !!WideCharToMultiByte(CP_ACP, 0, wide, -1, text, 39, NULL, NULL);
++}
++
++static UINT insert_feature(MSIHANDLE db, const struct variant *variant, unsigned int index)
++{
++    const struct feature *feature = get_feature(index);
++    unsigned int level = feature->level, attributes = feature->attributes;
++    char sql[1024];
++
++    if (!strcmp(feature->name, "Loose")) { level = variant->loose_level; attributes = variant->loose_attributes; }
++    if (!strcmp(feature->name, "SWFiles")) attributes = variant->swfiles_attributes;
++    if (!strcmp(feature->name, "Other")) attributes = variant->other_attributes;
++    if (variant->level_probe && (!strcmp(feature->name, "DFChild") || !strcmp(feature->name, "FWChild")))
++    {
++        level = 200;
++        attributes = 8;
++    }
++    if (variant->nonfp_probe && (!strcmp(feature->name, "DFGrandchild") || !strcmp(feature->name, "FWGrandchild")))
++        attributes = 8;
++    if (feature->parent)
++        sprintf(sql, "INSERT INTO `Feature` (`Feature`,`Feature_Parent`,`Title`,`Display`,`Level`,`Directory_`,`Attributes`) VALUES ('%s','%s','%s',%u,%u,'PROBEDIR',%u)",
++                feature->name, feature->parent, feature->name, index + 1, level, attributes);
++    else
++        sprintf(sql, "INSERT INTO `Feature` (`Feature`,`Title`,`Display`,`Level`,`Directory_`,`Attributes`) VALUES ('%s','%s',%u,%u,'PROBEDIR',%u)",
++                feature->name, feature->name, index + 1, level, attributes);
++    return execute(db, sql);
++}
++
++static UINT insert_own_ca(MSIHANDLE db)
++{
++    char path[MAX_PATH], *slash;
++    MSIHANDLE view = 0, record = 0;
++    UINT result;
++#ifdef STANDALONE
++    DWORD size = GetModuleFileNameA(NULL, path, sizeof(path));
++    if (!size || size >= sizeof(path) || !(slash = strrchr(path, '\\'))) return ERROR_INVALID_DATA;
++    *++slash = 0;
++    if (strlen(path) + 40 >= sizeof(path)) return ERROR_INVALID_DATA;
++    strcat(path, sizeof(void *) == 8 ? "msi-feature-ca-x86_64.dll" : "msi-feature-ca-i686.dll");
++#else
++    (void)slash;
++    strcpy(path, own_ca_path);
++#endif
++    result = execute(db, "CREATE TABLE `Binary` (`Name` CHAR(72) NOT NULL, `Data` OBJECT NOT NULL PRIMARY KEY `Name`)");
++    if (!result) result = execute(db, "CREATE TABLE `CustomAction` (`Action` CHAR(72) NOT NULL, `Type` SHORT NOT NULL, `Source` CHAR(72), `Target` CHAR(255) PRIMARY KEY `Action`)");
++    if (result) return result;
++    result = MsiDatabaseOpenViewA(db, "INSERT INTO `Binary` (`Name`,`Data`) VALUES ('OwnFeatureStateCA', ?)", &view);
++    if (result) goto done;
++    record = MsiCreateRecord(1);
++    if (!record) { result = ERROR_OUTOFMEMORY; goto done; }
++    result = MsiRecordSetStreamA(record, 1, path);
++    if (!result) result = MsiViewExecute(view, record);
++    if (!result) result = execute(db, "INSERT INTO `CustomAction` (`Action`,`Type`,`Source`,`Target`) VALUES ('OwnSetFeatures',1,'OwnFeatureStateCA','ProbeFeatureStates')");
++    if (!result) result = execute(db, "INSERT INTO `InstallExecuteSequence` (`Action`,`Condition`,`Sequence`) VALUES ('OwnSetFeatures','NOT REMOVE',1100)");
++done:
++    if (record) MsiCloseHandle(record);
++    if (view) MsiCloseHandle(view);
++    return result;
++}
++
++static BOOL create_package(const char *path, const char *product, const struct variant *variant)
++{
++    static const char *schema[] =
++    {
++        "CREATE TABLE `Property` (`Property` CHAR(72) NOT NULL, `Value` CHAR(0) LOCALIZABLE PRIMARY KEY `Property`)",
++        "CREATE TABLE `Directory` (`Directory` CHAR(72) NOT NULL, `Directory_Parent` CHAR(72), `DefaultDir` CHAR(255) NOT NULL PRIMARY KEY `Directory`)",
++        "CREATE TABLE `Feature` (`Feature` CHAR(38) NOT NULL, `Feature_Parent` CHAR(38), `Title` CHAR(64), `Description` CHAR(255), `Display` SHORT, `Level` SHORT, `Directory_` CHAR(72), `Attributes` SHORT PRIMARY KEY `Feature`)",
++        "CREATE TABLE `Component` (`Component` CHAR(72) NOT NULL, `ComponentId` CHAR(38), `Directory_` CHAR(72), `Attributes` SHORT, `Condition` CHAR(255), `KeyPath` CHAR(72) PRIMARY KEY `Component`)",
++        "CREATE TABLE `FeatureComponents` (`Feature_` CHAR(38) NOT NULL, `Component_` CHAR(72) NOT NULL PRIMARY KEY `Feature_`, `Component_`)",
++        /* Windows' RegisterProduct reads Media (2228 without it); one empty disk. */
++        "CREATE TABLE `Media` (`DiskId` SHORT NOT NULL, `LastSequence` SHORT NOT NULL, `DiskPrompt` CHAR(64), `Cabinet` CHAR(255), `VolumeLabel` CHAR(32), `Source` CHAR(72) PRIMARY KEY `DiskId`)",
++        "INSERT INTO `Media` (`DiskId`,`LastSequence`) VALUES (1,0)",
++        "CREATE TABLE `InstallExecuteSequence` (`Action` CHAR(72) NOT NULL, `Condition` CHAR(255), `Sequence` SHORT PRIMARY KEY `Action`)",
++        "INSERT INTO `Property` (`Property`,`Value`) VALUES ('ProductName','Synthetic feature selection probe')",
++        "INSERT INTO `Property` (`Property`,`Value`) VALUES ('Manufacturer','Synthetic MSI tests')",
++        "INSERT INTO `Property` (`Property`,`Value`) VALUES ('ProductVersion','1.0.0')",
++        "INSERT INTO `Property` (`Property`,`Value`) VALUES ('ProductLanguage','1033')",
++        "INSERT INTO `Property` (`Property`,`Value`) VALUES ('INSTALLLEVEL','100')",
++        "INSERT INTO `Directory` (`Directory`,`DefaultDir`) VALUES ('TARGETDIR','SourceDir')",
++        "INSERT INTO `Directory` (`Directory`,`Directory_Parent`,`DefaultDir`) VALUES ('PROBEDIR','TARGETDIR','FeatureProbe')"
++    };
++    static const struct { const char *name; unsigned int sequence; } actions[] =
++    {
++        {"CostInitialize", 800}, {"FileCost", 900}, {"CostFinalize", 1000},
++        {"InstallValidate", 1400}, {"InstallInitialize", 1500},
++        {"ProcessComponents", 1600}, {"UnpublishFeatures", 1800},
++        {"RegisterProduct", 6100}, {"PublishFeatures", 6300},
++        {"PublishProduct", 6400}, {"InstallFinalize", 6600}
++    };
++    MSIHANDLE db = 0, summary = 0;
++    char sql[1024], guid[39];
++    unsigned int i, index, count = feature_count(variant);
++    const struct feature *feature;
++    UINT result;
++    BOOL success = FALSE;
++
++    result = MsiOpenDatabaseA(path, (LPCSTR)MSIDBOPEN_CREATE, &db);
++    ok(result == ERROR_SUCCESS, "create database returned %u\n", result);
++    if (result) return FALSE;
++#define EXEC_SQL(statement) do { result = execute(db, statement); \
++    ok(result == ERROR_SUCCESS, "database statement returned %u\n", result); \
++    if (result) goto done; } while (0)
++    for (i = 0; i < ARRAY_SIZE(schema); ++i) EXEC_SQL(schema[i]);
++    sprintf(sql, "INSERT INTO `Property` (`Property`,`Value`) VALUES ('ProductCode','%s')", product);
++    EXEC_SQL(sql);
++    if (variant->chain_order)
++    {
++        /* Only the six chain Feature rows change order, not Component or
++         * FeatureComponents insertion, names, Display, attributes or selection. */
++        for (i = 0; i < count; ++i)
++        {
++            index = i;
++            if (variant->chain_order == 2 && i >= ARRAY_SIZE(features))
++                index = ARRAY_SIZE(features) + ((i - ARRAY_SIZE(features)) / 3) * 3 +
++                        2 - (i - ARRAY_SIZE(features)) % 3;
++            result = insert_feature(db, variant, index);
++            ok(!result, "feature row returned %u\n", result);
++            if (result) goto done;
++        }
++    }
++    for (i = 0; i < count; ++i)
++    {
++        feature = get_feature(i);
++        if (!variant->chain_order)
++        {
++            result = insert_feature(db, variant, i);
++            ok(!result, "feature row returned %u\n", result);
++            if (result) goto done;
++        }
++        if (!new_guid(guid)) goto done;
++        /* Empty components: directory key path, unique GUID, no File/Registry rows. */
++        sprintf(sql, "INSERT INTO `Component` (`Component`,`ComponentId`,`Directory_`,`Attributes`) VALUES ('C_%s','%s','PROBEDIR',0)", feature->name, guid);
++        EXEC_SQL(sql);
++        sprintf(sql, "INSERT INTO `FeatureComponents` (`Feature_`,`Component_`) VALUES ('%s','C_%s')", feature->name, feature->name);
++        EXEC_SQL(sql);
++    }
++    for (i = 0; i < ARRAY_SIZE(actions); ++i)
++    {
++        sprintf(sql, "INSERT INTO `InstallExecuteSequence` (`Action`,`Sequence`) VALUES ('%s',%u)", actions[i].name, actions[i].sequence);
++        EXEC_SQL(sql);
++    }
++    if (variant->ca_mode == 2)
++    {
++        result = insert_own_ca(db);
++        ok(!result, "embed our synthetic CA returned %u\n", result);
++        if (result) goto done;
++    }
++#undef EXEC_SQL
++    if (!new_guid(guid)) goto done;
++    result = MsiGetSummaryInformationA(db, NULL, 5, &summary);
++    ok(!result, "open summary returned %u\n", result);
++    if (result) goto done;
++#define SUMMARY(call) do { result = (call); ok(!result, "summary returned %u\n", result); if (result) goto done; } while (0)
++    SUMMARY(MsiSummaryInfoSetPropertyA(summary, 7, VT_LPSTR, 0, NULL, variant->ca_mode && sizeof(void *) == 8 ? "x64;1033" : "Intel;1033"));
++    SUMMARY(MsiSummaryInfoSetPropertyA(summary, 9, VT_LPSTR, 0, NULL, guid));
++    SUMMARY(MsiSummaryInfoSetPropertyA(summary, 14, VT_I4, 200, NULL, NULL));
++    SUMMARY(MsiSummaryInfoSetPropertyA(summary, 15, VT_I4, 0, NULL, NULL));
++    SUMMARY(MsiSummaryInfoPersist(summary));
++    SUMMARY(MsiDatabaseCommit(db));
++#undef SUMMARY
++    success = TRUE;
++done:
++    if (summary) MsiCloseHandle(summary);
++    MsiCloseHandle(db);
++    return success;
++}
++
++/* Reopen the persisted source: INSERT order is not a promise of enumeration
++ * order. Record only known synthetic names, without path or database contents. */
++static BOOL trace_feature_order(const char *path, const struct variant *variant)
++{
++    MSIHANDLE db = 0, view = 0, record = 0;
++    char name[73];
++    DWORD size;
++    UINT result;
++    unsigned int i, count = feature_count(variant), ordinal = 0;
++    BOOL success = FALSE, seen[ARRAY_SIZE(features) + ARRAY_SIZE(chain_features)] = {0};
++
++    result = MsiOpenDatabaseA(path, (LPCSTR)MSIDBOPEN_READONLY, &db);
++    ok(!result, "reopen row-order database returned %u\n", result);
++    if (result) return FALSE;
++    result = MsiDatabaseOpenViewA(db, "SELECT `Feature` FROM `Feature`", &view);
++    ok(!result, "open row-order query returned %u\n", result);
++    if (result) goto done;
++    result = MsiViewExecute(view, 0);
++    ok(!result, "execute row-order query returned %u\n", result);
++    if (result) goto done;
++    while ((result = MsiViewFetch(view, &record)) == ERROR_SUCCESS)
++    {
++        size = sizeof(name);
++        result = MsiRecordGetStringA(record, 1, name, &size);
++        MsiCloseHandle(record); record = 0;
++        ok(!result, "read row-order identifier returned %u\n", result);
++        if (result) goto done;
++        for (i = 0; i < count; ++i) if (!strcmp(name, get_feature(i)->name)) break;
++        ok(i < count, "unexpected synthetic row-order identifier\n");
++        if (i == count) goto done;
++        ok(!seen[i], "duplicate synthetic row-order identifier\n");
++        if (seen[i]) goto done;
++        seen[i] = TRUE;
++        trace("ROW %s ordinal=%u feature=%s\n", variant->name, ++ordinal, get_feature(i)->name);
++    }
++    ok(result == ERROR_NO_MORE_ITEMS, "row-order fetch ended with %u\n", result);
++    ok(ordinal == count, "row-order count %u expected %u\n", ordinal, count);
++    success = result == ERROR_NO_MORE_ITEMS && ordinal == count;
++done:
++    if (view) MsiCloseHandle(view);
++    MsiCloseHandle(db);
++    return success;
++}
++
++static const char *state_name(INSTALLSTATE state)
++{
++    switch (state)
++    {
++    case INSTALLSTATE_UNKNOWN: return "Unknown";
++    case INSTALLSTATE_ABSENT: return "Absent";
++    case INSTALLSTATE_LOCAL: return "Local";
++    case INSTALLSTATE_SOURCE: return "Source";
++    case INSTALLSTATE_ADVERTISED: return "Advertised";
++    case INSTALLSTATE_BROKEN: return "Broken";
++    default: return "Other";
++    }
++}
++
++/* Failure diagnosis without raw logs: only action names and numeric message
++ * codes are traced, never message text, arguments or paths. */
++static char last_action[73];
++static unsigned int ca_reports[2];
++static unsigned int descendant_reports[2];
++static BOOL ca_bad_report;
++
++
++static void trace_code(const char *kind, const char *text)
++{
++    unsigned int code;
++    if (text && sscanf(text, "%u", &code) == 1 && code >= 1000 && code < 30000)
++        trace("MSGCODE %s code=%u last_action=%s\n", kind, code, last_action);
++}
++
++static INT CALLBACK ui_handler(void *context, UINT type, const char *message)
++{
++    const UINT kind = type & 0xff000000;
++    const char *p;
++    unsigned int i;
++
++    (void)context;
++    if (!message) return 0;
++    if (!strncmp(message, "V10DESC ", 8))
++    {
++        char name[73];
++        unsigned int before, after, index;
++        int bi, ba, ai, aa, end = 0;
++        if (sscanf(message, "V10DESC name=%72s before_rc=%u before_installed=%d before_action=%d after_rc=%u after_installed=%d after_action=%d%n",
++                   name, &before, &bi, &ba, &after, &ai, &aa, &end) != 7 || message[end] ||
++            (strcmp(name, "FWGrandchild") && strcmp(name, "DFGrandchild")) ||
++            bi < -7 || bi > 5 || ba < -7 || ba > 5 || ai < -7 || ai > 5 || aa < -7 || aa > 5)
++        { ca_bad_report = TRUE; return 0; }
++        index = !strcmp(name, "FWGrandchild") ? 0 : 1;
++        descendant_reports[index]++;
++        /* Both return codes and before/after states are native measurements. */
++        trace("DESC feature=%s before_rc=%u before_installed=%d before_action=%d after_rc=%u after_installed=%d after_action=%d\n",
++              name, before, bi, ba, after, ai, aa);
++        return 0;
++    }
++    if (!strncmp(message, "V7CA ", 5))
++    {
++        char name[73];
++        unsigned int set, before, after, index;
++        int bi, ba, ai, aa, end = 0;
++        if (sscanf(message, "V7CA name=%72s set_rc=%u before_rc=%u before_installed=%d before_action=%d after_rc=%u after_installed=%d after_action=%d%n",
++                   name, &set, &before, &bi, &ba, &after, &ai, &aa, &end) != 8 || message[end] ||
++            (strcmp(name, "FWChild") && strcmp(name, "DFChild")) ||
++            bi < -7 || bi > 5 || ba < -7 || ba > 5 || ai < -7 || ai > 5 || aa < -7 || aa > 5)
++        { ca_bad_report = TRUE; return 0; }
++        ok(set == ERROR_SUCCESS, "CA %s Set returned %u\n", name, set);
++        ok(before == ERROR_SUCCESS, "CA %s Get(before) returned %u\n", name, before);
++        ok(after == ERROR_SUCCESS, "CA %s Get(after) returned %u\n", name, after);
++        ok(aa == INSTALLSTATE_LOCAL, "CA %s action after Set %d\n", name, aa);
++        index = !strcmp(name, "FWChild") ? 0 : 1;
++        ca_reports[index]++;
++        trace("CA feature=%s set_rc=%u before_rc=%u before_installed=%d before_action=%d after_rc=%u after_installed=%d after_action=%d\n",
++              name, set, before, bi, ba, after, ai, aa);
++        return 0;
++    }
++    if (kind == INSTALLMESSAGE_ACTIONSTART)
++    {
++        /* "Action hh:mm:ss: Name. Description" */
++        if ((p = strstr(message, ": ")))
++        {
++            p += 2;
++            for (i = 0; i < sizeof(last_action) - 1 && (isalnum((unsigned char)p[i]) || p[i] == '_'); ++i)
++                last_action[i] = p[i];
++            last_action[i] = 0;
++        }
++    }
++    else if (kind == INSTALLMESSAGE_ERROR || kind == INSTALLMESSAGE_FATALEXIT || kind == INSTALLMESSAGE_WARNING)
++    {
++        trace_code(kind == INSTALLMESSAGE_WARNING ? "warning" : "error",
++                   (p = strstr(message, "Error ")) ? p + 6 : NULL);
++    }
++    else if (kind == INSTALLMESSAGE_INFO)
++    {
++        if (strstr(message, "Return value 3")) trace("FAILED action=%s\n", last_action);
++        if ((p = strstr(message, "Note: 1: "))) trace_code("note", p + 9);
++        if ((p = strstr(message, "DEBUG: Error "))) trace_code("debug", p + 13);
++        /* 2228 names a missing table; an identifier is safe to print. */
++        if ((p = strstr(message, "Unknown table '")))
++        {
++            char table[73];
++            p += 15;
++            for (i = 0; i < sizeof(table) - 1 && (isalnum((unsigned char)p[i]) || p[i] == '_'); ++i) table[i] = p[i];
++            table[i] = 0;
++            if (p[i] == '\'') trace("MISSING table=%s last_action=%s\n", table, last_action);
++        }
++    }
++    return 0;
++}
++
++static void test_variant(const char *directory, const struct variant *variant)
++{
++    char path[MAX_PATH], product[39], command[2 * MAX_PATH];
++    INSTALLSTATE state;
++    unsigned int i;
++    UINT result;
++
++    winetest_push_context("%s", variant->name);
++    if (!new_guid(product)) goto done;
++    if (snprintf(path, sizeof(path), "%s\\probe.msi", directory) >= (int)sizeof(path))
++    {
++        ok(0, "temporary path too long\n");
++        goto done;
++    }
++    state = MsiQueryProductStateA(product);
++    ok(state == INSTALLSTATE_UNKNOWN, "fresh product state %d\n", state);
++    if (!create_package(path, product, variant)) goto delete_file;
++    if (variant->chain_order && !trace_feature_order(path, variant)) goto delete_file;
++    /* Private temp directory on C: / Wine C:; never a path from model/media data. */
++    if (snprintf(command, sizeof(command), "ALLUSERS=1 INSTALLLEVEL=100 %s PROBEDIR=\"%s\\empty\"",
++                 variant->selection, directory) >= (int)sizeof(command))
++    {
++        ok(0, "command line too long\n");
++        goto delete_file;
++    }
++    trace("BEGIN %s INSTALLLEVEL=100 ALLUSERS=1 %s Loose.level=%u Loose.attr=%u SWFiles.attr=%u Other.attr=%u chain_order=%u ca_mode=%u package_bits=%u level_probe=%u nonfp_probe=%u\n",
++          variant->name, variant->selection, variant->loose_level, variant->loose_attributes,
++          variant->swfiles_attributes, variant->other_attributes, variant->chain_order, variant->ca_mode,
++          variant->ca_mode && sizeof(void *) == 8 ? 64 : 32, variant->level_probe, variant->nonfp_probe);
++    last_action[0] = 0; ca_reports[0] = ca_reports[1] = 0; ca_bad_report = FALSE;
++    descendant_reports[0] = descendant_reports[1] = 0;
++    result = MsiInstallProductA(path, command);
++    if (result) trace("install failed: last_action=%s\n", last_action);
++    ok(result == ERROR_SUCCESS, "install returned %u\n", result);
++    if (variant->ca_mode == 2)
++    {
++        ok(!ca_bad_report, "invalid synthetic CA report\n");
++        ok(ca_reports[0] == 1 && ca_reports[1] == 1, "CA reports FWChild=%u DFChild=%u expected one each\n", ca_reports[0], ca_reports[1]);
++        ok(descendant_reports[0] == 1 && descendant_reports[1] == 1,
++           "DESC reports FWGrandchild=%u DFGrandchild=%u expected one each\n",
++           descendant_reports[0], descendant_reports[1]);
++    }
++    if (!result)
++    {
++        for (i = 0; i < feature_count(variant); ++i)
++        {
++            state = MsiQueryFeatureStateA(product, get_feature(i)->name);
++            todo_wine_if(todo_states[variant - variants][i] & ~SELECTION_FIXED_RULES)
++            ok(state == expected_states[variant - variants][i],
++               "feature %s state %d (%s), expected %d\n", get_feature(i)->name, state,
++               state_name(state), expected_states[variant - variants][i]);
++        }
++    }
++    /* Also attempt cleanup after a failed/partially registered installation. */
++    state = MsiQueryProductStateA(product);
++    if (state != INSTALLSTATE_UNKNOWN)
++    {
++        result = MsiConfigureProductExA(product, INSTALLLEVEL_DEFAULT, INSTALLSTATE_ABSENT, "REMOVE=ALL");
++        ok(result == ERROR_SUCCESS, "uninstall returned %u\n", result);
++    }
++    state = MsiQueryProductStateA(product);
++    ok(state == INSTALLSTATE_UNKNOWN, "product remains registered after cleanup: %d\n", state);
++    for (i = 0; i < feature_count(variant); ++i)
++    {
++        state = MsiQueryFeatureStateA(product, get_feature(i)->name);
++        ok(state == INSTALLSTATE_UNKNOWN, "feature %s remains after uninstall: %d\n", get_feature(i)->name, state);
++    }
++    trace("END %s cleanup_product_state=%d\n", variant->name, MsiQueryProductStateA(product));
++delete_file:
++    result = DeleteFileA(path);
++    ok(result || GetLastError() == ERROR_FILE_NOT_FOUND, "delete synthetic MSI failed: %lu\n", GetLastError());
++done:
++    winetest_pop_context();
++}
++
++START_TEST(selection)
++{
++    char temp[MAX_PATH], directory[MAX_PATH];
++    DWORD length;
++    unsigned int i;
++    INSTALLUILEVEL previous;
++    INSTALLUI_HANDLERA previous_handler;
++    BOOL result;
++
++    /* A measurement must not lose rows to Wine's default per-line limit (42). */
++#ifdef STANDALONE
++    winetest_mute_threshold = 1000;
++    if (winetest_debug < 1) winetest_debug = 1;
++#endif
++    trace("Synthetic selection conformance v10 arch=%u platform=%s; non-FP descendants measured separately\n",
++          (unsigned int)(8 * sizeof(void *)), winetest_platform);
++    length = GetTempPathA(ARRAY_SIZE(temp), temp);
++    ok(length && length < ARRAY_SIZE(temp) - 24, "temporary directory unavailable\n");
++    if (!length || length >= ARRAY_SIZE(temp) - 24) return;
++    /* Avoid generating even synthetic MSI files in the shared Z: folder. */
++    ok((temp[0] == 'C' || temp[0] == 'c') && temp[1] == ':', "TEMP must be on C: for this measurement\n");
++    if ((temp[0] != 'C' && temp[0] != 'c') || temp[1] != ':') return;
++    result = GetTempFileNameA(temp, "mfs", 0, directory);
++    ok(result, "reserve private temporary name failed: %lu\n", GetLastError());
++    if (!result) return;
++    DeleteFileA(directory);
++    result = CreateDirectoryA(directory, NULL);
++    ok(result, "create temporary directory failed: %lu\n", GetLastError());
++    if (!result) return;
++#ifndef STANDALONE
++    {
++        HRSRC resource = FindResourceA(NULL, "selection_ca.dll", "TESTDLL");
++        const void *data;
++        HANDLE file;
++        DWORD written, size;
++        ok(!!resource, "missing own CA resource\n");
++        if (!resource) goto cleanup_directory;
++        data = LockResource(LoadResource(NULL, resource));
++        size = SizeofResource(NULL, resource);
++        snprintf(own_ca_path, sizeof(own_ca_path), "%s\\own-ca.dll", directory);
++        file = CreateFileA(own_ca_path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
++        ok(file != INVALID_HANDLE_VALUE, "create own CA file failed %lu\n", GetLastError());
++        if (file == INVALID_HANDLE_VALUE) goto cleanup_directory;
++        result = WriteFile(file, data, size, &written, NULL);
++        CloseHandle(file);
++        ok(result && written == size, "write own CA file failed\n");
++        if (!result || written != size) goto cleanup_directory;
++    }
++#endif
++    previous = MsiSetInternalUI(INSTALLUILEVEL_NONE, NULL);
++    previous_handler = MsiSetExternalUIA(ui_handler, INSTALLLOGMODE_ACTIONSTART | INSTALLLOGMODE_ERROR |
++                                         INSTALLLOGMODE_FATALEXIT | INSTALLLOGMODE_WARNING | INSTALLLOGMODE_INFO, NULL);
++    for (i = 0; i < ARRAY_SIZE(variants); ++i) test_variant(directory, &variants[i]);
++    MsiSetExternalUIA(previous_handler, 0, NULL);
++    MsiSetInternalUI(previous, NULL);
++#ifndef STANDALONE
++cleanup_directory:
++    DeleteFileA(own_ca_path);
++#endif
++    /* No CreateFolders/InstallFiles actions: no payload directory is created. */
++    result = RemoveDirectoryA(directory);
++    ok(result, "remove temporary directory failed: %lu\n", GetLastError());
++}
+diff --git a/dlls/msi/tests/selection_ca.c b/dlls/msi/tests/selection_ca.c
+new file mode 100644
+--- /dev/null
++++ b/dlls/msi/tests/selection_ca.c
+@@ -0,0 +1,85 @@
++/*
++ * Copyright 2026 Harvi654
++ *
++ * Original synthetic feature-state custom action, AI-assisted; no vendor code.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++#if 0
++#pragma makedep testdll
++#endif
++
++#define _WIN32_MSI 300
++#include <windows.h>
++#include <msi.h>
++#include <msiquery.h>
++#include <stdio.h>
++
++static void set_code(MSIHANDLE record, unsigned int field, UINT code)
++{
++    char buffer[11];
++    snprintf(buffer, sizeof(buffer), "%u", code);
++    MsiRecordSetStringA(record, field, buffer);
++}
++
++__declspec(dllexport) UINT WINAPI ProbeFeatureStates(MSIHANDLE package)
++{
++    static const char *features[] = {"FWChild", "DFChild"};
++    static const char *descendants[] = {"FWGrandchild", "DFGrandchild"};
++    unsigned int i;
++    for (i = 0; i < sizeof(features) / sizeof(features[0]); ++i)
++    {
++        INSTALLSTATE before_installed = INSTALLSTATE_UNKNOWN, before_action = INSTALLSTATE_UNKNOWN;
++        INSTALLSTATE after_installed = INSTALLSTATE_UNKNOWN, after_action = INSTALLSTATE_UNKNOWN;
++        INSTALLSTATE descendant_bi = INSTALLSTATE_UNKNOWN, descendant_ba = INSTALLSTATE_UNKNOWN;
++        INSTALLSTATE descendant_ai = INSTALLSTATE_UNKNOWN, descendant_aa = INSTALLSTATE_UNKNOWN;
++        UINT before, set, after, descendant_before, descendant_after;
++        MSIHANDLE record;
++        before = MsiGetFeatureStateA(package, features[i], &before_installed, &before_action);
++        descendant_before = MsiGetFeatureStateA(package, descendants[i], &descendant_bi, &descendant_ba);
++        set = MsiSetFeatureStateA(package, features[i], INSTALLSTATE_LOCAL);
++        after = MsiGetFeatureStateA(package, features[i], &after_installed, &after_action);
++        descendant_after = MsiGetFeatureStateA(package, descendants[i], &descendant_ai, &descendant_aa);
++        record = MsiCreateRecord(8);
++        if (!record) return ERROR_FUNCTION_FAILED;
++        MsiRecordSetStringA(record, 0, "V7CA name=[1] set_rc=[2] before_rc=[3] before_installed=[4] before_action=[5] after_rc=[6] after_installed=[7] after_action=[8]");
++        MsiRecordSetStringA(record, 1, features[i]);
++        set_code(record, 2, set);
++        set_code(record, 3, before);
++        MsiRecordSetInteger(record, 4, before_installed);
++        MsiRecordSetInteger(record, 5, before_action);
++        set_code(record, 6, after);
++        MsiRecordSetInteger(record, 7, after_installed);
++        MsiRecordSetInteger(record, 8, after_action);
++        MsiProcessMessage(package, INSTALLMESSAGE_INFO, record);
++        MsiCloseHandle(record);
++        /* Observe descendants without setting them, in both old FP and new
++         * non-FP cases. The EXE traces these values without native guesses. */
++        record = MsiCreateRecord(7);
++        if (!record) return ERROR_FUNCTION_FAILED;
++        MsiRecordSetStringA(record, 0, "V10DESC name=[1] before_rc=[2] before_installed=[3] before_action=[4] after_rc=[5] after_installed=[6] after_action=[7]");
++        MsiRecordSetStringA(record, 1, descendants[i]);
++        set_code(record, 2, descendant_before);
++        MsiRecordSetInteger(record, 3, descendant_bi);
++        MsiRecordSetInteger(record, 4, descendant_ba);
++        set_code(record, 5, descendant_after);
++        MsiRecordSetInteger(record, 6, descendant_ai);
++        MsiRecordSetInteger(record, 7, descendant_aa);
++        MsiProcessMessage(package, INSTALLMESSAGE_INFO, record);
++        MsiCloseHandle(record);
++    }
++    /* A measured API failure must not abort installation and hide later states. */
++    return ERROR_SUCCESS;
++}
+diff --git a/dlls/msi/tests/selection_ca.spec b/dlls/msi/tests/selection_ca.spec
+new file mode 100644
+--- /dev/null
++++ b/dlls/msi/tests/selection_ca.spec
+@@ -0,0 +1 @@
++@ stdcall ProbeFeatureStates(long)

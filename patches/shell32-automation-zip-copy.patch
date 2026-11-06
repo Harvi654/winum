@@ -1,0 +1,995 @@
+--- a/dlls/shell32/Makefile.in
++++ b/dlls/shell32/Makefile.in
+@@ -1,7 +1,8 @@
+ EXTRADEFS = -D_SHELL32_
+ MODULE    = shell32.dll
+ IMPORTLIB = shell32
+-IMPORTS   = uuid shlwapi user32 gdi32 advapi32
++IMPORTS   = uuid shlwapi user32 gdi32 advapi32 $(ZLIB_PE_LIBS)
++EXTRAINCL = $(ZLIB_PE_CFLAGS)
+ DELAYIMPORTS = ole32 oleaut32 shdocvw version comctl32 comdlg32 gdiplus
+ 
+ VER_PRODUCTVERSION  = 6,0,2900,6242
+@@ -80,6 +81,7 @@
+ 	shell32_main.c \
+ 	shell32_tlb.idl \
+ 	shelldispatch.c \
++	shellzip.c \
+ 	shellitem.c \
+ 	shelllink.c \
+ 	shellole.c \
+--- a/dlls/shell32/shelldispatch.c
++++ b/dlls/shell32/shelldispatch.c
+@@ -33,6 +33,7 @@
+ 
+ #include "shell32_main.h"
+ #include "pidl.h"
++#include "shellzip.h"
+ 
+ #include "wine/debug.h"
+ 
+@@ -65,6 +66,7 @@
+     IShellFolder2 *folder;
+     PIDLIST_ABSOLUTE pidl;
+     BSTR path;
++    struct shell_zip *zip;
+ } FolderImpl;
+ 
+ typedef struct {
+@@ -140,6 +142,16 @@
+ static inline ShellLinkObjectImpl *impl_from_IShellLinkDual(IShellLinkDual2 *iface)
+ {
+     return CONTAINING_RECORD(iface, ShellLinkObjectImpl, IShellLinkDual2_iface);
++}
++
++static HRESULT zip_folder_create(struct shell_zip *zip, const WCHAR *relative, Folder **ret);
++static HRESULT WINAPI FolderImpl_ParseName(Folder3 *iface, BSTR name, FolderItem **item);
++
++static const WCHAR *zip_relative(FolderImpl *folder, const WCHAR *path)
++{
++    size_t length = wcslen(shell_zip_path(folder->zip));
++    path += length;
++    return *path == '\\' ? path + 1 : path;
+ }
+ 
+ static HRESULT load_typelib(void)
+@@ -1075,6 +1087,12 @@
+ 
+     *name = NULL;
+ 
++    if (This->folder->zip)
++    {
++        *name = SysAllocString(PathFindFileNameW(This->path ? This->path : This->folder->path));
++        return *name ? S_OK : E_OUTOFMEMORY;
++    }
++
+     if (This->path)
+         hr = SHParseDisplayName(This->path, NULL, &pidl, 0, NULL);
+     else
+@@ -1137,13 +1155,18 @@
+     return S_OK;
+ }
+ 
+-static HRESULT WINAPI FolderItemImpl_get_GetFolder(FolderItem2 *iface,
+-        IDispatch **ppid)
+-{
+-    FIXME("(%p,%p)\n", iface, ppid);
+-
++static HRESULT WINAPI FolderItemImpl_get_GetFolder(FolderItem2 *iface, IDispatch **ppid)
++{
++    FolderItemImpl *This = impl_from_FolderItem(iface);
++    Folder *folder;
++    HRESULT hr;
+     *ppid = NULL;
+-    return E_NOTIMPL;
++    if (!This->folder->zip) return E_NOTIMPL;
++    if (!(This->attributes & SFGAO_FOLDER)) return E_FAIL;
++    hr = zip_folder_create(This->folder->zip,
++            zip_relative(This->folder, This->path ? This->path : This->folder->path), &folder);
++    if (SUCCEEDED(hr)) *ppid = (IDispatch *)folder;
++    return hr;
+ }
+ 
+ static HRESULT WINAPI FolderItemImpl_get_IsLink(FolderItem2 *iface, VARIANT_BOOL *b)
+@@ -1205,11 +1228,16 @@
+     return E_NOTIMPL;
+ }
+ 
+-static HRESULT WINAPI FolderItemImpl_get_Size(FolderItem2 *iface, LONG *pul)
+-{
+-    FIXME("(%p,%p)\n", iface, pul);
+-
+-    return E_NOTIMPL;
++static HRESULT WINAPI FolderItemImpl_get_Size(FolderItem2 *iface, LONG *size)
++{
++    FolderItemImpl *This = impl_from_FolderItem(iface);
++    DWORD value;
++    HRESULT hr;
++    if (!This->folder->zip) return E_NOTIMPL;
++    hr = shell_zip_size(This->folder->zip,
++            zip_relative(This->folder, This->path ? This->path : This->folder->path), &value);
++    if (SUCCEEDED(hr)) *size = value;
++    return hr;
+ }
+ 
+ static HRESULT WINAPI FolderItemImpl_get_Type(FolderItem2 *iface, BSTR *pbs)
+@@ -1304,7 +1332,12 @@
+     This->folder = folder;
+     Folder3_AddRef(&folder->Folder3_iface);
+ 
+-    if (SHParseDisplayName(This->path, NULL, &pidl, ~0u, &This->attributes) == S_OK)
++    if (folder->zip)
++    {
++        if (shell_zip_directory(folder->zip, zip_relative(folder, path ? path : folder->path)))
++            This->attributes = SFGAO_FOLDER | SFGAO_BROWSABLE;
++    }
++    else if (SHParseDisplayName(This->path, NULL, &pidl, ~0u, &This->attributes) == S_OK)
+         ILFree(pidl);
+ 
+     *item = (FolderItem *)&This->FolderItem2_iface;
+@@ -1434,7 +1467,7 @@
+ 
+     TRACE("(%p,%p)\n", iface, count);
+ 
+-    *count = shellfolder_exists(This->folder->path) ? This->item_count : 0;
++    *count = (This->folder->zip || shellfolder_exists(This->folder->path)) ? This->item_count : 0;
+     return S_OK;
+ }
+ 
+@@ -1468,7 +1501,7 @@
+ 
+     *item = NULL;
+ 
+-    if (!shellfolder_exists(This->folder->path))
++    if (!This->folder->zip && !shellfolder_exists(This->folder->path))
+         return S_FALSE;
+ 
+     VariantInit(&index);
+@@ -1496,6 +1529,12 @@
+             if (!V_BSTR(&index))
+                 return S_FALSE;
+ 
++            if (This->folder->zip)
++            {
++                hr = FolderImpl_ParseName(&This->folder->Folder3_iface, V_BSTR(&index), item);
++                VariantClear(&index);
++                return hr;
++            }
+             hr = IShellFolder2_ParseDisplayName(This->folder->folder, NULL, NULL, V_BSTR(&index), NULL, &pidl, NULL);
+             VariantClear(&index);
+             if (FAILED(hr))
+@@ -1522,15 +1561,110 @@
+     return hr;
+ }
+ 
+-static HRESULT WINAPI FolderItemsImpl__NewEnum(FolderItems3 *iface, IUnknown **ppunk)
+-{
+-    FIXME("(%p,%p)\n", iface, ppunk);
+-
+-    if (!ppunk)
+-        return E_INVALIDARG;
+-
+-    *ppunk = NULL;
+-    return E_NOTIMPL;
++typedef struct {
++    IEnumVARIANT IEnumVARIANT_iface;
++    LONG ref;
++    FolderItems3 *items;
++    ULONG position;
++} FolderEnum;
++
++static HRESULT folder_enum_create(FolderItems3 *items, ULONG position, IEnumVARIANT **result);
++
++static HRESULT WINAPI folder_enum_QueryInterface(IEnumVARIANT *iface, REFIID iid, void **result)
++{
++    if (!result) return E_POINTER;
++    *result = NULL;
++    if (!IsEqualIID(iid, &IID_IUnknown) && !IsEqualIID(iid, &IID_IEnumVARIANT)) return E_NOINTERFACE;
++    *result = iface;
++    IEnumVARIANT_AddRef(iface);
++    return S_OK;
++}
++
++static ULONG WINAPI folder_enum_AddRef(IEnumVARIANT *iface)
++{
++    FolderEnum *enumerator = CONTAINING_RECORD(iface, FolderEnum, IEnumVARIANT_iface);
++    return InterlockedIncrement(&enumerator->ref);
++}
++
++static ULONG WINAPI folder_enum_Release(IEnumVARIANT *iface)
++{
++    FolderEnum *enumerator = CONTAINING_RECORD(iface, FolderEnum, IEnumVARIANT_iface);
++    ULONG ref = InterlockedDecrement(&enumerator->ref);
++    if (!ref) { FolderItems3_Release(enumerator->items); free(enumerator); }
++    return ref;
++}
++
++static HRESULT WINAPI folder_enum_Next(IEnumVARIANT *iface, ULONG count, VARIANT *values, ULONG *fetched)
++{
++    FolderEnum *enumerator = CONTAINING_RECORD(iface, FolderEnum, IEnumVARIANT_iface);
++    ULONG done = 0;
++    HRESULT hr = S_OK;
++    if (fetched) *fetched = 0;
++    if (!values || (count != 1 && !fetched)) return E_POINTER;
++    while (done < count)
++    {
++        FolderItem *item = NULL;
++        VARIANT index;
++        VariantInit(&values[done]);
++        VariantInit(&index);
++        V_VT(&index) = VT_I4;
++        V_I4(&index) = enumerator->position;
++        hr = FolderItems3_Item(enumerator->items, index, &item);
++        if (hr != S_OK || !item) break;
++        V_VT(&values[done]) = VT_DISPATCH;
++        V_DISPATCH(&values[done]) = (IDispatch *)item;
++        ++enumerator->position;
++        ++done;
++    }
++    if (fetched) *fetched = done;
++    return FAILED(hr) ? hr : done == count ? S_OK : S_FALSE;
++}
++
++static HRESULT WINAPI folder_enum_Skip(IEnumVARIANT *iface, ULONG count)
++{
++    FolderEnum *enumerator = CONTAINING_RECORD(iface, FolderEnum, IEnumVARIANT_iface);
++    ULONG total = impl_from_FolderItems(enumerator->items)->item_count;
++    ULONG remaining = total - min(total, enumerator->position);
++    enumerator->position += min(count, remaining);
++    return count <= remaining ? S_OK : S_FALSE;
++}
++
++static HRESULT WINAPI folder_enum_Reset(IEnumVARIANT *iface)
++{
++    CONTAINING_RECORD(iface, FolderEnum, IEnumVARIANT_iface)->position = 0;
++    return S_OK;
++}
++
++static HRESULT WINAPI folder_enum_Clone(IEnumVARIANT *iface, IEnumVARIANT **result)
++{
++    FolderEnum *enumerator = CONTAINING_RECORD(iface, FolderEnum, IEnumVARIANT_iface);
++    return folder_enum_create(enumerator->items, enumerator->position, result);
++}
++
++static const IEnumVARIANTVtbl folder_enum_vtbl = {
++    folder_enum_QueryInterface, folder_enum_AddRef, folder_enum_Release,
++    folder_enum_Next, folder_enum_Skip, folder_enum_Reset, folder_enum_Clone
++};
++
++static HRESULT folder_enum_create(FolderItems3 *items, ULONG position, IEnumVARIANT **result)
++{
++    FolderEnum *enumerator;
++    if (!result) return E_POINTER;
++    *result = NULL;
++    if (!(enumerator = calloc(1, sizeof(*enumerator)))) return E_OUTOFMEMORY;
++    enumerator->IEnumVARIANT_iface.lpVtbl = &folder_enum_vtbl;
++    enumerator->ref = 1;
++    enumerator->items = items;
++    enumerator->position = position;
++    FolderItems3_AddRef(items);
++    *result = &enumerator->IEnumVARIANT_iface;
++    return S_OK;
++}
++
++static HRESULT WINAPI FolderItemsImpl__NewEnum(FolderItems3 *iface, IUnknown **result)
++{
++    if (!result) return E_INVALIDARG;
++    return folder_enum_create(iface, 0, (IEnumVARIANT **)result);
+ }
+ 
+ static HRESULT WINAPI FolderItemsImpl_InvokeVerbEx(FolderItems3 *iface, VARIANT verb, VARIANT args)
+@@ -1629,6 +1763,14 @@
+     This->folder = folder;
+     Folder3_AddRef(&folder->Folder3_iface);
+ 
++    if (folder->zip)
++    {
++        hr = shell_zip_children(folder->zip, zip_relative(folder, folder->path), &This->item_names, &This->item_count);
++        if (FAILED(hr)) { FolderItems3_Release(&This->FolderItems3_iface); return hr; }
++        *ret = (FolderItems *)&This->FolderItems3_iface;
++        return S_OK;
++    }
++
+     enumidlist = NULL;
+     if (FAILED(hr = IShellFolder2_EnumObjects(folder->folder, NULL, SHCONTF_FOLDERS | SHCONTF_NONFOLDERS,
+             &enumidlist)))
+@@ -1731,8 +1873,9 @@
+     {
+         ILFree(This->pidl);
+         SysFreeString(This->path);
+-        IShellFolder2_Release(This->folder);
+-        IDispatch_Release(This->application);
++        if (This->folder) IShellFolder2_Release(This->folder);
++        if (This->zip) shell_zip_release(This->zip);
++        if (This->application) IDispatch_Release(This->application);
+         free(This);
+     }
+     return ref;
+@@ -1804,6 +1947,12 @@
+ 
+     *title = NULL;
+ 
++    if (This->zip)
++    {
++        *title = SysAllocString(PathFindFileNameW(This->path));
++        return *title ? S_OK : E_OUTOFMEMORY;
++    }
++
+     if (FAILED(hr = SHBindToParent(This->pidl, &IID_IShellFolder2, (void **)&parent, &last_part)))
+         return hr;
+ 
+@@ -1868,6 +2017,20 @@
+ 
+     *item = NULL;
+ 
++    if (This->zip)
++    {
++        size_t length;
++        DWORD size;
++        if (!name || !*name || wcschr(name, '\\') || wcschr(name, '/')) return S_FALSE;
++        length = wcslen(This->path) + wcslen(name) + 2;
++        if (!(path = SysAllocStringLen(NULL, length - 1))) return E_OUTOFMEMORY;
++        swprintf(path, length, L"%s\\%s", This->path, name);
++        hr = shell_zip_size(This->zip, zip_relative(This, path), &size);
++        if (SUCCEEDED(hr)) hr = FolderItem_Constructor(This, path, item);
++        SysFreeString(path);
++        return FAILED(hr) ? S_FALSE : hr;
++    }
++
+     if (FAILED(IShellFolder2_ParseDisplayName(This->folder, NULL, NULL, name, NULL, &pidl, NULL)))
+         return S_FALSE;
+ 
+@@ -1897,11 +2060,123 @@
+     return E_NOTIMPL;
+ }
+ 
++static HRESULT append_copy_path(WCHAR **list, size_t *used, const WCHAR *path,
++                               struct shell_zip *zip, const WCHAR *stage)
++{
++    const WCHAR *relative = path;
++    size_t length, total;
++    WCHAR *new_list;
++    if (!path || !*path) return E_INVALIDARG;
++    if (zip)
++    {
++        size_t archive = wcslen(shell_zip_path(zip));
++        if (wcsnicmp(path, shell_zip_path(zip), archive) || path[archive] != '\\') return E_INVALIDARG;
++        relative = path + archive + 1;
++        length = wcslen(stage) + 1 + wcslen(relative);
++    }
++    else length = wcslen(path);
++    if (length > 32760 || *used > 0x7fffffff / sizeof(WCHAR) - length - 2) return E_OUTOFMEMORY;
++    total = *used + length + 2;
++    if (!(new_list = realloc(*list, total * sizeof(WCHAR)))) return E_OUTOFMEMORY;
++    *list = new_list;
++    if (zip) swprintf(new_list + *used, length + 1, L"%s\\%s", stage, relative);
++    else memcpy(new_list + *used, path, (length + 1) * sizeof(WCHAR));
++    *used += length + 1;
++    new_list[*used] = 0;
++    return S_OK;
++}
++
+ static HRESULT WINAPI FolderImpl_CopyHere(Folder3 *iface, VARIANT item, VARIANT options)
+ {
+-    FIXME("(%p,%s,%s)\n", iface, debugstr_variant(&item), debugstr_variant(&options));
+-
+-    return E_NOTIMPL;
++    FolderImpl *This = impl_from_Folder(iface);
++    FolderItems *items = NULL;
++    FolderItem *entry = NULL;
++    IUnknown *object;
++    struct shell_zip *zip = NULL;
++    WCHAR *sources = NULL, *stage = NULL, *destination = NULL;
++    BSTR path = NULL;
++    size_t used = 0;
++    VARIANT source, flags;
++    SHFILEOPSTRUCTW operation = {0};
++    LONG count, i;
++    int result;
++    HRESULT hr;
++
++    if (This->zip) return E_NOTIMPL; /* Creating/updating ZIP archives is separate. */
++    VariantInit(&source);
++    VariantInit(&flags);
++    if (FAILED(hr = VariantCopyInd(&source, &item))) return hr;
++    if (V_VT(&options) != VT_EMPTY && !(V_VT(&options) == VT_ERROR && V_ERROR(&options) == DISP_E_PARAMNOTFOUND))
++    {
++        if (FAILED(hr = VariantChangeType(&flags, &options, 0, VT_I4))) goto done;
++        if (V_I4(&flags) & ~0xffff) { hr = E_INVALIDARG; goto done; }
++        operation.fFlags = V_I4(&flags);
++    }
++    if (V_VT(&source) == VT_BSTR)
++    {
++        if (!V_BSTR(&source) || SysStringLen(V_BSTR(&source)) != wcslen(V_BSTR(&source)))
++        { hr = E_INVALIDARG; goto done; }
++        hr = append_copy_path(&sources, &used, V_BSTR(&source), NULL, NULL);
++    }
++    else if ((V_VT(&source) == VT_DISPATCH && V_DISPATCH(&source)) ||
++             (V_VT(&source) == VT_UNKNOWN && V_UNKNOWN(&source)))
++    {
++        object = V_VT(&source) == VT_DISPATCH ? (IUnknown *)V_DISPATCH(&source) : V_UNKNOWN(&source);
++        if (SUCCEEDED(IUnknown_QueryInterface(object, &IID_FolderItems, (void **)&items)))
++        {
++            if (((FolderItems3 *)items)->lpVtbl == &FolderItemsImpl_Vtbl)
++                zip = impl_from_FolderItems((FolderItems3 *)items)->folder->zip;
++            if (zip && FAILED(hr = shell_zip_stage(zip, &stage))) goto done;
++            if (FAILED(hr = FolderItems_get_Count(items, &count))) goto done;
++            if (count < 0) { hr = E_INVALIDARG; goto done; }
++            hr = S_OK;
++            for (i = 0; i < count && SUCCEEDED(hr); ++i)
++            {
++                VARIANT index;
++                VariantInit(&index);
++                V_VT(&index) = VT_I4;
++                V_I4(&index) = i;
++                hr = FolderItems_Item(items, index, &entry);
++                if (hr != S_OK || !entry) { hr = HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND); break; }
++                hr = FolderItem_get_Path(entry, &path);
++                if (SUCCEEDED(hr)) hr = append_copy_path(&sources, &used, path, zip, stage);
++                SysFreeString(path);
++                path = NULL;
++                FolderItem_Release(entry);
++                entry = NULL;
++            }
++        }
++        else if (SUCCEEDED(IUnknown_QueryInterface(object, &IID_FolderItem, (void **)&entry)))
++        {
++            if (((FolderItem2 *)entry)->lpVtbl == &FolderItemImpl_Vtbl)
++                zip = impl_from_FolderItem((FolderItem2 *)entry)->folder->zip;
++            if (zip && FAILED(hr = shell_zip_stage(zip, &stage))) goto done;
++            hr = FolderItem_get_Path(entry, &path);
++            if (SUCCEEDED(hr)) hr = append_copy_path(&sources, &used, path, zip, stage);
++        }
++        else hr = DISP_E_TYPEMISMATCH;
++    }
++    else hr = DISP_E_TYPEMISMATCH;
++    if (FAILED(hr) || !used) goto done;
++    destination = calloc(wcslen(This->path) + 2, sizeof(WCHAR));
++    if (!destination) { hr = E_OUTOFMEMORY; goto done; }
++    wcscpy(destination, This->path);
++    operation.wFunc = FO_COPY;
++    operation.pFrom = sources;
++    operation.pTo = destination;
++    result = SHFileOperationW(&operation);
++    hr = result ? HRESULT_FROM_WIN32(result) : operation.fAnyOperationsAborted ?
++                 HRESULT_FROM_WIN32(ERROR_CANCELLED) : S_OK;
++done:
++    SysFreeString(path);
++    if (entry) FolderItem_Release(entry);
++    if (items) FolderItems_Release(items);
++    VariantClear(&source);
++    VariantClear(&flags);
++    shell_zip_cleanup(stage);
++    free(destination);
++    free(sources);
++    return hr;
+ }
+ 
+ static HRESULT WINAPI FolderImpl_GetDetailsOf(Folder3 *iface, VARIANT item, int column, BSTR *str)
+@@ -2003,7 +2278,7 @@
+ 
+     *ret = NULL;
+ 
+-    This = malloc(sizeof(*This));
++    This = calloc(1, sizeof(*This));
+     if (!This)
+         return E_OUTOFMEMORY;
+ 
+@@ -2021,6 +2296,28 @@
+ 
+     *ret = (Folder *)&This->Folder3_iface;
+     return hr;
++}
++
++static HRESULT zip_folder_create(struct shell_zip *zip, const WCHAR *relative, Folder **ret)
++{
++    FolderImpl *folder;
++    size_t length = wcslen(shell_zip_path(zip)) + wcslen(relative) + (*relative ? 1 : 0);
++    HRESULT hr;
++    *ret = NULL;
++    if (!shell_zip_directory(zip, relative)) return S_FALSE;
++    if (!(folder = calloc(1, sizeof(*folder)))) return E_OUTOFMEMORY;
++    folder->Folder3_iface.lpVtbl = &FolderImpl_Vtbl;
++    folder->ref = 1;
++    folder->zip = zip;
++    shell_zip_addref(zip);
++    folder->path = SysAllocStringLen(NULL, length);
++    if (!folder->path) { Folder3_Release(&folder->Folder3_iface); return E_OUTOFMEMORY; }
++    if (*relative) swprintf(folder->path, length + 1, L"%s\\%s", shell_zip_path(zip), relative);
++    else wcscpy(folder->path, shell_zip_path(zip));
++    hr = IShellDispatch_Constructor(NULL, &IID_IDispatch, (void **)&folder->application);
++    if (FAILED(hr)) { Folder3_Release(&folder->Folder3_iface); return hr; }
++    *ret = (Folder *)&folder->Folder3_iface;
++    return S_OK;
+ }
+ 
+ static HRESULT WINAPI ShellDispatch_QueryInterface(IShellDispatch6 *iface,
+@@ -2203,6 +2500,17 @@
+ 
+             break;
+         case VT_BSTR:
++            if (V_BSTR(&dir) && !wcsicmp(PathFindExtensionW(V_BSTR(&dir)), L".zip") &&
++                GetFileAttributesW(V_BSTR(&dir)) != INVALID_FILE_ATTRIBUTES &&
++                !(GetFileAttributesW(V_BSTR(&dir)) & FILE_ATTRIBUTE_DIRECTORY))
++            {
++                struct shell_zip *zip;
++                hr = shell_zip_open(V_BSTR(&dir), &zip);
++                if (FAILED(hr)) return hr == E_OUTOFMEMORY ? hr : S_FALSE;
++                hr = zip_folder_create(zip, L"", ret);
++                shell_zip_release(zip);
++                return hr;
++            }
+             if (FAILED(hr = SHParseDisplayName(V_BSTR(&dir), NULL, &pidl, 0, NULL)))
+                 return S_FALSE;
+ 
+--- a/dlls/shell32/tests/shelldispatch.c
++++ b/dlls/shell32/tests/shelldispatch.c
+@@ -759,9 +759,7 @@
+     }
+ 
+     r = FolderItems__NewEnum(items, &unk);
+-    todo_wine
+     ok(r == S_OK, "FolderItems::_NewEnum failed: %08lx\n", r);
+-    todo_wine
+     ok(!!unk, "unk is null\n");
+     if (unk) IUnknown_Release(unk);
+ 
+--- /dev/null
++++ b/dlls/shell32/shellzip.h
+@@ -0,0 +1,11 @@
++/* Experimental Shell Automation ZIP support. LGPL-2.1-or-later. */
++struct shell_zip;
++HRESULT shell_zip_open(const WCHAR *path, struct shell_zip **out);
++void shell_zip_addref(struct shell_zip *zip);
++void shell_zip_release(struct shell_zip *zip);
++const WCHAR *shell_zip_path(struct shell_zip *zip);
++BOOL shell_zip_directory(struct shell_zip *zip, const WCHAR *relative);
++HRESULT shell_zip_size(struct shell_zip *zip, const WCHAR *relative, DWORD *size);
++HRESULT shell_zip_children(struct shell_zip *zip, const WCHAR *relative, BSTR **names, LONG *count);
++HRESULT shell_zip_stage(struct shell_zip *zip, WCHAR **directory);
++void shell_zip_cleanup(WCHAR *directory);
+--- /dev/null
++++ b/dlls/shell32/shellzip.c
+@@ -0,0 +1,442 @@
++/*
++ * Experimental ZIP storage for Shell Automation.
++ * This library is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ */
++#define COBJMACROS
++#include <stdarg.h>
++#include <stdlib.h>
++#include <wchar.h>
++#include <zlib.h>
++#include "windef.h"
++#include "winbase.h"
++#include "winerror.h"
++#include "oleauto.h"
++#include "shlobj.h"
++#include "shellapi.h"
++#include "shlwapi.h"
++#include "shellzip.h"
++
++struct zip_entry
++{
++    WCHAR *name;
++    char *raw_name;
++    DWORD compressed, size, crc, offset;
++    WORD flags, method, name_len;
++    BOOL directory;
++};
++
++struct shell_zip
++{
++    LONG ref;
++    HANDLE file;
++    WCHAR *path;
++    ULONGLONG length;
++    unsigned count;
++    struct zip_entry *entries;
++    CRITICAL_SECTION lock;
++};
++
++static WORD get16(const BYTE *p) { return p[0] | (p[1] << 8); }
++static DWORD get32(const BYTE *p) { return get16(p) | ((DWORD)get16(p + 2) << 16); }
++static HRESULT invalid_zip(void) { return HRESULT_FROM_WIN32(ERROR_INVALID_DATA); }
++
++static voidpf zip_alloc(voidpf opaque, uInt count, uInt size)
++{
++    if (size && count > (SIZE_T)-1 / size) return NULL;
++    return calloc(count, size);
++}
++
++static void zip_free(voidpf opaque, voidpf memory) { free(memory); }
++
++static HRESULT read_at(struct shell_zip *zip, ULONGLONG offset, void *data, DWORD length)
++{
++    LARGE_INTEGER position;
++    DWORD read;
++    if (offset > zip->length || length > zip->length - offset) return invalid_zip();
++    position.QuadPart = offset;
++    if (!SetFilePointerEx(zip->file, position, NULL, FILE_BEGIN) ||
++        !ReadFile(zip->file, data, length, &read, NULL)) return HRESULT_FROM_WIN32(GetLastError());
++    return read == length ? S_OK : invalid_zip();
++}
++
++static BOOL valid_name(const WCHAR *name)
++{
++    const WCHAR *start = name, *p;
++    if (!*name || *name == '\\' || *name == '/') return FALSE;
++    for (p = name; ; ++p)
++    {
++        if (*p && (*p < 32 || wcschr(L":<>\"|?*", *p))) return FALSE;
++        if (*p && *p != '\\') continue;
++        if (p == start || p[-1] == '.' || p[-1] == ' ') return FALSE;
++        {
++            const WCHAR *dot = wmemchr(start, '.', p - start);
++            size_t len = dot ? dot - start : p - start;
++            if ((len == 3 && (!wcsnicmp(start, L"CON", 3) || !wcsnicmp(start, L"PRN", 3) ||
++                             !wcsnicmp(start, L"AUX", 3) || !wcsnicmp(start, L"NUL", 3))) ||
++                (len == 4 && (!wcsnicmp(start, L"COM", 3) || !wcsnicmp(start, L"LPT", 3)) &&
++                             ((start[3] >= '1' && start[3] <= '9') || start[3] == 0xb9 ||
++                              start[3] == 0xb2 || start[3] == 0xb3)) ||
++                (len == 6 && !wcsnicmp(start, L"CONIN$", 6)) ||
++                (len == 7 && !wcsnicmp(start, L"CONOUT$", 7)) ||
++                (len == 6 && !wcsnicmp(start, L"CLOCK$", 6))) return FALSE;
++        }
++        if (!*p) return TRUE;
++        start = p + 1;
++    }
++}
++
++static int entry_compare(const void *a, const void *b)
++{
++    return wcsicmp(((const struct zip_entry *)a)->name, ((const struct zip_entry *)b)->name);
++}
++
++static struct zip_entry *find_entry(struct shell_zip *zip, const WCHAR *name)
++{
++    struct zip_entry key = {0};
++    key.name = (WCHAR *)name;
++    return bsearch(&key, zip->entries, zip->count, sizeof(*zip->entries), entry_compare);
++}
++
++HRESULT shell_zip_open(const WCHAR *path, struct shell_zip **out)
++{
++    struct shell_zip *zip;
++    BYTE *tail = NULL, header[46];
++    LARGE_INTEGER size;
++    ULONGLONG position, end;
++    DWORD tail_len, central_size, central_offset, i, path_length;
++    int eocd;
++    HRESULT hr = invalid_zip();
++    *out = NULL;
++    if (!(zip = calloc(1, sizeof(*zip)))) return E_OUTOFMEMORY;
++    zip->ref = 1;
++    zip->file = INVALID_HANDLE_VALUE;
++    InitializeCriticalSection(&zip->lock);
++    path_length = GetFullPathNameW(path, 0, NULL, NULL);
++    if (!path_length || path_length > 32760) { hr = HRESULT_FROM_WIN32(ERROR_FILENAME_EXCED_RANGE); goto failed; }
++    if (!(zip->path = malloc(path_length * sizeof(WCHAR)))) { hr = E_OUTOFMEMORY; goto failed; }
++    if (!GetFullPathNameW(path, path_length, zip->path, NULL)) { hr = HRESULT_FROM_WIN32(GetLastError()); goto failed; }
++    zip->file = CreateFileW(zip->path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, 0, NULL);
++    if (zip->file == INVALID_HANDLE_VALUE) { hr = HRESULT_FROM_WIN32(GetLastError()); goto failed; }
++    if (!GetFileSizeEx(zip->file, &size)) { hr = HRESULT_FROM_WIN32(GetLastError()); goto failed; }
++    zip->length = size.QuadPart;
++    if (zip->length < 22) goto failed;
++    tail_len = min(zip->length, 65557);
++    if (!(tail = malloc(tail_len))) { hr = E_OUTOFMEMORY; goto failed; }
++    if (FAILED(hr = read_at(zip, zip->length - tail_len, tail, tail_len))) goto failed;
++    hr = invalid_zip();
++    for (eocd = tail_len - 22; eocd >= 0; --eocd)
++        if (get32(tail + eocd) == 0x06054b50 && eocd + 22 + get16(tail + eocd + 20) == tail_len) break;
++    if (eocd < 0) goto failed;
++    if (get16(tail + eocd + 4) || get16(tail + eocd + 6) ||
++        get16(tail + eocd + 8) != get16(tail + eocd + 10)) goto failed;
++    zip->count = get16(tail + eocd + 10);
++    central_size = get32(tail + eocd + 12);
++    central_offset = get32(tail + eocd + 16);
++    if (zip->count == 0xffff || central_offset == 0xffffffff || central_size == 0xffffffff)
++    { hr = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED); goto failed; }
++    position = central_offset;
++    end = position + central_size;
++    if (end > zip->length - tail_len + eocd || zip->count > central_size / 46) goto failed;
++    if (!(zip->entries = calloc(max(zip->count, 1), sizeof(*zip->entries))))
++    { hr = E_OUTOFMEMORY; goto failed; }
++    for (i = 0; i < zip->count; ++i)
++    {
++        struct zip_entry *entry = zip->entries + i;
++        unsigned name_length, total;
++        WCHAR *p;
++        int chars;
++        if (position > end || sizeof(header) > end - position ||
++            FAILED(hr = read_at(zip, position, header, sizeof(header)))) goto failed;
++        hr = invalid_zip();
++        if (get32(header) != 0x02014b50 || get16(header + 34)) goto failed;
++        entry->flags = get16(header + 8);
++        entry->method = get16(header + 10);
++        entry->crc = get32(header + 16);
++        entry->compressed = get32(header + 20);
++        entry->size = get32(header + 24);
++        entry->offset = get32(header + 42);
++        entry->name_len = name_length = get16(header + 28);
++        total = 46 + name_length + get16(header + 30) + get16(header + 32);
++        if (!name_length || total > end - position) goto failed;
++        if (entry->flags & 1 || (entry->method != 0 && entry->method != 8) ||
++            entry->compressed == 0xffffffff || entry->size == 0xffffffff || entry->offset == 0xffffffff ||
++            ((get32(header + 38) >> 16) & 0170000) == 0120000 ||
++            (get32(header + 38) & FILE_ATTRIBUTE_REPARSE_POINT))
++        { hr = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED); goto failed; }
++        if (!(entry->raw_name = malloc(name_length))) { hr = E_OUTOFMEMORY; goto failed; }
++        if (FAILED(hr = read_at(zip, position + 46, entry->raw_name, name_length))) goto failed;
++        hr = invalid_zip();
++        if (memchr(entry->raw_name, 0, name_length)) goto failed;
++        chars = MultiByteToWideChar(entry->flags & 0x800 ? CP_UTF8 : CP_OEMCP,
++                                   entry->flags & 0x800 ? MB_ERR_INVALID_CHARS : 0,
++                                   entry->raw_name, name_length, NULL, 0);
++        if (!chars || chars > 32700) goto failed;
++        if (!(entry->name = calloc(chars + 1, sizeof(WCHAR)))) { hr = E_OUTOFMEMORY; goto failed; }
++        MultiByteToWideChar(entry->flags & 0x800 ? CP_UTF8 : CP_OEMCP,
++                           entry->flags & 0x800 ? MB_ERR_INVALID_CHARS : 0,
++                           entry->raw_name, name_length, entry->name, chars);
++        for (p = entry->name; *p; ++p) if (*p == '/') *p = '\\';
++        if (entry->name[chars - 1] == '\\') { entry->directory = TRUE; entry->name[--chars] = 0; }
++        if (!valid_name(entry->name) || (entry->directory && entry->size)) goto failed;
++        if (!entry->directory && !entry->method && entry->compressed != entry->size) goto failed;
++        position += total;
++    }
++    hr = invalid_zip();
++    if (position != end) goto failed;
++    qsort(zip->entries, zip->count, sizeof(*zip->entries), entry_compare);
++    for (i = 0; i < zip->count; ++i)
++    {
++        WCHAR *parent, *p;
++        if (i && !wcsicmp(zip->entries[i-1].name, zip->entries[i].name)) goto failed;
++        if (!(parent = wcsdup(zip->entries[i].name))) { hr = E_OUTOFMEMORY; goto failed; }
++        for (p = parent; *p; ++p) if (*p == '\\')
++        {
++            struct zip_entry *ancestor;
++            *p = 0;
++            ancestor = find_entry(zip, parent);
++            *p = '\\';
++            if (ancestor && !ancestor->directory) { free(parent); hr = invalid_zip(); goto failed; }
++        }
++        free(parent);
++    }
++    free(tail);
++    *out = zip;
++    return S_OK;
++failed:
++    free(tail);
++    shell_zip_release(zip);
++    return hr;
++}
++
++void shell_zip_addref(struct shell_zip *zip) { InterlockedIncrement(&zip->ref); }
++
++void shell_zip_release(struct shell_zip *zip)
++{
++    unsigned i;
++    if (InterlockedDecrement(&zip->ref)) return;
++    if (zip->file != INVALID_HANDLE_VALUE) CloseHandle(zip->file);
++    for (i = 0; zip->entries && i < zip->count; ++i)
++    { free(zip->entries[i].name); free(zip->entries[i].raw_name); }
++    free(zip->entries);
++    free(zip->path);
++    DeleteCriticalSection(&zip->lock);
++    free(zip);
++}
++
++const WCHAR *shell_zip_path(struct shell_zip *zip) { return zip->path; }
++
++BOOL shell_zip_directory(struct shell_zip *zip, const WCHAR *relative)
++{
++    size_t len = wcslen(relative);
++    unsigned i;
++    if (!len) return TRUE;
++    for (i = 0; i < zip->count; ++i)
++        if ((!wcsicmp(relative, zip->entries[i].name) && zip->entries[i].directory) ||
++            (!wcsnicmp(relative, zip->entries[i].name, len) && zip->entries[i].name[len] == '\\')) return TRUE;
++    return FALSE;
++}
++
++HRESULT shell_zip_size(struct shell_zip *zip, const WCHAR *relative, DWORD *size)
++{
++    struct zip_entry *entry = find_entry(zip, relative);
++    if (!entry && !shell_zip_directory(zip, relative)) return HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
++    *size = entry ? entry->size : 0;
++    return S_OK;
++}
++
++static int bstr_compare(const void *a, const void *b) { return wcsicmp(*(BSTR *)a, *(BSTR *)b); }
++
++HRESULT shell_zip_children(struct shell_zip *zip, const WCHAR *relative, BSTR **names, LONG *count)
++{
++    size_t prefix = wcslen(relative), archive = wcslen(zip->path);
++    unsigned i, used = 0, unique = 0;
++    BSTR *result;
++    HRESULT hr = E_OUTOFMEMORY;
++    *names = NULL;
++    *count = 0;
++    if (!(result = calloc(max(zip->count, 1), sizeof(*result)))) return hr;
++    for (i = 0; i < zip->count; ++i)
++    {
++        const WCHAR *name = zip->entries[i].name, *child, *slash;
++        size_t length;
++        if (prefix && (wcsnicmp(name, relative, prefix) || name[prefix] != '\\')) continue;
++        child = name + (prefix ? prefix + 1 : 0);
++        slash = wcschr(child, '\\');
++        length = slash ? slash - name : wcslen(name);
++        if (archive + length + 1 > 32760) { hr = HRESULT_FROM_WIN32(ERROR_FILENAME_EXCED_RANGE); goto failed; }
++        if (!(result[used] = SysAllocStringLen(NULL, archive + 1 + length))) goto failed;
++        memcpy(result[used], zip->path, archive * sizeof(WCHAR));
++        result[used][archive] = '\\';
++        memcpy(result[used] + archive + 1, name, length * sizeof(WCHAR));
++        ++used;
++    }
++    qsort(result, used, sizeof(*result), bstr_compare);
++    for (i = 0; i < used; ++i)
++    {
++        if (unique && !wcsicmp(result[unique-1], result[i])) SysFreeString(result[i]);
++        else result[unique++] = result[i];
++    }
++    *names = result;
++    *count = unique;
++    return S_OK;
++failed:
++    for (i = 0; i < used; ++i) SysFreeString(result[i]);
++    free(result);
++    return hr;
++}
++
++static HRESULT create_parents(WCHAR *path, size_t root, BOOL include_leaf)
++{
++    WCHAR *p;
++    for (p = path + root + 1; ; ++p)
++    {
++        DWORD attributes;
++        if (*p && *p != '\\') continue;
++        if (!*p && !include_leaf) break;
++        {
++            WCHAR saved = *p;
++            *p = 0;
++            if (!CreateDirectoryW(path, NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
++            { *p = saved; return HRESULT_FROM_WIN32(GetLastError()); }
++            attributes = GetFileAttributesW(path);
++            *p = saved;
++            if (attributes == INVALID_FILE_ATTRIBUTES || !(attributes & FILE_ATTRIBUTE_DIRECTORY) ||
++                attributes & FILE_ATTRIBUTE_REPARSE_POINT) return HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED);
++        }
++        if (!*p) break;
++    }
++    return S_OK;
++}
++
++static HRESULT extract_entry(struct shell_zip *zip, struct zip_entry *entry, HANDLE output)
++{
++    BYTE local[30], *buffers = NULL, *input, *out;
++    char *name = NULL;
++    ULONGLONG position, produced = 0;
++    DWORD remaining = entry->compressed, crc = crc32(0, NULL, 0);
++    z_stream stream = {0};
++    BOOL initialized = FALSE, ended = FALSE;
++    HRESULT hr;
++    if (FAILED(hr = read_at(zip, entry->offset, local, sizeof(local)))) return hr;
++    if (get32(local) != 0x04034b50 || get16(local + 6) != entry->flags ||
++        get16(local + 8) != entry->method || get16(local + 26) != entry->name_len) return invalid_zip();
++    position = (ULONGLONG)entry->offset + 30 + get16(local + 26) + get16(local + 28);
++    if (position > zip->length || remaining > zip->length - position) return invalid_zip();
++    if (!(name = malloc(entry->name_len))) return E_OUTOFMEMORY;
++    hr = read_at(zip, (ULONGLONG)entry->offset + 30, name, entry->name_len);
++    if (SUCCEEDED(hr) && memcmp(name, entry->raw_name, entry->name_len)) hr = invalid_zip();
++    free(name);
++    if (FAILED(hr)) return hr;
++    if (!(buffers = malloc(131072))) return E_OUTOFMEMORY;
++    input = buffers;
++    out = buffers + 65536;
++    if (entry->method == 8)
++    {
++        stream.zalloc = zip_alloc;
++        stream.zfree = zip_free;
++        if (inflateInit2(&stream, -MAX_WBITS) != Z_OK) { free(buffers); return E_OUTOFMEMORY; }
++        initialized = TRUE;
++    }
++    hr = S_OK;
++    do
++    {
++        DWORD n = min(remaining, 65536), written, amount;
++        if (n)
++        {
++            if (FAILED(hr = read_at(zip, position, input, n))) break;
++            position += n;
++            remaining -= n;
++        }
++        stream.next_in = input;
++        stream.avail_in = n;
++        do
++        {
++            BYTE *data = input;
++            if (initialized)
++            {
++                int result;
++                stream.next_out = out;
++                stream.avail_out = 65536;
++                result = inflate(&stream, Z_NO_FLUSH);
++                if (result == Z_BUF_ERROR && !stream.avail_in && remaining) break;
++                if (result != Z_OK && result != Z_STREAM_END) { hr = invalid_zip(); break; }
++                amount = 65536 - stream.avail_out;
++                ended = result == Z_STREAM_END;
++                data = out;
++            }
++            else amount = n;
++            if (amount > entry->size - produced) { hr = invalid_zip(); break; }
++            if (amount && !WriteFile(output, data, amount, &written, NULL))
++            { hr = HRESULT_FROM_WIN32(GetLastError()); break; }
++            if (amount && written != amount) { hr = HRESULT_FROM_WIN32(ERROR_WRITE_FAULT); break; }
++            produced += amount;
++            crc = crc32(crc, data, amount);
++            if (!initialized || ended || (!stream.avail_in && stream.avail_out)) break;
++        } while (SUCCEEDED(hr));
++        if (ended && (remaining || stream.avail_in)) hr = invalid_zip();
++        if (!remaining && initialized && !ended && SUCCEEDED(hr)) hr = invalid_zip();
++    } while (remaining && SUCCEEDED(hr) && !ended);
++    if (initialized) inflateEnd(&stream);
++    free(buffers);
++    if (SUCCEEDED(hr) && (produced != entry->size || crc != entry->crc)) hr = invalid_zip();
++    return hr;
++}
++
++void shell_zip_cleanup(WCHAR *directory)
++{
++    SHFILEOPSTRUCTW operation = {0};
++    if (!directory) return;
++    operation.wFunc = FO_DELETE;
++    operation.pFrom = directory; /* allocated with two terminal NULs */
++    operation.fFlags = FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI;
++    SHFileOperationW(&operation);
++    free(directory);
++}
++
++HRESULT shell_zip_stage(struct shell_zip *zip, WCHAR **directory)
++{
++    WCHAR temp[MAX_PATH], name[MAX_PATH], *stage = NULL;
++    HRESULT hr = E_FAIL;
++    unsigned i;
++    DWORD temp_length;
++    *directory = NULL;
++    temp_length = GetTempPathW(MAX_PATH, temp);
++    if (!temp_length || temp_length >= MAX_PATH) return HRESULT_FROM_WIN32(ERROR_FILENAME_EXCED_RANGE);
++    if (!GetTempFileNameW(temp, L"wsz", 0, name))
++        return HRESULT_FROM_WIN32(GetLastError());
++    if (!DeleteFileW(name) || !CreateDirectoryW(name, NULL)) return HRESULT_FROM_WIN32(GetLastError());
++    if (!(stage = calloc(wcslen(name) + 2, sizeof(WCHAR))))
++    { RemoveDirectoryW(name); return E_OUTOFMEMORY; }
++    wcscpy(stage, name);
++    EnterCriticalSection(&zip->lock);
++    for (i = 0; i < zip->count; ++i)
++    {
++        struct zip_entry *entry = zip->entries + i;
++        WCHAR *path;
++        size_t root = wcslen(stage), length = root + wcslen(entry->name) + 2;
++        HANDLE output;
++        if (length > 32760) { hr = HRESULT_FROM_WIN32(ERROR_FILENAME_EXCED_RANGE); goto failed; }
++        if (!(path = malloc(length * sizeof(WCHAR)))) { hr = E_OUTOFMEMORY; goto failed; }
++        swprintf(path, length, L"%s\\%s", stage, entry->name);
++        hr = create_parents(path, root, entry->directory);
++        if (SUCCEEDED(hr) && !entry->directory)
++        {
++            output = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_NEW,
++                                 FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
++            if (output == INVALID_HANDLE_VALUE) hr = HRESULT_FROM_WIN32(GetLastError());
++            else { hr = extract_entry(zip, entry, output); CloseHandle(output); }
++        }
++        free(path);
++        if (FAILED(hr)) goto failed;
++    }
++    LeaveCriticalSection(&zip->lock);
++    *directory = stage;
++    return S_OK;
++failed:
++    LeaveCriticalSection(&zip->lock);
++    shell_zip_cleanup(stage);
++    return hr;
++}
