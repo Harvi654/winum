@@ -11,7 +11,12 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source="$(realpath -e -- "$1")"
 output="$(realpath -m -- "$2")"
 patch="$here/patches/candidates/oleaut32-typelib-cache/oleaut32-typelib-keep-released.patch"
-[[ -f "$source/include/wine/test.h" ]] || { echo "No include/wine/test.h in $source" >&2; exit 2; }
+if [[ ! -f "$source/include/wine/test.h" ]]; then
+    # A source archive has the tree one or two levels down.
+    found="$(find "$source" -maxdepth 4 -path '*/include/wine/test.h' -print -quit)"
+    [[ -n "$found" ]] || { echo "No include/wine/test.h in $source" >&2; exit 2; }
+    source="${found%/include/wine/test.h}"
+fi
 [[ ! -e "$output" && ! -L "$output" ]] || { echo 'Use a new output directory' >&2; exit 2; }
 for arch in x86_64 i686; do
     command -v "$arch-w64-mingw32-gcc" >/dev/null || { echo "Missing $arch-w64-mingw32-gcc (pacman -S mingw-w64-gcc)" >&2; exit 2; }

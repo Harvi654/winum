@@ -11,10 +11,12 @@ there `b2bce4e`, results `34d626a`), unchanged.
 
 ## State (2026-11-06)
 
+Next: cross review, i686 L2, full L0, SOLIDWORKS L4.
+
 | Level | Result |
 | --- | --- |
 | L0 | applies without fuzz on Wine 11.20 + winum `series` (incl. `oleaut32-typedesc-pointee` v2); full build pending |
-| L1 | open: bundle from `scripts/build-l1-oleaut32-cache.sh` |
+| L1 | passed 2026-11-06, Windows 10 x86_64 and i686: 26 tests, 0 failures each (`docs/wine-repro/oleaut32-typelib-cache/windows-2026-11-06/`). Windows also lets the file be deleted right after the last Release. |
 | L2 | Wine 11.20 x86_64: `typelib` 7724 tests / 0 failures, `tmarshal` 754 / 0 (2026-11-03); i686 open |
 | L3 | `measure.c`: load after Release to 0 0.09 ms (was ~20 ms) |
 | L4 | Inventor 2027.2 3D PDF: part 15 s, assembly 20 s, PRC model present (2026-11-03); SOLIDWORKS open |
@@ -31,7 +33,7 @@ On the maintainer's machine (needs `mingw-w64-gcc` and any Wine 11.20
 source tree for `include/wine/test.h`):
 
 ```bash
-export WINE_SRC="$HOME/path/to/wine-11.20-source"
+export WINE_SRC="$HOME/path/to/wine-11.20-source"   # a tree or an unpacked source archive
 bash scripts/build-l1-oleaut32-cache.sh "$WINE_SRC" ~/vm-share/oleaut32-cache-l1
 ```
 
