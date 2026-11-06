@@ -13,7 +13,7 @@ output="$(realpath -m -- "$2")"
 patch="$here/patches/candidates/oleaut32-typelib-cache/oleaut32-typelib-keep-released.patch"
 if [[ ! -f "$source/include/wine/test.h" ]]; then
     # A source archive has the tree one or two levels down.
-    found="$(find "$source" -maxdepth 4 -path '*/include/wine/test.h' -print -quit)"
+    found="$(find "$source" -maxdepth 6 -path '*/include/wine/test.h' -print -quit)"
     [[ -n "$found" ]] || { echo "No include/wine/test.h in $source" >&2; exit 2; }
     source="${found%/include/wine/test.h}"
 fi
