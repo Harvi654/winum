@@ -1,0 +1,198 @@
+MEASURE opengl32 pixel format alpha, 64-bit
+FORMATS count=300
+LIST index=101 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=102 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=103 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=104 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=105 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=106 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=107 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=108 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=109 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=110 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=111 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=112 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=113 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=114 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=115 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=116 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=117 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=118 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=119 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=120 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=121 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=122 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=123 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=124 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=125 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=126 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=127 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=128 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=129 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=130 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=131 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=132 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=133 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=134 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=135 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=136 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=137 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=138 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=139 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=140 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=141 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=142 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=143 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=144 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=145 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=146 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=147 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=148 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=149 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=150 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=151 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=152 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=153 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=154 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=155 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=156 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=157 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=158 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=159 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=160 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=161 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=162 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=163 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=164 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=165 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=166 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=167 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=168 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=169 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=170 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=171 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=172 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=173 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=174 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=175 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=176 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=177 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=178 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=179 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=180 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=201 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=202 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=203 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=204 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=205 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=206 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=207 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=208 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=209 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=210 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=211 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=212 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=213 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=214 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=215 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=216 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=217 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=218 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=219 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=220 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=221 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=222 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=223 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=224 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=225 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=226 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=227 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=228 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=229 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=230 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=231 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=232 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=233 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=234 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=235 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=236 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=237 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=238 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=239 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=240 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=241 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=242 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=243 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=244 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=245 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=246 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=247 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=248 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=0 stencil=0 accum=0 aux=0
+LIST index=249 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=250 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=251 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=16 stencil=0 accum=0 aux=0
+LIST index=252 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=253 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=254 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=0 accum=0 aux=0
+LIST index=255 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=256 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=257 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+LIST index=258 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=259 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=260 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=32 stencil=0 accum=0 aux=0
+LIST index=261 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=262 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=263 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=264 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=265 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=266 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=267 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=268 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=0 stencil=0 accum=0 aux=0
+LIST index=269 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=270 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=271 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=16 stencil=0 accum=0 aux=0
+LIST index=272 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=273 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=274 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=0 accum=0 aux=0
+LIST index=275 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=276 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=277 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+LIST index=278 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=279 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+LIST index=280 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=32 stencil=0 accum=0 aux=0
+FORMATS listed=160
+CHOOSE color=24 alpha=8 -> index=124 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+CHOOSE color=24 alpha=0 -> index=124 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+CHOOSE color=32 alpha=8 -> index=104 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+CHOOSE color=32 alpha=0 -> index=104 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+SEQUENCE legacy color=24 alpha=8, ARB color=32 alpha=8
+SEQ first index=124 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+SEQ first_set=1 error=0 getpixelformat=124
+GL vendor="ATI Technologies Inc." renderer="AMD Radeon RX 6400 (radeonsi, navi24, ACO, DRM 3.64, 7.2.14-zen" version="4.6 (Compatibility Profile) Mesa 26.2.6-arch1.1"
+SEQ wglChoosePixelFormatARB=yes
+SEQ arb_choose=1 found=1
+SEQ second index=104 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+SEQ same_index=0
+SEQ second_set=0 error=3735928559 getpixelformat=124
+SEQ other_set index=1 ret=0 error=3735928559 getpixelformat=124
+SEQUENCE legacy color=24 alpha=8, ARB color=24 alpha=8
+SEQ first index=124 flags=0x802d type=0 color=24 rgba=8/8/8/0 depth=24 stencil=8 accum=0 aux=0
+SEQ first_set=1 error=0 getpixelformat=124
+GL vendor="ATI Technologies Inc." renderer="AMD Radeon RX 6400 (radeonsi, navi24, ACO, DRM 3.64, 7.2.14-zen" version="4.6 (Compatibility Profile) Mesa 26.2.6-arch1.1"
+SEQ wglChoosePixelFormatARB=yes
+SEQ arb_choose=1 found=1
+SEQ second index=104 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+SEQ same_index=0
+SEQ second_set=0 error=3735928559 getpixelformat=124
+SEQ other_set index=1 ret=0 error=3735928559 getpixelformat=124
+SEQUENCE legacy color=32 alpha=8, ARB color=32 alpha=8
+SEQ first index=104 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+SEQ first_set=1 error=0 getpixelformat=104
+GL vendor="ATI Technologies Inc." renderer="AMD Radeon RX 6400 (radeonsi, navi24, ACO, DRM 3.64, 7.2.14-zen" version="4.6 (Compatibility Profile) Mesa 26.2.6-arch1.1"
+SEQ wglChoosePixelFormatARB=yes
+SEQ arb_choose=1 found=1
+SEQ second index=104 flags=0x802d type=0 color=32 rgba=8/8/8/8 depth=24 stencil=8 accum=0 aux=0
+SEQ same_index=1
+SEQ second_set=1 error=0 getpixelformat=104
+SEQ other_set index=1 ret=0 error=3735928559 getpixelformat=104
+DONE
