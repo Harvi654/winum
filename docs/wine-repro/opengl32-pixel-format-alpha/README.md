@@ -86,3 +86,27 @@ What it means:
   path. This is a candidate for a Windows-like fix without an environment
   variable; it is not measured yet on a driver that has 8/8/8/0 window
   formats of its own.
+
+### Inventor 2027 under Wine on the RX 6400 (2026-11-06)
+
+Arch, KDE Plasma (Xwayland), RX 6400 bound to amdgpu for the test, all
+three APIs on it (`INV_GPU=6400`, `DRI_PRIME=pci-0000_23_00_0`), GLX
+(`UseEGL=N` for Inventor.exe), `Driver\EnableHydra=1`, DirectX 12 through
+vkd3d-proton 3.0.1. The monitor on the RX 6400 was disabled in KDE during
+the test: with it, Xwayland used its scale 2.7 for all X11 windows.
+
+| Run | Wine build | *Enable Viewport GPU Ray Tracing* | Aurora |
+| --- | --- | --- | --- |
+| A | series + PR #3 patch, `WINE_OPENGL_REQUIRE_ALPHA` unset (= vanilla behaviour) | greyed out, "does not support this option" | - |
+| B | same, `WINE_OPENGL_REQUIRE_ALPHA=1` | available | starts |
+| C | series + `opengl-window-color-bits` candidate, no variable | available | starts |
+
+In B and C Aurora starts (its `ConvertEnvMapLayout` message), then
+`vkCreateRayTracingPipelinesKHR` faults in the Vulkan driver and Inventor
+exits (afterwards an unimplemented `msvcp140.?_Throw_Cpp_error`). That is
+the next stage, outside Wine: vkd3d-proton's DXIL-to-SPIR-V translation of
+Aurora's long-vector ray payloads (Autodesk-Inventor-for-Linux PR #3,
+`vkd3d-ray-payload.patch`, written for vkd3d-proton 2.14.1).
+
+Result: the pixel format choice is what greys the option out on AMD, and
+the Windows-like candidate removes it without an environment variable.
