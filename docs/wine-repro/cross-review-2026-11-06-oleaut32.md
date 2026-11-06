@@ -509,3 +509,43 @@ scheduling-hook DLLs are kept separately. Applied source scheduling hooks
 were removed afterward; normal build DLL outputs were restored from the
 uninstrumented copies. Only this new English section is committed. Repository
 patches and `series` are unchanged; the historical report is preserved.
+
+## v2.2 check
+
+2026-11-06, Codex. Focused thread-safety check of v2.1 -> v2.2 only,
+commit `efee849c5b2db194ba4dab4f6722cb4a3da782e6`. The delta changes
+`reusable` to LONG and both creator-QI stores to InterlockedExchange;
+the test source is unchanged. Candidate SHA256:
+`e1dc6db43843ec5cae9f489f91ad0fef33c0e121325b828eea9867aceab3510e`.
+
+- The native ThreadSanitizer model now has a 32-bit LONG field and the exact
+  two `InterlockedExchange(&...reusable, FALSE)` calls, using the public
+  Wine 11.20 `winnt.h` implementation (GCC's sequentially consistent atomic
+  exchange). The same two callers perform 100 barrier-started iterations
+  each, retaining their original references until join. **Exit 0, no race
+  report**, `library_refs=2 typeinfo_refs=1 reusable=0`. This instruments
+  the native model, not the complete Wine DLL.
+- The final-release lifetime argument is unchanged and still sound. Both
+  QI writers are now atomic; initialization precedes publication, and the
+  final reader runs after the holders release their references. No cache
+  lock was reintroduced in QI.
+- Final candidate applied with `--fuzz=0`; all four oleaut32 DLL/test EXE
+  make targets succeeded for **x86_64 and i386**, MinGW/GCC 14, using the
+  existing full-feature configuration. The S baseline inputs were checked
+  unchanged. Identical final x64 tests ran on S and C2.2 in separate fresh
+  prefixes/HOME under Xvfb:
+
+| Module | Checks S / C2.2 | Failures S / C2.2 | Todo S / C2.2 | Skipped S / C2.2 |
+| --- | --- | --- | --- | --- |
+| typelib | 7733 / 7733 | 0 / 0 | 43 / 43 | 1 / 1 |
+| tmarshal | 754 / 754 | 0 / 0 | 19 / 19 | 0 / 0 |
+
+Both comparisons are `no_new_failures`; all exits are 0, flaky counts 0,
+and all four bootstraps/cleanups succeeded. Artifacts and the real-write
+model: `/workspace/oleaut32-review-v22-20261106`.
+
+**Verdict: P2-v2-1 closed; focused code/thread-safety check OK.** No new issue
+was found in this delta. This does not close the remaining full-runtime L0,
+i686 runtime L2 or application validation gates recorded above. The earlier
+functional probes were not repeated in this delta-only check. Only this
+section is added; repository patches and `series` remain unchanged.
