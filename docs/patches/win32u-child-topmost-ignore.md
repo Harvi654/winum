@@ -22,7 +22,7 @@ PropertyManager section headers (Circle, Dimension, Force) were empty.
 
 | Level | Result |
 | --- | --- |
-| L0 | component builds runtime-9; full build pending |
+| L0 | component builds runtime-9; full build pending; full 62-patch series built in winum CI, both architectures, no fuzz (run 42298819890, 2026-11-06) |
 | L1 | Windows 10 x64/i686 201 checks, 0 failures (2026-11-02) |
 | L2 | paired, 2026-11-02 and v2 2026-11-04 |
 | L3 | not separate |

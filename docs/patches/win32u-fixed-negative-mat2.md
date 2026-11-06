@@ -22,7 +22,7 @@ Drawings: rotated or mirrored dimension text was unreadable and slow.
 
 | Level | Result |
 | --- | --- |
-| L0 | component builds; full L0 transcript not attached; with the full winum series: pending CI |
+| L0 | component builds; full L0 transcript not attached; with the full winum series: pending CI; full 62-patch series built in winum CI, both architectures, no fuzz (run 42298819890, 2026-11-06) |
 | L1 | Windows contract confirmed (patch-status.md, 2026-11-01) |
 | L2 | paired x64/i686 confirmed |
 | L3 | strict -6 fails / -8 passes |

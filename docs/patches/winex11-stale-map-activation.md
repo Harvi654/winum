@@ -22,7 +22,7 @@ A late `_NET_ACTIVE_WINDOW`/WM_TAKE_FOCUS for a replaced X window (older serial,
 
 | Level | Result |
 | --- | --- |
-| L0 | component runtime -11e; full build pending |
+| L0 | component runtime -11e; full build pending; full 62-patch series built in winum CI, both architectures, no fuzz (run 42298819890, 2026-11-06) |
 | L1 | Windows 10 x64/i686 44 checks, 0 failures (2026-11-03) |
 | L2 | paired v4, 2026-11-05: popup_focus_desktop 10 -> 0, user32/win32u unchanged |
 | L3 | extracted functions: run.sh 24/0, run-review.py 18/0 |

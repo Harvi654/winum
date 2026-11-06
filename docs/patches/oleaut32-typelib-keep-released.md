@@ -49,7 +49,7 @@ Still open for v2.2: i686 L2, full L0, SOLIDWORKS L4.
 
 | Level | Result |
 | --- | --- |
-| L0 | applies without fuzz on Wine 11.20 + winum `series` (incl. `oleaut32-typedesc-pointee` v2); full build pending |
+| L0 | applies without fuzz on Wine 11.20 + winum `series` (incl. `oleaut32-typedesc-pointee` v2); full build pending; full 62-patch series built in winum CI, both architectures, no fuzz (run 42298819890, 2026-11-06) |
 | L1 | v2.2 passed 2026-11-06 (35/0, both arch.); v2 33/0; v1 passed 2026-11-06, Windows 10 x86_64 and i686: 26 tests, 0 failures each (`docs/wine-repro/oleaut32-typelib-cache/windows-2026-11-06/`). Windows also lets the file be deleted right after the last Release. |
 | L2 | Wine 11.20 x86_64: `typelib` 7724 tests / 0 failures, `tmarshal` 754 / 0 (2026-11-03); i686 open |
 | L3 | `measure.c`: load after Release to 0 0.09 ms (was ~20 ms) |

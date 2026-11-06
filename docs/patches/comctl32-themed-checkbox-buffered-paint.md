@@ -22,7 +22,7 @@ A themed BS_AUTOCHECKBOX buffers only its background (parent background and WM_C
 
 | Level | Result |
 | --- | --- |
-| L0 | component builds runtime-10/-10b; full build pending |
+| L0 | component builds runtime-10/-10b; full build pending; full 62-patch series built in winum CI, both architectures, no fuzz (run 42298819890, 2026-11-06) |
 | L1 | Windows 10 x64/i686 15 checks, 0 failures (2026-11-03, third run; pixel comparison removed) |
 | L2 | paired -9 vs -10b, 2026-11-03: button 0 new failures |
 | L3 | not separate |

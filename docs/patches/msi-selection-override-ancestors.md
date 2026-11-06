@@ -22,7 +22,7 @@ Extends the ancestor closure of fresh ADDSOURCE/ADVERTISE required selections. W
 
 | Level | Result |
 | --- | --- |
-| L0 | SOLIDWORKS candidate builds (msi-selection profile, G0); with the full winum series: pending CI |
+| L0 | SOLIDWORKS candidate builds (msi-selection profile, G0); with the full winum series: pending CI; full 62-patch series built in winum CI, both architectures, no fuzz (run 42298819890, 2026-11-06) |
 | L1 | Windows 10 x64/i686 v14 16749/0 (2026-10-30) |
 | L2 | paired x64 and i686, `custom.c:1488` on both engines (2026-11-05/06, `scripts/run-msi-l2.py`) |
 | L3 | selection/boundary fixtures of the conformance suite; separate L3 per patch not recorded |

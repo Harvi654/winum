@@ -1,12 +1,12 @@
 # Patch status overview
 
 One row per patch of `patches/series`, in series order. Details, dates and
-evidence are on each patch's page. Updated 2026-11-06.
+evidence are on each patch's page. Updated 2026-11-06. L0 of the whole
+series: winum CI run 42298819890 (build and source archive, both architectures).
 
 Legend: **yes** done and recorded; **partly** done for part of the scope;
 **test, not run on Win** the patch has a Wine test that never ran on
-Windows 10; **missing** no Wine test exists yet; **CI** waits for the
-full-series build; **confirm** the patch has been in daily use for more than
+Windows 10; **missing** no Wine test exists yet; **confirm** the patch has been in daily use for more than
 a week, the maintainer still has to confirm it; **-** not recorded.
 
 | # | Patch | DLL | L0 | L1 | L2 | L3 | L4 | L5 | Cross review |
@@ -50,28 +50,28 @@ a week, the maintainer still has to confirm it; **-** not recorded.
 | 37 | [mshtml-document-open-optional-result](mshtml-document-open-optional-result.md) | mshtml | yes | **missing** | - | yes | yes | confirm | - |
 | 38 | [winex11-owner-managed-async](winex11-owner-managed-async.md) | winex11.drv | yes | **missing** | - | yes | yes | confirm | - |
 | 39 | [glu32-nurbs-curves](glu32-nurbs-curves.md) | glu32 | yes | yes | yes | yes | yes | confirm | - |
-| 40 | [win32u-fixed-negative-mat2](win32u-fixed-negative-mat2.md) | win32u | CI | yes | yes | yes | partly | - | - |
-| 41 | [win32u-child-topmost-ignore](win32u-child-topmost-ignore.md) | win32u | CI | yes | yes | - | yes | - | yes |
-| 42 | [comctl32-themed-checkbox-buffered-paint](comctl32-themed-checkbox-buffered-paint.md) | comctl32 | CI | yes | yes | - | yes | - | yes |
-| 43 | [winex11-stale-map-activation](winex11-stale-map-activation.md) | winex11.drv | CI | yes | yes | yes | yes | - | yes |
-| 44 | [msi-addlocal-feature-ancestors](msi-addlocal-feature-ancestors.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 45 | [msi-follow-parent-install-level](msi-follow-parent-install-level.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 46 | [msi-setfeaturestate-post-cost-action](msi-setfeaturestate-post-cost-action.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 47 | [msi-setfeaturestate-post-cost-ancestors](msi-setfeaturestate-post-cost-ancestors.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 48 | [msi-setfeaturestate-required-descendants](msi-setfeaturestate-required-descendants.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 49 | [msi-selection-override-ancestors](msi-selection-override-ancestors.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 50 | [msi-required-feature-source-state](msi-required-feature-source-state.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 51 | [msi-required-feature-advertise-state](msi-required-feature-advertise-state.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 52 | [msi-required-feature-absent-state](msi-required-feature-absent-state.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 53 | [msi-costfinalize-reset-feature-requests](msi-costfinalize-reset-feature-requests.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 54 | [msi-post-cost-local-idempotence](msi-post-cost-local-idempotence.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 55 | [msi-disabled-feature-selection](msi-disabled-feature-selection.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 56 | [msi-reject-cyclic-feature-parents](msi-reject-cyclic-feature-parents.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 57 | [msi-costfinalize-feature-depth](msi-costfinalize-feature-depth.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 58 | [msi-ui-localonly-source-state](msi-ui-localonly-source-state.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 59 | [msi-executeaction-ui-selection-transfer](msi-executeaction-ui-selection-transfer.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 60 | [msi-source-directory-component-state](msi-source-directory-component-state.md) | msi | CI | yes | yes | partly | yes | - | yes |
-| 61 | [oleaut32-typelib-keep-released](oleaut32-typelib-keep-released.md) | oleaut32 | CI | yes | partly | yes | Inventor | - | yes |
+| 40 | [win32u-fixed-negative-mat2](win32u-fixed-negative-mat2.md) | win32u | yes | yes | yes | yes | partly | - | - |
+| 41 | [win32u-child-topmost-ignore](win32u-child-topmost-ignore.md) | win32u | yes | yes | yes | - | yes | - | yes |
+| 42 | [comctl32-themed-checkbox-buffered-paint](comctl32-themed-checkbox-buffered-paint.md) | comctl32 | yes | yes | yes | - | yes | - | yes |
+| 43 | [winex11-stale-map-activation](winex11-stale-map-activation.md) | winex11.drv | yes | yes | yes | yes | yes | - | yes |
+| 44 | [msi-addlocal-feature-ancestors](msi-addlocal-feature-ancestors.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 45 | [msi-follow-parent-install-level](msi-follow-parent-install-level.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 46 | [msi-setfeaturestate-post-cost-action](msi-setfeaturestate-post-cost-action.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 47 | [msi-setfeaturestate-post-cost-ancestors](msi-setfeaturestate-post-cost-ancestors.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 48 | [msi-setfeaturestate-required-descendants](msi-setfeaturestate-required-descendants.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 49 | [msi-selection-override-ancestors](msi-selection-override-ancestors.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 50 | [msi-required-feature-source-state](msi-required-feature-source-state.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 51 | [msi-required-feature-advertise-state](msi-required-feature-advertise-state.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 52 | [msi-required-feature-absent-state](msi-required-feature-absent-state.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 53 | [msi-costfinalize-reset-feature-requests](msi-costfinalize-reset-feature-requests.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 54 | [msi-post-cost-local-idempotence](msi-post-cost-local-idempotence.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 55 | [msi-disabled-feature-selection](msi-disabled-feature-selection.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 56 | [msi-reject-cyclic-feature-parents](msi-reject-cyclic-feature-parents.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 57 | [msi-costfinalize-feature-depth](msi-costfinalize-feature-depth.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 58 | [msi-ui-localonly-source-state](msi-ui-localonly-source-state.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 59 | [msi-executeaction-ui-selection-transfer](msi-executeaction-ui-selection-transfer.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 60 | [msi-source-directory-component-state](msi-source-directory-component-state.md) | msi | yes | yes | yes | partly | yes | - | yes |
+| 61 | [oleaut32-typelib-keep-released](oleaut32-typelib-keep-released.md) | oleaut32 | yes | yes | partly | yes | Inventor | - | yes |
 | 62 | [opengl32-window-format-color-bits](opengl32-window-format-color-bits.md) | opengl32 | yes | yes | partly | yes | Inventor | - | yes |
 
 ## What is missing, by kind
