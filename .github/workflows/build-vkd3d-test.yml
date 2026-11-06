@@ -1,0 +1,65 @@
+# Test build of vkd3d-proton 3.0.1 with gpu/vkd3d-proton/*.patch, for
+# Inventor's GPU ray tracing. Only on the topic/vkd3d-rt branch; uploads
+# artifacts, publishes nothing. Also shows the synthetic shaders in
+# gpu/vkd3d-proton/tests/ failing spirv-val without the patch and passing
+# with it.
+name: Build vkd3d-proton (test)
+
+on:
+  push:
+    branches: ['topic/vkd3d-rt']
+    paths: ['gpu/vkd3d-proton/**', '.github/workflows/build-vkd3d-test.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  VKD3D_TAG: v3.0.1
+  VKD3D_COMMIT: 3b10bd7a7ec6a7347e616cf8bea59333afec2255
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 120
+    steps:
+      - name: Dependencies (official Arch repositories)
+        run: pacman -Syu --noconfirm --needed git meson ninja cmake glslang mingw-w64-gcc wine python
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: winum
+      - name: vkd3d-proton source
+        run: |
+          git clone --branch "$VKD3D_TAG" --recursive --depth 1 --shallow-submodules https://github.com/HansKristian-Work/vkd3d-proton.git src
+          test "$(git -C src rev-parse HEAD)" = "$VKD3D_COMMIT"
+      - name: Shader check without the patches
+        run: |
+          cmake -S src/subprojects/dxil-spirv -B check-base -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+          ninja -C check-base dxil-spirv
+      - name: Apply patches
+        run: |
+          for p in winum/gpu/vkd3d-proton/*.patch; do echo "== $p"; patch -d src -p1 --fuzz=0 < "$p"; done
+      - name: Shader check with the patches
+        run: |
+          cmake -S src/subprojects/dxil-spirv -B check-patched -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+          ninja -C check-patched dxil-spirv
+          fail=0
+          for d in winum/gpu/vkd3d-proton/tests/*.dxil; do
+            n="$(basename "$d")"
+            if check-base/dxil-spirv "$d" --debug-all-entry-points --validate >/dev/null 2>&1; then b=valid; else b=INVALID; fi
+            if check-patched/dxil-spirv "$d" --debug-all-entry-points --validate >/dev/null 2>&1; then p=valid; else p=INVALID; fail=1; fi
+            echo "$n: 3.0.1 $b, patched $p"
+          done
+          exit $fail
+      - name: Build Windows DLLs
+        run: |
+          cd src
+          ./package-release.sh 3.0.1-winum-rt ../out --no-package
+          find ../out -name '*.dll' | sort
+          cd ../out && find . -name '*.dll' -exec sha256sum {} + | sort -k2 > SHA256SUMS && cat SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: vkd3d-proton-3.0.1-winum-rt
+          path: out/
+          retention-days: 30
