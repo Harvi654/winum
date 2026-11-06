@@ -1,16 +1,21 @@
 diff --git a/dlls/oleaut32/typelib.c b/dlls/oleaut32/typelib.c
-index b72a0054..00bd612f 100644
 --- a/dlls/oleaut32/typelib.c
 +++ b/dlls/oleaut32/typelib.c
-@@ -3521,6 +3521,7 @@ static ITypeLib2* ITypeLib2_Constructor_MSFT(LPVOID pLib, DWORD dwTLBLength)
+@@ -3521,9 +3521,12 @@
      if(tlbSegDir.pTypdescTab.length > 0)
      {
          int i, j, cTD = tlbSegDir.pTypdescTab.length / (2*sizeof(INT));
 +        TYPEDESC *array_desc;
          INT16 td[4];
          pTypeLibImpl->ctTypeDesc = cTD;
-         pTypeLibImpl->pTypeDesc = calloc(cTD, sizeof(TYPEDESC));
-@@ -3533,7 +3534,29 @@ static ITypeLib2* ITypeLib2_Constructor_MSFT(LPVOID pLib, DWORD dwTLBLength)
+-        pTypeLibImpl->pTypeDesc = calloc(cTD, sizeof(TYPEDESC));
++        /* The second half holds the SAFEARRAY descriptions that simple
++         * pointees may need, so they are freed with the table. */
++        pTypeLibImpl->pTypeDesc = calloc(2 * cTD, sizeof(TYPEDESC));
+         MSFT_ReadLEWords(td, sizeof(td), &cx, tlbSegDir.pTypdescTab.offset);
+         for(i=0; i<cTD; )
+ 	{
+@@ -3533,7 +3536,29 @@
  	    {
  	        /* FIXME: check safearray */
                  if(td[3] < 0)
@@ -23,9 +28,9 @@ index b72a0054..00bd612f 100644
 +
 +                    if (pointee <= VT_LPWSTR)
 +                        pTypeLibImpl->pTypeDesc[i].lptdesc = &std_typedesc[pointee];
-+                    else if ((pointee & ~VT_TYPEMASK) == VT_ARRAY && (pointee & VT_TYPEMASK) <= VT_LPWSTR
-+                             && (array_desc = calloc(1, sizeof(*array_desc))))
++                    else if ((pointee & ~VT_TYPEMASK) == VT_ARRAY && (pointee & VT_TYPEMASK) <= VT_LPWSTR)
 +                    {
++                        array_desc = &pTypeLibImpl->pTypeDesc[cTD + i];
 +                        TRACE_(typelib)("typedesc %d: pointer to SAFEARRAY of vt %d\n", i, pointee & VT_TYPEMASK);
 +                        array_desc->vt = VT_SAFEARRAY;
 +                        array_desc->lptdesc = &std_typedesc[pointee & VT_TYPEMASK];

@@ -19,6 +19,9 @@ is in [AGENTS.md](../AGENTS.md); each patch gets a page in `docs/patches/`.
 | --- | --- | --- |
 | the first 27 (`combase-…` to `winex11-xinput-bad-device`) | Autodesk-Inventor-for-Linux, `patches/*.patch` at commit `a41b275`, = its Wine release `wine-11.20-6` | Inventor 2026/2027 since October 2026 (release `wine-11.20-6`) |
 
+Changed here since: `oleaut32-typedesc-pointee.patch` v2 (2026-11-06, no
+leak; see its page in `docs/patches/`).
+
 Their history (why each was made, how it was tested) is in that project's
 `git log` and `docs/arch-hyprland.md`; the pages in `docs/patches/` will
 link to it. The dates in `PATCHES.txt` of a winum build are the dates of
