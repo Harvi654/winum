@@ -1,0 +1,2 @@
+choosepixelformat_alpha.c:154: renderer AMD Radeon RX 6400, version 4.6.0 Compatibility Profile Context 26.10.1.261008
+077c:choosepixelformat_alpha: 18 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
