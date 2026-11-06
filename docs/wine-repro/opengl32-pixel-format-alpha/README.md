@@ -123,3 +123,9 @@ So two changes are needed on AMD, and nothing else: the Windows-like
 pixel format description in Wine (`opengl-window-color-bits`) and the
 long-vector fix in vkd3d-proton's dxil-spirv. Not yet tried: Draft/High
 quality, noise reduction, an assembly, a longer session.
+
+Later the same session: Draft and High quality, noise reduction on, an
+assembly with several parts, orbiting while ray tracing - all render on
+the GPU and refresh each time; no errors in the log. Seen once, not
+investigated: the status bar text at the bottom left was drawn over
+itself (two messages overlapping). Note it if it comes back.
