@@ -325,3 +325,85 @@ memory behaviour and the original P3 follow-up are fixed; window colour-bit
 normalization, pbuffer creation and context restoration work in the probes.
 The completed x64 EGL pair has zero candidate failures, subject to the
 component-runtime and coverage limits above.
+
+## v3 check
+
+Reviewed `4b06099807f606a556a60030978b8edeab9d0764` after updating `main`,
+including the complete v2-to-v3 patch change and the affected function/callers.
+Candidate SHA-256:
+`a01c9c7829389bac7793e891762c35f83c5d97463b00b36c96523553c6b8a8ca`.
+Only this document changes; the public Wine reference and clean-room scope
+remain as above. All checks below were performed on 2026-11-06.
+
+### P2-2 closed: short aliases bypass cache identity
+
+`get_pixel_formats` (`opengl32/wgl.c:1673,1682,1717`) now disables cache
+lookup for low-16-bit HDC aliases and publishes a null cache key for their
+results. The same short-alias/slot-reuse probe, with an explicit 24-bit DIB
+selected into the replacement memory DC, returned:
+
+| Current memory DC | S: short alias / full HDC | C v3: short alias / full HDC |
+| --- | --- | --- |
+| GLX colour bits | 24 / 24 | 24 / 24 |
+| GLX format count | 80 / 240 | 240 / 240 |
+| EGL colour bits | 24 / 24 | 24 / 24 |
+| EGL format count | 150 / 200 | 200 / 200 |
+
+Both probes confirmed that the GDI slot was actually reused and the current
+object was `OBJ_MEMDC`. Thus v3 fixes the colour-bit leak and the inherited
+stale-count case exercised by this sequence; no Windows alias behaviour is
+assumed.
+
+The ordinary-DC probe also reproduced the v2 results on both backends:
+memory bitmap choices stayed GLX index 10 / colour 24 and EGL index 15 /
+colour 24, with the selected DIB still 24-bit. All 48 GLX and 60 EGL
+RGB888/0 window records changed from colour 24 on S to 32 on C. Integer and
+float ARB colour attributes agreed with descriptors. Five hundred repeated
+window/memory alternations had zero mismatches on each engine/backend.
+
+### Returned-array lifetime is preserved
+
+The null key does not discard the allocation. On success, the function still
+stores `args.formats` in the thread's `WINE_GL_RESERVED_FORMATS_PTR` and
+returns that same pointer. The previous allocation is freed only when a
+successful cache-miss query publishes its replacement; thread detach frees
+the last allocation. Invalid-handle/backend-error paths do not free the
+previously published array. A short alias now causes a fresh fetch each
+time, so callers must not retain the pointer across the next such query.
+It remains valid after return until that replacement, as before. Describe
+and attribute calls copy values out; ARB selection consumes its borrowed
+array before another format query. No new ownership or reentrancy change
+was found in these callers.
+
+An additional C model compiled the verbatim v3 `get_pixel_formats` body
+with mocked DC/backend inputs and allocation tracking, under GCC
+AddressSanitizer/UndefinedBehaviorSanitizer with leak detection. It exercised
+full-handle cache hits, 40 alternating short-alias window/memory fetches,
+post-return reads after unrelated heap allocations, invalid handles, failures
+in either backend call, and final thread-style cleanup: **339 checks,
+44 allocations / 44 frees, zero live allocations, no sanitizer diagnostics**.
+This is a function/ownership model, not a sanitizer build of the Wine runtime.
+
+### Builds, x64 EGL pair and verdict
+
+V3 applied after the unchanged 27-patch series with `--fuzz=0`, without
+candidate offsets. `opengl32.dll` and `opengl32_test.exe` built successfully
+for x86_64 and i386 with GCC/MinGW 14 in the same Debian 13 container.
+The component-runtime S/C trees differed only in the two PE `opengl32.dll`
+files. Both engines used the identical v3 test executable, private Xvfb and
+fresh prefix/HOME/XDG directories; both suite runs confirmed server cleanup.
+
+| Full x64 EGL `opengl` suite | Checks | Failures | Todo / skipped | Exit |
+| --- | ---: | ---: | --- | ---: |
+| S | 9625 | 64 | 65 / 39 | 64 |
+| C v3 | 9917 | 0 | 65 / 39 | 0 |
+
+All 64 S failures were in the added test at the same locations as v2;
+C had no failing locations. The 292-check coverage difference persists.
+This check did not repeat the previously incomplete GLX/i386 full suites
+or perform a full-runtime L0, native Windows L1 or consumer L4 smoke.
+
+**Verdict: v3 passes this correctness check; P2-2 is closed and no remaining
+code-review blocker was found.** P2-1 stays fixed for ordinary DCs, and the
+v2 test changes are unchanged. Series promotion still requires the outstanding
+validation gates described above; this review does not waive them.
