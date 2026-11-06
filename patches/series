@@ -30,4 +30,4 @@ wbemprox-timezone.patch
 winex11-flush-putimage.patch
 winex11-shape-alpha-xwayland.patch
 winex11-xinput-bad-device.patch
-win32u-window-format-color-bits.patch
+opengl32-window-format-color-bits.patch
