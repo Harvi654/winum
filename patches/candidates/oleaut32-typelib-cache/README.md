@@ -23,14 +23,20 @@ two P2 findings, both addressed in **v2** (same day):
   and time are taken before opening and after closing; the library is kept
   only if both agree.
 
-v2 needs: L1 again (the test changed; it also traces whether Windows offers
-`ICreateTypeLib2` on a loaded library), Codex's two probes rerun on v2, then
-i686 L2, full L0, SOLIDWORKS L4.
+v2 L1 (2026-11-06, `docs/wine-repro/oleaut32-typelib-cache/windows-2026-11-06-v2/`):
+33 tests, 0 failures on x86_64 and i686. Windows offers `ICreateTypeLib2`
+on a loaded library (S_OK), `SetName` returns S_OK, and the next load has
+the file's name again - the behaviour v2 keeps. The two traces became
+`ok()` checks with these measured values afterwards; that final test
+text runs on Windows again with the next bundle.
+
+Still open for v2: Codex's re-review (both probes rerun), i686 L2, full L0,
+SOLIDWORKS L4.
 
 | Level | Result |
 | --- | --- |
 | L0 | applies without fuzz on Wine 11.20 + winum `series` (incl. `oleaut32-typedesc-pointee` v2); full build pending |
-| L1 | v1 passed 2026-11-06, Windows 10 x86_64 and i686: 26 tests, 0 failures each (`docs/wine-repro/oleaut32-typelib-cache/windows-2026-11-06/`). Windows also lets the file be deleted right after the last Release. |
+| L1 | v2 passed 2026-11-06 (33/0, both arch.); v1 passed 2026-11-06, Windows 10 x86_64 and i686: 26 tests, 0 failures each (`docs/wine-repro/oleaut32-typelib-cache/windows-2026-11-06/`). Windows also lets the file be deleted right after the last Release. |
 | L2 | Wine 11.20 x86_64: `typelib` 7724 tests / 0 failures, `tmarshal` 754 / 0 (2026-11-03); i686 open |
 | L3 | `measure.c`: load after Release to 0 0.09 ms (was ~20 ms) |
 | L4 | Inventor 2027.2 3D PDF: part 15 s, assembly 20 s, PRC model present (2026-11-03); SOLIDWORKS open |

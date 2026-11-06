@@ -1,0 +1,3 @@
+typelib_released.c:92: ICreateTypeLib2 of a loaded library: hr 0.
+typelib_released.c:96: SetName: hr 0.
+0850:typelib_released: 33 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.

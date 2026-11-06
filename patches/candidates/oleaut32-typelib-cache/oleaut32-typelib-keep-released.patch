@@ -37,16 +37,17 @@ would have returned them (review P2-1). The file's size and time are taken
 before opening it and again after closing it; the library is kept only if
 both agree, so a file replaced while it was being read is not reused with
 the new file's stamp (review P2-2). The test checks that an edited name is
-not seen by the next load; it traces whether Windows offers ICreateTypeLib2
-on a loaded library at all.
+not seen by the next load. Windows 10 (x86_64 and i686, measured) returns
+S_OK for ICreateTypeLib2 on a loaded library and for SetName, and the next
+load has the file's name again; the test checks exactly that.
 
 Written with AI help (Claude); not submitted to Wine. LGPL 2.1 or later.
 
 diff --git a/dlls/oleaut32/tests/typelib.c b/dlls/oleaut32/tests/typelib.c
-index 535b97e..17a3dad 100644
+index 535b97e..b6edac9 100644
 --- a/dlls/oleaut32/tests/typelib.c
 +++ b/dlls/oleaut32/tests/typelib.c
-@@ -7373,6 +7373,116 @@ static void test_LoadTypeLib(void)
+@@ -7373,6 +7373,113 @@ static void test_LoadTypeLib(void)
      ok(tl == (void *)0xdeadbeef, "Got %p.\n", tl);
  }
  
@@ -120,13 +121,10 @@ index 535b97e..17a3dad 100644
 +    hr = ITypeLib_GetDocumentation(tl, -1, &name, NULL, NULL, NULL);
 +    ok(hr == S_OK, "Got hr %#lx.\n", hr);
 +    hr = ITypeLib_QueryInterface(tl, &IID_ICreateTypeLib2, (void **)&ctl);
-+    trace("ICreateTypeLib2 of a loaded library: hr %#lx.\n", hr);
-+    if (SUCCEEDED(hr))
-+    {
-+        hr = ICreateTypeLib2_SetName(ctl, (WCHAR *)L"edited");
-+        trace("SetName: hr %#lx.\n", hr);
-+        ICreateTypeLib2_Release(ctl);
-+    }
++    ok(hr == S_OK, "Got hr %#lx.\n", hr);
++    hr = ICreateTypeLib2_SetName(ctl, (WCHAR *)L"edited");
++    ok(hr == S_OK, "Got hr %#lx.\n", hr);
++    ICreateTypeLib2_Release(ctl);
 +    ref = ITypeLib_Release(tl);
 +    ok(!ref, "Got refcount %lu.\n", ref);
 +
@@ -163,7 +161,7 @@ index 535b97e..17a3dad 100644
  static void test_SetVarHelpContext(void)
  {
      static OLECHAR nameW[] = {'n','a','m','e',0};
-@@ -8847,6 +8957,7 @@ START_TEST(typelib)
+@@ -8847,6 +8954,7 @@ START_TEST(typelib)
      test_register_typelib_64();
      test_create_typelibs();
      test_LoadTypeLib();
