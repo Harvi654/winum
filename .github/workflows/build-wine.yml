@@ -1,8 +1,9 @@
 # Builds winum (vanilla Wine + patches/series) in public, so anyone can see
 # what the downloadable Wine is made of.
 #
-# - push to main / pull request: build and source archive only, as a check
-#   that the series applies and compiles (artifacts kept 30 days, nothing
+# - push to main or a topic/<name> branch / pull request: build and source
+#   archive only, as a check or a test build
+#   (that the series applies and compiles; artifacts kept 30 days, nothing
 #   published).
 # - push of a tag winum-<version>-<build> (made by the maintainer, signed):
 #   the same build from the tag, then the release "winum-<version>-<build>"
@@ -24,7 +25,7 @@ on:
         required: false
         default: ''
   push:
-    branches: [main]
+    branches: [main, 'topic/**']
     tags: ['winum-*']
     paths:
       - 'patches/**'
@@ -94,6 +95,8 @@ jobs:
           else
             . wine/version.env
             name="winum-$WINE_VERSION-$WINUM_BUILD" ref="$GITHUB_SHA"
+            # a test build of a topic branch is labelled with the branch
+            case "$GITHUB_REF_NAME" in topic/*) name="$name-${GITHUB_REF_NAME#topic/}" ;; esac
           fi
           { echo "name=$name"; echo "ref=$ref"; echo "build=$build"; echo "source=$source"; echo "publish=$publish"; } >> "$GITHUB_OUTPUT"
           echo "name=$name ref=$ref build=$build source=$source publish=$publish"

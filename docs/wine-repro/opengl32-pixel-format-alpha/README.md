@@ -49,4 +49,40 @@ run `run-measure.bat`, return `result-x86_64.txt`, `result-i686.txt` and
 
 ## Results
 
-(none yet)
+### Windows 10, AMD Radeon RX 6400, Adrenalin 26.10.1 (2026-11-06)
+
+`windows-2026-11-06-rx6400/`, identical on x86_64 and i686:
+
+- 216 formats; 28 RGBA, double-buffered OpenGL window formats. Every
+  format of the AMD driver (flags `0x8025`/`0x8425`) is colour 32 with
+  alpha 8. Only the Microsoft generic formats (`0x8465`, with
+  `PFD_GENERIC_FORMAT`) include formats without alpha - and those report
+  **colour 32 with 8/8/8/0**, i.e. `cColorBits` counts the whole 32-bit
+  pixel, not red+green+blue.
+- `ChoosePixelFormat` returns index 14 (32, 8/8/8/8, depth 24, stencil 8)
+  for colour 24 or 32, alpha 8 or 0.
+- The capability-check sequence: first choice 14, `SetPixelFormat` OK,
+  context on the RX 6400 (OpenGL 4.6), `wglChoosePixelFormatARB` also 14,
+  the second `SetPixelFormat` with the same index succeeds.
+- `SetPixelFormat` with a *different* format on a window that has one
+  fails with error 2000 (`ERROR_INVALID_PIXEL_FORMAT`) - Windows rejects
+  it as Wine does.
+
+Inventor 2027 in the same VM: *Enable Viewport GPU Ray Tracing* is
+available and checked (DirectX 12), and ray tracing runs on the **GPU**
+(Low quality, a few seconds on a small part).
+
+What it means:
+
+- On Windows the two choices agree because the driver offers no window
+  format without alpha, not because `ChoosePixelFormat` weighs alpha above
+  colour. The second `SetPixelFormat` would fail on Windows too if they
+  differed.
+- Under Wine on X11, GLX reports `cColorBits` = `GLX_BUFFER_SIZE`, which is
+  24 for an 8/8/8/0 configuration, while Windows reports 32 for the same
+  layout (generic formats above). With 24 vs 32, Wine's colour-first
+  precedence picks the exact 24-bit format without alpha. If Wine reported
+  32 like Windows, colour would tie and alpha would decide, as in the ARB
+  path. This is a candidate for a Windows-like fix without an environment
+  variable; it is not measured yet on a driver that has 8/8/8/0 window
+  formats of its own.
