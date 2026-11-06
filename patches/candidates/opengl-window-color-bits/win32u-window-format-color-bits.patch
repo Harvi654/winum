@@ -1,0 +1,157 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] win32u: Describe 8-bit RGB window formats without alpha as 32-bit.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows describes an RGB window pixel format with 8 bits per channel and
+no alpha with cColorBits 32, the size of its pixel, like the format with
+alpha (measured on Windows 10: the Microsoft generic formats 8/8/8/0 have
+cColorBits 32; AMD's driver offers only 8/8/8/8 window formats, so there
+ChoosePixelFormat and wglChoosePixelFormatARB return the same format).
+GLX and EGL report the buffer size, 24. wglChoosePixelFormat compares
+cColorBits before cAlphaBits, so a request for colour 24 with alpha 8
+returned the 24-bit format without alpha, wglChoosePixelFormatARB with
+alpha 8 returned another format, and SetPixelFormat with it on the same
+window failed. Autodesk Inventor makes exactly these calls before it
+offers GPU ray tracing, and greys the option out.
+
+The change is limited to on-screen window formats with 8/8/8 RGB and no
+alpha, described once in win32u for every driver. Bitmap and off-screen
+formats keep their sizes: a 24-bit DIB really has 24-bit pixels.
+
+diff --git a/dlls/opengl32/tests/opengl.c b/dlls/opengl32/tests/opengl.c
+index 2f25f57..88708e1 100644
+--- a/dlls/opengl32/tests/opengl.c
++++ b/dlls/opengl32/tests/opengl.c
+@@ -1018,6 +1018,97 @@ static void test_choosepixelformat(void)
+     pfd.cDepthBits = 0;
+ }
+ 
++static void test_choosepixelformat_alpha(void)
++{
++    PIXELFORMATDESCRIPTOR pfd =
++    {
++        .nSize = sizeof(PIXELFORMATDESCRIPTOR),
++        .nVersion = 1,
++        .dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
++        .iPixelType = PFD_TYPE_RGBA,
++        .cColorBits = 24,
++        .cAlphaBits = 8,
++        .cDepthBits = 24,
++        .cStencilBits = 8,
++        .iLayerType = PFD_MAIN_PLANE,
++    };
++    int attribs[] =
++    {
++        WGL_DRAW_TO_WINDOW_ARB, 1,
++        WGL_SUPPORT_OPENGL_ARB, 1,
++        WGL_DOUBLE_BUFFER_ARB, 1,
++        WGL_ACCELERATION_ARB, WGL_FULL_ACCELERATION_ARB,
++        WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
++        WGL_COLOR_BITS_ARB, 32,
++        WGL_ALPHA_BITS_ARB, 8,
++        WGL_DEPTH_BITS_ARB, 24,
++        WGL_STENCIL_BITS_ARB, 8,
++        0
++    };
++    int i, count, format, arb_format = 0, with_alpha = 0;
++    PIXELFORMATDESCRIPTOR fmt;
++    HGLRC old_ctx = wglGetCurrentContext(), ctx;
++    HDC old_hdc = wglGetCurrentDC(), hdc;
++    UINT arb_count = 0;
++    HWND hwnd;
++    BOOL ret;
++
++    if (!ext.wglChoosePixelFormatARB)
++    {
++        win_skip( "wglChoosePixelFormatARB is not available.\n" );
++        return;
++    }
++
++    hwnd = CreateWindowA( "static", "Title", WS_OVERLAPPEDWINDOW, 10, 10, 200, 200, NULL, NULL, NULL, NULL );
++    ok( hwnd != NULL, "Failed to create window, error %lu.\n", GetLastError() );
++    hdc = GetDC( hwnd );
++
++    /* An 8-bit RGB window format without alpha counts its whole 32-bit pixel. */
++    count = DescribePixelFormat( hdc, 1, sizeof(fmt), &fmt );
++    for (i = 1; i <= count; i++)
++    {
++        if (!DescribePixelFormat( hdc, i, sizeof(fmt), &fmt )) continue;
++        if (!(fmt.dwFlags & PFD_DRAW_TO_WINDOW) || !(fmt.dwFlags & PFD_SUPPORT_OPENGL)) continue;
++        if (fmt.iPixelType != PFD_TYPE_RGBA) continue;
++        if (fmt.cRedBits != 8 || fmt.cGreenBits != 8 || fmt.cBlueBits != 8) continue;
++        if (fmt.cAlphaBits) with_alpha++;
++        else ok( fmt.cColorBits == 32, "format %d: got cColorBits %u.\n", i, fmt.cColorBits );
++    }
++    if (!with_alpha)
++    {
++        skip( "No 8-bit RGBA window format.\n" );
++        goto done;
++    }
++
++    /* A request for colour 24 with alpha gets alpha, and choosing again with
++     * wglChoosePixelFormatARB gives the same format, so it can be set again. */
++    format = ChoosePixelFormat( hdc, &pfd );
++    ok( format, "ChoosePixelFormat failed, error %lu.\n", GetLastError() );
++    ret = DescribePixelFormat( hdc, format, sizeof(fmt), &fmt );
++    ok( ret, "DescribePixelFormat failed, error %lu.\n", GetLastError() );
++    ok( fmt.cAlphaBits >= 8, "format %d: got cAlphaBits %u.\n", format, fmt.cAlphaBits );
++    ok( fmt.cColorBits == 32, "format %d: got cColorBits %u.\n", format, fmt.cColorBits );
++
++    ret = SetPixelFormat( hdc, format, &pfd );
++    ok( ret, "SetPixelFormat failed, error %lu.\n", GetLastError() );
++    ctx = wglCreateContext( hdc );
++    ok( ctx != NULL, "wglCreateContext failed, error %lu.\n", GetLastError() );
++    ret = wglMakeCurrent( hdc, ctx );
++    ok( ret, "wglMakeCurrent failed, error %lu.\n", GetLastError() );
++    ret = ext.wglChoosePixelFormatARB( hdc, attribs, NULL, 1, &arb_format, &arb_count );
++    ok( ret, "wglChoosePixelFormatARB failed, error %lu.\n", GetLastError() );
++    ok( arb_count == 1, "got %u formats.\n", arb_count );
++    ok( arb_format == format, "got format %d, expected %d.\n", arb_format, format );
++    wglMakeCurrent( old_hdc, old_ctx );
++    wglDeleteContext( ctx );
++    ret = SetPixelFormat( hdc, arb_format, &pfd );
++    ok( ret, "SetPixelFormat failed, error %lu.\n", GetLastError() );
++
++done:
++    ReleaseDC( hwnd, hdc );
++    DestroyWindow( hwnd );
++}
++
+ static void test_choosepixelformat_flag_is_ignored_when_unset(DWORD flag)
+ {
+     PIXELFORMATDESCRIPTOR pfd = {
+@@ -6171,6 +6262,7 @@ START_TEST(opengl)
+     }
+ 
+     test_choosepixelformat();
++    test_choosepixelformat_alpha();
+     test_choosepixelformat_flag_is_ignored_when_unset( PFD_DRAW_TO_WINDOW );
+     test_choosepixelformat_flag_is_ignored_when_unset( PFD_DRAW_TO_BITMAP );
+     test_choosepixelformat_flag_is_ignored_when_unset( PFD_SUPPORT_GDI );
+diff --git a/dlls/win32u/opengl.c b/dlls/win32u/opengl.c
+index 64884c7..98589fb 100644
+--- a/dlls/win32u/opengl.c
++++ b/dlls/win32u/opengl.c
+@@ -3467,7 +3467,19 @@ static void display_funcs_init(void)
+ 
+     formats_count = driver_funcs->p_init_pixel_formats( &onscreen_count );
+     if (!(pixel_formats = malloc( formats_count * sizeof(*pixel_formats) ))) ERR( "Failed to allocate memory for pixel formats\n" );
+-    else for (int i = 0; i < formats_count; i++) driver_funcs->p_describe_pixel_format( i + 1, pixel_formats + i );
++    else for (int i = 0; i < formats_count; i++)
++    {
++        PIXELFORMATDESCRIPTOR *pfd = &pixel_formats[i].pfd;
++
++        driver_funcs->p_describe_pixel_format( i + 1, pixel_formats + i );
++
++        /* Windows describes an 8-bit RGB window format without alpha by its
++         * 32-bit pixel, like the one with alpha; GLX and EGL give 24. */
++        if (i < onscreen_count && (pfd->dwFlags & PFD_DRAW_TO_WINDOW) && pfd->iPixelType == PFD_TYPE_RGBA &&
++            pfd->cColorBits == 24 && pfd->cRedBits == 8 && pfd->cGreenBits == 8 && pfd->cBlueBits == 8 &&
++            !pfd->cAlphaBits)
++            pfd->cColorBits = 32;
++    }
+ 
+     for (int i = 0; i < ARRAY_SIZE(procs); i++)
+     {
