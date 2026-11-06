@@ -110,3 +110,16 @@ Aurora's long-vector ray payloads (Autodesk-Inventor-for-Linux PR #3,
 
 Result: the pixel format choice is what greys the option out on AMD, and
 the Windows-like candidate removes it without an environment variable.
+
+### GPU ray tracing renders (2026-11-06, 12:30)
+
+Same setup as run C, plus vkd3d-proton 3.0.1 with
+`dxil-spirv-ray-payload-long-vector.patch` (branch `topic/vkd3d-rt`, CI run
+42207914047; `d3d12.dll` 1e1e01be..f545, `d3d12core.dll` 7ea42672..58b2):
+Inventor 2027 renders the part with GPU ray tracing, the panel says
+**GPU**, Low quality in 2 s - the same as Windows 10 on the same RX 6400.
+
+So two changes are needed on AMD, and nothing else: the Windows-like
+pixel format description in Wine (`opengl-window-color-bits`) and the
+long-vector fix in vkd3d-proton's dxil-spirv. Not yet tried: Draft/High
+quality, noise reduction, an assembly, a longer session.
