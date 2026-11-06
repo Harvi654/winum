@@ -27,7 +27,7 @@ named the method. Details in Autodesk-Inventor-for-Linux,
 
 | Level | Result | Date, build |
 | --- | --- | --- |
-| L0 | v1 in Inventor `wine-11.20-6`; v2 in winum CI on push | 2026-10-16 (v1); v2 pending |
+| L0 | v1 in Inventor `wine-11.20-6`; v2 full build in winum CI ([run 42179812897](https://github.com/Harvi654/winum/actions/runs/42179812897), `e8e73d4`, both architectures, no fuzz) | 2026-10-16 (v1); 2026-11-06 (v2) |
 | L1 | no Wine test yet | open |
 | L2 | v2 x86_64: `typelib` 7724/0, `tmarshal` 754/0 (Codex review build, same results with and without the cache candidate); i686 open | 2026-11-06 |
 | L4 | v1: Design Accelerator Shaft works in Inventor 2026/2027 | 2026-10 |
