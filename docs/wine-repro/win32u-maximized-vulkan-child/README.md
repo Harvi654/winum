@@ -181,3 +181,13 @@ window is not enough on this setup.
 The first build stopped with "status class is not comctl32 v6": on Wine the
 global status bar class has no class HINSTANCE; the check now resolves the
 module of the class procedure (`e34acbe`).
+
+### 2026-11-07, RX 580, GLX (`UseEGL=N` for the EXE)
+
+Fresh prefix, `--vulkan --delay-vulkan`: 1174 frames,
+`completed_timeline=1`, `failed=0`. Visual result: **no overlap**.
+
+Not reproduced with plain Vulkan under EGL or GLX on the RX 580. Next
+candidates (unchanged): a D3D12/DXGI swapchain through vkd3d-proton and
+DXVK's dxgi as in Inventor; Inventor-like child nesting and swapchain
+lifecycle; the RX 6400 (maintainer's decision, needs a GPU rebind).
