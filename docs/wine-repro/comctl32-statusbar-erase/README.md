@@ -668,7 +668,7 @@ Wine, with `ClientSideWithRender=N`, the same ray-tracing DLLs and GLX:
 
 | Check | Maintainer result |
 | --- | --- |
-| Ordinary interface interaction | OK, subject to the frame-state artefact below |
+| Ordinary interface interaction | Basic interactions OK; frame-state and WebView repaint caveats below |
 | Part editing and view manipulation | OK |
 | GPU ray tracing and maximisation, status text | OK |
 | Assembly | OK |
@@ -733,3 +733,19 @@ to type dimension values and unsatisfactory window-state transitions. The
 verification output/log was not returned, so no exact backend API failure is
 identified. The practical direction remains the tested XWayland/X11 path with
 the XRender workaround; native-Wayland UI compatibility is outside this fix.
+
+### WebView home-page repaint clarification (2026-11-07)
+
+The maintainer clarified that the WebView2 home-page repaint symptom also
+persists locally in the working XWayland configuration: after the dialog
+interaction, the home page can remain stale until a click causes it to
+refresh. This qualifies the earlier interface smoke-test result. Do not
+describe the XRender workaround as fixing all UI repainting or imply that
+the WebView symptom was observed only by the NVIDIA tester.
+
+This is an open observation alongside the post-ray-tracing frame artefact.
+Its dependence on starting ray tracing has not been measured; the fresh-session
+frame control does not establish that dependence for WebView. A shared Wine
+window-surface/update issue is possible, but neither that nor the earlier
+attribution to WebView2's GPU process is proven. Keep the WebView symptom in
+the remaining investigation rather than declaring an independent known cause.
