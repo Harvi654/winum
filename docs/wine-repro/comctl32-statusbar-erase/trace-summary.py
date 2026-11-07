@@ -36,7 +36,12 @@ spy_re = re.compile(r"^([0-9a-f]+):trace:message:spy_(enter|exit)_message\s+\(([
                     r".*?\[([0-9a-f]{4})\] \S+ (sent|dispatched|returned)\s*([0-9a-f]*)", re.I)
 # +relay, limited with HKCU\Software\Wine\Debug RelayInclude: the drawing
 # calls made while the status bar's WM_ERASEBKGND or WM_PAINT is handled
-relay_re = re.compile(r"^([0-9a-f]+):Call ([A-Za-z0-9_]+\.[A-Za-z0-9_@?$]+)\(")
+relay_re = re.compile(r"^([0-9a-f]+):Call ([A-Za-z0-9_]+\.[A-Za-z0-9_@?$]+)\(([^)]*)\)")
+# calls whose first argument is a DC: marked [wp] when it is the DC that
+# came with WM_ERASEBKGND, [other] when not; ExtTextOutW also shows its
+# options (2 = ETO_OPAQUE, i.e. a rectangle fill)
+DC_FUNCS = {"gdi32.ExtTextOutW", "user32.FillRect", "gdi32.PatBlt", "gdi32.BitBlt",
+            "gdi32.StretchBlt", "gdi32.GdiAlphaBlend", "user32.DrawTextW"}
 # first sign of Direct3D 12 / ray tracing in the log (only the pattern is printed)
 MARKERS = ["ConvertEnvMapLayout", "Aurora", "Hydra"]
 
@@ -74,7 +79,7 @@ def main():
     timeline = []
     phase = "before"
     spy = Counter()
-    stack = defaultdict(list)                 # tid -> [(msg, [calls])]
+    stack = defaultdict(list)                 # tid -> [(msg, [calls], wp)]
     sigs = []                                 # (msg, calls) in order
     with open(path, errors="replace") as fh:
         for line in fh:
@@ -86,9 +91,19 @@ def main():
             m = relay_re.match(line)
             if m:
                 if stack[m.group(1)]:
-                    calls = stack[m.group(1)][-1][1]
-                    if not calls or calls[-1] != m.group(2):
-                        calls.append(m.group(2))
+                    _, calls, wp = stack[m.group(1)][-1]
+                    tok = m.group(2)
+                    args = [a.strip() for a in m.group(3).split(",")]
+                    if tok in DC_FUNCS and args and args[0]:
+                        try:
+                            same = wp is not None and (int(args[0], 16) & 0xffffffff) == wp
+                        except ValueError:
+                            same = False
+                        tok += "[wp]" if same else "[other]"
+                        if m.group(2) == "gdi32.ExtTextOutW" and len(args) > 3:
+                            tok += "(opt %x)" % int(args[3], 16)
+                    if not calls or calls[-1] != tok:
+                        calls.append(tok)
                 continue
             m = spy_re.match(line)
             if m and hnum(m.group(3)) in hwnds:
@@ -96,9 +111,11 @@ def main():
                 msg = int(msg, 16)
                 if msg in (0x0014, 0x000f):
                     if kind.lower() == "enter":
-                        stack[tid].append((msg, []))
+                        w = re.search(r"wp=([0-9a-f]+)", line)
+                        wp = int(w.group(1), 16) & 0xffffffff if w and msg == 0x0014 else None
+                        stack[tid].append((msg, [], wp))
                     elif stack[tid] and stack[tid][-1][0] == msg:
-                        sm, calls = stack[tid].pop()
+                        sm, calls, _ = stack[tid].pop()
                         sigs.append((name(sm), " ".join(calls) or "(no drawing call)"))
                 if what == "returned":
                     spy["%s %s returned %s" % (phase, name(msg), ret)] += 1
@@ -157,6 +174,13 @@ def main():
                 runs.append([sig, 1])
         for (msg, calls), n in runs[-keep:]:
             print("  %5dx %-14s %s" % (n, msg, calls))
+        print("\ndistinct handlings: count, first-final position (of %d)" % len(sigs))
+        seen = {}
+        for i, sig in enumerate(sigs):
+            c, f, l = seen.get(sig, (0, i, i))
+            seen[sig] = (c + 1, f, i)
+        for (msg, calls), (c, f, l) in sorted(seen.items(), key=lambda x: x[1][1]):
+            print("  %5d  %5d-%-5d %-14s %s" % (c, f, l, msg, calls))
     print("\nlast %d events:" % keep)
     for t in timeline[-keep:]:
         print("  " + t)
