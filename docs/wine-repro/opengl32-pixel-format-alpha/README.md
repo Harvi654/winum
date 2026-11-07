@@ -129,3 +129,15 @@ assembly with several parts, orbiting while ray tracing - all render on
 the GPU and refresh each time; no errors in the log. Seen once, not
 investigated: the status bar text at the bottom left was drawn over
 itself (two messages overlapping). Note it if it comes back.
+
+### NVIDIA, reported by a user (2026-11-07)
+
+Lukas10999 in Autodesk-Inventor-for-Linux PR #3: Arch/CachyOS, KDE Plasma
+(Xwayland), RTX 5080, NVIDIA 615.78.08, Inventor 2027, test build
+`topic/gpu-rt-colorbits` 8a37627 (v3) and `vkd3d-proton-3.0.1-winum-rt`,
+`EnableHydra=1`, `UseEGL=N`, no `WINE_OPENGL_REQUIRE_ALPHA`: the option is
+available, the panel says GPU, Low/Draft/High render (High about 1 s on a
+small part), vkd3d-proton reports DXR 1.1 and SM 6.8 without errors. This
+answers the open NVIDIA case. Two observations there, not specific to ray
+tracing: status bar text drawn over old text, and the WebView2 home page
+not repainted after closing Application Options until hovered.
