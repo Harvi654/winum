@@ -513,3 +513,88 @@ omitted, increase `--limit` locally; do not send the full original log.
 After the run, close Terminal 1 and use the previous normal launcher settings
 to return to the old Wine. GPU/DLL/registry restoration, if wanted, is the
 separate existing procedure; this trace does not invent backup locations.
+
+### Drawing-DC results (2026-11-07)
+
+The maintainer reproduced **A clean -> B overlap -> C clean -> D overlap**
+with the diagnostic Wine, RX 6400 PRIME, GLX and the same patched vkd3d DLLs.
+The supplied numeric summary contains 696 complete calls, zero rejected or
+incomplete records, and no omitted signatures. This also confirms that the
+fault reproduces with the full production series used by this build.
+Only derived observations are recorded here; no raw application log is added.
+
+| Marker interval | Complete calls | Window/DIB driver attached | Window/DIB driver absent |
+| --- | ---: | ---: | ---: |
+| unmarked | 206 | 206 | 0 |
+| before | 100 | 100 | 0 |
+| rt_start | 59 | 7 | 52 |
+| after | 99 | 7 | 92 |
+| restored | 134 | 119 | 15 |
+| remax | 98 | 0 | 98 |
+
+The manual markers are written after observing each state, so transitions
+occur in the previous interval too: for example, Restore Down introduces
+restored-size draws near the end of `after`, and maximising introduces draws
+in `restored` before `remax` is marked. Signatures are grouped by frequency,
+not chronologically. The table is not a precise transition timeline.
+
+In the stable clean maximised interval, all 50 fills and 50 text calls have
+`window_driver=1`, a non-dummy parent window surface with rectangle
+`(0,0)-(1920,1152)`, DIB mapping `(0,1014)-(1920,1038)` and stride 7680.
+In the faulty maximised intervals the window driver is absent, the selected
+text-dispatch table changes, and `device=(0,0)-(0,0)`. Restore Down returns
+the DIB-backed path, mapping `(0,1006)-(1910,1030)` for the narrower status
+bar. Maximise again removes it for all 98 calls under `remax`.
+
+The zero device rectangle does **not** mean the HWND became zero-sized.
+`win32u/dce.c:update_visible_region` explicitly empties that internal rectangle
+when no window surface is selected. The stock bitmap printed on this path
+does not prove drawing targets a 1x1 bitmap: the display driver can draw
+directly to its host drawable. This path switch is strong correlation with
+the fault, not proof that direct drawing itself should always be disabled.
+
+All 354 explicit fills report `ret=1`, including those on the faulty path.
+The common visible/effective region remains `(0,2)-(1842,24)` in the clean
+and faulty maximised states; no application or meta clip is selected in those
+common calls. Mapping remains identity, the fill rectangle remains the whole
+status client area, background colour is unchanged, and the common text
+dispatch origin is `(0,18)` throughout. Some fully clipped fills occur during
+transitions and before the fault as well; they do not explain the stable
+overlap. Dispatch success is not a pixel readback or acknowledgement of all
+asynchronous X11 rendering effects.
+
+Open-source follow-up read: `win32u/dce.c:update_visible_region`,
+`win32u/dibdrv/dc.c:dibdrv_set_window_surface`,
+`winex11.drv/bitblt.c:enable_direct_drawing` / `X11DRV_CreateWindowSurface`,
+`winex11.drv/window.c:X11DRV_GetDC`, `winex11.drv/xrender.c` picture/clipping
+and ExtTextOut dispatch, and server visible-region/top-clipping selection.
+Wine can deliberately drop a DIB surface and draw directly when a host client
+window exists. X11 DC origin is then derived separately from the window and
+top surface rectangles. The trace does not yet identify which condition
+caused the switch or measure the host drawable/picture coordinates.
+The observed table address alone cannot name the replacement driver.
+
+### Next control: disable XRender for Inventor only
+
+Before another custom build, use the existing diagnostic Wine with just
+`HKCU\Software\Wine\AppDefaults\Inventor.exe\X11 Driver` value
+`ClientSideWithRender` set to `REG_SZ N`. Wine 11.20 reads this per-application
+setting in `x11drv_main.c`; `X11DRV_XRender_Init` returns without installing
+the XRender driver when false. Keep `ClientSideGraphics`, UseEGL, GPU, DLLs
+and ray-tracing settings unchanged. This does not disable Vulkan/DXR itself,
+but the maintainer must verify ray tracing actually starts in the new run.
+Close the first launcher, change the setting using that Wine in the same
+prefix, stop/wait for its wineserver, then start one fresh launcher with a
+new log directory and repeat the same four states/markers. Preserve the old
+registry value locally and restore it after the control run.
+
+- Clean text with ray tracing working and `window_driver=0` still observed:
+  strongly narrows the fault to the XRender drawing/picture route, rather
+  than the generic fact that the DIB driver was removed.
+- The same overlap with the setting confirmed `N`: XRender is not required;
+  trace the common direct drawable origin, clipping and surface attachment.
+- No working ray tracing, or the DIB/direct transition does not occur:
+  the negative visual result does not isolate the XRender hypothesis.
+
+No fix is proposed from this correlation, and the production series remains
+unchanged.
