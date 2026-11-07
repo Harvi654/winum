@@ -1,6 +1,7 @@
 # MEASURE: status-bar background erase and old text
 
-Original AI-assisted (Codex), LGPL-2.1-or-later. Windows results are **pending**.
+Original AI-assisted (Codex), LGPL-2.1-or-later. Windows 10 results: 2026-11-07,
+see [Windows results](#windows-results-2026-11-07).
 This is a public-API observation program, not a Wine test with guessed expected
 values. No correction to `patches/comctl32-statusbar-erase-background.patch`
 or change to a series is part of this work.
@@ -130,3 +131,61 @@ it was not treated as a disabled-theme observation. The local i686 Wine
 launcher exited 1 before a program summary, so its runtime smoke is incomplete.
 These are fixture checks only. **Windows 10 x64/i686 values remain unmeasured;
 no fix or Wine regression-test expectations have been chosen.**
+
+## Windows results (2026-11-07)
+
+Windows 10, comctl32 5.82.10586 and 6.16.10586, all four executables exit 0,
+144 rows and 0 errors each; files in `windows-2026-11-07/`. The i686 files are
+identical to the x86_64 ones apart from the `arch_bits` header. Every staged
+row has `prep_diff=0`, `update_before=0`, `marker_before=192` and a nonempty
+old-glyph mask, so all rows are usable. `theme_hr` is 0 in every classic
+config, so `SetWindowTheme(hwnd, "", "")` succeeded and the classic rows are
+real unthemed observations (v6 classic reports `theme=0`).
+
+| Configuration | `settext` | `invalidate_false`, `redraw_noerase` | `invalidate_true`, `redraw_erase` | `paint_no_update` |
+| --- | --- | --- | --- | --- |
+| v5 (unthemed) | no erase message; old text and marker cleared | no erase; cleared | erase; cleared | nothing changes |
+| v6 classic (`SetWindowTheme "",""`) | erase delivered (nested); cleared | no erase; cleared | erase; cleared | nothing changes |
+| v6 themed | erase delivered (nested); cleared | no erase; **old text and marker kept** (`old_retained=1423`, `marker_after=192`) | erase; cleared | nothing changes |
+
+Background colour after the operation (`after_rgb` at an old-only glyph pixel)
+with the dark erase subclass (`custom_erase=1`, fills `#182028`):
+
+| Configuration | after an erasing repaint | clean reference |
+| --- | --- | --- |
+| v5, v6 classic | `f0f0f0` - `WM_PAINT` paints the control's own background over the subclass's dark fill | `f0f0f0` |
+| v6 themed | `182028` - the subclass's dark fill stays; `WM_PAINT` paints no background | `182028` |
+
+The same holds for normal (`style=0`), `SBT_NOBORDERS` (256) and owner-drawn
+(4352) parts; in the themed owner-drawn rows the dark fill also survives under
+the part, so no theme pane is drawn there.
+
+What this says about Windows:
+
+1. **Unthemed** (v5, and v6 with the theme removed): `WM_PAINT` always paints
+   the background itself, whether or not an erase happened. A non-erasing
+   invalidation still clears old text. A custom `WM_ERASEBKGND` fill does not
+   survive.
+2. **Themed v6**: `WM_PAINT` paints no background. The background comes only
+   from `WM_ERASEBKGND`; when the application handles it, its fill stays. A
+   non-erasing invalidation leaves the old pixels (on Windows too).
+3. `SB_SETTEXT` erases in v6 (themed and classic) and does not in v5.
+
+Compared with `patches/comctl32-statusbar-erase-background.patch` (v1):
+
+- Themed v6 (Inventor's case: Wine's default prefix has the aero theme
+  active, and the 2026-10 trace showed a themed status bar): v1 matches
+  points 2 and 3.
+- Unthemed: v1 also skips the background in `WM_PAINT` when there was no
+  erase, while Windows paints it. Any non-erasing invalidation then leaves the
+  old text - a divergence from Windows that can produce overlapping text.
+  This applies to the v5 build and to v6 without a theme.
+- v5: v1 makes `SB_SETTEXT` (and the other invalidations) erase; Windows v5
+  `SB_SETTEXT` does not.
+
+Not measured yet: the invalidations of `SB_SETPARTS`, `SB_SETICON`,
+`SB_SIMPLE`, `SB_SETBKCOLOR`, `SB_SETBORDERS`, `WM_SETFONT` and `WM_SIZE`;
+v1 makes all of them erase. Whether the overlap Inventor users see comes from
+one of the divergences above is also not known yet: next is the same bundle
+under Wine (vanilla and patched), then a trace of Inventor's status bar
+messages at the moment of an overlap.
