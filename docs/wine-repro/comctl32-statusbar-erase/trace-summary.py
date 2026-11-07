@@ -23,8 +23,9 @@ MSG = {
 QUIET = {0x0084, 0x0020, 0x0200, 0x0201, 0x0202, 0x02a3, 0x0402, 0x0403,
          0x0406, 0x040c, 0x040d, 0x0413, 0x0414, 0x0087, 0x0281, 0x0282}
 
-sb_re = re.compile(r"^([0-9a-f]+):trace:statusbar:\w+ hwnd ([0-9a-fx]+), msg ([0-9a-f]+)")
-rdw_re = re.compile(r"^([0-9a-f]+):trace:win:NtUserRedrawWindow ([0-9a-fx]+) (.*)$")
+# Wine prints handles as upper-case hex (%p), message numbers in lower case
+sb_re = re.compile(r"^([0-9a-f]+):trace:statusbar:\w+ hwnd ([0-9a-fx]+), msg ([0-9a-f]+)", re.I)
+rdw_re = re.compile(r"^([0-9a-f]+):trace:win:NtUserRedrawWindow ([0-9a-fx]+) (.*)$", re.I)
 bp_re = re.compile(r"^([0-9a-f]+):trace:win:NtUserBeginPaint .*fErase = (\d)")
 
 
