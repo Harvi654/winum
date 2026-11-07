@@ -316,3 +316,20 @@ maximised top-level window with a Vulkan swapchain in a child window and a
 status bar whose text changes - run on the RX 580 (plain Vulkan) first,
 to see whether ray tracing is needed at all or any Vulkan swapchain is
 enough.
+
+## Experiment 1: where the offset appears (2026-11-07)
+
+Codex's first proposal (`docs/wine-repro/cross-review-2026-11-07-vkd3d-ray-payload.md`):
+tell apart a wrong window content (GDI/DC side) from a wrong composition
+(surface side) across the switch to ray tracing. Tool: `winsnap.c`
+(original, public Win32 calls only, prints no window texts). Run in
+Inventor's prefix with Inventor's Wine while Inventor runs, three times:
+maximised before ray tracing, maximised with the overlap visible,
+restored. Each run prints the top window, the status bar and its parent
+chain (window/client rectangles, client origin, styles, DPI, window
+region), the status bar's DC origin, every visible child window, and
+saves the status bar twice: as its window DC holds it, and as the screen
+DC returns that area. A clean `status-*.bmp` with an overlapped screen
+points at composition; an overlapped `status-*.bmp` points at the window
+content (DC origin, clipping); geometry changing by the few pixels of the
+offset points at window geometry.
