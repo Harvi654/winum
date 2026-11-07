@@ -454,3 +454,27 @@ backtrace of the hung process (`winedbg`).
 
 Visual result (maintainer): the status text was **correct in all four
 runs** - no overlap on the offload GPU either.
+
+#### The hang, repeated and backtraced (2026-11-07, 04:58)
+
+Not deterministic: of five GL + delayed D3D12 runs on the RX 6400, three hung
+(the first two, and the first of a loop of three), two completed
+(`SUMMARY failed=0 frames=1112 gl_frames=1679`). Nothing was touched during
+the runs; the earlier screenshot was taken only after the hang.
+
+`winedbg --command "bt all"` on the hung process (the runtime has no debug
+symbols, so only module offsets):
+
+- main thread: `opengl32 +0xbe7cc` <- fixture `+0x1d08` (in `frame_gl`,
+  i.e. `wglMakeCurrent` or `SwapBuffers`) <- user32 timer dispatch;
+- one vkd3d-proton thread: `winevulkan +0x1cefa` <- `d3d12core +0x60f34`
+  (a Vulkan call in flight, most likely the presentation thread);
+- the other d3d12core threads wait in ntdll (normal idle waits).
+
+So the GL swap on the main thread blocks while vkd3d-proton's present
+thread is inside a Vulkan call, both presenting into one window tree on the
+offload GPU. This is a hang, not the status text overlap (the text was
+correct in all runs), and it may be outside Wine (Mesa's GLX/DRI3 and
+Vulkan X11 WSI with PRIME). Next, if followed up: the Unix side of the same
+threads with `gdb -p <wine process> -batch -ex "thread apply all bt"`
+(Mesa, xcb), which shows what each one waits for.
