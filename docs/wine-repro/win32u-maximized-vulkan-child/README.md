@@ -14,8 +14,9 @@ It contains no Autodesk code, assets, vendor binaries, ray tracing or Wine fix.
 One x86_64 console EXE creates a `WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN`
 top-level window, a child filling the area above a common-controls v6 status
 bar, and two timers. A parent-installed status-bar subclass fills its client
-rect dark (`#182028`) with `ExtTextOutW(ETO_OPAQUE)` on the supplied
-`WM_ERASEBKGND` DC and returns 1. `SB_SETTEXTW` alternates long text and
+rect light grey (`#c8d0d8`) with `ExtTextOutW(ETO_OPAQUE)` on the supplied
+`WM_ERASEBKGND` DC and returns 1 (Inventor fills dark; the mechanism is the
+same, and a light fill keeps the theme's dark text readable). `SB_SETTEXTW` alternates long text and
 `Ready` every 250 ms; no extra manual erase is added to the text setter.
 The manifest requests comctl32 v6 and system DPI awareness.
 
@@ -113,8 +114,7 @@ Vulkan presentation path was selected.
 
 For each run, look at the status strip when long text changes to `Ready`:
 old letters must disappear, and the new baseline must stay at the same height.
-Native theme text may have low contrast on the dark erase fill; confirm
-that you can distinguish the glyphs before judging overlap. Also inspect thin strips along the top/left child edges and whether the client
+Also inspect thin strips along the top/left child edges and whether the client
 content is offset relative to the status bar. Capture the whole synthetic
 window (including title and borders) around **12–14 s**, **17–19 s** and
 **25–28 s** if an offset/overlap appears. With delayed Vulkan, also capture

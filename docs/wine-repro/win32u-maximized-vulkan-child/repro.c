@@ -299,7 +299,8 @@ static LRESULT CALLBACK status_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
         HDC dc = (HDC)wp;
         COLORREF old;
         GetClientRect(hwnd, &r);
-        old = SetBkColor(dc, RGB(24,32,40));
+        /* light, so the theme's dark status text stays readable */
+        old = SetBkColor(dc, RGB(200,208,216));
         ExtTextOutW(dc, 0, 0, ETO_OPAQUE, &r, NULL, 0, NULL);
         SetBkColor(dc, old);
         return 1;
