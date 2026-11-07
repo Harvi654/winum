@@ -424,3 +424,31 @@ vkd3d-proton. Lukas10999's NVIDIA report has to be checked for a second
 GPU too. Next, when the RX 6400 is bound to amdgpu again: the same fixture
 runs with `DRI_PRIME=pci-0000_23_00_0` and `INV_GPU`-style device
 filters, before going back to Inventor.
+
+### 2026-11-07, RX 6400 through PRIME offload, GL + D3D12, GLX
+
+RX 6400 bound to amdgpu, display on the RX 580, `DRI_PRIME=pci-0000_23_00_0`,
+`VKD3D_FILTER_DEVICE_NAME=6400`, `DXVK_FILTER_DEVICE_NAME=6400`, stock
+`wine-inventor-11.20-6`, stock vkd3d-proton 3.0.1. GL renderer "AMD Radeon
+RX 6400 (radeonsi, navi24)", D3D12 device "AMD Radeon RX 6400 (RADV NAVI24)"
+in every run, so both APIs rendered on the RX 6400.
+
+| Run | Result |
+| --- | --- |
+| GL + delayed D3D12 inside the GL child, `--nest=2` | **hung** at the end: the window stayed in "maximized 20-30s" and did not close at 30 s; last lines: `GL_GEOMETRY phase=3 ... gl_frames=1119`, then vkd3d-proton's "Got 3 swapchain images" (swapchain recreated after the second maximise); no `ERROR`; killed with Ctrl+C |
+| GL + delayed D3D12 as a sibling, `--nest=2` | **hung** the same way; killed |
+| D3D12 alone, delayed, `--nest=2` | completed, 1154 frames |
+| GL alone, `--nest=2` | completed, 1705 GL frames |
+
+A screenshot during the first run (phase "maximized 20-30s", GL and D3D12
+both visible) shows a clean status bar. `dmesg` around the runs has
+`amdgpu 0000:10:00.0: [drm] *ERROR* Unsupported screen format RA24` (the
+RX 580, the display GPU); whether it belongs to these runs is not known.
+
+So OpenGL and D3D12 rendering at the same time on the offload GPU blocks
+after the window is maximised again and the swapchain is recreated, while
+either API alone does not. The fence wait in the fixture times out after
+5 s with an `ERROR` line, and none was printed, so the block is in a call
+without a timeout (SwapBuffers, Present or ResizeBuffers). Next: a
+backtrace of the hung process (`winedbg`), and the maintainer's visual
+result for the status text in these runs.
