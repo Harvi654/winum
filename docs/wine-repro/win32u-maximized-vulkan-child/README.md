@@ -171,8 +171,8 @@ a vkd3d-specific or ray-tracing-specific trigger.
 
 Fresh prefix, `WINEDEBUG=-all`. `CONTROL version=6.0.2600 themed=1` in all
 three runs. Vulkan device reported as `Radeon (TM) RX 480 Graphics`
-(1002:67df, the RX 580; the name suggests AMD's own Vulkan driver rather
-than RADV - to be checked). `--none`: 0 frames, `--vulkan`: 1170 frames,
+(1002:67df, the RX 580). The only Vulkan driver installed is RADV
+(`vulkan-radeon`); the marketing name comes from libdrm's device table. `--none`: 0 frames, `--vulkan`: 1170 frames,
 `--vulkan --delay-vulkan`: 1754 frames; all `completed_timeline=1`,
 `failed=0`. Maintainer's visual result: **no overlap and no offset in any
 phase of any run.** So a plain Vulkan swapchain in a child of a maximised
