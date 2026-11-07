@@ -223,3 +223,26 @@ Conclusions:
   to v6 with an active theme and leaves v5 as vanilla Wine.
 - Separate finding (uxtheme, not part of this patch): `SetWindowTheme` with
   empty strings fails in Wine.
+
+## Inventor traces (2026-11-07)
+
+`WINEDEBUG=err+all,fixme-all,+statusbar,+win`, summarised with
+`trace-summary.py` (prints only message numbers, flags and counts).
+Inventor 2027, a part, the mouse moved over the model for a few minutes.
+
+| Run | Wine | Display path | Overlapping text |
+| --- | --- | --- | --- |
+| 1 | `wine-inventor-11.20-6` | EGL, RX 580 | no |
+| 2 | `topic/gpu-rt-colorbits` v3 (11.20-6 patches + opengl32 colour bits v3) | EGL, RX 580 | no |
+| 3 | same | GLX (`UseEGL=N`), RX 580 | no |
+| earlier | same, plus patched vkd3d-proton, `EnableHydra=1` | GLX, RX 6400, GPU ray tracing | yes, once (maintainer, 2026-11-06); also Lukas10999 on NVIDIA |
+
+Run 3, the reference without the fault: one status bar, about 380
+`SB_SETTEXTW` and 375 `WM_PAINT`. Every invalidation of the status bar asks
+for an erase (`RDW_INVALIDATE RDW_ERASE`, from `SB_SETTEXTW`, `SB_SETPARTS`,
+`WM_SETREDRAW` and inside `WM_PAINT`), followed by
+`RDW_ALLCHILDREN RDW_UPDATENOW`. No invalidation without `RDW_ERASE` was
+seen. Every `BeginPaint` returns `fErase=0`, because Inventor handles
+`WM_ERASEBKGND` itself (dark strip) before the status bar paints. Next: the same
+trace with GPU ray tracing on the RX 6400, to look for an invalidation
+without an erase or a paint not preceded by one.
