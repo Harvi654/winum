@@ -693,8 +693,7 @@ The maintainer compared the restored/maximised window sizes with a Windows
 VM and found them approximately the same. Exposed background next to a
 smaller restored window is not by itself corrupt rendering. The supplied
 screenshots are observational evidence, not a pixel-accurate geometry test,
-and are not committed. It remains unmeasured whether the frame artefact
-appears after a fresh start without ever enabling ray tracing.
+and are not committed. The fresh-session control is recorded below.
 
 The application's public hardware dialog names RX 6400 / RADV NAVI24,
 DirectX 12, hardware rendering and 32-bit display colour. Its unknown Windows
@@ -705,3 +704,20 @@ the application's process architecture, and the dialog's WHQL wording is
 not verification of Linux driver certification. These labels do not identify
 the source of the frame artefact. No graphics-quality setting, driver-name
 override or additional patch is changed on the basis of the screenshot.
+
+### Fresh-session control without starting ray tracing (2026-11-07)
+
+After reboot, on the original gpurt-v3 Wine with `ClientSideWithRender=N`,
+GLX and the same enabled graphics configuration, the maintainer confirmed
+that repeated Restore Down/maximise transitions are correct when ray tracing
+is never started in that session. Once ray tracing is started, subsequent
+window-state transitions produce the frame/white-edge artefact; actual
+minimisation and showing the window again resets the reported display state.
+
+This ties the remaining frame artefact to state introduced after starting
+ray tracing, rather than ordinary fresh-session resizing alone. It survives
+the XRender-disabled configuration that avoids status-text overlap. A common
+window/client-surface state change could underlie both symptoms, but that is
+not proven. Disabling Wine's XRender driver is therefore a status-text
+workaround, not a complete correction of window-state rendering. No specific
+XRender library, X server, Mesa or Wine implementation defect is claimed yet.
