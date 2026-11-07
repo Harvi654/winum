@@ -326,3 +326,19 @@ Not reproduced with plain Vulkan under EGL or GLX on the RX 580. Next
 candidates (unchanged): a D3D12/DXGI swapchain through vkd3d-proton and
 DXVK's dxgi as in Inventor; Inventor-like child nesting and swapchain
 lifecycle; the RX 6400 (maintainer's decision, needs a GPU rebind).
+
+### 2026-11-07, RX 580, D3D12 (vkd3d-proton 3.0.1, DXVK 2.7.1 dxgi), EGL
+
+Prefix from `setup-repro-d3d12-prefix.sh` (both archives from the Inventor
+download cache, SHA-256 verified). Four runs: `--d3d12` with `--nest=0` and
+`--nest=2`, each immediate and `--delay`. All: `D3D12 started=1`,
+`FLIP_DISCARD`, `occluded_presents=0`, 1157-1737 frames, `failed=0`,
+`completed_timeline=1`. Visual result: **no overlap in any run.**
+
+So neither a plain Vulkan nor a plain D3D12 swapchain in a (nested) child of
+a maximised window reproduces the fault on the RX 580. One thing Inventor
+has and the fixture does not: while GPU ray tracing runs, Inventor's
+viewport also has an OpenGL context (the pixel format work in
+`opengl32-window-format-color-bits` is about that context, GLX with
+`UseEGL=N`). Next candidate: an OpenGL child and a D3D12 swapchain in the
+same window tree at the same time.
