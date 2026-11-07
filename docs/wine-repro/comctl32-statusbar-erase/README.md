@@ -333,3 +333,183 @@ DC returns that area. A clean `status-*.bmp` with an overlapped screen
 points at composition; an overlapped `status-*.bmp` points at the window
 content (DC origin, clipping); geometry changing by the few pixels of the
 offset points at window geometry.
+
+### Snapshot results and limits (2026-11-07)
+
+The maintainer supplied before/after/Restore Down measurements from the
+RX 6400 PRIME, GLX setup with patched ray-tracing DLLs. The status-window DC
+image is clean before ray tracing, overlapped afterwards while maximised,
+and clean after Restore Down. All three screen-DC images are entirely black;
+they cannot be used to compare composition with window pixels. Screenshots
+from the desktop independently show the overlap and clean restored state.
+
+Before and after, the status rectangle is `(0,1014)-(1920,1038)`, client
+`1920x24`, DC origin `(0,1014)`, DPI 96. The top window geometry/styles and
+all 30 `TREE` records are identical. Restored: `IsZoomed=0`, `IsIconic=0`,
+status origin `(10,1006)`, client `1910x24`. The top-level region report
+changes from `none` to `set`; the observer conflates no region with an API
+error, so this alone does not identify a faulty region. No raw logs or
+application images are committed.
+
+The maintainer clarified the sequence: starting ray tracing in an already
+maximised window triggers overlap immediately; Restore Down cleans it;
+starting ray tracing in the restored window stays clean; maximising again
+brings the overlap back. This is Restore Down, not minimisation.
+
+The original two-image interpretation above is too strong: reading through
+`GetDC(status)` does not guarantee an independent pre-composition image, nor
+does it reveal the HDC actually used by the application's erase/paint calls.
+These measurements exclude a persistent before/after change in the observed
+HWND geometry, but do not separate DC clipping, surface mapping and drawing
+failure. They also do not observe transient or non-HWND surface changes.
+
+## Experiment 2: actual drawing DCs
+
+The isolated [status-bar DC trace](../../../patches/debug/statusbar-dc-trace/README.md)
+adds numeric `+sbdiag` records to Wine's actual ExtTextOut fill/text dispatches.
+No application strings or pixels are recorded by this channel. The normal
+series and installed Wine are unchanged. The diagnostic build uses the full
+production series; the previous Inventor build had fewer patches. **If the
+same overlap does not reproduce, stop and report that difference.** An
+absence of overlap on this build is not proof about the original build's DCs.
+
+### Obtain the separate build
+
+Download the artifact from the successful **Build status-bar DC trace** run
+for the measurement commit. Extract the artifact ZIP into a new directory
+`~/sb-snap/dc-trace-build`. It contains binary/source tarballs and checksums.
+The following uses build number 1; if `wine/version.env` changes, use the
+names printed by that run.
+
+```bash
+cd ~/winum
+git pull
+cd ~/sb-snap/dc-trace-build
+sha256sum -c winum-11.20-1-sbdiag-x86_64.tar.xz.sha256
+mkdir -p ~/.local/share/winum-sbdiag
+tar -xf winum-11.20-1-sbdiag-x86_64.tar.xz -C ~/.local/share/winum-sbdiag
+```
+
+Alternatively, on a machine with the Wine build dependencies installed:
+
+```bash
+cd ~/winum
+bash scripts/build-statusbar-dc-trace.sh ~/sb-snap/dc-trace-build
+```
+
+Then verify/extract as above. Full builds take time; the cloud check of the
+changed objects is not an Inventor runtime test.
+
+### One run, four observed states
+
+Use the same working RX 6400/PRIME ray-tracing setup as experiment 1,
+including the existing patched vkd3d DLLs, EnableHydra and GLX settings.
+This procedure does not repeat GPU rebinding, DLL copying or registry setup.
+Close Inventor and let its old launcher exit before selecting another Wine.
+All launch changes below are confined to this terminal. The launcher still
+uses Inventor's existing prefix; its ordinary startup may update that prefix
+for the selected Wine. Do not run the two Wine builds in it simultaneously.
+
+Terminal 1 (use a new log directory; if it exists, choose another name in
+both terminals):
+
+```bash
+export INV_YEAR=2027
+export INV_WINE=system
+export TRACE_WINE="$HOME/.local/share/winum-sbdiag/winum-11.20-1-sbdiag-x86_64"
+export PATH="$TRACE_WINE/bin:$PATH"
+export WINE="$TRACE_WINE/bin/wine"
+export WINELOADER="$TRACE_WINE/bin/wine"
+export WINESERVER="$TRACE_WINE/bin/wineserver"
+export INV_GPU=6400
+export DRI_PRIME=pci-0000_23_00_0
+export INV_LOGDIR="$HOME/sb-snap/dc-trace-run-1"
+export WINEDEBUG=-all,+sbdiag,+timestamp,+pid,+tid
+test ! -e "$INV_LOGDIR" && mkdir -p "$INV_LOGDIR"
+cd ~/inventor-on-linux
+bash scripts/launch-inventor.sh
+```
+
+`INV_WINE=system` tells this launcher to honour the Wine placed first in
+`PATH`. Confirm its startup line names the diagnostic Wine, rather than the
+old bundled build. Do not rebuild or copy individual Wine DLLs into the
+prefix if a launcher check complains: report the complaint instead.
+
+Terminal 2, after Inventor opens:
+
+```bash
+export TRACE_LOG="$(ls -t "$HOME/sb-snap/dc-trace-run-1"/inventor-*.log | head -n 1)"
+grep -m 1 ':trace:sbdiag:' "$TRACE_LOG"
+```
+
+The grep should find an `SBSTATE`, `SBREGION` or related numeric record once
+status text has changed. If there are no records, stop: verify the selected
+Wine and channel before another run. The launcher's log uses append writes,
+so these markers can be appended safely while Wine writes to it:
+
+1. Open the part, maximise, keep ray tracing off. Mark **before**, then move
+   the mouse over the part for about five seconds:
+
+   ```bash
+   printf '\nSBMARK before\n' >> "$TRACE_LOG"
+   ```
+
+2. Immediately before clicking ray tracing, mark **rt_start**. Once the
+   overlap appears, mark **after** and move the mouse for five seconds:
+
+   ```bash
+   printf '\nSBMARK rt_start\n' >> "$TRACE_LOG"
+   ```
+
+   ```bash
+   printf '\nSBMARK after\n' >> "$TRACE_LOG"
+   ```
+
+3. Click **Restore Down**, confirm clean text, mark **restored**, then move
+   the mouse for five seconds. Ray tracing can remain on:
+
+   ```bash
+   printf '\nSBMARK restored\n' >> "$TRACE_LOG"
+   ```
+
+4. Maximise again. When the overlap returns, mark **remax** and move the
+   mouse for five seconds:
+
+   ```bash
+   printf '\nSBMARK remax\n' >> "$TRACE_LOG"
+   ```
+
+Close Inventor normally, then create the shareable report:
+
+```bash
+python3 ~/winum/docs/wine-repro/comctl32-statusbar-erase/sbdiag-summary.py "$TRACE_LOG" > ~/sb-snap/dc-trace-summary.txt
+grep -E '^(SBREPORT|PHASE|SIGNATURE|OMITTED|CHECK)' ~/sb-snap/dc-trace-summary.txt
+```
+
+Return `dc-trace-summary.txt` and say which of the four states showed the
+fault. Keep the original launcher log local: it can contain unrelated program
+output even though `+sbdiag` itself prints no application strings. The parser
+accepts only fixed numeric fields and fixed region labels, associates records
+by thread/DC, groups complete calls by their entry phase, and reports missing
+or rejected records rather than copying arbitrary lines. If signatures are
+omitted, increase `--limit` locally; do not send the full original log.
+
+### What the result can distinguish
+
+- Different erase/text `vis`, `device`, matrix, DIB rectangle or surface
+  identity after ray tracing, reversed on Restore Down and repeated on
+  remaximisation: supports a DC/surface mapping error. Pointer changes by
+  themselves can also be ordinary resource replacement.
+- Empty or differently shaped effective/DIB clipping for a fill, while text
+  remains drawable: supports erase clipping as the reason old text survives.
+  A bounding box alone is insufficient; compare count/hash and rectangles.
+- `SBFILL ret=0`: the actual fill dispatch failed, even if the enclosing
+  `SBRETURN ret=1`. This directs the next trace to that selected driver.
+- Same successful fills, mapping and clipping in clean/faulty states:
+  weakens those hypotheses; next measure surface pixels immediately around
+  the fill and inspect surface copying/presentation. This trace does not
+  claim to settle those downstream paths.
+
+After the run, close Terminal 1 and use the previous normal launcher settings
+to return to the old Wine. GPU/DLL/registry restoration, if wanted, is the
+separate existing procedure; this trace does not invent backup locations.

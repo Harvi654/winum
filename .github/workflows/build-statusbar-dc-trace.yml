@@ -1,0 +1,47 @@
+# Diagnostic only: a separate archive, never a release or a production-series change.
+name: Build status-bar DC trace
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'topic/**']
+    paths:
+      - 'patches/debug/statusbar-dc-trace/**'
+      - 'scripts/build-statusbar-dc-trace.sh'
+      - '.github/workflows/build-statusbar-dc-trace.yml'
+permissions:
+  contents: read
+concurrency:
+  group: statusbar-dc-trace-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 300
+    steps:
+      - name: Build dependencies (official Arch repositories)
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed git mingw-w64-gcc python \
+            alsa-lib libpulse gnutls krb5 dbus fontconfig freetype2 \
+            libx11 libxext libxi libxrandr libxrender libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
+            wayland mesa libglvnd vulkan-icd-loader vulkan-headers \
+            gst-plugins-base-libs sdl2 libcups libgphoto2 sane libpcap v4l-utils pcsclite unixodbc ocl-icd opencl-headers \
+            giflib wine-mono wine-gecko
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Build isolated diagnostic binary and corresponding source
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          export JOBS="$(nproc)"
+          export WINE_SB_TRACE_WORK=/tmp/statusbar-dc-trace
+          bash scripts/build-statusbar-dc-trace.sh dist-sbdiag
+      - name: Logs on failure
+        if: failure()
+        run: tail -n 100 /tmp/statusbar-dc-trace/build/*.log || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: statusbar-dc-trace-${{ github.sha }}
+          path: dist-sbdiag/*
+          retention-days: 30

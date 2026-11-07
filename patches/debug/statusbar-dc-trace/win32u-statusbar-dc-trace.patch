@@ -1,0 +1,213 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: win32u: Trace status-bar text DCs without application strings.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not
+submitted upstream.
+
+Diagnostic only, 2026-11-07. No Windows behaviour is asserted or changed.
+The maintainer's public-API snapshots show overlapping pixels through the
+status-bar DC after GPU ray tracing in a maximised Inventor window; window
+geometry and the observer's DC origin remain unchanged. Restore Down
+cleans the text and maximising again restores the fault. Screen-DC
+snapshots were black, so they do not distinguish composition.
+
+With +sbdiag, identify status-bar DCs by their public class name and record
+numeric state at the actual ExtTextOut entry, opaque backend fill, glyph
+backend call and return. Include clipping shapes and DIB surface mapping.
+Do not print text, glyphs, titles, pixel data or file paths. Keep this out
+of patches/series; it diagnoses the fault and is not a proposed fix.
+
+diff --git a/dlls/win32u/dce.c b/dlls/win32u/dce.c
+--- a/dlls/win32u/dce.c
++++ b/dlls/win32u/dce.c
+@@ -33,6 +33,7 @@
+ #include "wine/debug.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(win);
++WINE_DECLARE_DEBUG_CHANNEL(sbdiag);
+ 
+ struct dce
+ {
+@@ -51,6 +52,64 @@
+ 
+ static struct list window_surfaces = LIST_INIT( window_surfaces );
+ static pthread_mutex_t surfaces_lock = PTHREAD_MUTEX_INITIALIZER;
++
++/* Diagnostic only: numeric GDI state, never application strings or pixel data. */
++void trace_statusbar_region( HDC hdc, const char *kind, HRGN handle )
++{
++    const WINEREGION *region;
++    UINT hash = 2166136261u;
++    int i, j;
++
++    if (!handle || !(region = get_wine_region( handle )))
++    {
++        TRACE_(sbdiag)( "SBREGION hdc=%p kind=%s present=0\n", hdc, kind );
++        return;
++    }
++    for (i = 0; i < region->numRects; i++)
++    {
++        const RECT *r = &region->rects[i];
++        const LONG values[] = {r->left, r->top, r->right, r->bottom};
++        for (j = 0; j < ARRAY_SIZE(values); j++) hash = (hash ^ (UINT)values[j]) * 16777619u;
++    }
++    TRACE_(sbdiag)( "SBREGION hdc=%p kind=%s present=1 count=%d hash=%08x box=%s\n",
++                    hdc, kind, region->numRects, hash, wine_dbgstr_rect( &region->extents ));
++    for (i = 0; i < min( region->numRects, 8 ); i++)
++        TRACE_(sbdiag)( "SBRECT hdc=%p kind=%s index=%d rect=%s\n",
++                        hdc, kind, i, wine_dbgstr_rect( &region->rects[i] ));
++    release_wine_region( handle );
++}
++
++BOOL trace_statusbar_dc( DC *dc, INT x, INT y, UINT flags, const RECT *rect, UINT count )
++{
++    WCHAR buffer[64];
++    UNICODE_STRING name = {0, sizeof(buffer), buffer};
++    DC_ATTR *a = dc->attr;
++    const XFORM *m = &dc->xformWorld2Vport;
++    struct dce *dce = dc->dce;
++
++    if (!TRACE_ON(sbdiag) || !dce || !dce->hwnd) return FALSE;
++    if (!NtUserGetClassName( dce->hwnd, FALSE, &name ) ||
++        wcsicmp( buffer, u"msctls_statusbar32" )) return FALSE;
++
++    TRACE_(sbdiag)( "SBSTATE hwnd=%p hdc=%p count=%u flags=%x xy=%d,%d rect=%s dcx=%x "
++                    "vis=%s device=%s wnd=%d,%d/%d,%d vp=%d,%d/%d,%d "
++                    "map=%d gm=%d layout=%x bk=%08x text=%08x bkmode=%u align=%x "
++                    "matrix=%g,%g,%g,%g,%g,%g backend=%p\n",
++                    dce->hwnd, dc->hSelf, count, flags, x, y, wine_dbgstr_rect( rect ), dce->flags,
++                    wine_dbgstr_rect( &a->vis_rect ), wine_dbgstr_rect( &dc->device_rect ),
++                    a->wnd_org.x, a->wnd_org.y, a->wnd_ext.cx, a->wnd_ext.cy,
++                    a->vport_org.x, a->vport_org.y, a->vport_ext.cx, a->vport_ext.cy,
++                    a->map_mode, a->graphics_mode, (UINT)a->layout, (UINT)a->background_color,
++                    (UINT)a->text_color, a->background_mode, a->text_align,
++                    m->eM11, m->eM12, m->eM21, m->eM22, m->eDx, m->eDy,
++                    GET_DC_PHYSDEV( dc, pExtTextOut )->funcs );
++    trace_statusbar_region( dc->hSelf, "visible", dc->hVisRgn );
++    trace_statusbar_region( dc->hSelf, "app", dc->hClipRgn );
++    trace_statusbar_region( dc->hSelf, "meta", dc->hMetaRgn );
++    trace_statusbar_region( dc->hSelf, "effective", get_dc_region( dc ) );
++    trace_statusbar_surface( dc );
++    return TRUE;
++}
+ 
+ /*******************************************************************
+  * Dummy window surface for windows that shouldn't get painted.
+diff --git a/dlls/win32u/dibdrv/dc.c b/dlls/win32u/dibdrv/dc.c
+--- a/dlls/win32u/dibdrv/dc.c
++++ b/dlls/win32u/dibdrv/dc.c
+@@ -32,6 +32,7 @@
+ #include "wine/debug.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(dib);
++WINE_DECLARE_DEBUG_CHANNEL(sbdiag);
+ 
+ static const DWORD bit_fields_888[3] = {0xff0000, 0x00ff00, 0x0000ff};
+ static const DWORD bit_fields_555[3] = {0x7c00, 0x03e0, 0x001f};
+@@ -513,6 +514,28 @@
+     return (struct windrv_physdev *)dev;
+ }
+ 
++/* Called only for an identified status-bar DC with +sbdiag enabled. */
++void trace_statusbar_surface( DC *dc )
++{
++    PHYSDEV dev = find_dc_driver( dc, &window_driver );
++    struct windrv_physdev *physdev;
++    struct window_surface *surface;
++
++    if (!dev)
++    {
++        TRACE_(sbdiag)( "SBSURFACE hdc=%p window_driver=0 bitmap=%p\n", dc->hSelf, dc->hBitmap );
++        return;
++    }
++    physdev = get_windrv_physdev( dev );
++    surface = physdev->surface;
++    TRACE_(sbdiag)( "SBSURFACE hdc=%p window_driver=1 surface=%p dummy=%u hwnd=%p "
++                    "rect=%s bitmap=%p dibrect=%s stride=%d\n",
++                    dc->hSelf, surface, surface == &dummy_surface, surface->hwnd,
++                    wine_dbgstr_rect( &surface->rect ), surface->color_bitmap,
++                    wine_dbgstr_rect( &physdev->dibdrv->dib.rect ), physdev->dibdrv->dib.stride );
++    trace_statusbar_region( dc->hSelf, "dib", physdev->dibdrv->clip );
++}
++
+ /* gdi_lock should not be locked */
+ static inline void lock_surface( struct windrv_physdev *dev )
+ {
+diff --git a/dlls/win32u/font.c b/dlls/win32u/font.c
+--- a/dlls/win32u/font.c
++++ b/dlls/win32u/font.c
+@@ -45,6 +45,7 @@
+ #include "wine/debug.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(font);
++WINE_DECLARE_DEBUG_CHANNEL(sbdiag);
+ 
+ static HKEY wine_fonts_key;
+ static HKEY wine_fonts_cache_key;
+@@ -5796,7 +5797,7 @@
+ BOOL WINAPI NtGdiExtTextOutW( HDC hdc, INT x, INT y, UINT flags, const RECT *lprect,
+                               const WCHAR *str, UINT count, const INT *lpDx, DWORD cp )
+ {
+-    BOOL ret = FALSE;
++    BOOL ret = FALSE, sb_trace;
+     UINT align;
+     DWORD layout;
+     POINT pt;
+@@ -5827,6 +5828,7 @@
+ 
+     update_dc( dc );
+     physdev = GET_DC_PHYSDEV( dc, pExtTextOut );
++    sb_trace = trace_statusbar_dc( dc, x, y, flags, lprect, count );
+ 
+     if (flags & ETO_RTLREADING) align |= TA_RTLREADING;
+     if (layout & LAYOUT_RTL)
+@@ -5876,7 +5878,10 @@
+         lp_to_dp(dc, (POINT*)&rc, 2);
+         order_rect( &rc );
+         if (flags & ETO_OPAQUE)
+-            physdev->funcs->pExtTextOut( physdev, 0, 0, ETO_OPAQUE, &rc, NULL, 0, NULL );
++        {
++            BOOL fill_ret = physdev->funcs->pExtTextOut( physdev, 0, 0, ETO_OPAQUE, &rc, NULL, 0, NULL );
++            if (sb_trace) TRACE_(sbdiag)( "SBFILL hdc=%p kind=explicit rect=%s ret=%u\n", hdc, wine_dbgstr_rect( &rc ), fill_ret );
++        }
+     }
+     else flags &= ~ETO_CLIPPED;
+ 
+@@ -6052,11 +6057,15 @@
+ 
+                 if (flags & ETO_CLIPPED) intersect_rect( &text_box, &text_box, &rc );
+                 if (!IsRectEmpty( &text_box ))
+-                    physdev->funcs->pExtTextOut( physdev, 0, 0, ETO_OPAQUE, &text_box, NULL, 0, NULL );
++                {
++                    BOOL fill_ret = physdev->funcs->pExtTextOut( physdev, 0, 0, ETO_OPAQUE, &text_box, NULL, 0, NULL );
++                    if (sb_trace) TRACE_(sbdiag)( "SBFILL hdc=%p kind=implicit rect=%s ret=%u\n", hdc, wine_dbgstr_rect( &text_box ), fill_ret );
++                }
+             }
+         }
+     }
+ 
++    if (sb_trace) TRACE_(sbdiag)( "SBTEXT hdc=%p xy=%d,%d count=%u flags=%x\n", hdc, x, y, count, flags & ~ETO_OPAQUE );
+     ret = physdev->funcs->pExtTextOut( physdev, x, y, (flags & ~ETO_OPAQUE), &rc,
+                                        str, count, (INT*)deltas );
+ 
+@@ -6135,6 +6144,7 @@
+         NtGdiDeleteObjectApp( hbrush );
+     }
+ 
++    if (sb_trace) TRACE_(sbdiag)( "SBRETURN hdc=%p ret=%u\n", hdc, ret );
+     release_dc_ptr( dc );
+ 
+     return ret;
+diff --git a/dlls/win32u/ntgdi_private.h b/dlls/win32u/ntgdi_private.h
+--- a/dlls/win32u/ntgdi_private.h
++++ b/dlls/win32u/ntgdi_private.h
+@@ -429,6 +429,9 @@
+ /* dce.c */
+ extern BOOL delete_dce( struct dce *dce );
+ extern void update_dc( DC *dc );
++extern BOOL trace_statusbar_dc( DC *dc, INT x, INT y, UINT flags, const RECT *rect, UINT count );
++extern void trace_statusbar_region( HDC hdc, const char *kind, HRGN handle );
++extern void trace_statusbar_surface( DC *dc );
+ 
+ #define RGN_DEFAULT_RECTS 4
+ typedef struct
