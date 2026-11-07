@@ -721,3 +721,10 @@ window/client-surface state change could underlie both symptoms, but that is
 not proven. Disabling Wine's XRender driver is therefore a status-text
 workaround, not a complete correction of window-state rendering. No specific
 XRender library, X server, Mesa or Wine implementation defect is claimed yet.
+
+### Native-Wayland comparison prepared (2026-11-07)
+
+The maintainer confirmed the desktop session is Wayland, so the measured X11
+driver runs use XWayland. A [native-Wayland control](../winewayland-inventor/README.md)
+is prepared on a private copy of the Inventor prefix, with explicit backend
+selection and active-driver verification. No result is claimed before it runs.
