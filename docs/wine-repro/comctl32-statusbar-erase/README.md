@@ -260,3 +260,38 @@ Inventor's own handler before it reaches comctl32, so the `+statusbar`
 channel cannot see it. Next: `+message` with `SpyInclude` limited to
 `WM_ERASEBKGND`, `WM_PAINT` and `WM_DRAWITEM`, to see whether the erase is
 still delivered after ray tracing starts and what Inventor's handler returns.
+
+### Run 5: what Inventor draws (2026-11-07, 03:30)
+
+Run 4's setup plus `+message` (`SpyInclude=WM_ERASEBKGND;WM_PAINT;WM_DRAWITEM`)
+and a limited `+relay` (drawing functions only, `RelayInclude`). Over the
+whole session (539 status bar erase/paint handlings, ray tracing started in
+the middle) Inventor handles every status bar `WM_ERASEBKGND` the same way:
+one `ExtTextOutW` with `ETO_OPAQUE` (a rectangle fill) on the DC that came
+with the message, return value 1. `WM_PAINT` draws the text with
+`DrawTextW`. The paint boxes Wine hands out do not change either: mostly
+`(0,2)-(1842,24)` and `(0,0)-(1920,24)` from start to end. So neither
+Inventor's drawing nor the area Wine asks for changes when ray tracing
+starts.
+
+### Window state (2026-11-07, 03:39, no trace)
+
+Ray tracing on, overlap visible; then ray tracing off:
+
+- Minimised and restored: Inventor came back **not maximised**, and the
+  status text repainted correctly.
+- Maximised again: the overlap was back, and the overlapping texts sit a
+  few pixels apart vertically ("For Help, press F1" over "Ready"); the rest
+  of the UI looked shifted as well (a white line along the top and left
+  edge of the viewport).
+
+Two texts a few pixels apart cannot come from a missing erase in one DC.
+It looks like old window content shown at a different offset than new
+content, i.e. the window's on-screen composition (winex11, Xwayland, KDE)
+once a Vulkan swapchain exists in the window and the window is maximised.
+**This is probably not a comctl32 problem.** The status bar patch stays as
+is for Inventor, with the v5/unthemed correction above.
+Lukas10999's second observation on NVIDIA (WebView2 home page not
+repainted after closing Application Options until hovered) may be the
+same effect. Next: the same steps inside a Wine virtual desktop
+(`INV_VDESKTOP`), where the window manager does not maximise the window.
