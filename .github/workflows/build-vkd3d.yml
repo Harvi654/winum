@@ -44,13 +44,26 @@ jobs:
         run: |
           cmake -S src/subprojects/dxil-spirv -B check-patched -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5
           ninja -C check-patched dxil-spirv
-          fail=0
+          # Negative control: unpatched 3.0.1 must reject every fixture with the
+          # long-vector diagnostic; the patched converter must accept every one.
+          fail=0 count=0
           for d in winum/gpu/vkd3d-proton/tests/*.dxil; do
-            n="$(basename "$d")"
-            if check-base/dxil-spirv "$d" --debug-all-entry-points --validate >/dev/null 2>&1; then b=valid; else b=INVALID; fi
-            if check-patched/dxil-spirv "$d" --debug-all-entry-points --validate >/dev/null 2>&1; then p=valid; else p=INVALID; fail=1; fi
+            n="$(basename "$d")"; count=$((count + 1))
+            if check-base/dxil-spirv "$d" --debug-all-entry-points --validate > base.log 2>&1; then
+              b="valid (UNEXPECTED)"; fail=1
+            elif grep -q 'Illegal number of components' base.log; then
+              b="invalid, long-vector diagnostic"
+            else
+              b="invalid for another reason (UNEXPECTED)"; fail=1; tail -5 base.log
+            fi
+            if check-patched/dxil-spirv "$d" --debug-all-entry-points --validate > patched.log 2>&1; then
+              p=valid
+            else
+              p=INVALID; fail=1; tail -5 patched.log
+            fi
             echo "$n: 3.0.1 $b, patched $p"
           done
+          [ "$count" -eq 6 ] || { echo "expected 6 fixtures, found $count"; fail=1; }
           exit $fail
       - name: Build Windows DLLs
         run: |

@@ -22,6 +22,18 @@ TypeVector") and validate with it.
 Windows DLLs as an artifact. Validation so far (2026-11-06): Inventor 2027
 renders with GPU ray tracing on an RX 6400 with these DLLs and the Wine
 pixel format fix (docs/wine-repro/opengl32-pixel-format-alpha/README.md).
-Open: a cross review of the port by an assistant that did not write it;
-publishing the DLLs with a winum release (a second archive next to Wine,
-pinned by SHA-256 in the installers).
+Cross review (Codex, 2026-11-07,
+`docs/wine-repro/cross-review-2026-11-07-vkd3d-ray-payload.md`): the
+component-wise bridge is sound for the long-vector copy path the tests
+cover. Fixed after the review: the workflow now requires the unpatched
+converter to reject every fixture with the long-vector diagnostic (P2-1).
+Open:
+- P2-2, inherited from 3.0.1, not caused by the patch: a `float2x2`
+  payload copy still emits an illegal aggregate `OpBitcast`; needs its own
+  fix and test.
+- P3: `v1` and `v2` compile to identical DXIL; no fixture covers TraceRay,
+  CallShader, custom hit attributes, nested arrays, 16/64-bit or integer
+  leaves (the reviewer's extra probes pass but are not committed); no GPU
+  readback test; the CI images and packages are not pinned.
+- Publishing the DLLs with a winum release (a second archive next to Wine,
+  pinned by SHA-256 in the installers).
