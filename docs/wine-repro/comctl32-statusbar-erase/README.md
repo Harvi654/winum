@@ -189,3 +189,37 @@ v1 makes all of them erase. Whether the overlap Inventor users see comes from
 one of the divergences above is also not known yet: next is the same bundle
 under Wine (vanilla and patched), then a trace of Inventor's status bar
 messages at the moment of an overlap.
+
+## Wine results (2026-11-07)
+
+The same x86_64 executables under Wine 11.20 on the maintainer's machine
+(Arch, fresh prefixes, Wine's default aero theme): `vanilla` is Arch's
+Wine 11.20, `patched` the Inventor runtime `wine-inventor-11.20-6` (which
+contains v1). Files in `wine-2026-11-07/`, all 144 rows, 0 errors, exit 0.
+Row-by-row comparison: `python3 compare.py windows-2026-11-07/result-x86_64-v6.txt wine-2026-11-07/patched-x86_64-v6.txt`.
+
+Differences to ignore: the glyph masks differ by font rasterisation
+(`old_retained` 1423 on Windows, 1325-1360 in Wine), and Wine's button face
+is `f5f5f5` where Windows has `f0f0f0`. Wine's `SetWindowTheme(hwnd, "", "")`
+fails with `0x8007007b` (ERROR_INVALID_NAME) where Windows succeeds, so the
+Wine `classic=1` v6 rows are still themed and are compared against the
+themed Windows rows; v5 has no theming in Wine either way.
+
+| Build | v5 | v6 themed |
+| --- | --- | --- |
+| Windows 10 | WM_PAINT always paints the background; non-erasing invalidation clears; dark erase fill painted over; `SB_SETTEXT` does not erase | WM_PAINT paints no background; non-erasing invalidation keeps old text; dark erase fill stays; `SB_SETTEXT` erases |
+| vanilla Wine | **same as Windows** | **differs**: WM_PAINT always paints the background (clears, paints over the dark fill); `SB_SETTEXT` does not erase |
+| patched (v1) | **differs**: non-erasing invalidation keeps old text, dark fill stays, `SB_SETTEXT` erases | **same as Windows** |
+
+Conclusions:
+
+- For the themed v6 status bar Inventor uses, v1 already matches Windows in
+  every measured operation. The overlapping text Inventor users report is
+  therefore caused by something this bundle does not exercise: another
+  invalidation path (the status bar's other messages, or an invalidation
+  from the window system without an erase), or an application paint.
+  Next: a `+statusbar` trace in Inventor at the moment of an overlap.
+- v1 is wrong for v5 (and would be for an unthemed v6): v2 limits the change
+  to v6 with an active theme and leaves v5 as vanilla Wine.
+- Separate finding (uxtheme, not part of this patch): `SetWindowTheme` with
+  empty strings fails in Wine.
