@@ -637,9 +637,10 @@ returns are still not evidence that the intended pixels were overwritten.
 diagnostic build**, for the four window states with working GPU ray tracing.
 It disables Wine's XRender GDI driver for Inventor; it does not globally
 disable the desktop compositor or change the ray-payload shader patch.
-It may change 2D text rendering/performance. The normal Inventor Wine build,
-longer CAD use and the other consumer have not been validated with this
-setting, so this is not a Wine fix or an L4/L5 compatibility claim.
+It may change 2D text rendering/performance. At this stage the normal Inventor
+Wine build, longer CAD use and the other consumer had not been validated with
+this setting; the subsequent normal-build smoke test is recorded below.
+This is not a Wine fix or an L4/L5 compatibility claim.
 
 To use the workaround in this test prefix after restoring the control value,
 close Inventor and set the value again with the selected Wine:
@@ -659,3 +660,48 @@ X11/XRender APIs, without application strings or proprietary binary analysis.
 Re-enable the original XRender setting for a fault-path measurement; keeping
 the workaround enabled would bypass the path being investigated. No additional
 synthetic GPU-mode matrix or production patch is justified by these results.
+
+### Normal-build smoke test and remaining frame artefact (2026-11-07)
+
+The maintainer repeated ordinary CAD use on the original `inventor-gpurt-v3`
+Wine, with `ClientSideWithRender=N`, the same ray-tracing DLLs and GLX:
+
+| Check | Maintainer result |
+| --- | --- |
+| Ordinary interface interaction | OK, subject to the frame-state artefact below |
+| Part editing and view manipulation | OK |
+| GPU ray tracing and maximisation, status text | OK |
+| Assembly | OK |
+| Drawing and 2D PDF | OK |
+| Save, close, restart and reopen | OK |
+| Font appearance and interface responsiveness | No change noticed |
+
+This extends the status-text workaround validation to the original Wine build.
+It is a short Inventor smoke test, not a full shared-DLL L4 or a week of L5.
+
+The same report adds an unresolved visual issue: after Restore Down and
+maximising again on Arch, parts of the interface are redrawn differently,
+including a white strip at the top/left of the viewport. Actual minimisation
+and showing the window maximised again, or closing/reopening the window,
+clears the reported state. This is distinct from the status-text overlap as
+an observation; whether the causes are related is unknown. A white top/left
+edge and shifted interface were already reported earlier with the original
+XRender-enabled failure (see "Window state" above), so its presence now does
+not establish a new regression caused by `ClientSideWithRender=N`.
+
+The maintainer compared the restored/maximised window sizes with a Windows
+VM and found them approximately the same. Exposed background next to a
+smaller restored window is not by itself corrupt rendering. The supplied
+screenshots are observational evidence, not a pixel-accurate geometry test,
+and are not committed. It remains unmeasured whether the frame artefact
+appears after a fresh start without ever enabling ray tracing.
+
+The application's public hardware dialog names RX 6400 / RADV NAVI24,
+DirectX 12, hardware rendering and 32-bit display colour. Its unknown Windows
+driver file/version is consistent with the incomplete driver-name metadata
+already noted in the launcher's experimental `INV_DRIVER_NAMES` option;
+it does not independently establish GPU failure. Display colour depth is not
+the application's process architecture, and the dialog's WHQL wording is
+not verification of Linux driver certification. These labels do not identify
+the source of the frame artefact. No graphics-quality setting, driver-name
+override or additional patch is changed on the basis of the screenshot.
