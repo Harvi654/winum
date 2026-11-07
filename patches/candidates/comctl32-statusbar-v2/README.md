@@ -141,3 +141,23 @@ Wine release tarball. Those distinctions remain explicit when promoting v2.
 An advisory second-assistant static review is separate from Claude's required
 cross review; it found test include-order and initial counter issues, which
 were corrected before the integrated suite build passed.
+
+## L1 on Windows 10 (2026-11-07)
+
+Bundle from `scripts/build-l1-comctl32-statusbar-v2.sh`, run in the
+maintainer's offline Windows 10 x64 VM, themes on. Results in
+`windows-2026-11-07-l1/`:
+
+| EXE | Result |
+| --- | --- |
+| x86_64 v5 | 180 tests, 0 failures, 0 skipped |
+| i686 v5 | 180 tests, 0 failures, 0 skipped |
+| x86_64 v6 | 360 tests, 0 failures, 0 skipped |
+| i686 v6 | 360 tests, 0 failures, 0 skipped |
+
+All exit codes 0. Coverage complete: v5 three styles; v6 `classic=0
+themed=1` and `classic=1 themed=0` for styles 0, 0x100 and 0x1100.
+**L1 reached.** Claude's cross review: `docs/wine-repro/cross-review-2026-11-07-comctl32-statusbar-v2.md`
+(approved; P2: the unthemed v6 path is not exercised under Wine).
+Next: paired L2 of the comctl32 tests (series vs series + candidate), then
+fold into `patches/comctl32-statusbar-erase-background.patch` as v2.
