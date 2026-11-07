@@ -164,3 +164,20 @@ application's child styles/ownership and swapchain lifecycle more closely; then
 an RX 6400 comparison. The GPU rebind is the maintainer's decision, not an
 automatic next step. Do not claim that a negative plain-Vulkan result excludes
 a vkd3d-specific or ray-tracing-specific trigger.
+
+## Results
+
+### 2026-11-07, RX 580, EGL, `wine-inventor-11.20-6`
+
+Fresh prefix, `WINEDEBUG=-all`. `CONTROL version=6.0.2600 themed=1` in all
+three runs. Vulkan device reported as `Radeon (TM) RX 480 Graphics`
+(1002:67df, the RX 580; the name suggests AMD's own Vulkan driver rather
+than RADV - to be checked). `--none`: 0 frames, `--vulkan`: 1170 frames,
+`--vulkan --delay-vulkan`: 1754 frames; all `completed_timeline=1`,
+`failed=0`. Maintainer's visual result: **no overlap and no offset in any
+phase of any run.** So a plain Vulkan swapchain in a child of a maximised
+window is not enough on this setup.
+
+The first build stopped with "status class is not comctl32 v6": on Wine the
+global status bar class has no class HINSTANCE; the check now resolves the
+module of the class procedure (`e34acbe`).
