@@ -598,3 +598,64 @@ registry value locally and restore it after the control run.
 
 No fix is proposed from this correlation, and the production series remains
 unchanged.
+
+### XRender-disabled control results (2026-11-07)
+
+With per-application `ClientSideWithRender=N`, the maintainer reported clean
+text in **all four phases**, and separately confirmed that ray tracing really
+rendered the model progressively, rather than merely enabling its button.
+The supplied summary has 818 complete calls, zero rejected/incomplete records
+and no omitted signatures. No raw log, screenshot or registry dump is added.
+
+| Marker interval | Complete calls | Window/DIB driver attached | Window/DIB driver absent |
+| --- | ---: | ---: | ---: |
+| unmarked | 261 | 261 | 0 |
+| before | 124 | 124 | 0 |
+| rt_start | 83 | 7 | 76 |
+| after | 89 | 15 | 74 |
+| restored | 95 | 82 | 13 |
+| remax | 166 | 14 | 152 |
+
+The manual-marker boundary limitation above still applies, including restored
+draws at the end of the final interval. Crucially, the direct-drawing path
+still occurs: the common maximised-after and remax calls have
+`window_driver=0` and the intentionally cleared device rectangle. Their
+common visible/effective clip is still `(0,2)-(1842,24)`, mapping is identity,
+background colour is unchanged, and text dispatch is still `(0,18)`.
+All 417 explicit fills report success. The dispatch table switches to the
+fallback used with XRender disabled, rather than retaining the DIB driver.
+Absolute table addresses from separate processes are not compared as symbols.
+
+This control substantially narrows the fault to the **XRender-enabled direct
+drawing route**. Removing the DIB window driver is not sufficient to cause
+overlap, and the clean result was not obtained by preventing ray tracing or
+keeping that driver attached. It does not yet identify a faulty Wine line,
+XRender picture/clip operation, or an X server/driver interaction. Success
+returns are still not evidence that the intended pixels were overwritten.
+
+`ClientSideWithRender=N` is a **tested per-application workaround on the
+diagnostic build**, for the four window states with working GPU ray tracing.
+It disables Wine's XRender GDI driver for Inventor; it does not globally
+disable the desktop compositor or change the ray-payload shader patch.
+It may change 2D text rendering/performance. The normal Inventor Wine build,
+longer CAD use and the other consumer have not been validated with this
+setting, so this is not a Wine fix or an L4/L5 compatibility claim.
+
+To use the workaround in this test prefix after restoring the control value,
+close Inventor and set the value again with the selected Wine:
+
+```bash
+export WINEPREFIX="$HOME/.wine-inventor2027"
+export WINE="$HOME/.local/share/winum-sbdiag/winum-11.20-1-sbdiag-x86_64/bin/wine"
+"$WINE" reg add 'HKCU\Software\Wine\AppDefaults\Inventor.exe\X11 Driver' /v ClientSideWithRender /t REG_SZ /d N /f
+```
+
+The next source-level measurement should instrument the failing XRender
+route itself: actual host drawable and picture identities, DC/picture clip
+origins and rectangles, fill destination coordinates/operator/colour, and
+glyph destination coordinates. Compare with the matching direct fallback
+route and with restored state. Use numeric Wine debug records and public
+X11/XRender APIs, without application strings or proprietary binary analysis.
+Re-enable the original XRender setting for a fault-path measurement; keeping
+the workaround enabled would bypass the path being investigated. No additional
+synthetic GPU-mode matrix or production patch is justified by these results.
