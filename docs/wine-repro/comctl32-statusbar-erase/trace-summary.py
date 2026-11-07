@@ -34,6 +34,9 @@ bp_re = re.compile(r"^([0-9a-f]+):trace:win:NtUserBeginPaint .*fErase = (\d)")
 # message as the application's window procedure (subclass) sees it
 spy_re = re.compile(r"^([0-9a-f]+):trace:message:spy_(enter|exit)_message\s+\(([0-9a-fx]+)\)"
                     r".*?\[([0-9a-f]{4})\] \S+ (sent|dispatched|returned)\s*([0-9a-f]*)", re.I)
+# +relay, limited with HKCU\Software\Wine\Debug RelayInclude: the drawing
+# calls made while the status bar's WM_ERASEBKGND or WM_PAINT is handled
+relay_re = re.compile(r"^([0-9a-f]+):Call ([A-Za-z0-9_]+\.[A-Za-z0-9_@?$]+)\(")
 # first sign of Direct3D 12 / ray tracing in the log (only the pattern is printed)
 MARKERS = ["ConvertEnvMapLayout", "Aurora", "Hydra"]
 
@@ -71,6 +74,8 @@ def main():
     timeline = []
     phase = "before"
     spy = Counter()
+    stack = defaultdict(list)                 # tid -> [(msg, [calls])]
+    sigs = []                                 # (msg, calls) in order
     with open(path, errors="replace") as fh:
         for line in fh:
             if phase == "before" and ":trace:" not in line:
@@ -78,10 +83,23 @@ def main():
                 if hit:
                     phase = "after"
                     timeline.append("---- first log line with '%s' ----" % hit)
+            m = relay_re.match(line)
+            if m:
+                if stack[m.group(1)]:
+                    calls = stack[m.group(1)][-1][1]
+                    if not calls or calls[-1] != m.group(2):
+                        calls.append(m.group(2))
+                continue
             m = spy_re.match(line)
             if m and hnum(m.group(3)) in hwnds:
                 tid, kind, hwnd, msg, what, ret = m.groups()
                 msg = int(msg, 16)
+                if msg in (0x0014, 0x000f):
+                    if kind.lower() == "enter":
+                        stack[tid].append((msg, []))
+                    elif stack[tid] and stack[tid][-1][0] == msg:
+                        sm, calls = stack[tid].pop()
+                        sigs.append((name(sm), " ".join(calls) or "(no drawing call)"))
                 if what == "returned":
                     spy["%s %s returned %s" % (phase, name(msg), ret)] += 1
                     if msg == 0x0014:
@@ -128,6 +146,17 @@ def main():
         print("\nmessages as the application sees them (+message), before/after the marker:")
         for k, v in sorted(spy.items()):
             print("  %6d %s" % (v, k))
+    if sigs:
+        print("\ndrawing calls inside the status bar's WM_ERASEBKGND / WM_PAINT, in order")
+        print("(consecutive identical handlings counted once):")
+        runs = []
+        for sig in sigs:
+            if runs and runs[-1][0] == sig:
+                runs[-1][1] += 1
+            else:
+                runs.append([sig, 1])
+        for (msg, calls), n in runs[-keep:]:
+            print("  %5dx %-14s %s" % (n, msg, calls))
     print("\nlast %d events:" % keep)
     for t in timeline[-keep:]:
         print("  " + t)
