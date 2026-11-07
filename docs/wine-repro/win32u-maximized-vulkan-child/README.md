@@ -450,5 +450,7 @@ after the window is maximised again and the swapchain is recreated, while
 either API alone does not. The fence wait in the fixture times out after
 5 s with an `ERROR` line, and none was printed, so the block is in a call
 without a timeout (SwapBuffers, Present or ResizeBuffers). Next: a
-backtrace of the hung process (`winedbg`), and the maintainer's visual
-result for the status text in these runs.
+backtrace of the hung process (`winedbg`).
+
+Visual result (maintainer): the status text was **correct in all four
+runs** - no overlap on the offload GPU either.
