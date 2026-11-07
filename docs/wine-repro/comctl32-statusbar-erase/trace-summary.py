@@ -29,7 +29,7 @@ QUIET = {0x0084, 0x0020, 0x0200, 0x0201, 0x0202, 0x02a3, 0x0402, 0x0403,
 # (win32u) as 0x... in lower case: handles are compared as numbers.
 sb_re = re.compile(r"^([0-9a-f]+):trace:statusbar:\w+ hwnd ([0-9a-fx]+), msg ([0-9a-f]+)", re.I)
 rdw_re = re.compile(r"^([0-9a-f]+):trace:win:NtUserRedrawWindow ([0-9a-fx]+) (.*)$", re.I)
-bp_re = re.compile(r"^([0-9a-f]+):trace:win:NtUserBeginPaint .*fErase = (\d)")
+bp_re = re.compile(r"^([0-9a-f]+):trace:win:NtUserBeginPaint .*box = \((.*)\), fErase = (\d)")
 # +message (win32u spy, with HKCU\Software\Wine\Debug SpyInclude): the
 # message as the application's window procedure (subclass) sees it
 spy_re = re.compile(r"^([0-9a-f]+):trace:message:spy_(enter|exit)_message\s+\(([0-9a-fx]+)\)"
@@ -81,6 +81,7 @@ def main():
     spy = Counter()
     stack = defaultdict(list)                 # tid -> [(msg, [calls], wp)]
     sigs = []                                 # (msg, calls) in order
+    boxes = {}                                # BeginPaint box -> (count, first, final)
     with open(path, errors="replace") as fh:
         for line in fh:
             if phase == "before" and ":trace:" not in line:
@@ -145,9 +146,11 @@ def main():
                 continue
             m = bp_re.match(line)
             if m and m.group(1) in pending_paint:
-                tid, erase = m.groups()
+                tid, box, erase = m.groups()
                 hwnd = pending_paint.pop(tid)
                 paints["fErase=%s" % erase] += 1
+                n = boxes.get(box, (0, len(sigs), 0))
+                boxes[box] = (n[0] + 1, n[1], len(sigs))
                 timeline.append("%s sb%d   BeginPaint fErase=%s" % (tid, sorted(hwnds).index(hwnd), erase))
 
     print("\nmessages to the status bars (without queries and mouse):")
@@ -159,6 +162,10 @@ def main():
     print("\nstatus bar WM_PAINT -> BeginPaint result:")
     for k, v in paints.most_common():
         print("  %6d %s" % (v, k))
+    if boxes:
+        print("\nstatus bar BeginPaint boxes: count, first-final position (same scale as below)")
+        for b, (c, f, l) in sorted(boxes.items(), key=lambda x: x[1][1]):
+            print("  %5d  %5d-%-5d %s" % (c, f, l, b))
     if spy:
         print("\nmessages as the application sees them (+message), before/after the marker:")
         for k, v in sorted(spy.items()):
