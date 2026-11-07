@@ -739,7 +739,9 @@ the XRender workaround; native-Wayland UI compatibility is outside this fix.
 The maintainer clarified that the WebView2 home-page repaint symptom also
 persists locally in the working XWayland configuration: after the dialog
 interaction, the home page can remain stale until a click causes it to
-refresh. This qualifies the earlier interface smoke-test result. Do not
+refresh. The maintainer had observed it before the current experiments and
+had not investigated it; it is not newly introduced by these tests. This
+qualifies the earlier interface smoke-test result. Do not
 describe the XRender workaround as fixing all UI repainting or imply that
 the WebView symptom was observed only by the NVIDIA tester.
 
