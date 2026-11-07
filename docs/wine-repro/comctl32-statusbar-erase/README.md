@@ -246,3 +246,17 @@ seen. Every `BeginPaint` returns `fErase=0`, because Inventor handles
 `WM_ERASEBKGND` itself (dark strip) before the status bar paints. Next: the same
 trace with GPU ray tracing on the RX 6400, to look for an invalidation
 without an erase or a paint not preceded by one.
+
+Run 4 (03:20): same Wine and GLX, RX 6400, patched vkd3d-proton,
+`EnableHydra=1`. The overlap appears **only after GPU ray tracing has been
+started**; from then on every new status text is drawn over the old ones,
+and opening another document only adds more layers - the status bar never
+returns to a clean background in that session. The status bar side of the
+trace is the same as in run 3: 286 `SB_SETTEXTW`, 243 `WM_PAINT`, every
+invalidation with `RDW_ERASE`, every `BeginPaint` with `fErase=0`. So Wine
+asks for the erase and someone answers it (`fErase=0`), but after ray
+tracing the old text is no longer covered. `WM_ERASEBKGND` is answered by
+Inventor's own handler before it reaches comctl32, so the `+statusbar`
+channel cannot see it. Next: `+message` with `SpyInclude` limited to
+`WM_ERASEBKGND`, `WM_PAINT` and `WM_DRAWITEM`, to see whether the erase is
+still delivered after ray tracing starts and what Inventor's handler returns.

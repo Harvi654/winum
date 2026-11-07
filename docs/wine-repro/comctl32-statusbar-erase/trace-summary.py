@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Summarise a WINEDEBUG=+statusbar,+win log: which invalidations and paints
+# Summarise a WINEDEBUG=+statusbar,+win[,+message] log: which invalidations and paints
 # reach the status bars, and whether each WM_PAINT had an erase.
 # Original, AI-assisted (Claude); LGPL-2.1-or-later.
 #
@@ -30,6 +30,12 @@ QUIET = {0x0084, 0x0020, 0x0200, 0x0201, 0x0202, 0x02a3, 0x0402, 0x0403,
 sb_re = re.compile(r"^([0-9a-f]+):trace:statusbar:\w+ hwnd ([0-9a-fx]+), msg ([0-9a-f]+)", re.I)
 rdw_re = re.compile(r"^([0-9a-f]+):trace:win:NtUserRedrawWindow ([0-9a-fx]+) (.*)$", re.I)
 bp_re = re.compile(r"^([0-9a-f]+):trace:win:NtUserBeginPaint .*fErase = (\d)")
+# +message (win32u spy, with HKCU\Software\Wine\Debug SpyInclude): the
+# message as the application's window procedure (subclass) sees it
+spy_re = re.compile(r"^([0-9a-f]+):trace:message:spy_(enter|exit)_message\s+\(([0-9a-fx]+)\)"
+                    r".*?\[([0-9a-f]{4})\] \S+ (sent|dispatched|returned)\s*([0-9a-f]*)", re.I)
+# first sign of Direct3D 12 / ray tracing in the log (only the pattern is printed)
+MARKERS = ["ConvertEnvMapLayout", "Aurora", "Hydra"]
 
 
 def hnum(h):
@@ -63,8 +69,26 @@ def main():
     last_sb_msg = defaultdict(lambda: None)   # tid -> last status bar msg
     pending_paint = {}                        # tid -> hwnd awaiting BeginPaint
     timeline = []
+    phase = "before"
+    spy = Counter()
     with open(path, errors="replace") as fh:
         for line in fh:
+            if phase == "before" and ":trace:" not in line:
+                hit = next((k for k in MARKERS if k in line), None)
+                if hit:
+                    phase = "after"
+                    timeline.append("---- first log line with '%s' ----" % hit)
+            m = spy_re.match(line)
+            if m and hnum(m.group(3)) in hwnds:
+                tid, kind, hwnd, msg, what, ret = m.groups()
+                msg = int(msg, 16)
+                if what == "returned":
+                    spy["%s %s returned %s" % (phase, name(msg), ret)] += 1
+                    if msg == 0x0014:
+                        timeline.append("%s sb%d   (app) WM_ERASEBKGND returned %s" % (tid, sorted(hwnds).index(hnum(hwnd)), ret))
+                else:
+                    spy["%s %s %s" % (phase, name(msg), what)] += 1
+                continue
             m = sb_re.match(line)
             if m:
                 tid, hwnd, msg = m.group(1), hnum(m.group(2)), int(m.group(3), 16)
@@ -100,6 +124,10 @@ def main():
     print("\nstatus bar WM_PAINT -> BeginPaint result:")
     for k, v in paints.most_common():
         print("  %6d %s" % (v, k))
+    if spy:
+        print("\nmessages as the application sees them (+message), before/after the marker:")
+        for k, v in sorted(spy.items()):
+            print("  %6d %s" % (v, k))
     print("\nlast %d events:" % keep)
     for t in timeline[-keep:]:
         print("  " + t)
