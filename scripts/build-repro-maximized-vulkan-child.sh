@@ -24,7 +24,7 @@ printf '1 24 "repro.manifest"\n' > "$work/repro.rc"
 x86_64-w64-mingw32-windres -I "$work" "$work/repro.rc" -O coff -o "$work/manifest.o"
 x86_64-w64-mingw32-gcc -std=c11 -O2 -static -Wall -Wextra -Werror \
     -I "$work/include" "$src/repro.c" "$work/manifest.o" \
-    -o "$work/maximized-vulkan-child.exe" -lcomctl32 -luxtheme -lgdi32 -luser32
+    -o "$work/maximized-vulkan-child.exe" -ldxguid -lcomctl32 -luxtheme -lgdi32 -luser32
 mkdir -p -- "$(dirname -- "$output")"
 mkdir -- "$output"
 cp "$work/maximized-vulkan-child.exe" "$src/repro.c" "$src/repro.manifest" "$src/README.md" "$here/LICENSE" "$output/"

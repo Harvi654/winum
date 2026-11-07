@@ -1,6 +1,8 @@
 /* Original, AI-assisted (Codex)
  * SPDX-License-Identifier: LGPL-2.1-or-later
- * Public Win32/Vulkan APIs only; no application code or private interfaces. */
+ * Public Win32/Vulkan/D3D12 APIs only; no application code or private interfaces. */
+#define COBJMACROS
+#define WIDL_C_INLINE_WRAPPERS
 #define WIN32_LEAN_AND_MEAN
 #define VK_USE_PLATFORM_WIN32_KHR
 #define VK_NO_PROTOTYPES
@@ -9,6 +11,8 @@
 #include <uxtheme.h>
 #include <shlwapi.h>
 #include <vulkan/vulkan.h>
+#include <d3d12.h>
+#include <dxgi1_4.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,7 +34,8 @@ VK_FUNCTIONS(DECLARE)
 static PFN_vkCreateInstance vkCreateInstance;
 static PFN_vkGetInstanceProcAddr get_proc;
 static HMODULE loader;
-static HWND top, child, status;
+static HWND top, child, status, containers[2];
+static int nesting, use_d3d12;
 static int use_vulkan, delayed, started, failed, phase = -1, dirty = 1;
 static ULONGLONG epoch, frames;
 static VkInstance instance;
@@ -69,6 +74,12 @@ static void geometry(const char *event)
            c.left,c.top,c.right,c.bottom,v.left,v.top,v.right,v.bottom,
            s.left,s.top,s.right,s.bottom,extent.width,extent.height,
            (unsigned long long)frames);
+    for (int i = 0; i < nesting; ++i)
+    {
+        RECT r;
+        GetWindowRect(containers[i], &r);
+        printf("NEST level=%d screen=%ld,%ld,%ld,%ld\n", i+1, r.left,r.top,r.right,r.bottom);
+    }
 }
 
 static void cleanup(void)
@@ -289,6 +300,210 @@ static int frame(void)
     return 1;
 }
 
+/* One D3D12 frame in flight, no shaders or private interfaces. */
+static HMODULE d3d_module, dxgi_module;
+static IDXGIFactory2 *factory12;
+static ID3D12Device *device12;
+static ID3D12CommandQueue *queue12;
+static IDXGISwapChain3 *swap12;
+static ID3D12CommandAllocator *allocator12;
+static ID3D12GraphicsCommandList *list12;
+static ID3D12DescriptorHeap *heap12;
+static ID3D12Resource *buffers12[2];
+static ID3D12Fence *fence12;
+static HANDLE event12;
+static UINT64 serial12;
+static UINT stride12;
+static int occluded12;
+static ULONGLONG occluded_frames12;
+
+static int hrcheck(HRESULT hr, const char *operation)
+{
+    if (SUCCEEDED(hr)) return 1;
+    printf("ERROR operation=%s HRESULT=%08lx\n", operation, (unsigned long)hr);
+    if (device12)
+        printf("D3D12 removed_reason=%08lx\n", (unsigned long)ID3D12Device_GetDeviceRemovedReason(device12));
+    return 0;
+}
+#define HR(call) do { if (!hrcheck((call), #call)) return 0; } while (0)
+#define RELEASE12(p) do { if (p) { IUnknown_Release((IUnknown *)(p)); (p) = NULL; } } while (0)
+
+static int drain12(void)
+{
+    UINT64 done;
+    HR(ID3D12CommandQueue_Signal(queue12, fence12, ++serial12));
+    done = ID3D12Fence_GetCompletedValue(fence12);
+    if (done == UINT64_MAX) { puts("ERROR D3D12 fence device removed"); return 0; }
+    if (done < serial12)
+    {
+        DWORD wait;
+        HR(ID3D12Fence_SetEventOnCompletion(fence12, serial12, event12));
+        wait = WaitForSingleObject(event12, 5000);
+        if (wait != WAIT_OBJECT_0)
+        { printf("ERROR D3D12 fence_wait=%lu win32=%lu\n", wait, GetLastError()); return 0; }
+    }
+    return 1;
+}
+
+static void cleanup12(void)
+{
+    if (queue12 && fence12 && event12 && !drain12()) failed = 1;
+    RELEASE12(list12); RELEASE12(allocator12);
+    for (unsigned int i = 0; i < 2; ++i) RELEASE12(buffers12[i]);
+    RELEASE12(heap12); RELEASE12(swap12); RELEASE12(fence12);
+    RELEASE12(queue12); RELEASE12(device12); RELEASE12(factory12);
+    if (event12) CloseHandle(event12);
+    if (d3d_module) FreeLibrary(d3d_module);
+    if (dxgi_module) FreeLibrary(dxgi_module);
+}
+
+static int targets12(void)
+{
+    D3D12_CPU_DESCRIPTOR_HANDLE handle = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(heap12);
+    for (UINT i = 0; i < 2; ++i)
+    {
+        HR(IDXGISwapChain3_GetBuffer(swap12, i, &IID_ID3D12Resource, (void **)&buffers12[i]));
+        ID3D12Device_CreateRenderTargetView(device12, buffers12[i], NULL, handle);
+        handle.ptr += stride12;
+    }
+    return 1;
+}
+
+static int init12(void)
+{
+    HRESULT (WINAPI *create_device)(IUnknown *, D3D_FEATURE_LEVEL, REFIID, void **);
+    HRESULT (WINAPI *create_factory)(REFIID, void **);
+    D3D12_COMMAND_QUEUE_DESC q = {0};
+    D3D12_DESCRIPTOR_HEAP_DESC h = {0};
+    DXGI_SWAP_CHAIN_DESC1 desc = {0};
+    IDXGISwapChain1 *chain;
+    RECT rect;
+    dxgi_module = LoadLibraryW(L"dxgi.dll");
+    d3d_module = LoadLibraryW(L"d3d12.dll");
+    if (!dxgi_module || !d3d_module)
+    { printf("ERROR D3D12 LoadLibrary win32=%lu\n", GetLastError()); return 0; }
+    create_device = (void *)GetProcAddress(d3d_module, "D3D12CreateDevice");
+    create_factory = (void *)GetProcAddress(dxgi_module, "CreateDXGIFactory1");
+    if (!create_device || !create_factory) { puts("ERROR D3D12 missing entry point"); return 0; }
+    HR(create_factory(&IID_IDXGIFactory2, (void **)&factory12));
+    for (UINT i = 0; !device12; ++i)
+    {
+        IDXGIAdapter1 *adapter = NULL;
+        DXGI_ADAPTER_DESC1 adapter_desc;
+        HRESULT hr = IDXGIFactory2_EnumAdapters1(factory12, i, &adapter);
+        if (hr == DXGI_ERROR_NOT_FOUND) break;
+        HR(hr);
+        hr = IDXGIAdapter1_GetDesc1(adapter, &adapter_desc);
+        if (FAILED(hr)) { RELEASE12(adapter); return hrcheck(hr, "GetDesc1"); }
+        if (!(adapter_desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE))
+        {
+            hr = create_device((IUnknown *)adapter, D3D_FEATURE_LEVEL_11_0,
+                               &IID_ID3D12Device, (void **)&device12);
+            printf("D3D12 adapter=%u vendor=%04x device=%04x create_hresult=%08lx\n",
+                   i, adapter_desc.VendorId, adapter_desc.DeviceId, (unsigned long)hr);
+            if (device12)
+            {
+                char name[256];
+                if (!WideCharToMultiByte(CP_UTF8, 0, adapter_desc.Description, -1, name, sizeof(name), NULL, NULL))
+                    strcpy(name, "unavailable");
+                printf("DEVICE api=d3d12 name=%s vendor=%04x device=%04x\n",
+                       name, adapter_desc.VendorId, adapter_desc.DeviceId);
+            }
+        }
+        RELEASE12(adapter);
+    }
+    if (!device12) { puts("ERROR no hardware D3D12 device (no WARP fallback)"); return 0; }
+    q.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+    HR(ID3D12Device_CreateCommandQueue(device12, &q, &IID_ID3D12CommandQueue, (void **)&queue12));
+    HR(ID3D12Device_CreateCommandAllocator(device12, q.Type, &IID_ID3D12CommandAllocator, (void **)&allocator12));
+    HR(ID3D12Device_CreateCommandList(device12, 0, q.Type, allocator12, NULL,
+                                   &IID_ID3D12GraphicsCommandList, (void **)&list12));
+    HR(ID3D12GraphicsCommandList_Close(list12));
+    h.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV; h.NumDescriptors = 2;
+    HR(ID3D12Device_CreateDescriptorHeap(device12, &h, &IID_ID3D12DescriptorHeap, (void **)&heap12));
+    stride12 = ID3D12Device_GetDescriptorHandleIncrementSize(device12, h.Type);
+    HR(ID3D12Device_CreateFence(device12, 0, D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence, (void **)&fence12));
+    event12 = CreateEventW(NULL, FALSE, FALSE, NULL);
+    if (!event12) { printf("ERROR D3D12 CreateEvent win32=%lu\n", GetLastError()); return 0; }
+    GetClientRect(child, &rect);
+    desc.Width = rect.right; desc.Height = rect.bottom;
+    desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; desc.SampleDesc.Count = 1;
+    desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; desc.BufferCount = 2;
+    desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    desc.Scaling = DXGI_SCALING_STRETCH; desc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+    HR(IDXGIFactory2_CreateSwapChainForHwnd(factory12, (IUnknown *)queue12, child, &desc, NULL, NULL, &chain));
+    HRESULT hr = IDXGISwapChain1_QueryInterface(chain, &IID_IDXGISwapChain3, (void **)&swap12);
+    IDXGISwapChain1_Release(chain);
+    HR(hr);
+    HR(IDXGIFactory2_MakeWindowAssociation(factory12, top, DXGI_MWA_NO_ALT_ENTER));
+    if (!targets12()) return 0;
+    extent.width = desc.Width; extent.height = desc.Height;
+    dirty = 0; started = 1;
+    puts("D3D12 started=1 buffers=2 swap_effect=FLIP_DISCARD sync_interval=1");
+    geometry("swapchain");
+    return 1;
+}
+
+static int frame12(void)
+{
+    RECT rect;
+    D3D12_RESOURCE_BARRIER barrier = {0};
+    D3D12_CPU_DESCRIPTOR_HANDLE handle;
+    ID3D12CommandList *commands;
+    FLOAT color[4] = {0.06f, 0.17f, 0.28f, 1.0f};
+    UINT index;
+    HRESULT hr;
+    GetClientRect(child, &rect);
+    if (!rect.right || !rect.bottom) return 1;
+    if (dirty)
+    {
+        if (!drain12()) return 0;
+        /* Drop recorded references before ResizeBuffers. */
+        HR(ID3D12CommandAllocator_Reset(allocator12));
+        HR(ID3D12GraphicsCommandList_Reset(list12, allocator12, NULL));
+        HR(ID3D12GraphicsCommandList_Close(list12));
+        for (UINT i = 0; i < 2; ++i) RELEASE12(buffers12[i]);
+        HR(IDXGISwapChain3_ResizeBuffers(swap12, 2, rect.right, rect.bottom, DXGI_FORMAT_R8G8B8A8_UNORM, 0));
+        if (!targets12()) return 0;
+        extent.width = rect.right; extent.height = rect.bottom;
+        dirty = 0; geometry("swapchain");
+    }
+    index = IDXGISwapChain3_GetCurrentBackBufferIndex(swap12);
+    HR(ID3D12CommandAllocator_Reset(allocator12));
+    HR(ID3D12GraphicsCommandList_Reset(list12, allocator12, NULL));
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = buffers12[index];
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    ID3D12GraphicsCommandList_ResourceBarrier(list12, 1, &barrier);
+    handle = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(heap12);
+    handle.ptr += index * stride12;
+    color[0] += (FLOAT)((frames / 60) % 4) * 0.025f;
+    ID3D12GraphicsCommandList_ClearRenderTargetView(list12, handle, color, 0, NULL);
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+    ID3D12GraphicsCommandList_ResourceBarrier(list12, 1, &barrier);
+    HR(ID3D12GraphicsCommandList_Close(list12));
+    commands = (ID3D12CommandList *)list12;
+    ID3D12CommandQueue_ExecuteCommandLists(queue12, 1, &commands);
+    hr = IDXGISwapChain3_Present(swap12, 1, 0);
+    HR(hr);
+    if (!drain12()) return 0;
+    if (hr == DXGI_STATUS_OCCLUDED)
+    {
+        if (!occluded12) puts("D3D12 present=OCCLUDED visual_check_incomplete=1");
+        occluded12 = 1; ++occluded_frames12;
+    }
+    else
+    {
+        if (occluded12) puts("D3D12 present=VISIBLE");
+        occluded12 = 0;
+        ++frames;
+    }
+    return 1;
+}
+
 static LRESULT CALLBACK status_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp,
                                     UINT_PTR id, DWORD_PTR data)
 {
@@ -314,12 +529,12 @@ static LRESULT CALLBACK child_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     {
         PAINTSTRUCT ps;
         HDC dc = BeginPaint(hwnd, &ps);
-        if (!started)
+        if (!started || hwnd != child)
         {
             RECT r; GetClientRect(hwnd, &r);
             FillRect(dc, &r, (HBRUSH)GetStockObject(DKGRAY_BRUSH));
             SetTextColor(dc, RGB(255,255,255)); SetBkMode(dc, TRANSPARENT);
-            TextOutW(dc, 20, 20, L"GDI control / Vulkan not started", 31);
+            TextOutW(dc, 20, 20, L"GDI / renderer not started", 25);
         }
         EndPaint(hwnd, &ps); return 0;
     }
@@ -333,7 +548,14 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         RECT c, s;
         SendMessageW(status, WM_SIZE, 0, 0);
         GetClientRect(hwnd, &c); GetWindowRect(status, &s);
-        MoveWindow(child, 0, 0, c.right, c.bottom > s.bottom-s.top ? c.bottom-(s.bottom-s.top) : 0, TRUE);
+        int width = c.right, height = c.bottom > s.bottom-s.top ? c.bottom-(s.bottom-s.top) : 0;
+        for (int i = 0; i < nesting; ++i)
+        {
+            MoveWindow(containers[i], i ? 7 : 0, i ? 9 : 0, width, height, TRUE);
+            width = width > 14 ? width - 14 : 0;
+            height = height > 18 ? height - 18 : 0;
+        }
+        MoveWindow(child, nesting ? 7 : 0, nesting ? 9 : 0, width, height, TRUE);
         dirty = 1;
         return 0;
     }
@@ -355,15 +577,15 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
             if (next != phase)
             {
                 phase = next;
-                swprintf(title, 160, L"Synthetic repaint [%ls] %ls%ls", use_vulkan ? L"Vulkan" : L"GDI",
-                         titles[phase], delayed ? L" (Vulkan starts at 10s)" : L"");
+                swprintf(title, 160, L"Synthetic repaint [%ls] %ls%ls", use_d3d12 ? L"D3D12" : use_vulkan ? L"Vulkan" : L"GDI",
+                         titles[phase], delayed ? L" (renderer starts at 10s)" : L"");
                 SetWindowTextW(hwnd, title);
                 ShowWindow(hwnd, (phase == 1 || phase == 3) ? SW_MAXIMIZE : SW_RESTORE);
                 geometry("phase");
             }
-            if (use_vulkan && !started && (!delayed || elapsed >= 10000))
-                if (!init_vulkan()) { failed = 1; DestroyWindow(hwnd); return 0; }
-            if (started && !IsIconic(hwnd) && !frame()) { failed = 1; DestroyWindow(hwnd); }
+            if ((use_vulkan || use_d3d12) && !started && (!delayed || elapsed >= 10000))
+                if (!(use_d3d12 ? init12() : init_vulkan())) { failed = 1; DestroyWindow(hwnd); return 0; }
+            if (started && !IsIconic(hwnd) && !(use_d3d12 ? frame12() : frame())) { failed = 1; DestroyWindow(hwnd); }
         }
         return 0;
     }
@@ -382,10 +604,15 @@ int main(int argc, char **argv)
     {
         if (!strcmp(argv[i], "--none") && !mode) { mode = 1; use_vulkan = 0; }
         else if (!strcmp(argv[i], "--vulkan") && !mode) { mode = 1; use_vulkan = 1; }
-        else if (!strcmp(argv[i], "--delay-vulkan")) delayed = 1;
-        else { puts("Usage: maximized-vulkan-child.exe (--none | --vulkan) [--delay-vulkan]"); return 2; }
+        else if (!strcmp(argv[i], "--d3d12") && !mode) { mode = 1; use_d3d12 = 1; }
+        else if (!strcmp(argv[i], "--delay")) delayed = 1;
+        else if (!strcmp(argv[i], "--delay-vulkan")) delayed = 2;
+        else if (!strcmp(argv[i], "--nest=0")) nesting = 0;
+        else if (!strcmp(argv[i], "--nest=1")) nesting = 1;
+        else if (!strcmp(argv[i], "--nest=2")) nesting = 2;
+        else { puts("Usage: maximized-vulkan-child.exe (--none | --vulkan | --d3d12) [--delay] [--nest=0|1|2]"); return 2; }
     }
-    if (!mode || (delayed && !use_vulkan)) { puts("ERROR choose one mode; delay requires Vulkan"); return 2; }
+    if (!mode || (delayed && !use_vulkan && !use_d3d12) || (delayed == 2 && !use_vulkan)) { puts("ERROR choose one mode; delay requires renderer; --delay-vulkan requires Vulkan"); return 2; }
     if (!InitCommonControlsEx(&controls)) return 2;
     wc.hInstance = GetModuleHandleW(NULL); wc.hCursor = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW);
     wc.lpfnWndProc = window_proc; wc.lpszClassName = L"SyntheticTop";
@@ -395,7 +622,15 @@ int main(int argc, char **argv)
     top = CreateWindowW(L"SyntheticTop", L"Synthetic repaint", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                         60,60,1000,700,NULL,NULL,wc.hInstance,NULL);
     if (!top) return 2;
-    child = CreateWindowW(L"SyntheticChild", NULL, WS_CHILD | WS_VISIBLE, 0,0,1,1,top,NULL,wc.hInstance,NULL);
+    HWND parent = top;
+    for (i = 0; i < nesting; ++i)
+    {
+        containers[i] = CreateWindowW(L"SyntheticChild", NULL, WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN,
+                                      0,0,1,1,parent,NULL,wc.hInstance,NULL);
+        if (!containers[i]) return 2;
+        parent = containers[i];
+    }
+    child = CreateWindowW(L"SyntheticChild", NULL, WS_CHILD | WS_VISIBLE, 0,0,1,1,parent,NULL,wc.hInstance,NULL);
     status = CreateWindowW(STATUSCLASSNAMEW, NULL, WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
                           0,0,0,0,top,NULL,wc.hInstance,NULL);
     if (!child || !status || !SetWindowSubclass(status, status_proc, 1, 0)) return 2;
@@ -415,13 +650,17 @@ int main(int argc, char **argv)
                version.dwMinorVersion, version.dwBuildNumber, GetWindowTheme(status) != NULL);
     }
     SendMessageW(status, SB_SETTEXTW, 0, (LPARAM)L"Ready");
+    printf("CONFIG mode=%s delay=%d nesting=%d\n", use_d3d12 ? "d3d12" : use_vulkan ? "vulkan" : "none", !!delayed, nesting);
     puts("START duration_ms=30000 text_period_ms=250 render_timer_ms=16 visual_check_required=1");
     epoch = GetTickCount64();
     ShowWindow(top, SW_SHOWNORMAL);
     if (!SetTimer(top, 1, 16, NULL) || !SetTimer(top, 2, 250, NULL)) return 2;
     while ((result = GetMessageW(&msg, NULL, 0, 0)) > 0) { TranslateMessage(&msg); DispatchMessageW(&msg); }
     if (result == -1) failed = 1;
+    cleanup12();
     cleanup();
+    if (use_d3d12) printf("D3D12 occluded_presents=%llu\n", (unsigned long long)occluded_frames12);
+    if ((use_vulkan || use_d3d12) && !frames) failed = 1;
     printf("SUMMARY failed=%d frames=%llu completed_timeline=%d\n", failed,
            (unsigned long long)frames, GetTickCount64()-epoch >= 30000);
     return failed || GetTickCount64()-epoch < 30000 ? 2 : 0;

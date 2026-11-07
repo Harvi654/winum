@@ -1,4 +1,4 @@
-# Maximized top-level window with a Vulkan child
+# Maximized top-level window with a Vulkan or D3D12 child
 
 Original, AI-assisted (Codex). LGPL-2.1-or-later.
 
@@ -27,9 +27,27 @@ The manifest requests comctl32 v6 and system DPI awareness.
   flight, queue-idle synchronization for command/acquire reuse, and a present
   semaphore per swapchain image, reused only after reacquiring that image.
   The blue clear slowly changes shade to show that frames continue. No Vulkan
-  import library, shader compiler, OpenGL context, D3D12 or DXGI is used.
+  import library, shader compiler or OpenGL context is used in this mode.
 - `--vulkan --delay-vulkan`: same, but create Vulkan at 10 seconds, five seconds
   into the first maximized phase. Before then the child paints with GDI.
+- `--d3d12`: dynamically load `d3d12.dll`/`dxgi.dll`, select a hardware
+  D3D12 device (feature level 11_0, no WARP fallback), and call
+  `CreateSwapChainForHwnd` on the same child. Two RGBA8 backbuffers use
+  `DXGI_SWAP_EFFECT_FLIP_DISCARD`; command lists transition PRESENT →
+  RENDER_TARGET → PRESENT around each clear. `Present(1, 0)` and a GPU fence
+  serialize frames and backbuffer/allocator reuse. Resize waits for the GPU,
+  drops recorded/backbuffer references, calls `ResizeBuffers`, then rebuilds
+  render-target views. This exercises vkd3d-proton plus DXVK's DXGI, with no
+  ray tracing, shaders or proprietary code.
+- `--delay`: common spelling for either Vulkan or D3D12; create the device
+  and swapchain at 10 seconds. `--delay-vulkan` remains a Vulkan-only alias.
+- `--nest=0|1|2`: zero (default), one or two intermediate `WS_CHILD` windows
+  between frame and swapchain child. All modes support the same nesting.
+  Containers use `WS_CLIPCHILDREN`; each level insets the next child by
+  7 px horizontally and 9 px vertically, with symmetric remaining borders.
+  This is an explicit synthetic hierarchy, not a claim to reconstruct
+  Inventor's exact window styles or ownership. `NEST` logs container screen
+  rects; `GEOMETRY` always reports the innermost swapchain child.
 
 The fixed timeline starts after window creation; the title identifies phases:
 
@@ -50,13 +68,18 @@ a themed-v6 comparison. A phase line may still show the previous extent; the fol
 `event=swapchain` line reports the recreated extent. Expected resize
 `OUT_OF_DATE`/`SUBOPTIMAL` results are logged and retried. Other errors exit 2.
 A zero exit status is **not** a visual pass; check `completed_timeline=1` and a
-nonzero final frame count in Vulkan mode. An early manual close is identified
+nonzero final frame count in either graphics mode. D3D12 occlusion is logged
+on transitions and counted separately; occluded presents do not count as frames.
+An early manual close is identified
 by `completed_timeline=0` and exits 2. Startup/usage failures also exit 2.
 
 ## Build
 
 Requires Python-free Bash, x86_64 MinGW GCC/windres, and system Vulkan headers
-(Arch `vulkan-headers`, Debian `libvulkan-dev`).
+(Arch `vulkan-headers`, Debian `libvulkan-dev`). The MinGW installation must
+also provide `d3d12.h`, `dxgi1_4.h` and `libdxguid.a` (tested with MinGW-w64
+12 headers/GCC 14.2). `libdxguid` supplies interface GUIDs only; D3D12/DXGI
+entry points are loaded dynamically. No additional Windows SDK is required.
 
 ```sh
 bash scripts/build-repro-maximized-vulkan-child.sh /path/to/new-repaint-bundle
@@ -153,17 +176,129 @@ assistant reviewed the complete source/build script; its present-semaphore reuse
 finding was addressed with per-image semaphores. It identified no recognizable
 project-specific copied structure; this is not an exhaustive provenance claim.
 
-No RX 580, RX 6400, Windows or Wine visual result is recorded yet. This is a
+At the initial build, no GPU/Windows visual run had been recorded; the later
+RX 580 results below cover the original direct-child Vulkan fixture. This is a
 fixture, not a claim that the fault reproduces or that comctl32 needs changing.
 The comctl32 v2 task has not been started.
 
-If none of the RX 580 Vulkan runs reproduce, **stop and report that result**.
-Next candidates, requiring a separate decision: repeat inside a Wine virtual
-desktop; a D3D12/DXGI child swapchain through vkd3d-proton/DXVK; matching the
-application's child styles/ownership and swapchain lifecycle more closely; then
-an RX 6400 comparison. The GPU rebind is the maintainer's decision, not an
-automatic next step. Do not claim that a negative plain-Vulkan result excludes
-a vkd3d-specific or ray-tracing-specific trigger.
+The RX 580 Vulkan results below motivated the D3D12/nesting extension now
+authorized by the maintainer. D3D12 and nested-window visual results remain
+pending. No Wine patch or comctl32 v2 work is included. The RX 6400 still
+requires the maintainer's separate decision and GPU rebind.
+
+## D3D12 experiment: isolated prefix and RX 580 commands
+
+The source of the pins and copy/override policy is Inventor's
+[`scripts/lib/common.sh`](https://github.com/Harvi654/Autodesk-Inventor-for-Linux/blob/996576aa07b7ff153d341496d23bb76021db1fa2/scripts/lib/common.sh),
+`install_dxvk` and `install_vkd3d` at commit
+`996576aa07b7ff153d341496d23bb76021db1fa2`:
+
+| Archive | SHA-256 |
+| --- | --- |
+| `dxvk-2.7.1.tar.gz` | `d85ce7c79f57ecd765aaa1b9e7007cb875e6fde9f6d331df799bce73d513ce87` |
+| `vkd3d-proton-3.0.1.tar.zst` | `3cf2315522af5e43605ef6d3c41dad91387040bf97199934f3f7ab76caaa2f0c` |
+
+The helper reads the literal pinned defaults from the supplied checkout's
+`common.sh`, without sourcing it or loading Inventor config. It requires these
+versions and verifies SHA-256 before extraction or prefix creation. It takes
+archives from `DOWNLOAD_DIR` (default `<Inventor checkout>/downloads`) when
+present; otherwise it downloads the pinned official GitHub release into a
+temporary directory. Existing cache files are never overwritten or deleted,
+even on mismatch. A custom installer cache can be selected with a separate
+`export DOWNLOAD_DIR=...` line. This uses the **stock pinned 3.0.1** archive,
+not the separate patched ray-payload build; no ray tracing is performed here.
+
+Like the installer, it copies DXVK's x64/x32 DLLs (`dxgi`, `d3d8`, `d3d9`,
+`d3d10core`, `d3d11`) and vkd3d-proton's x64/x86 `d3d12`/`d3d12core` into
+`system32`/`syswow64`, respectively, and sets registry DllOverrides to `native`
+for all seven DLLs plus `d3dcompiler_47`. The clear-only EXE uses only DXGI and
+D3D12; it does not need a shader compiler DLL. A separate prefix holds **only
+this fixture**. The helper refuses any existing destination, paths outside
+`~/.cache`, and nesting inside another prefix. It never selects or modifies
+`~/.wine-inventor2027`. Failed partial prefixes are retained for diagnosis;
+retry with a new directory rather than reusing one.
+
+First build a new bundle and select paths (replace the three checkout/bundle
+paths). Helper dependencies: Bash, Python 3, curl, sha256sum, tar and zstd.
+Use the RX 580/RADV and the existing Inventor Wine 11.20-6 runtime. Do not set
+`WINEDLLOVERRIDES` in the caller: it would take priority over registry settings.
+
+```sh
+export WINUM_REPO=/path/to/winum
+export INVENTOR_REPO=/path/to/Autodesk-Inventor-for-Linux
+export REPRO_BUNDLE=/path/to/new-d3d12-repaint-bundle
+export WINE="$HOME/.local/share/inventor-on-linux/wine-inventor-11.20-6-x86_64/bin/wine"
+export DOWNLOAD_DIR="$INVENTOR_REPO/downloads"
+export WINEDEBUG=-all
+export WINEARCH=win64
+export VKD3D_DEBUG=warn
+export DXVK_LOG_LEVEL=warn
+unset WINEDLLOVERRIDES
+bash "$WINUM_REPO/scripts/build-repro-maximized-vulkan-child.sh" "$REPRO_BUNDLE"
+```
+
+EGL/default X11-driver configuration, new prefix. The prefix path itself must
+not exist; `mktemp` creates only its parent experiment directory:
+
+```sh
+export REPRO_CASE_ROOT="$(mktemp -d "$HOME/.cache/winum-repaint-d3d12-egl.XXXXXX")"
+export WINEPREFIX="$REPRO_CASE_ROOT/prefix"
+export DXVK_LOG_PATH="$REPRO_CASE_ROOT"
+bash "$WINUM_REPO/scripts/setup-repro-d3d12-prefix.sh" "$INVENTOR_REPO" "$WINEPREFIX"
+for depth in 0 1 2; do
+    "$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --none "--nest=$depth" > "$REPRO_CASE_ROOT/none-nest$depth.txt" 2>&1
+    "$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --d3d12 "--nest=$depth" > "$REPRO_CASE_ROOT/d3d12-nest$depth.txt" 2>&1
+    "$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --d3d12 --delay "--nest=$depth" > "$REPRO_CASE_ROOT/d3d12-delay-nest$depth.txt" 2>&1
+done
+```
+
+Then GLX (`UseEGL=N` per EXE) in **another fresh prefix**, with the same DLL
+versions and copies:
+
+```sh
+export REPRO_CASE_ROOT="$(mktemp -d "$HOME/.cache/winum-repaint-d3d12-glx.XXXXXX")"
+export WINEPREFIX="$REPRO_CASE_ROOT/prefix"
+export DXVK_LOG_PATH="$REPRO_CASE_ROOT"
+bash "$WINUM_REPO/scripts/setup-repro-d3d12-prefix.sh" "$INVENTOR_REPO" "$WINEPREFIX"
+"$WINE" reg add 'HKCU\Software\Wine\AppDefaults\maximized-vulkan-child.exe\X11 Driver' /v UseEGL /t REG_SZ /d N /f
+for depth in 0 1 2; do
+    "$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --none "--nest=$depth" > "$REPRO_CASE_ROOT/none-nest$depth.txt" 2>&1
+    "$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --d3d12 "--nest=$depth" > "$REPRO_CASE_ROOT/d3d12-nest$depth.txt" 2>&1
+    "$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --d3d12 --delay "--nest=$depth" > "$REPRO_CASE_ROOT/d3d12-delay-nest$depth.txt" 2>&1
+done
+```
+
+Each matrix takes about 4.5 minutes. As in the original Vulkan runs, the
+EGL/GLX registry setting is an X11-driver configuration comparison; this EXE
+does not create an OpenGL context. Vulkan can also be compared at any nesting
+depth using `--vulkan --delay --nest=1` (or `2`).
+
+For each prefix, return only these fixture lines and the visual result, naming
+the depth and delayed/immediate case:
+
+```sh
+rg '^(CONFIG|START|CONTROL|DEVICE|D3D12|NEST|GEOMETRY|ERROR|SUMMARY)' "$REPRO_CASE_ROOT"/*.txt
+```
+
+Expected healthy D3D12 output includes `CONFIG mode=d3d12 delay=0|1
+nesting=0|1|2`, `CONTROL ... themed=1`, `DEVICE api=d3d12 ...` identifying the
+RX 580 (possibly named RX 480, vendor/device `1002:67df`), and
+`D3D12 started=1 ... swap_effect=FLIP_DISCARD`. Every phase should have a
+`GEOMETRY` record, extents should match the innermost child, frame counts must
+advance after creation, and the final lines should show
+`D3D12 occluded_presents=0` and `SUMMARY failed=0 ... completed_timeline=1`.
+In delayed runs `frames=0` before 10 s is intentional. Any `ERROR`, no
+D3D12 startup, non-advancing frames or occlusion makes that comparison
+incomplete. A healthy summary still says nothing about visual correctness.
+Observe/capture at the same times as above; if all cases remain clean, report
+the negative result and stop before another GPU or a Wine fix.
+
+D3D12 extension validation: MinGW `-Werror` build and PE imports checked;
+actual pinned archives verified and helper copy/override/refusal behavior
+checked with mocked Wine. A second assistant reviewed the D3D12 lifetime,
+nesting and helper isolation; occlusion and cleanup-error reporting findings
+were addressed. This does **not** constitute D3D12 runtime or GPU
+validation. The RX 580 D3D12/nesting matrix remains for the maintainer.
 
 ## Results
 
