@@ -295,3 +295,24 @@ Lukas10999's second observation on NVIDIA (WebView2 home page not
 repainted after closing Application Options until hovered) may be the
 same effect. Next: the same steps inside a Wine virtual desktop
 (`INV_VDESKTOP`), where the window manager does not maximise the window.
+
+### Run 6: inside a Wine virtual desktop (2026-11-07, 03:45)
+
+`INV_VDESKTOP=1920x1000` (explorer `/desktop`), so KDE does not manage
+Inventor's window. Result: the same as on the KDE desktop. Maximised inside
+the virtual desktop with ray tracing: overlapping status text; restored
+(not maximised): the status bar repaints correctly. So it is **not** the
+window manager: it is Wine's own handling of a maximised top-level window
+once a Vulkan swapchain (vkd3d-proton) lives in one of its child windows -
+win32u/winex11 window surface and client surface geometry are the
+candidates (the restored and maximised states differ by the frame offset,
+which matches the few pixels between the old and the new text).
+Side notes from this run, not followed up: in the virtual desktop
+Inventor's New and Open buttons and double-clicking a recent file did not
+work, and input felt worse.
+
+Next (proposal): a synthetic reproducer without Autodesk code - a
+maximised top-level window with a Vulkan swapchain in a child window and a
+status bar whose text changes - run on the RX 580 (plain Vulkan) first,
+to see whether ray tracing is needed at all or any Vulkan swapchain is
+enough.
