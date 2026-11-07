@@ -405,3 +405,22 @@ viewport also has an OpenGL context (the pixel format work in
 `opengl32-window-format-color-bits` is about that context, GLX with
 `UseEGL=N`). Next candidate: an OpenGL child and a D3D12 swapchain in the
 same window tree at the same time.
+
+### 2026-11-07, RX 580, GL + D3D12, GLX (`UseEGL=N`)
+
+Stock `wine-inventor-11.20-6` (without the colour bits patch: the chosen
+format is index 17, 32-bit colour with 8 alpha bits), radeonsi for GL,
+RADV/vkd3d-proton for D3D12. Runs: GL + delayed D3D12 inside the GL child
+(`--nest=2`), GL + delayed D3D12 as a sibling (`--nest=2`), GL alone. All
+`failed=0`, `completed_timeline=1`, GL about 1690 frames, D3D12 about 1120
+frames. Visual result: **no overlap.**
+
+Summary of the fixture so far: on the RX 580 alone, no combination of a
+maximised window with Vulkan, D3D12, OpenGL or OpenGL + D3D12 children
+reproduces the fault. What Inventor's failing runs had in addition:
+rendering on a **second GPU** (RX 6400 via `DRI_PRIME`, display on the
+RX 580 - a PRIME offload path), GPU ray tracing itself, and the patched
+vkd3d-proton. Lukas10999's NVIDIA report has to be checked for a second
+GPU too. Next, when the RX 6400 is bound to amdgpu again: the same fixture
+runs with `DRI_PRIME=pci-0000_23_00_0` and `INV_GPU`-style device
+filters, before going back to Inventor.
