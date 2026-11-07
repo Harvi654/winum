@@ -401,9 +401,13 @@ int main(int argc, char **argv)
     if (!child || !status || !SetWindowSubclass(status, status_proc, 1, 0)) return 2;
     {
         DLLVERSIONINFO version = {0};
-        HMODULE module = (HMODULE)GetClassLongPtrW(status, GCLP_HMODULE);
-        HRESULT (CALLBACK *get_version)(DLLVERSIONINFO *) =
-            (void *)GetProcAddress(module, "DllGetVersion");
+        HMODULE module = NULL;
+        HRESULT (CALLBACK *get_version)(DLLVERSIONINFO *) = NULL;
+        /* A global class may have no class HINSTANCE (Wine): resolve the
+           module of the class procedure, as the status bar MEASURE does. */
+        if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                               (LPCWSTR)(ULONG_PTR)GetClassLongPtrW(status, GCLP_WNDPROC), &module))
+            get_version = (void *)GetProcAddress(module, "DllGetVersion");
         version.cbSize = sizeof(version);
         if (!get_version || FAILED(get_version(&version)) || version.dwMajorVersion != 6)
         { puts("ERROR status class is not comctl32 v6"); DestroyWindow(top); return 2; }
