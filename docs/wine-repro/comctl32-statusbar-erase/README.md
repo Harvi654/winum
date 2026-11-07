@@ -726,5 +726,10 @@ XRender library, X server, Mesa or Wine implementation defect is claimed yet.
 
 The maintainer confirmed the desktop session is Wayland, so the measured X11
 driver runs use XWayland. A [native-Wayland control](../winewayland-inventor/README.md)
-is prepared on a private copy of the Inventor prefix, with explicit backend
-selection and active-driver verification. No result is claimed before it runs.
+was prepared on a private copy of the Inventor prefix, with explicit backend
+selection and an active-driver verification procedure. The maintainer later
+reported working ray tracing but broken WebView, abnormal dialogs, inability
+to type dimension values and unsatisfactory window-state transitions. The
+verification output/log was not returned, so no exact backend API failure is
+identified. The practical direction remains the tested XWayland/X11 path with
+the XRender workaround; native-Wayland UI compatibility is outside this fix.

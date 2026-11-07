@@ -1,7 +1,7 @@
 # Inventor native-Wayland control (2026-11-07)
 
-Prepared by Codex. Commands/procedure only; no Wine patch or claimed runtime
-result. See the [status-bar investigation](../comctl32-statusbar-erase/README.md)
+Prepared by Codex. No Wine patch. The procedure and subsequent maintainer
+result are recorded here. See the [status-bar investigation](../comctl32-statusbar-erase/README.md)
 for the XRender workaround and remaining frame artefact after ray tracing.
 
 The maintainer confirmed a Wayland desktop session. The measured runs use
@@ -162,3 +162,40 @@ Keep the copied prefix and logs until the result is assessed. The next normal
 launch uses the existing original-prefix gpurt-v3 procedure. This control
 does not copy new DLLs, change GPU binding, or establish general native-Wayland
 CAD compatibility from a single successful launch.
+
+## Maintainer result and decision (2026-11-07)
+
+The installed original gpurt-v3 build contains both native-Wayland driver
+files, the session is Wayland, and RX 6400 is bound to amdgpu. The maintainer
+reported after following the native-control procedure:
+
+| Check | Reported result |
+| --- | --- |
+| WebView content | Does not work |
+| Dialogs | Abnormal appearance/behaviour |
+| Dimension value entry | Cannot type values |
+| GPU ray tracing | Works |
+| Restore Down/maximise | Abnormal, not satisfactory |
+
+The active-driver registry output and a filtered diagnostic log have not been
+returned. Record these as the maintainer's native-test observations, not a
+symbol-level attribution of each fault or an instrument-verified backend
+comparison. In particular, working ray tracing is not a general UI pass.
+
+The practical working direction for this investigation remains Wine's X11
+driver through XWayland, with per-application `ClientSideWithRender=N` and
+the previously tested GLX/gpurt-v3 configuration. That path already passed
+ordinary Inventor menus, part/assembly/drawing/PDF, dimension entry and
+save/restart/reopen tests, with the post-ray-tracing frame artefact still
+open. The native control introduces multiple basic UI failures, so expanding
+this task into focus/input/popup/WebView compatibility work would substantially
+increase scope without an established fix for the original fault.
+
+Likely areas of compatibility work include Windows focus/text input, hosted
+child windows and popup/dialog placement in the Wayland backend, but no exact
+failed API or implementation defect is identified by this visual report.
+Do not label the Linux Wayland desktop, WebView itself or Autodesk code as
+the proven cause. The native-Wayland control is not recommended for ordinary
+Inventor use in the tested configuration. Keep its copied prefix for later
+comparison and return to the original X11 prefix; no production patch or
+desktop/session change is required by this decision.
