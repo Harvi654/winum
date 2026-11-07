@@ -1,4 +1,4 @@
-# Maximized top-level window with a Vulkan or D3D12 child
+# Maximized window: OpenGL, Vulkan and D3D12 children
 
 Original, AI-assisted (Codex). LGPL-2.1-or-later.
 
@@ -6,7 +6,8 @@ A synthetic fixture for the [status-bar investigation](../comctl32-statusbar-era
 Inventor showed overlapping status text only after GPU ray tracing created a
 Vulkan swapchain in a child, and only while maximized, including inside a Wine
 virtual desktop. Its erase handler still filled the supplied DC and returned 1.
-This fixture asks whether an ordinary child Vulkan swapchain is sufficient.
+This fixture isolates plain Vulkan/D3D12 presentation and then concurrent
+OpenGL/D3D12 in one window tree.
 It contains no Autodesk code, assets, vendor binaries, ray tracing or Wine fix.
 
 ## What it does
@@ -20,7 +21,7 @@ same, and a light fill keeps the theme's dark text readable). `SB_SETTEXTW` alte
 `Ready` every 250 ms; no extra manual erase is added to the text setter.
 The manifest requests comctl32 v6 and system DPI awareness.
 
-- `--none`: ordinary GDI child; does not load Vulkan.
+- `--none`: ordinary GDI child; no graphics context or swapchain.
 - `--vulkan`: load `vulkan-1.dll` at runtime and use `vkGetInstanceProcAddr`;
   create `VK_KHR_win32_surface` on the **child**, a graphics/present queue,
   and a FIFO swapchain. Clear and present continuously, with one frame in
@@ -39,15 +40,42 @@ The manifest requests comctl32 v6 and system DPI awareness.
   drops recorded/backbuffer references, calls `ResizeBuffers`, then rebuilds
   render-target views. This exercises vkd3d-proton plus DXVK's DXGI, with no
   ray tracing, shaders or proprietary code.
+- `--gl`: legacy WGL context on the innermost viewport child (`CS_OWNDC`).
+  `ChoosePixelFormat` requests a window RGBA format, 32-bit colour, 24-bit depth,
+  double buffering, **zero requested alpha** and no requested stencil.
+  `SetPixelFormat` runs once, followed by `wglCreateContext`; no extensions or
+  ARB format selection are used. The request is the simple 32-bit/no-alpha
+  choice from the [pixel-format investigation](../opengl32-pixel-format-alpha/README.md),
+  not Inventor's separate two-stage capability check. The actual format may
+  include alpha: it is printed, not forced to zero. Every render tick uses
+  `glViewport`, `glClear` (colour/depth) and `SwapBuffers`. Green shades identify GL.
+- `--gl --d3d12`: GL starts before the timeline and continues while D3D12 runs.
+  The WGL context remains current on the main thread during D3D12 creation and
+  presentation. `--d3d12-placement=child` (default) creates a **new HWND inside
+  the GL child**, centred at half its width/height, leaving a visible green GL
+  border around blue D3D12. `--d3d12-placement=sibling` creates a **new HWND
+  with the same parent as the GL child**. GL occupies the left half, D3D12 the
+  right; that space is reserved from the beginning so starting D3D12 does not
+  itself resize GL. The D3D12 HWND/device/swapchain are all created when D3D12
+  starts, at 10 s with `--delay`, otherwise on the first render tick.
+  Both layouts keep the requested `--nest` chain above GL; the inside-child
+  variant adds one more level for the swapchain. These are deliberately
+  different HWNDs: no GL and DXGI presentation target the same HWND.
 - `--delay`: common spelling for either Vulkan or D3D12; create the device
-  and swapchain at 10 seconds. `--delay-vulkan` remains a Vulkan-only alias.
+  and swapchain at 10 seconds. In `--gl --d3d12` it delays **only D3D12**;
+  GL already runs before the first maximize at 5 s. GL-only `--delay` is rejected.
+  `--delay-vulkan` remains a Vulkan-only alias. GL cannot combine with `--none`
+  or `--vulkan`; placement options require `--gl --d3d12`.
 - `--nest=0|1|2`: zero (default), one or two intermediate `WS_CHILD` windows
   between frame and swapchain child. All modes support the same nesting.
   Containers use `WS_CLIPCHILDREN`; each level insets the next child by
   7 px horizontally and 9 px vertically, with symmetric remaining borders.
   This is an explicit synthetic hierarchy, not a claim to reconstruct
   Inventor's exact window styles or ownership. `NEST` logs container screen
-  rects; `GEOMETRY` always reports the innermost swapchain child.
+  rects; `GEOMETRY` reports the D3D12 HWND once created, otherwise the original
+  viewport child. `GL_GEOMETRY` separately reports GL screen/client rects and
+  its frame count. In GL-only mode swapchain `extent`/`frames` stay zero;
+  `gl_frames` is the useful counter.
 
 The fixed timeline starts after window creation; the title identifies phases:
 
@@ -68,7 +96,8 @@ a themed-v6 comparison. A phase line may still show the previous extent; the fol
 `event=swapchain` line reports the recreated extent. Expected resize
 `OUT_OF_DATE`/`SUBOPTIMAL` results are logged and retried. Other errors exit 2.
 A zero exit status is **not** a visual pass; check `completed_timeline=1` and a
-nonzero final frame count in either graphics mode. D3D12 occlusion is logged
+nonzero final frame count for each active API (`frames` for Vulkan/D3D12,
+`gl_frames` for GL). D3D12 occlusion is logged
 on transitions and counted separately; occluded presents do not count as frames.
 An early manual close is identified
 by `completed_timeline=0` and exits 2. Startup/usage failures also exit 2.
@@ -79,7 +108,9 @@ Requires Python-free Bash, x86_64 MinGW GCC/windres, and system Vulkan headers
 (Arch `vulkan-headers`, Debian `libvulkan-dev`). The MinGW installation must
 also provide `d3d12.h`, `dxgi1_4.h` and `libdxguid.a` (tested with MinGW-w64
 12 headers/GCC 14.2). `libdxguid` supplies interface GUIDs only; D3D12/DXGI
-entry points are loaded dynamically. No additional Windows SDK is required.
+entry points are loaded dynamically. WGL/OpenGL 1.1 also loads dynamically:
+only `--gl` loads `opengl32.dll` and creates a GL context, preserving the
+original controls' DLL-loading behavior. No additional Windows SDK is required.
 
 ```sh
 bash scripts/build-repro-maximized-vulkan-child.sh /path/to/new-repaint-bundle
@@ -98,8 +129,10 @@ and builds with `-Wall -Wextra -Werror`. The bundle contains the EXE, original
 source, manifest, README, license and SHA-256 sums. No registry exports or logs
 are added to the repository.
 
-## Maintainer sequence: RX 580 first
+## Original Vulkan-only sequence (historical reference)
 
+The current requested runs are the six-run GL+D3D12 sequence below. These
+original commands document the preceding Vulkan-only experiment.
 Keep the RX 580 selected. Use the same visible, quiet desktop for all runs.
 Replace the bundle path below. These commands select the requested Inventor
 baseline without changing any existing prefix. Wine may populate its normal
@@ -150,7 +183,7 @@ oracle or automated visual assertion.
 Return only the fixture's bounded text, for each prefix, for example:
 
 ```sh
-rg '^(START|CONTROL|DEVICE|VULKAN|GEOMETRY|ERROR|SUMMARY)' "$WINEPREFIX/none.txt" "$WINEPREFIX/vulkan.txt" "$WINEPREFIX/vulkan-delay.txt"
+grep -E '^(START|CONTROL|DEVICE|VULKAN|GEOMETRY|ERROR|SUMMARY)' "$WINEPREFIX/none.txt" "$WINEPREFIX/vulkan.txt" "$WINEPREFIX/vulkan-delay.txt"
 ```
 
 Finally, a **program sanity check only** in the offline Windows 10 x64 VM:
@@ -181,12 +214,11 @@ RX 580 results below cover the original direct-child Vulkan fixture. This is a
 fixture, not a claim that the fault reproduces or that comctl32 needs changing.
 The comctl32 v2 task has not been started.
 
-The RX 580 Vulkan results below motivated the D3D12/nesting extension now
-authorized by the maintainer. D3D12 and nested-window visual results remain
-pending. No Wine patch or comctl32 v2 work is included. The RX 6400 still
+The RX 580 Vulkan and D3D12 results below motivated concurrent GL+D3D12.
+Concurrent-API visual results remain pending. No Wine patch or comctl32 v2 work is included. The RX 6400 still
 requires the maintainer's separate decision and GPU rebind.
 
-## D3D12 experiment: isolated prefix and RX 580 commands
+## GL+D3D12 experiment: isolated prefix and six RX 580 runs
 
 The source of the pins and copy/override policy is Inventor's
 [`scripts/lib/common.sh`](https://github.com/Harvi654/Autodesk-Inventor-for-Linux/blob/996576aa07b7ff153d341496d23bb76021db1fa2/scripts/lib/common.sh),
@@ -226,7 +258,7 @@ Use the RX 580/RADV and the existing Inventor Wine 11.20-6 runtime. Do not set
 ```sh
 export WINUM_REPO=/path/to/winum
 export INVENTOR_REPO=/path/to/Autodesk-Inventor-for-Linux
-export REPRO_BUNDLE=/path/to/new-d3d12-repaint-bundle
+export REPRO_BUNDLE=/path/to/new-gl-d3d12-repaint-bundle
 export WINE="$HOME/.local/share/inventor-on-linux/wine-inventor-11.20-6-x86_64/bin/wine"
 export DOWNLOAD_DIR="$INVENTOR_REPO/downloads"
 export WINEDEBUG=-all
@@ -237,68 +269,99 @@ unset WINEDLLOVERRIDES
 bash "$WINUM_REPO/scripts/build-repro-maximized-vulkan-child.sh" "$REPRO_BUNDLE"
 ```
 
+Keep the RX 580 selected. Run the same **six** cases below in each prefix,
+most Inventor-like first. Cases 1–2 start GL immediately, maximize at 5 s,
+then create D3D12 at 10 s. Cases 3–4 compare immediate D3D12 creation, case 5
+is GL alone, and case 6 removes the two intermediate parents. All last 30 s,
+so the matrix takes about three minutes per prefix.
+
 EGL/default X11-driver configuration, new prefix. The prefix path itself must
-not exist; `mktemp` creates only its parent experiment directory:
+not exist; `mktemp` creates only its parent experiment directory. This reuses
+the same verified D3D12-prefix helper as the previous experiment; it does not
+touch the Inventor prefix. Always use a new bundle path for the new EXE.
 
 ```sh
-export REPRO_CASE_ROOT="$(mktemp -d "$HOME/.cache/winum-repaint-d3d12-egl.XXXXXX")"
+export REPRO_CASE_ROOT="$(mktemp -d "$HOME/.cache/winum-repaint-gl-d3d12-egl.XXXXXX")"
 export WINEPREFIX="$REPRO_CASE_ROOT/prefix"
 export DXVK_LOG_PATH="$REPRO_CASE_ROOT"
 bash "$WINUM_REPO/scripts/setup-repro-d3d12-prefix.sh" "$INVENTOR_REPO" "$WINEPREFIX"
-for depth in 0 1 2; do
-    "$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --none "--nest=$depth" > "$REPRO_CASE_ROOT/none-nest$depth.txt" 2>&1
-    "$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --d3d12 "--nest=$depth" > "$REPRO_CASE_ROOT/d3d12-nest$depth.txt" 2>&1
-    "$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --d3d12 --delay "--nest=$depth" > "$REPRO_CASE_ROOT/d3d12-delay-nest$depth.txt" 2>&1
-done
+"$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --gl --d3d12 --d3d12-placement=child --delay --nest=2 > "$REPRO_CASE_ROOT/01-child-delay-n2.txt" 2>&1
+"$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --gl --d3d12 --d3d12-placement=sibling --delay --nest=2 > "$REPRO_CASE_ROOT/02-sibling-delay-n2.txt" 2>&1
+"$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --gl --d3d12 --d3d12-placement=child --nest=2 > "$REPRO_CASE_ROOT/03-child-immediate-n2.txt" 2>&1
+"$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --gl --d3d12 --d3d12-placement=sibling --nest=2 > "$REPRO_CASE_ROOT/04-sibling-immediate-n2.txt" 2>&1
+"$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --gl --nest=2 > "$REPRO_CASE_ROOT/05-gl-only-n2.txt" 2>&1
+"$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --gl --d3d12 --d3d12-placement=child --delay --nest=0 > "$REPRO_CASE_ROOT/06-child-delay-n0.txt" 2>&1
+grep -E '^(CONFIG|START|CONTROL|GL|DEVICE|D3D12|NEST|GEOMETRY|ERROR|SUMMARY)' "$REPRO_CASE_ROOT"/*.txt
 ```
 
-Then GLX (`UseEGL=N` per EXE) in **another fresh prefix**, with the same DLL
-versions and copies:
+Then GLX (`UseEGL=N` for this EXE), with another dedicated prefix and the same
+six cases. With a real GL context active, this now exercises the EGL/GLX path
+rather than just a registry configuration for a Vulkan-only program.
 
 ```sh
-export REPRO_CASE_ROOT="$(mktemp -d "$HOME/.cache/winum-repaint-d3d12-glx.XXXXXX")"
+export REPRO_CASE_ROOT="$(mktemp -d "$HOME/.cache/winum-repaint-gl-d3d12-glx.XXXXXX")"
 export WINEPREFIX="$REPRO_CASE_ROOT/prefix"
 export DXVK_LOG_PATH="$REPRO_CASE_ROOT"
 bash "$WINUM_REPO/scripts/setup-repro-d3d12-prefix.sh" "$INVENTOR_REPO" "$WINEPREFIX"
 "$WINE" reg add 'HKCU\Software\Wine\AppDefaults\maximized-vulkan-child.exe\X11 Driver' /v UseEGL /t REG_SZ /d N /f
-for depth in 0 1 2; do
-    "$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --none "--nest=$depth" > "$REPRO_CASE_ROOT/none-nest$depth.txt" 2>&1
-    "$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --d3d12 "--nest=$depth" > "$REPRO_CASE_ROOT/d3d12-nest$depth.txt" 2>&1
-    "$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --d3d12 --delay "--nest=$depth" > "$REPRO_CASE_ROOT/d3d12-delay-nest$depth.txt" 2>&1
-done
+"$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --gl --d3d12 --d3d12-placement=child --delay --nest=2 > "$REPRO_CASE_ROOT/01-child-delay-n2.txt" 2>&1
+"$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --gl --d3d12 --d3d12-placement=sibling --delay --nest=2 > "$REPRO_CASE_ROOT/02-sibling-delay-n2.txt" 2>&1
+"$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --gl --d3d12 --d3d12-placement=child --nest=2 > "$REPRO_CASE_ROOT/03-child-immediate-n2.txt" 2>&1
+"$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --gl --d3d12 --d3d12-placement=sibling --nest=2 > "$REPRO_CASE_ROOT/04-sibling-immediate-n2.txt" 2>&1
+"$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --gl --nest=2 > "$REPRO_CASE_ROOT/05-gl-only-n2.txt" 2>&1
+"$WINE" "$REPRO_BUNDLE/maximized-vulkan-child.exe" --gl --d3d12 --d3d12-placement=child --delay --nest=0 > "$REPRO_CASE_ROOT/06-child-delay-n0.txt" 2>&1
+grep -E '^(CONFIG|START|CONTROL|GL|DEVICE|D3D12|NEST|GEOMETRY|ERROR|SUMMARY)' "$REPRO_CASE_ROOT"/*.txt
 ```
 
-Each matrix takes about 4.5 minutes. As in the original Vulkan runs, the
-EGL/GLX registry setting is an X11-driver configuration comparison; this EXE
-does not create an OpenGL context. Vulkan can also be compared at any nesting
-depth using `--vulkan --delay --nest=1` (or `2`).
+Expected output for combination runs:
 
-For each prefix, return only these fixture lines and the visual result, naming
-the depth and delayed/immediate case:
+- `CONFIG mode=gl+d3d12 ... placement=child|sibling` and `CONTROL ... themed=1`.
+- `GL_FORMAT ... requested_color=32 requested_depth=24 requested_alpha=0` and
+  the actual alpha/depth/colour/flags. An actual nonzero alpha is permitted;
+  compare the recorded actual formats between EGL and GLX.
+- `GL_DEVICE` identifies the OpenGL renderer; confirm it is the RX 580 and
+  not a software renderer. `GL started=1` precedes the timeline's first phase.
+- `GL_GEOMETRY ... gl_frames=...` counts should advance before and after
+  D3D12 creation. In delayed runs they must already be nonzero at the first
+  maximize, when D3D12 `frames=0` and `d3d12_child=0` are still intentional.
+- `D3D12_WINDOW placement=... created_at_ms=...` appears around 10000 ms with
+  `--delay`, near zero otherwise. `D3D12 started=1 ... FLIP_DISCARD` follows;
+  `DEVICE api=d3d12 ...` should identify the same GPU as GL.
+- After creation `GEOMETRY` records the D3D12 HWND and its swapchain extent;
+  `GL_GEOMETRY` remains separate. Both frame counters should keep advancing.
+- Final `D3D12 occluded_presents=0` and
+  `SUMMARY failed=0 frames=... gl_frames=... completed_timeline=1`, with both
+  counters nonzero. GL-only deliberately has `frames=0`, positive `gl_frames`,
+  no D3D12 startup and `placement=none`.
 
-```sh
-rg '^(CONFIG|START|CONTROL|DEVICE|D3D12|NEST|GEOMETRY|ERROR|SUMMARY)' "$REPRO_CASE_ROOT"/*.txt
-```
+Look for the same status-text overlap, changed text baseline and displaced
+viewport borders as before. Green is GL; blue is D3D12. A blue centre with a
+green border in the inside-child case, or green left/blue right in the sibling
+case, is the intended layout. A brief presentation change when the D3D12 HWND
+appears at 10 s is not itself the status-bar fault. Capture the whole window at
+8–9 s (GL only), 12–14 s (D3D12 running, maximized), 17–19 s (restored) and
+25–28 s (maximized again) if something changes. Report the case number and
+EGL/GLX setting, the bounded output above and whether restore clears the fault.
+Any API error, no D3D12 startup, non-advancing required counter or occluded
+presents makes that visual comparison incomplete. A healthy summary is not a
+visual pass. If all six cases per prefix stay clean, report the negative result
+and stop before changing GPU or writing a Wine patch.
 
-Expected healthy D3D12 output includes `CONFIG mode=d3d12 delay=0|1
-nesting=0|1|2`, `CONTROL ... themed=1`, `DEVICE api=d3d12 ...` identifying the
-RX 580 (possibly named RX 480, vendor/device `1002:67df`), and
-`D3D12 started=1 ... swap_effect=FLIP_DISCARD`. Every phase should have a
-`GEOMETRY` record, extents should match the innermost child, frame counts must
-advance after creation, and the final lines should show
-`D3D12 occluded_presents=0` and `SUMMARY failed=0 ... completed_timeline=1`.
-In delayed runs `frames=0` before 10 s is intentional. Any `ERROR`, no
-D3D12 startup, non-advancing frames or occlusion makes that comparison
-incomplete. A healthy summary still says nothing about visual correctness.
-Observe/capture at the same times as above; if all cases remain clean, report
-the negative result and stop before another GPU or a Wine fix.
-
-D3D12 extension validation: MinGW `-Werror` build and PE imports checked;
+Prior D3D12 extension validation: MinGW `-Werror` build and PE imports checked;
 actual pinned archives verified and helper copy/override/refusal behavior
-checked with mocked Wine. A second assistant reviewed the D3D12 lifetime,
-nesting and helper isolation; occlusion and cleanup-error reporting findings
-were addressed. This does **not** constitute D3D12 runtime or GPU
-validation. The RX 580 D3D12/nesting matrix remains for the maintainer.
+checked with mocked Wine. The maintainer subsequently ran the D3D12 helper and
+four EGL D3D12 cases successfully; see Results. The GL extension's build and
+review checks do not constitute GL+D3D12 runtime or GPU validation; those new
+visual results remain pending. On 2026-11-07 the GL extension compiled with
+MinGW GCC 14.2 using `-Wall -Wextra -Werror`; the bundle hashes and absence
+of OpenGL/Vulkan/D3D12/DXGI static imports were checked. All shell
+snippets passed `bash -n`; both active matrices contain exactly six identical
+case commands in the documented order. A second assistant reviewed WGL/DC
+lifetime, delayed HWND creation and layout, and identified no recognizable
+project-specific copied structure (not an exhaustive provenance claim). Its
+background-erase observation was addressed by restricting the new class
+background brushes to GL runs; original modes retain their previous painting.
+
 
 ## Results
 

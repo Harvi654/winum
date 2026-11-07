@@ -1,6 +1,6 @@
 /* Original, AI-assisted (Codex)
  * SPDX-License-Identifier: LGPL-2.1-or-later
- * Public Win32/Vulkan/D3D12 APIs only; no application code or private interfaces. */
+ * Public Win32/WGL/Vulkan/D3D12 APIs only; no application code or private interfaces. */
 #define COBJMACROS
 #define WIDL_C_INLINE_WRAPPERS
 #define WIN32_LEAN_AND_MEAN
@@ -13,6 +13,7 @@
 #include <vulkan/vulkan.h>
 #include <d3d12.h>
 #include <dxgi1_4.h>
+#include <GL/gl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,7 +36,8 @@ static PFN_vkCreateInstance vkCreateInstance;
 static PFN_vkGetInstanceProcAddr get_proc;
 static HMODULE loader;
 static HWND top, child, status, containers[2];
-static int nesting, use_d3d12;
+static int nesting, use_d3d12, use_gl, sibling12, placement_selected;
+static HWND child12;
 static int use_vulkan, delayed, started, failed, phase = -1, dirty = 1;
 static ULONGLONG epoch, frames;
 static VkInstance instance;
@@ -62,11 +64,111 @@ static int check(VkResult result, const char *operation)
 }
 #define CHECK(call) do { if (!check((call), #call)) return 0; } while (0)
 
+/* Legacy WGL only: match the requested window format without extensions. */
+static HMODULE gl_module;
+static HGLRC (WINAPI *create_gl_context)(HDC);
+static BOOL (WINAPI *delete_gl_context)(HGLRC);
+static BOOL (WINAPI *make_gl_current)(HDC, HGLRC);
+static const GLubyte *(APIENTRY *get_gl_string)(GLenum);
+static void (APIENTRY *viewport_gl)(GLint, GLint, GLsizei, GLsizei);
+static void (APIENTRY *clear_color_gl)(GLclampf, GLclampf, GLclampf, GLclampf);
+static void (APIENTRY *clear_gl)(GLbitfield);
+static GLenum (APIENTRY *get_gl_error)(void);
+static HDC gl_dc;
+static HGLRC gl_context;
+static int gl_started;
+static ULONGLONG gl_frames;
+
+static int gl_win32_error(const char *operation)
+{
+    printf("ERROR operation=%s win32=%lu\n", operation, GetLastError());
+    return 0;
+}
+
+static void cleanup_gl(void)
+{
+    if (gl_context)
+    {
+        if (!make_gl_current(NULL, NULL)) { gl_win32_error("wglMakeCurrent(NULL)"); failed = 1; }
+        if (!delete_gl_context(gl_context)) { gl_win32_error("wglDeleteContext"); failed = 1; }
+        gl_context = NULL;
+    }
+    if (gl_dc) { ReleaseDC(child, gl_dc); gl_dc = NULL; }
+    gl_started = 0;
+    if (gl_module) { FreeLibrary(gl_module); gl_module = NULL; }
+}
+
+static int init_gl(void)
+{
+    PIXELFORMATDESCRIPTOR requested = {0}, actual = {0};
+    int format;
+    gl_module = LoadLibraryW(L"opengl32.dll");
+    if (!gl_module) return gl_win32_error("LoadLibrary(opengl32.dll)");
+#define LOAD_GL(target, name) do { \
+    target = (void *)GetProcAddress(gl_module, name); \
+    if (!target) { printf("ERROR missing_gl_entry=%s\n", name); return 0; } \
+} while (0)
+    LOAD_GL(create_gl_context, "wglCreateContext");
+    LOAD_GL(delete_gl_context, "wglDeleteContext");
+    LOAD_GL(make_gl_current, "wglMakeCurrent");
+    LOAD_GL(get_gl_string, "glGetString");
+    LOAD_GL(viewport_gl, "glViewport");
+    LOAD_GL(clear_color_gl, "glClearColor");
+    LOAD_GL(clear_gl, "glClear");
+    LOAD_GL(get_gl_error, "glGetError");
+#undef LOAD_GL
+    requested.nSize = sizeof(requested); requested.nVersion = 1;
+    requested.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+    requested.iPixelType = PFD_TYPE_RGBA;
+    requested.cColorBits = 32; requested.cDepthBits = 24;
+    /* Alpha/stencil remain zero; do not request an ARB format or set it twice. */
+    gl_dc = GetDC(child);
+    if (!gl_dc) return gl_win32_error("GetDC(GL child)");
+    format = ChoosePixelFormat(gl_dc, &requested);
+    if (!format) return gl_win32_error("ChoosePixelFormat");
+    if (!DescribePixelFormat(gl_dc, format, sizeof(actual), &actual)) return gl_win32_error("DescribePixelFormat");
+    printf("GL_FORMAT index=%d requested_color=32 requested_depth=24 requested_alpha=0 "
+           "actual_color=%u alpha=%u depth=%u stencil=%u flags=%08lx\n", format,
+           actual.cColorBits, actual.cAlphaBits, actual.cDepthBits, actual.cStencilBits, actual.dwFlags);
+    if ((actual.dwFlags & requested.dwFlags) != requested.dwFlags || actual.iPixelType != PFD_TYPE_RGBA)
+    { puts("ERROR chosen GL format lacks required window/OpenGL/double-buffer capabilities"); return 0; }
+    if (!SetPixelFormat(gl_dc, format, &actual)) return gl_win32_error("SetPixelFormat");
+    gl_context = create_gl_context(gl_dc);
+    if (!gl_context) return gl_win32_error("wglCreateContext");
+    if (!make_gl_current(gl_dc, gl_context)) return gl_win32_error("wglMakeCurrent");
+    const GLubyte *vendor = get_gl_string(GL_VENDOR), *renderer = get_gl_string(GL_RENDERER), *version = get_gl_string(GL_VERSION);
+    if (!vendor || !renderer || !version) { puts("ERROR GL identity unavailable"); return 0; }
+    printf("GL_DEVICE vendor=%s renderer=%s version=%s\n", vendor, renderer, version);
+    gl_started = 1;
+    puts("GL started=1 context=legacy window_format=1 double_buffer=1");
+    return 1;
+}
+
+static int frame_gl(void)
+{
+    RECT rect;
+    GLenum error;
+    GetClientRect(child, &rect);
+    if (!rect.right || !rect.bottom) return 1;
+    /* Keep this context current while D3D12 is created/presented on this thread. */
+    if (!make_gl_current(gl_dc, gl_context)) return gl_win32_error("wglMakeCurrent(frame)");
+    viewport_gl(0, 0, rect.right, rect.bottom);
+    clear_color_gl(0.08f, 0.26f + (float)((gl_frames / 60) % 4) * 0.025f, 0.10f, 1.0f);
+    clear_gl(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    error = get_gl_error();
+    if (error != GL_NO_ERROR) { printf("ERROR operation=glClear/Viewport GLenum=%04x\n", error); return 0; }
+    if (!SwapBuffers(gl_dc)) return gl_win32_error("SwapBuffers");
+    ++gl_frames;
+    return 1;
+}
+
+static void layout(void);
+
 static void geometry(const char *event)
 {
     RECT w, c, v, s;
     GetWindowRect(top, &w); GetClientRect(top, &c);
-    GetWindowRect(child, &v); GetWindowRect(status, &s);
+    GetWindowRect(child12 ? child12 : child, &v); GetWindowRect(status, &s);
     printf("GEOMETRY event=%s phase=%d zoomed=%d window=%ld,%ld,%ld,%ld "
            "client=%ld,%ld,%ld,%ld child_screen=%ld,%ld,%ld,%ld "
            "status_screen=%ld,%ld,%ld,%ld extent=%u,%u frames=%llu\n",
@@ -74,6 +176,14 @@ static void geometry(const char *event)
            c.left,c.top,c.right,c.bottom,v.left,v.top,v.right,v.bottom,
            s.left,s.top,s.right,s.bottom,extent.width,extent.height,
            (unsigned long long)frames);
+    if (use_gl)
+    {
+        RECT g, gc;
+        GetWindowRect(child, &g); GetClientRect(child, &gc);
+        printf("GL_GEOMETRY phase=%d screen=%ld,%ld,%ld,%ld client=%ld,%ld gl_frames=%llu d3d12_child=%d\n",
+               phase,g.left,g.top,g.right,g.bottom,gc.right,gc.bottom,
+               (unsigned long long)gl_frames, child12 != NULL);
+    }
     for (int i = 0; i < nesting; ++i)
     {
         RECT r;
@@ -378,6 +488,16 @@ static int init12(void)
     DXGI_SWAP_CHAIN_DESC1 desc = {0};
     IDXGISwapChain1 *chain;
     RECT rect;
+    if (use_gl)
+    {
+        child12 = CreateWindowW(L"SyntheticChild", NULL, WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+                                0,0,1,1,sibling12 ? GetParent(child) : child,NULL,GetModuleHandleW(NULL),NULL);
+        if (!child12) return gl_win32_error("CreateWindow(D3D12 child)");
+        layout();
+        printf("D3D12_WINDOW placement=%s created_at_ms=%llu\n", sibling12 ? "sibling" : "child",
+               (unsigned long long)(GetTickCount64() - epoch));
+    }
+    else child12 = child;
     dxgi_module = LoadLibraryW(L"dxgi.dll");
     d3d_module = LoadLibraryW(L"d3d12.dll");
     if (!dxgi_module || !d3d_module)
@@ -425,13 +545,13 @@ static int init12(void)
     HR(ID3D12Device_CreateFence(device12, 0, D3D12_FENCE_FLAG_NONE, &IID_ID3D12Fence, (void **)&fence12));
     event12 = CreateEventW(NULL, FALSE, FALSE, NULL);
     if (!event12) { printf("ERROR D3D12 CreateEvent win32=%lu\n", GetLastError()); return 0; }
-    GetClientRect(child, &rect);
+    GetClientRect(child12, &rect);
     desc.Width = rect.right; desc.Height = rect.bottom;
     desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; desc.SampleDesc.Count = 1;
     desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; desc.BufferCount = 2;
     desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     desc.Scaling = DXGI_SCALING_STRETCH; desc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
-    HR(IDXGIFactory2_CreateSwapChainForHwnd(factory12, (IUnknown *)queue12, child, &desc, NULL, NULL, &chain));
+    HR(IDXGIFactory2_CreateSwapChainForHwnd(factory12, (IUnknown *)queue12, child12, &desc, NULL, NULL, &chain));
     HRESULT hr = IDXGISwapChain1_QueryInterface(chain, &IID_IDXGISwapChain3, (void **)&swap12);
     IDXGISwapChain1_Release(chain);
     HR(hr);
@@ -453,7 +573,7 @@ static int frame12(void)
     FLOAT color[4] = {0.06f, 0.17f, 0.28f, 1.0f};
     UINT index;
     HRESULT hr;
-    GetClientRect(child, &rect);
+    GetClientRect(child12, &rect);
     if (!rect.right || !rect.bottom) return 1;
     if (dirty)
     {
@@ -529,7 +649,7 @@ static LRESULT CALLBACK child_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     {
         PAINTSTRUCT ps;
         HDC dc = BeginPaint(hwnd, &ps);
-        if (!started || hwnd != child)
+        if (hwnd != child12 && !(hwnd == child && (started || gl_started)))
         {
             RECT r; GetClientRect(hwnd, &r);
             FillRect(dc, &r, (HBRUSH)GetStockObject(DKGRAY_BRUSH));
@@ -541,24 +661,45 @@ static LRESULT CALLBACK child_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
+static void layout(void)
+{
+    RECT c, s;
+    int x, y, width, height;
+    SendMessageW(status, WM_SIZE, 0, 0);
+    GetClientRect(top, &c); GetWindowRect(status, &s);
+    width = c.right; height = c.bottom > s.bottom-s.top ? c.bottom-(s.bottom-s.top) : 0;
+    for (int i = 0; i < nesting; ++i)
+    {
+        MoveWindow(containers[i], i ? 7 : 0, i ? 9 : 0, width, height, TRUE);
+        width = width > 14 ? width - 14 : 0;
+        height = height > 18 ? height - 18 : 0;
+    }
+    x = nesting ? 7 : 0; y = nesting ? 9 : 0;
+    if (use_gl && use_d3d12 && sibling12)
+    {
+        /* Reserve the right half before D3D12 starts: GL size stays stable at 10s. */
+        MoveWindow(child, x, y, width/2, height, TRUE);
+        if (child12) MoveWindow(child12, x+width/2, y, width-width/2, height, TRUE);
+    }
+    else
+    {
+        MoveWindow(child, x, y, width, height, TRUE);
+        if (use_gl && child12) MoveWindow(child12, width/4, height/4, width/2, height/2, TRUE);
+    }
+    dirty = 1;
+}
+
+static void close_window(HWND hwnd)
+{
+    /* WGL owns the child DC; release it before DestroyWindow destroys children. */
+    cleanup_gl();
+    DestroyWindow(hwnd);
+}
+
 static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
-    if (msg == WM_SIZE && status)
-    {
-        RECT c, s;
-        SendMessageW(status, WM_SIZE, 0, 0);
-        GetClientRect(hwnd, &c); GetWindowRect(status, &s);
-        int width = c.right, height = c.bottom > s.bottom-s.top ? c.bottom-(s.bottom-s.top) : 0;
-        for (int i = 0; i < nesting; ++i)
-        {
-            MoveWindow(containers[i], i ? 7 : 0, i ? 9 : 0, width, height, TRUE);
-            width = width > 14 ? width - 14 : 0;
-            height = height > 18 ? height - 18 : 0;
-        }
-        MoveWindow(child, nesting ? 7 : 0, nesting ? 9 : 0, width, height, TRUE);
-        dirty = 1;
-        return 0;
-    }
+    if (msg == WM_CLOSE) { close_window(hwnd); return 0; }
+    if (msg == WM_SIZE && status) { layout(); return 0; }
     if (msg == WM_TIMER)
     {
         if (wp == 2)
@@ -573,19 +714,21 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
             int next = elapsed < 5000 ? 0 : elapsed < 15000 ? 1 : elapsed < 20000 ? 2 : 3;
             const wchar_t *titles[] = {L"restored 0-5s", L"maximized 5-15s", L"restored 15-20s", L"maximized 20-30s"};
             wchar_t title[160];
-            if (elapsed >= 30000) { DestroyWindow(hwnd); return 0; }
+            if (elapsed >= 30000) { close_window(hwnd); return 0; }
             if (next != phase)
             {
                 phase = next;
-                swprintf(title, 160, L"Synthetic repaint [%ls] %ls%ls", use_d3d12 ? L"D3D12" : use_vulkan ? L"Vulkan" : L"GDI",
-                         titles[phase], delayed ? L" (renderer starts at 10s)" : L"");
+                swprintf(title, 160, L"Synthetic repaint [%ls] %ls%ls", use_gl ? (use_d3d12 ? L"GL+D3D12" : L"GL") : use_d3d12 ? L"D3D12" : use_vulkan ? L"Vulkan" : L"GDI",
+                         titles[phase], delayed ? (use_d3d12 ? L" (D3D12 starts at 10s)" : L" (Vulkan starts at 10s)") : L"");
                 SetWindowTextW(hwnd, title);
                 ShowWindow(hwnd, (phase == 1 || phase == 3) ? SW_MAXIMIZE : SW_RESTORE);
                 geometry("phase");
             }
+            if (!IsIconic(hwnd) && gl_started && !frame_gl())
+            { failed = 1; close_window(hwnd); return 0; }
             if ((use_vulkan || use_d3d12) && !started && (!delayed || elapsed >= 10000))
-                if (!(use_d3d12 ? init12() : init_vulkan())) { failed = 1; DestroyWindow(hwnd); return 0; }
-            if (started && !IsIconic(hwnd) && !(use_d3d12 ? frame12() : frame())) { failed = 1; DestroyWindow(hwnd); }
+                if (!(use_d3d12 ? init12() : init_vulkan())) { failed = 1; close_window(hwnd); return 0; }
+            if (started && !IsIconic(hwnd) && !(use_d3d12 ? frame12() : frame())) { failed = 1; close_window(hwnd); }
         }
         return 0;
     }
@@ -605,19 +748,28 @@ int main(int argc, char **argv)
         if (!strcmp(argv[i], "--none") && !mode) { mode = 1; use_vulkan = 0; }
         else if (!strcmp(argv[i], "--vulkan") && !mode) { mode = 1; use_vulkan = 1; }
         else if (!strcmp(argv[i], "--d3d12") && !mode) { mode = 1; use_d3d12 = 1; }
+        else if (!strcmp(argv[i], "--gl") && !use_gl) use_gl = 1;
+        else if (!strcmp(argv[i], "--d3d12-placement=child") && !placement_selected) { placement_selected = 1; sibling12 = 0; }
+        else if (!strcmp(argv[i], "--d3d12-placement=sibling") && !placement_selected) { placement_selected = 1; sibling12 = 1; }
         else if (!strcmp(argv[i], "--delay")) delayed = 1;
         else if (!strcmp(argv[i], "--delay-vulkan")) delayed = 2;
         else if (!strcmp(argv[i], "--nest=0")) nesting = 0;
         else if (!strcmp(argv[i], "--nest=1")) nesting = 1;
         else if (!strcmp(argv[i], "--nest=2")) nesting = 2;
-        else { puts("Usage: maximized-vulkan-child.exe (--none | --vulkan | --d3d12) [--delay] [--nest=0|1|2]"); return 2; }
+        else { puts("Usage: maximized-vulkan-child.exe (--none | --vulkan | --d3d12 | --gl [--d3d12]) [--d3d12-placement=child|sibling] [--delay] [--nest=0|1|2]"); return 2; }
     }
-    if (!mode || (delayed && !use_vulkan && !use_d3d12) || (delayed == 2 && !use_vulkan)) { puts("ERROR choose one mode; delay requires renderer; --delay-vulkan requires Vulkan"); return 2; }
+    if ((!mode && !use_gl) || (use_gl && mode && !use_d3d12) ||
+        (placement_selected && !(use_gl && use_d3d12)) ||
+        (delayed && !use_vulkan && !use_d3d12) || (delayed == 2 && !use_vulkan))
+    { puts("ERROR invalid mode combination: GL combines only with D3D12; placement requires both; delay requires Vulkan/D3D12"); return 2; }
     if (!InitCommonControlsEx(&controls)) return 2;
     wc.hInstance = GetModuleHandleW(NULL); wc.hCursor = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW);
+    wc.hbrBackground = use_gl ? (HBRUSH)(COLOR_APPWORKSPACE+1) : NULL;
     wc.lpfnWndProc = window_proc; wc.lpszClassName = L"SyntheticTop";
     if (!RegisterClassW(&wc)) return 2;
     wc.lpfnWndProc = child_proc; wc.lpszClassName = L"SyntheticChild";
+    if (!RegisterClassW(&wc)) return 2;
+    wc.style = CS_OWNDC; wc.lpszClassName = L"SyntheticGL";
     if (!RegisterClassW(&wc)) return 2;
     top = CreateWindowW(L"SyntheticTop", L"Synthetic repaint", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                         60,60,1000,700,NULL,NULL,wc.hInstance,NULL);
@@ -630,7 +782,8 @@ int main(int argc, char **argv)
         if (!containers[i]) return 2;
         parent = containers[i];
     }
-    child = CreateWindowW(L"SyntheticChild", NULL, WS_CHILD | WS_VISIBLE, 0,0,1,1,parent,NULL,wc.hInstance,NULL);
+    child = CreateWindowW(use_gl ? L"SyntheticGL" : L"SyntheticChild", NULL,
+                          WS_CHILD | WS_VISIBLE | (use_gl ? WS_CLIPCHILDREN | WS_CLIPSIBLINGS : 0), 0,0,1,1,parent,NULL,wc.hInstance,NULL);
     status = CreateWindowW(STATUSCLASSNAMEW, NULL, WS_CHILD | WS_VISIBLE | SBARS_SIZEGRIP,
                           0,0,0,0,top,NULL,wc.hInstance,NULL);
     if (!child || !status || !SetWindowSubclass(status, status_proc, 1, 0)) return 2;
@@ -650,18 +803,25 @@ int main(int argc, char **argv)
                version.dwMinorVersion, version.dwBuildNumber, GetWindowTheme(status) != NULL);
     }
     SendMessageW(status, SB_SETTEXTW, 0, (LPARAM)L"Ready");
-    printf("CONFIG mode=%s delay=%d nesting=%d\n", use_d3d12 ? "d3d12" : use_vulkan ? "vulkan" : "none", !!delayed, nesting);
+    printf("CONFIG mode=%s delay=%d nesting=%d placement=%s\n",
+           use_gl ? (use_d3d12 ? "gl+d3d12" : "gl") : use_d3d12 ? "d3d12" : use_vulkan ? "vulkan" : "none",
+           !!delayed, nesting, use_gl && use_d3d12 ? (sibling12 ? "sibling" : "child") : "none");
     puts("START duration_ms=30000 text_period_ms=250 render_timer_ms=16 visual_check_required=1");
-    epoch = GetTickCount64();
     ShowWindow(top, SW_SHOWNORMAL);
-    if (!SetTimer(top, 1, 16, NULL) || !SetTimer(top, 2, 250, NULL)) return 2;
+    if (use_gl && !init_gl()) { close_window(top); return 2; }
+    epoch = GetTickCount64();
+    if (!SetTimer(top, 1, 16, NULL) || !SetTimer(top, 2, 250, NULL))
+    { gl_win32_error("SetTimer"); close_window(top); return 2; }
     while ((result = GetMessageW(&msg, NULL, 0, 0)) > 0) { TranslateMessage(&msg); DispatchMessageW(&msg); }
     if (result == -1) failed = 1;
+    cleanup_gl();
     cleanup12();
     cleanup();
     if (use_d3d12) printf("D3D12 occluded_presents=%llu\n", (unsigned long long)occluded_frames12);
+    if (use_gl) printf("GL frames=%llu\n", (unsigned long long)gl_frames);
+    if (use_gl && !gl_frames) failed = 1;
     if ((use_vulkan || use_d3d12) && !frames) failed = 1;
-    printf("SUMMARY failed=%d frames=%llu completed_timeline=%d\n", failed,
-           (unsigned long long)frames, GetTickCount64()-epoch >= 30000);
+    printf("SUMMARY failed=%d frames=%llu gl_frames=%llu completed_timeline=%d\n", failed,
+           (unsigned long long)frames, (unsigned long long)gl_frames, GetTickCount64()-epoch >= 30000);
     return failed || GetTickCount64()-epoch < 30000 ? 2 : 0;
 }
