@@ -118,6 +118,7 @@ int main(void)
     library("pointer_encoded_array_i4", &pointer, 1);
     pointer.lptdesc = &safe;
     library("pointer_safearray_i4", &pointer, 1);
+    library("large_nested_arrays", NULL, 5000);
     CoUninitialize();
     printf("SUMMARY api_errors=%u expectations=none\n", errors);
     return errors ? 2 : 0;

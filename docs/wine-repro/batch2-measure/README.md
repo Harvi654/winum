@@ -4,7 +4,7 @@ Original, AI-assisted (Codex), LGPL-2.1-or-later. Text output only. No vendor
 files, registry exports, proprietary data or network access are needed.
 These programs have no hard-coded expected Windows return values.
 
-## Type descriptions: pointee patch
+## Type descriptions: first two patches
 
 `typedesc.c` builds its own type libraries using ICreateTypeLib2 and
 ICreateTypeInfo, saves them to generated temporary files, releases the writer,
@@ -20,6 +20,15 @@ synthetic writer/reader round trip is not assumed to preserve the encoding.
 The program reports creation and load errors, rather than treating them as
 successful observations. The unsupported-pointee fallback to VARIANT is not
 asserted to be a Windows contract.
+
+The large case constructs 5000 alias types, each containing a pointer to an
+array whose element is a pointer to a uniquely sized inner array. Its intended
+purpose is to grow both descriptor tables beyond the signed-low-word and
+16-bit boundaries. Samples 0, 1500, 3000 and 4999 report the decoded trees.
+Before writing the offsets regression test, verify the actual descriptor
+offsets in this **self-generated** library: type count/file size alone is not
+proof that any particular serialized reference crosses a boundary. The program
+does not read the binary file format or modify the output of native oleaut32.
 
 ## Build and Windows run
 
@@ -39,5 +48,5 @@ completed; it does not establish any expected Windows type semantics.
 The two architectures compile with MinGW GCC 14.2. Native execution and
 expectations are pending. No Wine test, L1 pass, production patch revision,
 `winum-test` marker, or series change is claimed by this scaffolding.
-This initial bundle covers the typedesc-pointee investigation only. The
-remaining batch-2 investigations are not claimed complete or included.
+This initial bundle covers the two typedesc investigations only; the remaining
+four batch-2 investigations are not claimed complete or included.
