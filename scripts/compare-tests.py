@@ -14,14 +14,14 @@ from collections import Counter
 from pathlib import Path
 
 SUMMARY = re.compile(r'^[0-9a-f]+:(\w+): (\d+) tests executed \((\d+) marked as todo, (\d+) as flaky, (\d+) failures?\), (\d+) skipped')
-FAIL = re.compile(r'^(\w+\.c:\d+): Test (?:failed|succeeded inside todo block)')
+FAIL = re.compile(r'^(\w+\.c:\d+): (Test (?:failed|succeeded inside todo block).*)')
 
 def summarize(logdir):
     out = {}
     for log in sorted(Path(logdir).glob('*.log')):
         dll, arch, unit = log.stem.split('.', 2)
         r = {"finished": False, "tests": 0, "todo": 0, "flaky": 0, "failures": 0, "skipped": 0,
-             "fail_at": Counter(), "exit": None}
+             "fail_at": Counter(), "fail_msg": {}, "exit": None}
         for line in log.read_text(errors='replace').splitlines():
             m = SUMMARY.match(line)
             if m and m.group(1) == unit:
@@ -30,6 +30,7 @@ def summarize(logdir):
             m = FAIL.match(line)
             if m:
                 r["fail_at"][m.group(1)] += 1
+                r["fail_msg"].setdefault(m.group(1), m.group(2)[:160])
             if line.startswith('exit='):
                 r["exit"] = line[5:]
         r["fail_at"] = dict(r["fail_at"])
@@ -106,7 +107,9 @@ def compare(vpath, spath):
             moved.append((key, "same failures moved by %+d lines: " % shift +
                           ", ".join(f"{k} x{n}" for k, n in sorted(moved_at.items()))))
         if new_at:
-            regress.append((key, "new failures: " + ", ".join(f"{k} x{n}" for k, n in sorted(new_at.items()))))
+            msgs = b.get("fail_msg", {})
+            regress.append((key, "new failures: " + ", ".join(
+                f"{k} x{n}" + (f" ({msgs[k]})" if k in msgs else "") for k, n in sorted(new_at.items()))))
         if gone_at:
             fixed.append((key, "fixed: " + ", ".join(sorted(gone_at))))
         if a["tests"] != b["tests"] and not new_at:
