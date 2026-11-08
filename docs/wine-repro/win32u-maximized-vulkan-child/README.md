@@ -478,3 +478,49 @@ correct in all runs), and it may be outside Wine (Mesa's GLX/DRI3 and
 Vulkan X11 WSI with PRIME). Next, if followed up: the Unix side of the same
 threads with `gdb -p <wine process> -batch -ex "thread apply all bt"`
 (Mesa, xcb), which shows what each one waits for.
+
+### 2026-11-08, Intel HD 4000, Wine 11.21 and winum 11.20
+
+Maintainer-run comparison on a MacBook Pro 2012 running Arch Linux, KDE
+Wayland with Wine's X11 driver through XWayland. GPU: Intel HD Graphics 4000
+(IVB GT2, vendor/device `8086:0166`), Mesa `26.2.6-arch1.1`, OpenGL 4.2
+compatibility profile. The fixture was built with MinGW GCC 16.2.0.
+
+Two separate fresh prefixes, the same fixture executable:
+
+- Arch system Wine `11.21` (unpatched baseline).
+- Normal winum `11.20-1`, commit `c8614ea`, built 2026-11-07; downloaded
+  binary artifact verified against its accompanying SHA-256 file. This was
+  the normal build, not the status-bar DC trace build.
+
+| Mode (`--nest=0`) | System Wine 11.21 frames | winum 11.20 frames |
+| --- | ---: | ---: |
+| `--none` | 0 | 0 |
+| `--gl`, GLX (`UseEGL=N`) | 1646 GL | 1656 GL |
+| `--vulkan`, `UseEGL=N` | 1709 Vulkan | 1711 Vulkan |
+| `--vulkan --delay`, `UseEGL=N` | 1144 Vulkan | 1142 Vulkan |
+| `--gl`, EGL (`UseEGL=Y`) | 1712 GL | 1711 GL |
+
+All ten runs returned `failed=0`, `completed_timeline=1`; the maintainer
+reported clean text and no observed window-edge problem. Both GL paths
+identified the Intel GPU rather than a software renderer. Both builds chose
+GLX pixel format 9 (`flags=00008025`) and EGL format 62 (`flags=0000802d`),
+with actual colour/alpha/depth bits 32/8/24 for a 32/0/24 request. Frame counts
+are completion evidence, not a performance benchmark.
+
+In the system Wine Vulkan logs, maximizing caused an additional geometry
+update: the window top moved from -4 to -2, child top from 26 to 28, and the
+swapchain height from 708 to 706. The status rectangle remained unchanged.
+No visible error was reported; this observation alone does not identify the
+Inventor defect.
+
+Mesa warned that Ivy Bridge Vulkan support is incomplete, but the basic
+Vulkan clear/present fixture completed on the Intel device. This does not
+establish modern DXVK, D3D12, DXR or Inventor compatibility. No D3D12, mixed
+GL+D3D12 or nested-child runs were performed in this comparison. Because
+both the Wine version and the patch set differ, this is a comparison of two
+builds rather than a controlled test of individual patches. It neither
+reproduces the Inventor overlap nor proves Wine 11.21 fixes it.
+
+`UseEGL=N` was restored in the winum test prefix after the EGL run. Both
+prefixes and their local results were retained for further comparison.
