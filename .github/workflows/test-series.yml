@@ -99,8 +99,11 @@ jobs:
       - name: Compare vanilla and series (all groups that ran on both sides)
         run: |
           set -o pipefail
-          python3 scripts/compare-tests.py compare results/vanilla results/series \
-            | tee l2-report.md >> "$GITHUB_STEP_SUMMARY"
+          rc=0
+          python3 scripts/compare-tests.py compare results/vanilla results/series > l2-report.md || rc=$?
+          cat l2-report.md >> "$GITHUB_STEP_SUMMARY"
+          cat l2-report.md   # also in the log, readable without the web page
+          exit "$rc"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
