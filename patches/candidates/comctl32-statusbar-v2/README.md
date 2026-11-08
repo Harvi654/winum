@@ -193,3 +193,33 @@ not claimed by this preparation check. The workflow uses the full normal
 graphics build profile; it does not itself run paired L2 suites. A successful
 maintainer MEASURE comparison is focused runtime evidence, not full L2 or CAD
 L4 validation. Production-series promotion remains a separate step.
+
+## Maintainer candidate runtime measurement (2026-11-08)
+
+The maintainer supplied the x86_64 v5/v6 MEASURE results after following the
+isolated runtime instructions for candidate build `8cb32ac`, on Arch Linux,
+KDE Wayland/XWayland and Intel HD 4000. Both files contain 144 rows and
+`errors=0`, with correct class versions. Process exit codes were not supplied.
+Every staged row has `prep_diff=0`, `update_before=0`; all rows have
+`marker_before=192` and nonempty old-glyph masks. Raw logs are not committed.
+
+- Candidate v5's complete filtered output is line-for-line identical to the
+  preceding system Wine 11.21 v5 measurement. `SB_SETTEXT` requests no erase;
+  non-erasing invalidation/redraw clears the old glyphs and marker; all
+  repainting operations produce `diff_clean=0`. A custom dark erase fill is
+  replaced by the control background. These measured background/erase decisions
+  agree with Windows v5 and correct the production v1 divergence.
+- Candidate v6's complete filtered output is line-for-line identical to the
+  preceding production winum 11.20 v1 v6 measurement. Themed erase-only
+  background behaviour is preserved, including the custom dark fill and old
+  pixels remaining after non-erasing invalidation, as measured on Windows.
+- All three part styles and both target texts were covered. Theme disabling
+  still returns `8007007b`, with v6 `theme=1`; no unthemed-v6 Wine runtime
+  coverage is claimed. That limitation is unchanged from cross review.
+
+Focused x86_64 runtime measurement therefore supports the intended correction
+and preservation of themed behaviour. It is not paired L2 of the complete
+comctl32 suite, an i686 runtime test, Inventor L4, or a reproduction/fix of the
+RT-dependent composition problem. Keep the candidate outside production until
+the remaining validation is completed. See the
+[comparison with Windows and production v1](../../../docs/wine-repro/comctl32-statusbar-erase/README.md#intel-maintainer-measurement-2026-11-08).

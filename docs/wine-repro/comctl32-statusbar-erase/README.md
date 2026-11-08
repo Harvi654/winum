@@ -202,6 +202,16 @@ not change between 11.20 and 11.21. The comparison also changes patch sets
 and uses separate prefixes. It does not replace a same-version controlled
 patch comparison or candidate validation, and no new patch was promoted.
 
+The isolated v2 runtime was subsequently measured with the same x86_64
+executables. Both variants returned summaries of 144 rows, zero errors and
+valid staging/marker/glyph-mask prerequisites. The candidate v5 filtered
+output is line-for-line identical to system Wine 11.21 v5, and candidate
+themed v6 is line-for-line identical to production winum v1 v6. Thus v5's
+measured divergence is corrected while themed behaviour is preserved.
+Theme disabling still fails, so unthemed-v6 coverage remains excluded. This
+is focused runtime measurement, not full paired L2 or an Inventor RT fix;
+see the [candidate validation record](../../../patches/candidates/comctl32-statusbar-v2/README.md#maintainer-candidate-runtime-measurement-2026-11-08).
+
 ## Windows results (2026-11-07)
 
 Windows 10, comctl32 5.82.10586 and 6.16.10586, all four executables exit 0,
