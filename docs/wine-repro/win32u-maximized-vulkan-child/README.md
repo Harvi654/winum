@@ -524,3 +524,11 @@ reproduces the Inventor overlap nor proves Wine 11.21 fixes it.
 
 `UseEGL=N` was restored in the winum test prefix after the EGL run. Both
 prefixes and their local results were retained for further comparison.
+
+Follow-up on the same winum `c8614ea` prefix: `--gl --nest=2` also completed
+with GLX (1650 GL frames) and EGL (1714 GL frames). Both reported `failed=0`,
+`completed_timeline=1`, and the maintainer confirmed no visible defect. The
+two intermediate parents were present; GL client dimensions returned to
+964x604 when restored and 1252x672 when maximized in both runs. These two
+nested runs were not repeated with system Wine 11.21. `UseEGL=N` was restored
+afterwards.
