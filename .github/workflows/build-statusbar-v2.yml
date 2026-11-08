@@ -1,0 +1,47 @@
+# Candidate only: a separate archive, never a release or a production-series change.
+name: Build status-bar v2 candidate
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'topic/**']
+    paths:
+      - 'patches/candidates/comctl32-statusbar-v2/**'
+      - 'scripts/build-statusbar-v2.sh'
+      - '.github/workflows/build-statusbar-v2.yml'
+permissions:
+  contents: read
+concurrency:
+  group: statusbar-v2-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 300
+    steps:
+      - name: Build dependencies (official Arch repositories)
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed git mingw-w64-gcc python \
+            alsa-lib libpulse gnutls krb5 dbus fontconfig freetype2 \
+            libx11 libxext libxi libxrandr libxrender libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
+            wayland mesa libglvnd vulkan-icd-loader vulkan-headers \
+            gst-plugins-base-libs sdl2 libcups libgphoto2 sane libpcap v4l-utils pcsclite unixodbc ocl-icd opencl-headers \
+            giflib wine-mono wine-gecko
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Build isolated candidate binary and corresponding source
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          export JOBS="$(nproc)"
+          export WINE_SB_V2_WORK=/tmp/statusbar-v2
+          bash scripts/build-statusbar-v2.sh dist-sbv2
+      - name: Logs on failure
+        if: failure()
+        run: tail -n 100 /tmp/statusbar-v2/build/*.log || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: statusbar-v2-${{ github.sha }}
+          path: dist-sbv2/*
+          retention-days: 30

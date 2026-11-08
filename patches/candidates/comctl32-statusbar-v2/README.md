@@ -1,8 +1,9 @@
 # comctl32 status-bar background v2 candidate
 
 Original, AI-assisted (Codex), LGPL-2.1-or-later. Not submitted upstream.
-Candidate only: **not in `patches/series`**. Formal cross review by Claude and
-L1 on Windows 10 are pending. No RX 6400 fixture work is included.
+Candidate only: **not in `patches/series`**. Claude's cross review and Windows
+10 L1 passed (see below); paired L2 remains pending. No RX 6400 fixture work
+is included.
 
 ## Problem and bounded change
 
@@ -161,3 +162,34 @@ themed=1` and `classic=1 themed=0` for styles 0, 0x100 and 0x1100.
 (approved; P2: the unthemed v6 path is not exercised under Wine).
 Next: paired L2 of the comctl32 tests (series vs series + candidate), then
 fold into `patches/comctl32-statusbar-erase-background.patch` as v2.
+
+## Isolated graphics runtime (2026-11-08)
+
+`scripts/build-statusbar-v2.sh [--prepare-only] NEW_OUTPUT` prepares a private
+recipe containing the full production series followed by the two candidate
+patches. It never changes the checkout's production series or version pin.
+The Wine 11.20 public-mirror commit/archive SHA-256 are pinned and checked
+before extraction. The regular full-feature builder produces the WoW64
+runtime, named `winum-11.20-1-sbv2-x86_64`, and a corresponding source archive
+from the actual compiled tree, each with SHA-256 sums. `SBV2-INPUTS` records
+the upstream pin and checkout commit; `BUILDINFO` and `PATCHES.txt` identify
+the complete patch set. This is a candidate artifact, not a release.
+
+The separate **Build status-bar v2 candidate** workflow builds it on changes
+to this directory or its builder/workflow, or by manual dispatch. Download
+the `statusbar-v2-<commit>` artifact from that workflow, verify the binary
+archive's `.sha256`, and extract to a new runtime directory. Use a new test
+prefix; do not replace a working CAD runtime or copy individual DLLs into it.
+Repeat the same MEASURE executables used with production v1, retaining both
+results. V5 should clear on non-erasing repaints and not erase on SB_SETTEXT;
+themed v6 should retain the Windows-derived erase-only background behaviour.
+Failure to disable the theme still excludes classic-v6 coverage.
+
+Local preparation on 2026-11-08 verified the pinned source checksum and applied
+all 62 production patches plus both candidate patches with `--fuzz=0`.
+Shell syntax checks passed, including the generated private recipe and its
+candidate patch-date mapping. A full runtime build and its execution are
+not claimed by this preparation check. The workflow uses the full normal
+graphics build profile; it does not itself run paired L2 suites. A successful
+maintainer MEASURE comparison is focused runtime evidence, not full L2 or CAD
+L4 validation. Production-series promotion remains a separate step.
