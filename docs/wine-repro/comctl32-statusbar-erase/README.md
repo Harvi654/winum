@@ -171,6 +171,37 @@ RT-dependent overlap. In particular, themed v6 leaving old pixels after a
 non-erasing invalidation also occurs on Windows. The v2 candidate and its
 validation remain separate from this production-build measurement.
 
+The maintainer then ran the same x86_64 executables with Arch's system Wine
+11.21 in its separate test prefix. Both files contain 144 rows, zero errors,
+correct class versions and valid staging/marker/glyph-mask prerequisites.
+Process exit codes were not supplied for this pair. Theme disabling failed
+with `8007007b` again; v6 remained themed, so unthemed v6 is still unmeasured
+on this machine.
+
+| Default configuration / operation | System Wine 11.21 | winum 11.20 v1 | Windows 10 |
+| --- | --- | --- | --- |
+| v5 `settext` | No erase; clean | Erase; clean | No erase; clean |
+| v5 non-erasing invalidation/redraw | Clean | Old text and marker retained | Clean |
+| Themed v6 `settext` | No erase; clean | Erase; clean | Erase; clean |
+| Themed v6 non-erasing invalidation/redraw | Clean | Old text and marker retained | Old text and marker retained |
+| v5 erasing repaint with custom fill | Control background replaces fill | Custom fill survives | Control background replaces fill |
+| Themed v6 erasing repaint with custom fill | Control background replaces fill | Custom fill survives | Custom fill survives |
+
+These results hold for all three part styles and both target texts in the
+default configurations. System Wine's repainting operations produced
+`diff_clean=0`, `marker_after=0`, `old_retained=0`; `settext` delivered zero
+erase messages in both versions. Direct `paint_no_update` retained old pixels
+and the marker in both. With custom erasure, system Wine replaced the fill
+with `f5f5f5`; Windows v5 uses `f0f0f0`, whereas themed Windows v6 preserves
+`182028`. Thus system Wine agrees with Windows on the measured v5 background
+and erase decisions but diverges in themed v6. The production v1 patch has
+the inverse limitation, consistent with the existing rationale for v2.
+
+This is not evidence of a new 11.21 status-bar fix: upstream `status.c` did
+not change between 11.20 and 11.21. The comparison also changes patch sets
+and uses separate prefixes. It does not replace a same-version controlled
+patch comparison or candidate validation, and no new patch was promoted.
+
 ## Windows results (2026-11-07)
 
 Windows 10, comctl32 5.82.10586 and 6.16.10586, all four executables exit 0,
