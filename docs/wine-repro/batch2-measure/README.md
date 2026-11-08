@@ -81,12 +81,41 @@ demonstrate the reader patch. Schema 2 is therefore required before choosing
 its regression-test expectations. For offsets, the native returned trees
 are established, but schema 1 did not prove serialized boundary coverage.
 
-## State
+## Schema-2 native observations (2026-11-08)
+
+Both architectures again match apart from the header. The isolated reader
+processes exit 0: LoadTypeLibEx and GetTypeAttr return S_OK and the public
+descriptor is **VT_PTR -> (VT_ARRAY|VT_I4)** (`001a -> 2003`). The native reader
+preserves the encoded VARTYPE; it does not expose the structured
+`001a -> 001b -> 0003` chain returned for the ordinary SAFEARRAY control.
+This contradicts production typedesc-pointee v2's normalization. The
+[v3 candidate](../../../patches/candidates/oleaut32-typedesc-pointee-v3/README.md)
+preserves that VARTYPE and adds the corresponding Wine test, pending native
+L1 and cross review. The production patch and its validation marker remain
+unchanged.
+
+The ordinary schema-2 processes exit 2 only for the same recorded writer
+rejection. The large case has 160000 bytes in each descriptor segment and
+still returns the previously measured trees and bounds. Boundary counts:
+
+| Reference kind | At/above 0x8000 | At/above 0x10000 | Low-word bit 15 set |
+| --- | ---: | ---: | ---: |
+| PTR/SAFEARRAY pointee | 7952 | 5904 | 4096 |
+| CARRAY array-description offset | 7952 | 5904 | 4096 |
+| CARRAY element typedesc | 3976 | 2952 | 2048 |
+
+Thus the large generated library really exercises all three serialized
+reference paths across both boundaries. These measurements establish a
+Windows oracle for the offsets test; they are not L1 of a Wine assertion
+test, which still needs to be written and run. No raw logs were committed.
+
+## Current validation state
 
 Both schema-2 architectures compile with MinGW GCC 14.2 and `-Werror`.
-Schema-2 native execution, reader semantics and boundary counts are pending.
+Schema-2 native reader semantics and boundary counts are now measured.
 The ordinary run can still return 2 for the recorded writer rejection;
-return both result sets even when this happens. No Wine test, L1 pass, production patch revision,
-`winum-test` marker, or series change is claimed by this scaffolding.
+return both result sets even when this happens. A pointee Wine test exists in
+the separate v3 candidate; its L1 remains pending. No production patch revision,
+`winum-test` marker, or series change is claimed by these observations.
 This initial bundle covers the two typedesc investigations only; the remaining
 four batch-2 investigations are not claimed complete or included.

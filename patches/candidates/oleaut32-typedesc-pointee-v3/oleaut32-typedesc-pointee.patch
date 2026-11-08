@@ -1,0 +1,218 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: oleaut32: Preserve encoded array pointees in MSFT type descriptions.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Windows 10 x86_64/i686 measurements of our one-byte-edited synthetic library
+return VT_PTR -> (VT_ARRAY | VT_I4), not VT_PTR -> VT_SAFEARRAY -> VT_I4.
+Vanilla indexes std_typedesc out of bounds. Store the encoded pointee in the
+owned second half of the descriptor table rather than normalizing its type.
+
+v2 (2026-11-06): Keep additional descriptors in the allocation owned by the
+library, avoiding a leaked separate allocation per array pointee.
+v3 (2026-11-08): Preserve the measured encoded VARTYPE. Add the Windows-derived
+reader regression test. Ordinary pointees and the unmeasured unsupported-type
+fallback are unchanged. Candidate only; native L1, paired L2 and CAD pending.
+
+--- a/dlls/oleaut32/typelib.c
++++ b/dlls/oleaut32/typelib.c
+@@ -3521,9 +3521,12 @@
+     if(tlbSegDir.pTypdescTab.length > 0)
+     {
+         int i, j, cTD = tlbSegDir.pTypdescTab.length / (2*sizeof(INT));
++        TYPEDESC *array_desc;
+         INT16 td[4];
+         pTypeLibImpl->ctTypeDesc = cTD;
+-        pTypeLibImpl->pTypeDesc = calloc(cTD, sizeof(TYPEDESC));
++        /* The second half holds the encoded type descriptions that simple
++         * pointees may need, so they are freed with the table. */
++        pTypeLibImpl->pTypeDesc = calloc(2 * cTD, sizeof(TYPEDESC));
+         MSFT_ReadLEWords(td, sizeof(td), &cx, tlbSegDir.pTypdescTab.offset);
+         for(i=0; i<cTD; )
+ 	{
+@@ -3533,7 +3536,28 @@
+ 	    {
+ 	        /* FIXME: check safearray */
+                 if(td[3] < 0)
+-                    pTypeLibImpl->pTypeDesc[i].lptdesc = &std_typedesc[td[2]];
++                {
++                    /* Simple pointee type. It may carry VT_ARRAY (a SAFEARRAY of
++                     * that type) or be out of range - never index std_typedesc
++                     * with the raw value. */
++                    VARTYPE pointee = td[2];
++
++                    if (pointee <= VT_LPWSTR)
++                        pTypeLibImpl->pTypeDesc[i].lptdesc = &std_typedesc[pointee];
++                    else if ((pointee & ~VT_TYPEMASK) == VT_ARRAY && (pointee & VT_TYPEMASK) <= VT_LPWSTR)
++                    {
++                        array_desc = &pTypeLibImpl->pTypeDesc[cTD + i];
++                        TRACE_(typelib)("typedesc %d: pointer to encoded array vt %d\n", i, pointee & VT_TYPEMASK);
++                        array_desc->vt = pointee;
++                        pTypeLibImpl->pTypeDesc[i].lptdesc = array_desc;
++                    }
++                    else
++                    {
++                        FIXME("typedesc %d: unsupported simple pointee type %#x (td %#x %#x %#x %#x)\n",
++                              i, (USHORT)pointee, (USHORT)td[0], (USHORT)td[1], (USHORT)td[2], (USHORT)td[3]);
++                        pTypeLibImpl->pTypeDesc[i].lptdesc = &std_typedesc[VT_VARIANT];
++                    }
++                }
+                 else
+                     pTypeLibImpl->pTypeDesc[i].lptdesc = &pTypeLibImpl->pTypeDesc[td[2]/8];
+             }
+--- a/dlls/oleaut32/tests/typelib.c
++++ b/dlls/oleaut32/tests/typelib.c
+@@ -8810,6 +8810,146 @@
+     DeleteFileW(filenameW);
+ }
+ 
++/* BEGIN winum typedesc pointee test: original, AI-assisted (Codex), LGPL-2.1-or-later. */
++static void check_encoded_pointee(ITypeLib *lib, VARTYPE expected)
++{
++    ITypeInfo *info = NULL;
++    TYPEATTR *attr = NULL;
++    TYPEDESC pointee;
++    SIZE_T bytes = 0;
++    HRESULT hr;
++    BOOL ret;
++
++    ok(ITypeLib_GetTypeInfoCount(lib) == 1, "Unexpected type count.\n");
++    hr = ITypeLib_GetTypeInfo(lib, 0, &info);
++    ok(hr == S_OK, "GetTypeInfo returned %#lx.\n", hr);
++    if (FAILED(hr)) return;
++    hr = ITypeInfo_GetTypeAttr(info, &attr);
++    ok(hr == S_OK, "GetTypeAttr returned %#lx.\n", hr);
++    if (SUCCEEDED(hr))
++    {
++        ok(attr->typekind == TKIND_ALIAS, "Unexpected type kind %u.\n", attr->typekind);
++        ok(attr->tdescAlias.vt == VT_PTR, "Unexpected alias vt %#x.\n", attr->tdescAlias.vt);
++        if (attr->tdescAlias.vt == VT_PTR)
++        {
++            /* Bound this test-side read. Vanilla may already fault inside
++             * GetTypeAttr, before reaching this check. */
++            ret = ReadProcessMemory(GetCurrentProcess(), attr->tdescAlias.lptdesc,
++                                    &pointee, sizeof(pointee), &bytes);
++            ok(ret && bytes == sizeof(pointee), "Pointee is not readable.\n");
++            if (ret && bytes == sizeof(pointee))
++                ok(pointee.vt == expected, "Pointee vt %#x, expected %#x.\n", pointee.vt, expected);
++        }
++        ITypeInfo_ReleaseTypeAttr(info, attr);
++    }
++    ITypeInfo_Release(info);
++}
++
++static DWORD pointee_read32(const BYTE *data)
++{
++    return (DWORD)data[0] | (DWORD)data[1] << 8 | (DWORD)data[2] << 16 | (DWORD)data[3] << 24;
++}
++
++static void test_encoded_pointee(void)
++{
++    WCHAR directory[MAX_PATH], original[MAX_PATH] = {0}, edited[MAX_PATH] = {0};
++    ICreateTypeLib2 *create = NULL;
++    ICreateTypeInfo *type = NULL;
++    ITypeLib *lib = NULL;
++    TYPEDESC simple = {{0}, VT_I4}, pointer;
++    BYTE header[0x54], segment[16], record[8], encoded = 0x20;
++    HANDLE file = INVALID_HANDLE_VALUE;
++    DWORD length, got, size, dir_offset, desc_offset;
++    HRESULT hr;
++    BOOL ret;
++
++    hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
++    ok(SUCCEEDED(hr), "CoInitializeEx returned %#lx.\n", hr);
++    if (FAILED(hr)) return;
++    length = GetTempPathW(ARRAY_SIZE(directory), directory);
++    ok(length && length < ARRAY_SIZE(directory), "GetTempPathW failed.\n");
++    if (!length || length >= ARRAY_SIZE(directory)) goto done;
++    ret = GetTempFileNameW(directory, L"wpo", 0, original) != 0;
++    ok(ret, "GetTempFileNameW failed.\n");
++    if (!ret) goto done;
++    ret = GetTempFileNameW(directory, L"wpe", 0, edited) != 0;
++    ok(ret, "GetTempFileNameW failed.\n");
++    if (!ret) goto done;
++    ret = DeleteFileW(original);
++    ok(ret, "Initial placeholder cleanup failed.\n");
++    if (!ret) goto done;
++    hr = CreateTypeLib2(sizeof(void *) == 8 ? SYS_WIN64 : SYS_WIN32, original, &create);
++    ok(hr == S_OK, "CreateTypeLib2 returned %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    hr = ICreateTypeLib2_SetName(create, L"WinumSyntheticTypes");
++    ok(hr == S_OK, "SetName returned %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    hr = ICreateTypeLib2_CreateTypeInfo(create, L"Alias0", TKIND_ALIAS, &type);
++    ok(hr == S_OK, "CreateTypeInfo returned %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    pointer.vt = VT_PTR;
++    pointer.lptdesc = &simple;
++    hr = ICreateTypeInfo_SetTypeDescAlias(type, &pointer);
++    ok(hr == S_OK, "SetTypeDescAlias returned %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    ICreateTypeInfo_Release(type);
++    type = NULL;
++    hr = ICreateTypeLib2_SaveAllChanges(create);
++    ok(hr == S_OK, "SaveAllChanges returned %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    ICreateTypeLib2_Release(create);
++    create = NULL;
++    hr = LoadTypeLibEx(original, REGKIND_NONE, &lib);
++    ok(hr == S_OK, "LoadTypeLibEx control returned %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    check_encoded_pointee(lib, VT_I4);
++    ITypeLib_Release(lib);
++    lib = NULL;
++
++    /* Only our own generated fixture is read/edited. A fresh name avoids
++     * cache identity from the control load. Layout: open Wine MSFT format. */
++    ret = CopyFileW(original, edited, FALSE);
++    ok(ret, "CopyFileW failed.\n");
++    if (!ret) goto done;
++    file = CreateFileW(edited, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
++    ok(file != INVALID_HANDLE_VALUE, "CreateFileW failed.\n");
++    if (file == INVALID_HANDLE_VALUE) goto done;
++    size = GetFileSize(file, NULL);
++    if (!ReadFile(file, header, sizeof(header), &got, NULL) || got != sizeof(header)) goto format_error;
++    if (memcmp(header, "MSFT", 4) || pointee_read32(header + 0x20) != 1) goto format_error;
++    dir_offset = 0x54 + 4 + ((pointee_read32(header + 0x14) & 0x100) ? 4 : 0);
++    if (size > 32 * 1024 * 1024 || size < dir_offset + 15 * 16) goto format_error;
++    SetFilePointer(file, dir_offset + 9 * 16, NULL, FILE_BEGIN);
++    if (!ReadFile(file, segment, sizeof(segment), &got, NULL) || got != sizeof(segment)) goto format_error;
++    desc_offset = pointee_read32(segment);
++    if (pointee_read32(segment + 4) != 8 || desc_offset > size - 8) goto format_error;
++    SetFilePointer(file, desc_offset, NULL, FILE_BEGIN);
++    if (!ReadFile(file, record, sizeof(record), &got, NULL) || got != sizeof(record)) goto format_error;
++    if ((pointee_read32(record) & 0xffff) != VT_PTR ||
++        (pointee_read32(record + 4) & 0xffff) != VT_I4 || !(record[7] & 0x80)) goto format_error;
++    SetFilePointer(file, desc_offset + 5, NULL, FILE_BEGIN);
++    ret = WriteFile(file, &encoded, 1, &got, NULL);
++    ok(ret && got == 1, "WriteFile failed.\n");
++    if (!ret || got != 1) goto done;
++    CloseHandle(file);
++    file = INVALID_HANDLE_VALUE;
++    hr = LoadTypeLibEx(edited, REGKIND_NONE, &lib);
++    ok(hr == S_OK, "LoadTypeLibEx encoded returned %#lx.\n", hr);
++    if (SUCCEEDED(hr)) check_encoded_pointee(lib, VT_ARRAY | VT_I4);
++    goto done;
++format_error:
++    ok(0, "Generated fixture has an unexpected MSFT layout.\n");
++done:
++    if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
++    if (lib) ITypeLib_Release(lib);
++    if (type) ICreateTypeInfo_Release(type);
++    if (create) ICreateTypeLib2_Release(create);
++    if (original[0]) { ret = DeleteFileW(original); ok(ret, "Original cleanup failed.\n"); }
++    if (edited[0]) { ret = DeleteFileW(edited); ok(ret, "Edited cleanup failed.\n"); }
++    CoUninitialize();
++}
++/* END winum typedesc pointee test */
++
+ START_TEST(typelib)
+ {
+     const WCHAR *filename;
+@@ -8853,4 +8993,5 @@
+     test_stub();
+     test_DeleteImplType();
+     test_DeleteFuncDesc();
+-}
++    test_encoded_pointee();
++}
