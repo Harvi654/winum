@@ -1,5 +1,7 @@
 # explorer-tasklist-parenting-hosts.patch
 
+<!-- winum-test: l3-only: Wine's own explorer.exe desktop/task list, no Windows counterpart; reproducer in docs/wine-repro -->
+
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
 - **DLL:** `explorer`

@@ -1,5 +1,7 @@
 # Candidate: 8-bit RGB window formats without alpha are 32-bit
 
+<!-- winum-test: l1 -->
+
 `opengl32-window-format-color-bits.patch` (v2): Wine describes an 8/8/8/0 window
 pixel format as `cColorBits` 24 (the GLX/EGL buffer size); Windows says
 32. Because `wglChoosePixelFormat` compares colour before alpha, Inventor's

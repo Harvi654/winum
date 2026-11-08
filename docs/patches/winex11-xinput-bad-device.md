@@ -1,5 +1,7 @@
 # winex11-xinput-bad-device.patch
 
+<!-- winum-test: missing -->
+
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
 - **DLL:** `winex11.drv`

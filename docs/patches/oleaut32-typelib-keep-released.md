@@ -1,5 +1,7 @@
 # Candidate: oleaut32 type library cache
 
+<!-- winum-test: l1 -->
+
 `oleaut32-typelib-keep-released.patch`: a type library read from a file
 stays in oleaut32's cache after its last Release (up to 8), holding no
 references, and is used again if its file did not change. Made for

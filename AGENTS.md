@@ -55,6 +55,12 @@ Their own AGENTS.md / HANDOFF.md cover the programs; this file covers Wine.
   branches merged after their tests).
 - A patch goes into `patches/series` only after cross review by a second
   assistant who did not write it, and after the validation below.
+- Every patch in `patches/series` has a Wine test that passed on Windows 10
+  (L1) or, when no Windows counterpart exists (X11 driver, Explorer), a
+  reproducer and a written reason. Its page in `docs/patches/` records it in
+  one line, `<!-- winum-test: l1 -->` or `<!-- winum-test: l3-only: reason -->`;
+  `scripts/check-series.sh` checks this and the build of a release tag fails
+  without it.
 - Pull requests from others: read the whole diff, especially `scripts/`,
   anything that downloads, and `.github/workflows/`. Say what was read in
   full and what was only skimmed.

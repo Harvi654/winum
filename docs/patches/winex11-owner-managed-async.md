@@ -1,5 +1,7 @@
 # winex11-owner-managed-async.patch
 
+<!-- winum-test: l3-only: X11 window manager behaviour, no Windows counterpart; reproducer in docs/wine-repro -->
+
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
 - **DLL:** `winex11.drv`

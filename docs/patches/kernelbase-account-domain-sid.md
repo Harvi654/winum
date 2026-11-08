@@ -1,5 +1,7 @@
 # kernelbase-account-domain-sid.patch
 
+<!-- winum-test: test-not-on-windows -->
+
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
 - **DLL:** `kernelbase`

@@ -1,5 +1,7 @@
 # oleaut32-typedesc-pointee.patch
 
+<!-- winum-test: missing -->
+
 **Problem as the user saw it:** Inventor's Design Accelerator (Shaft,
 gears, ...) said "Failed to create shaft". Its add-in could not register
 itself because a call into Inventor's API failed.

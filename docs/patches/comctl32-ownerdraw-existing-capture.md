@@ -1,5 +1,7 @@
 # comctl32-ownerdraw-existing-capture.patch
 
+<!-- winum-test: missing -->
+
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
 - **DLL:** `comctl32`

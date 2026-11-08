@@ -1,5 +1,7 @@
 # win32u-child-topmost-ignore.patch
 
+<!-- winum-test: l1 -->
+
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
 - **DLL:** `win32u`

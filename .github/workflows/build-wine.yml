@@ -33,6 +33,7 @@ on:
       - 'scripts/build-wine.sh'
       - 'scripts/make-wine-source.sh'
       - 'scripts/lib/wine-patches.sh'
+      - 'scripts/check-series.sh'
       - '.github/workflows/build-wine.yml'
   pull_request:
     paths:
@@ -66,6 +67,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+      - name: Every patch has a Windows-tested test or an L3-only reason (enforced for release tags)
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then bash scripts/check-series.sh
+          else bash scripts/check-series.sh --report; fi
       - name: Plan
         id: plan
         env:
