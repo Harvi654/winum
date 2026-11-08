@@ -2,9 +2,13 @@
 # Original AI-assisted (Claude), LGPL-2.1-or-later.
 # summarize LOGDIR            -> JSON on stdout: per dll.arch.unit the counts of the
 #                                Wine test summary line and the failing source lines
-# compare VANILLA.json SERIES.json -> Markdown report on stdout; exit 1 when the
+# compare VANILLA SERIES       -> Markdown report on stdout; exit 1 when the
 #                                series adds a failure location or a unit stops
-#                                finishing (L2 regression), else 0
+#                                finishing (L2 regression), or when the two sides
+#                                do not cover the same test groups, else 0.
+#                                VANILLA/SERIES: a results JSON file, or a
+#                                directory searched for results-*-<group>.json
+#                                (one per CI job), merged.
 import json, re, sys
 from collections import Counter
 from pathlib import Path
@@ -32,8 +36,27 @@ def summarize(logdir):
         out[f"{dll}.{arch}.{unit}"] = r
     json.dump(out, sys.stdout, indent=1, sort_keys=True)
 
+def load(path):
+    """results JSON (file) or the merge of results-*.json under a directory;
+    returns (results, set of group names)"""
+    p = Path(path)
+    files = sorted(p.rglob('results-*.json')) if p.is_dir() else [p]
+    merged, groups = {}, set()
+    for f in files:
+        part = f.stem.split('-', 2)
+        groups.add(part[2] if len(part) == 3 else 'all')
+        for key, r in json.load(open(f)).items():
+            if key in merged:
+                sys.exit(f"{key} appears in two result files under {path}")
+            merged[key] = r
+    return merged, groups
+
 def compare(vpath, spath):
-    v, s = json.load(open(vpath)), json.load(open(spath))
+    (v, vg), (s, sg) = load(vpath), load(spath)
+    if not vg or vg != sg:
+        print("# L2: incomplete\n")
+        print(f"Test groups differ: vanilla {sorted(vg)}, series {sorted(sg)}. No comparison made.")
+        return 1
     regress, fixed, changed = [], [], []
     for key in sorted(set(v) | set(s)):
         a, b = v.get(key), s.get(key)
@@ -52,7 +75,8 @@ def compare(vpath, spath):
         if a["tests"] != b["tests"] and not new_at:
             changed.append((key, f"checks {a['tests']} -> {b['tests']}"))
     print("# L2: vanilla Wine against the winum series\n")
-    print(f"Units: {len(s)}. Regressions: {len(regress)}. Fixed: {len(fixed)}. Other changes: {len(changed)}.\n")
+    print(f"Groups: {', '.join(sorted(sg))}. Units: {len(s)}. Regressions: {len(regress)}. "
+          f"Fixed: {len(fixed)}. Other changes: {len(changed)}.\n")
     for title, rows in (("Regressions (new failure locations)", regress), ("Fixed", fixed), ("Other changes", changed)):
         print(f"## {title}\n")
         print("\n".join(f"- `{k}`: {t}" for k, t in rows) or "none")
@@ -67,4 +91,4 @@ if __name__ == "__main__":
     elif sys.argv[1:2] == ["compare"] and len(sys.argv) == 4:
         sys.exit(compare(sys.argv[2], sys.argv[3]))
     else:
-        sys.exit("usage: compare-tests.py summarize LOGDIR | compare VANILLA.json SERIES.json")
+        sys.exit("usage: compare-tests.py summarize LOGDIR | compare VANILLA SERIES")

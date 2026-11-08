@@ -8,8 +8,15 @@
 #
 #   bash scripts/test-series.sh vanilla|series OUTDIR
 #
-# Needs Wine's build dependencies (see the workflow), mingw-w64-gcc, xvfb-run
+# Needs Wine's build dependencies (see the workflow), mingw-w64-gcc, Xvfb
 # and about 15 GB of disk. Does not install anything.
+#
+# Environment (each on its own export line):
+#   TESTS         test directories to run (default: all the series touches);
+#                 the workflow splits them into groups, one job per group
+#   GROUP         name used in the result file names (default: all)
+#   UNIT_TIMEOUT  seconds per test unit (default 300; Wine's own default is 120)
+#   MAKE_L1       1 = also pack the L1 bundle (series only; default 1)
 set -euo pipefail
 HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
 VARIANT="${1:?vanilla or series}"
@@ -17,12 +24,17 @@ OUTDIR="$(mkdir -p "${2:?OUTDIR}" && cd "$2" && pwd)"
 case "$VARIANT" in vanilla|series) ;; *) echo "variant: vanilla or series" >&2; exit 2 ;; esac
 # shellcheck disable=SC1091
 source "$HERE/wine/version.env"
+WINE_PINNED_VERSION="$WINE_VERSION"
+# shellcheck disable=SC1091
+source "$HERE/scripts/lib/wine-source.sh"
 WORK="${WORK:-${XDG_CACHE_HOME:-$HOME/.cache}/winum/test-$VARIANT}"
 JOBS="${JOBS:-$(nproc)}"
 # test directories of the DLLs patches/series changes (the server, win32u and
 # winex11.drv changes are exercised by the user32/gdi32/win32u tests)
 TESTS="${TESTS:-advapi32 combase comctl32 gdi32 glu32 kernelbase msi mspatcha msxml3 ntdll ole32 oleaut32 opengl32 riched20 rpcrt4 shell32 urlmon user32 wbemprox win32u wininet}"
-UNIT_TIMEOUT="${UNIT_TIMEOUT:-900}"
+UNIT_TIMEOUT="${UNIT_TIMEOUT:-300}"
+GROUP="${GROUP:-all}"
+MAKE_L1="${MAKE_L1:-1}"
 say() { printf '\n==> %s\n' "$*"; }
 
 mkdir -p "$WORK"
@@ -31,6 +43,7 @@ rm -rf "$SRC"
 case "$WINE_VERSION" in *.0|*.0.*) SUB="${WINE_VERSION%%.*}.0" ;; *) SUB="${WINE_VERSION%%.*}.x" ;; esac
 TARBALL="$WORK/wine-$WINE_VERSION.tar.xz"
 [ -s "$TARBALL" ] || curl -fL --retry 3 -o "$TARBALL" "https://dl.winehq.org/wine/source/$SUB/wine-$WINE_VERSION.tar.xz"
+wine_verify_tarball "$TARBALL" "$WINE_VERSION" >/dev/null || exit 1
 tar -xf "$TARBALL" -C "$WORK"
 if [ "$VARIANT" = series ]; then
     say "Applying patches/series"
@@ -48,11 +61,20 @@ mkdir -p "$SRC/build" && cd "$SRC/build"
 say "Building with $JOBS jobs"
 make -j"$JOBS" > "$WORK/build.log" 2>&1 || { tail -60 "$WORK/build.log"; exit 1; }
 
-say "Running tests: $TESTS"
+say "Running tests ($GROUP): $TESTS"
 export WINEPREFIX="$WORK/prefix" WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml="
 rm -rf "$WINEPREFIX"
-xvfb-run -a -s "-screen 0 1280x1024x24" ./wine wineboot -i >/dev/null 2>&1 || true
+# one X server for the whole run (xvfb-run per unit cost a server start each time)
+Xvfb -displayfd 3 -screen 0 1280x1024x24 -nolisten tcp 3>"$WORK/display" &
+XVFB_PID=$!
+trap 'kill "$XVFB_PID" 2>/dev/null || true' EXIT
+for _ in $(seq 50); do [ -s "$WORK/display" ] && break; sleep 0.2; done
+[ -s "$WORK/display" ] || { echo "Xvfb did not start" >&2; exit 1; }
+export DISPLAY=":$(tr -d '\n' < "$WORK/display")"
+./wine wineboot -i >/dev/null 2>&1 || true
+./server/wineserver -w 2>/dev/null || true
 mkdir -p "$OUTDIR/logs"
+: > "$OUTDIR/durations-$VARIANT-$GROUP.tsv"
 for t in $TESTS; do
     for arch in x86_64 i386; do
         exe="dlls/$t/tests/$arch-windows/${t}_test.exe"
@@ -60,17 +82,18 @@ for t in $TESTS; do
         units="$(./wine "$exe" --list 2>/dev/null | sed -n 's/^    //p' | tr -d '\r')" || true
         for u in $units; do
             log="$OUTDIR/logs/$t.$arch.$u.log"
-            timeout -k 10 "$UNIT_TIMEOUT" xvfb-run -a -s "-screen 0 1280x1024x24" \
-                ./wine "$exe" "$u" > "$log" 2>&1 || echo "exit=$?" >> "$log"
+            start=$(date +%s)
+            timeout -k 10 "$UNIT_TIMEOUT" ./wine "$exe" "$u" > "$log" 2>&1 || echo "exit=$?" >> "$log"
+            printf '%s\t%s\t%s\t%s\n' "$t" "$arch" "$u" "$(( $(date +%s) - start ))" >> "$OUTDIR/durations-$VARIANT-$GROUP.tsv"
         done
     done
 done
 ./server/wineserver -k 2>/dev/null || true
 
 # summaries and failure locations only (no raw logs in the artifact's index)
-python3 "$HERE/scripts/compare-tests.py" summarize "$OUTDIR/logs" > "$OUTDIR/results-$VARIANT.json"
+python3 "$HERE/scripts/compare-tests.py" summarize "$OUTDIR/logs" > "$OUTDIR/results-$VARIANT-$GROUP.json"
 
-if [ "$VARIANT" = series ]; then
+if [ "$VARIANT" = series ] && [ "$MAKE_L1" = 1 ]; then
     say "L1 bundle (Wine test executables for Windows 10)"
     B="$OUTDIR/l1-bundle"
     mkdir -p "$B"
