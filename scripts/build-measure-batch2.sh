@@ -24,10 +24,16 @@ p=Path(sys.argv[1])
 lines=['@echo off','setlocal DisableDelayedExpansion','cd /d "%~dp0"',
        'if exist exitcodes.txt exit /b 2',
        'if exist result-typedesc-x86_64.txt exit /b 2',
-       'if exist result-typedesc-i686.txt exit /b 2', 'set "failed=0"']
+       'if exist result-typedesc-i686.txt exit /b 2',
+       'if exist result-reader-x86_64.txt exit /b 2',
+       'if exist result-reader-i686.txt exit /b 2', 'set "failed=0"']
 for arch in ('x86_64','i686'):
     lines += [f'typedesc-{arch}.exe > result-typedesc-{arch}.txt 2>&1',
               'set "code=%ERRORLEVEL%"',f'>>exitcodes.txt echo typedesc-{arch}=%code%',
+              'if not "%code%"=="0" set "failed=1"']
+for arch in ('x86_64','i686'):
+    lines += [f'typedesc-{arch}.exe --reader-only > result-reader-{arch}.txt 2>&1',
+              'set "code=%ERRORLEVEL%"',f'>>exitcodes.txt echo reader-{arch}=%code%',
               'if not "%code%"=="0" set "failed=1"']
 lines += ['pause','exit /b %failed%']
 (p/'run-measure.bat').write_bytes(('\r\n'.join(lines)+'\r\n').encode('ascii'))
