@@ -51,13 +51,35 @@ def load(path):
             merged[key] = r
     return merged, groups
 
+def uniform_shift(gone, new):
+    """the line offset if every new failure location is a vanished one in the
+    same file moved by one constant offset with the same count, else None"""
+    if not gone or len(gone) != len(new):
+        return None
+    def split(d):
+        out = []
+        for k, n in d.items():
+            f, _, line = k.rpartition(':')
+            if not line.isdigit():
+                return None
+            out.append((f, int(line), n))
+        return sorted(out)
+    g, n = split(gone), split(new)
+    if g is None or n is None:
+        return None
+    shifts = {b[1] - a[1] for a, b in zip(g, n) if a[0] == b[0] and a[2] == b[2]}
+    if len(shifts) != 1 or any(a[0] != b[0] or a[2] != b[2] for a, b in zip(g, n)):
+        return None
+    d = shifts.pop()
+    return d if d else None
+
 def compare(vpath, spath):
     (v, vg), (s, sg) = load(vpath), load(spath)
     if not vg or vg != sg:
         print("# L2: incomplete\n")
         print(f"Test groups differ: vanilla {sorted(vg)}, series {sorted(sg)}. No comparison made.")
         return 1
-    regress, fixed, changed = [], [], []
+    regress, fixed, changed, moved = [], [], [], []
     for key in sorted(set(v) | set(s)):
         a, b = v.get(key), s.get(key)
         if a is None or b is None:
@@ -68,6 +90,12 @@ def compare(vpath, spath):
             continue
         new_at = {k: n for k, n in b["fail_at"].items() if n > a["fail_at"].get(k, 0)}
         gone_at = {k: n for k, n in a["fail_at"].items() if n > b["fail_at"].get(k, 0)}
+        shift = uniform_shift(gone_at, new_at)
+        if shift is not None:
+            # a patch added lines to the test file: the same failures, moved
+            moved.append((key, "same failures moved by %+d lines: " % shift +
+                          ", ".join(f"{k} x{n}" for k, n in sorted(new_at.items()))))
+            new_at, gone_at = {}, {}
         if new_at:
             regress.append((key, "new failures: " + ", ".join(f"{k} x{n}" for k, n in sorted(new_at.items()))))
         if gone_at:
@@ -76,8 +104,9 @@ def compare(vpath, spath):
             changed.append((key, f"checks {a['tests']} -> {b['tests']}"))
     print("# L2: vanilla Wine against the winum series\n")
     print(f"Groups: {', '.join(sorted(sg))}. Units: {len(s)}. Regressions: {len(regress)}. "
-          f"Fixed: {len(fixed)}. Other changes: {len(changed)}.\n")
-    for title, rows in (("Regressions (new failure locations)", regress), ("Fixed", fixed), ("Other changes", changed)):
+          f"Fixed: {len(fixed)}. Moved: {len(moved)}. Other changes: {len(changed)}.\n")
+    for title, rows in (("Regressions (new failure locations)", regress), ("Fixed", fixed),
+                        ("Moved (test file patched, same failures)", moved), ("Other changes", changed)):
         print(f"## {title}\n")
         print("\n".join(f"- `{k}`: {t}" for k, t in rows) or "none")
         print()
