@@ -11,8 +11,11 @@ Consumers (each pins a release and its SHA-256):
 Their own AGENTS.md / HANDOFF.md cover the programs; this file covers Wine.
 
 ## Layout (target; filled step by step)
-- `wine/version.env` - `WINE_VERSION` (upstream release the patches are for)
-  and `WINUM_BUILD` (raised whenever `patches/series` or a patch changes).
+- `wine/version.env` - `WINE_VERSION` (upstream release the patches are for),
+  `WINE_SHA256` (of the official `wine-<version>.tar.xz`, checked before
+  extraction by `scripts/lib/wine-source.sh`; changes together with
+  `WINE_VERSION`, taken from a GPG-verified download) and `WINUM_BUILD`
+  (raised whenever `patches/series` or a patch changes).
 - `patches/series` - the patches of a normal build, in order. Nothing else
   is applied.
 - `patches/*.patch` - one fix per file, named `<dll>-<what>.patch`.

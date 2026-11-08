@@ -20,7 +20,10 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$HERE/wine/version.env"
+WINE_PINNED_VERSION="$WINE_VERSION"
 WINE_VERSION="${WINE_VER_OVERRIDE:-$WINE_VERSION}"
+# shellcheck disable=SC1091
+source "$HERE/scripts/lib/wine-source.sh"
 OUTDIR="$(mkdir -p "${1:-$HERE/dist}" && cd "${1:-$HERE/dist}" && pwd)"
 WORK="${WORK:-${XDG_CACHE_HOME:-$HOME/.cache}/winum/wine-build}"
 NAME="winum-$WINE_VERSION-$WINUM_BUILD-x86_64"
@@ -41,9 +44,10 @@ rm -rf "$SRC"
 case "$WINE_VERSION" in *.0|*.0.*) SUB="${WINE_VERSION%%.*}.0" ;; *) SUB="${WINE_VERSION%%.*}.x" ;; esac
 TARBALL="${WINE_SOURCE_TARBALL:-$WORK/wine-$WINE_VERSION.tar.xz}"
 [ -s "$TARBALL" ] || curl -fL --retry 3 -o "$TARBALL" "https://dl.winehq.org/wine/source/$SUB/wine-$WINE_VERSION.tar.xz"
+SRC_SHA="$(wine_verify_tarball "$TARBALL" "$WINE_VERSION")" || die "Wine source not verified"
+echo "verified wine-$WINE_VERSION.tar.xz sha256 $SRC_SHA"
 tar -xf "$TARBALL" -C "$WORK"
 [ -f "$SRC/configure" ] || die "unexpected source layout in $TARBALL"
-SRC_SHA="$(sha256sum "$TARBALL" | cut -d' ' -f1)"
 
 say "Applying patches/series"
 # also writes PATCHES.txt and the LGPL change notices (end of each changed file);

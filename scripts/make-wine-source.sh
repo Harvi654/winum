@@ -48,7 +48,7 @@ say "Build files at $REF ($(git -C "$HERE" rev-parse --short "$COMMIT"))"
 EXP="$WORK/winum"
 mkdir -p "$EXP"
 paths=()
-for p in patches wine/version.env scripts/build-wine.sh scripts/lib/wine-patches.sh \
+for p in patches wine/version.env scripts/build-wine.sh scripts/lib/wine-patches.sh scripts/lib/wine-source.sh \
          scripts/make-wine-source.sh .github/workflows/build-wine.yml LICENSE; do
     git -C "$HERE" cat-file -e "$COMMIT:$p" 2>/dev/null && paths+=("$p")
 done
@@ -75,7 +75,10 @@ case "$WINE_VERSION" in *.0|*.0.*) SUB="${WINE_VERSION%%.*}.0" ;; *) SUB="${WINE
 URL="https://dl.winehq.org/wine/source/$SUB/wine-$WINE_VERSION.tar.xz"
 TARBALL="${WINE_SOURCE_TARBALL:-$WORK/wine-$WINE_VERSION.tar.xz}"
 [ -s "$TARBALL" ] || curl -fL --retry 3 -o "$TARBALL" "$URL"
-SRC_SHA="$(sha256sum "$TARBALL" | cut -d' ' -f1)"
+WINE_PINNED_VERSION="$WINE_VERSION"
+# shellcheck disable=SC1091
+source "$HERE/scripts/lib/wine-source.sh"
+SRC_SHA="$(wine_verify_tarball "$TARBALL" "$WINE_VERSION")" || die "Wine source not verified"
 STAGE="$WORK/stage"
 mkdir -p "$STAGE"
 tar -xf "$TARBALL" -C "$STAGE"
