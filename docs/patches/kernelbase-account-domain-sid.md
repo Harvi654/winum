@@ -1,6 +1,6 @@
 # kernelbase-account-domain-sid.patch
 
-<!-- winum-test: test-not-on-windows -->
+<!-- winum-test: l1 -->
 
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
@@ -25,7 +25,7 @@ Content Center libraries stayed empty and a refresh crashed Inventor (.NET `Win3
 | Level | Result |
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
-| L1 | Wine test exists, **never run on Windows 10** |
+| L1 | Windows 10 VM (Mac host), L1 bundle of run 42483162074 (2026-11-08): advapi32 security x86_64 3653 checks 0 failures; i386 3666 checks, 4 failures in the unrelated upstream `test_system_security_access` (registry SACL, lines 6804-6836), the patch's checks (after line 6892) pass |
 | L2 | not recorded per patch |
 | L3 | not recorded |
 | L4 | Content Center libraries load. (Inventor, maintainer) |

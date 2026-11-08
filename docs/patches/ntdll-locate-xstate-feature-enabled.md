@@ -25,7 +25,7 @@ Frame Analysis: Simulate crashed the solver on CPUs with compacted XSAVE (Zen 3,
 | Level | Result |
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.20-4` (2026-10-21, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
-| L1 | Wine test exists, **never run on Windows 10** |
+| L1 | the `ntdll:exception` unit restarts Windows VMs (two hypervisors, 2026-11-08); the patch's check repeated standalone in `docs/wine-repro/ntdll-xstate-locate/` - to be run |
 | L2 | not recorded per patch |
 | L3 | not recorded |
 | L4 | Frame Analysis Simulate (wine-11.20-6). (Inventor, maintainer) |

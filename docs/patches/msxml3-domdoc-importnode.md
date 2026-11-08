@@ -1,6 +1,6 @@
 # msxml3-domdoc-importnode.patch
 
-<!-- winum-test: test-not-on-windows -->
+<!-- winum-test: l1 -->
 
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
@@ -25,7 +25,7 @@ Frame Generator: Insert Frame created only an empty folder.
 | Level | Result |
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.20-3` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
-| L1 | Wine test exists, **never run on Windows 10** |
+| L1 | Windows 10 VM (Mac host), L1 bundle of run 42483162074 (2026-11-08): msxml3 domdoc 36828 checks both architectures; the patch's `test_importNode` checks pass (the one failure belongs to msxml3-parseerror-filepos) |
 | L2 | not recorded per patch |
 | L3 | not recorded |
 | L4 | Insert Frame creates members (wine-11.20-3 onwards). (Inventor, maintainer) |

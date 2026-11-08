@@ -1,6 +1,6 @@
 # ole32-transacted-truncate-dirty.patch
 
-<!-- winum-test: test-not-on-windows -->
+<!-- winum-test: l1 -->
 
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
@@ -25,7 +25,7 @@ Found with the storage lock: a stream truncated to 0 in a transacted storage los
 | Level | Result |
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.20-6` (2026-10-22, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
-| L1 | Wine test exists, **never run on Windows 10** |
+| L1 | Windows 10 VM (Mac host), L1 bundle of run 42483162074 (2026-11-08): ole32 storage32 19102 checks, 0 failures, both architectures |
 | L2 | not recorded per patch |
 | L3 | Reproducer `docs/wine-repro/ole32-storage/trunc.c` (Inventor repository). |
 | L4 | Frame Analysis Simulate (wine-11.20-6). (Inventor, maintainer) |

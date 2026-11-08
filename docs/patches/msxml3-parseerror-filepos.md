@@ -1,6 +1,6 @@
 # msxml3-parseerror-filepos.patch
 
-<!-- winum-test: test-not-on-windows -->
+<!-- winum-test: missing -->
 
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
@@ -25,7 +25,7 @@ SOLIDWORKS Installation Manager stopped with a fatal exception after the serial 
 | Level | Result |
 | --- | --- |
 | L0 | full builds full-1/full-2 |
-| L1 | Wine test exists, never run on Windows |
+| L1 | **fails on Windows** (Windows 10 VM (Mac host), L1 bundle of run 42483162074 (2026-11-08)): `domdoc.c:12959` - for a document without a parse error Windows returns S_FALSE from `get_filepos` (filepos 0), the patch returns S_OK; both architectures. Needs a MEASURE and v2 |
 | L2 | not recorded |
 | L3 | 32/64-bit standalone probes, three fixtures |
 | L4 | Installation Manager passes the serial step; combined smoke |

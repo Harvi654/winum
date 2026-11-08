@@ -38,3 +38,19 @@ Run the remaining units one at a time to find which one restarts the VM
 extended CPU state). Windows Event Viewer (System, source "Kernel-Power"
 41 or "BugCheck") tells whether Windows crashed or the VM was reset from
 outside.
+
+## Second run, one unit at a time (Windows 10 VM on a Mac, 2026-11-08)
+
+| Unit | x86_64 | i386 |
+| --- | --- | --- |
+| `advapi32:security` | 3653 checks, 0 failures | 3666 checks, 4 failures in upstream `test_system_security_access` (lines 6804-6836, registry SACL access under WOW64), not in the patch's test |
+| `msxml3:domdoc` | 1 failure (parseerror, above) | the same 1 failure |
+| `ole32:storage32` | 19102, 0 failures | 19102, 0 failures |
+| `shell32:shlfolder` | 3730, 0 failures | 2083, 0 failures |
+| `shell32:shelldispatch` | 480, 0 failures | output lost - re-run |
+| `ntdll:exception` | restarts the VM | restarts the VM |
+
+The VM restart comes from `ntdll:exception` (also on the second hypervisor);
+its patch check is repeated standalone in `docs/wine-repro/ntdll-xstate-locate/`.
+L1 recorded for kernelbase-account-domain-sid, msxml3-domdoc-importnode,
+both ole32 patches and shell32-getimage.
