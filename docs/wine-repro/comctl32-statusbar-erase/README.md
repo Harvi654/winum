@@ -212,6 +212,12 @@ Theme disabling still fails, so unthemed-v6 coverage remains excluded. This
 is focused runtime measurement, not full paired L2 or an Inventor RT fix;
 see the [candidate validation record](../../../patches/candidates/comctl32-statusbar-v2/README.md#maintainer-candidate-runtime-measurement-2026-11-08).
 
+Both i686 candidate variants subsequently completed with 144 rows, zero
+errors and valid capture/staging prerequisites each. Their filtered outputs
+are identical to the corresponding x86_64 files except for `arch_bits=32`.
+This extends the focused v2 observations to both architectures (576 rows
+total); it does not add unthemed-v6 coverage or replace full paired L2.
+
 ## Windows results (2026-11-07)
 
 Windows 10, comctl32 5.82.10586 and 6.16.10586, all four executables exit 0,

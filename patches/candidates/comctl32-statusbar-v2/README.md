@@ -223,3 +223,13 @@ comctl32 suite, an i686 runtime test, Inventor L4, or a reproduction/fix of the
 RT-dependent composition problem. Keep the candidate outside production until
 the remaining validation is completed. See the
 [comparison with Windows and production v1](../../../docs/wine-repro/comctl32-statusbar-erase/README.md#intel-maintainer-measurement-2026-11-08).
+
+The maintainer subsequently supplied both i686 MEASURE files from the same
+candidate prefix. Each has `arch_bits=32`, the correct class version, 144 rows,
+zero errors and valid staging/marker/glyph-mask prerequisites. Each complete
+filtered output is identical to its x86_64 counterpart apart from `arch_bits`.
+Process exit codes were not supplied. Thus the focused measurement covers
+both PE architectures (576 rows total); the v5 correction and themed-v6
+preservation hold in both. Failed theme disabling and missing unthemed-v6
+Wine coverage remain unchanged. This completes this focused measurement set,
+not the complete paired comctl32 L2 suites or CAD L4 validation.
