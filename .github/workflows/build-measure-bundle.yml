@@ -1,0 +1,36 @@
+# Builds the MEASURE / standalone L1 programs listed in
+# docs/wine-repro/measure-bundle.list for x86_64 and i686 (MinGW) into one
+# artifact for the maintainer's offline Windows 10 VM. Publishes nothing.
+name: Build MEASURE bundle
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/wine-repro/measure-bundle.list'
+      - 'docs/wine-repro/**/measure*.c'
+      - 'docs/wine-repro/**/l1*.c'
+      - 'scripts/build-measure-bundle.sh'
+      - '.github/workflows/build-measure-bundle.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    steps:
+      - name: MinGW (official Arch repositories)
+        run: pacman -Syu --noconfirm --needed git mingw-w64-gcc
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash scripts/build-measure-bundle.sh out/measure-bundle
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: measure-bundle
+          path: out/measure-bundle/
+          retention-days: 30
