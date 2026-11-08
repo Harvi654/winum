@@ -1,0 +1,203 @@
+--- a/dlls/comctl32/toolbar.c
++++ b/dlls/comctl32/toolbar.c
+@@ -169,6 +169,7 @@
+     TBUTTON_INFO *buttons;      /* pointer to button array */
+     LPWSTR       *strings;      /* pointer to string array */
+     TBITMAP_INFO *bitmaps;
++    INT      nRowsColumns;      /* buttons per row set by TB_SETROWS, 0 = none */
+ #if __WINE_COMCTL32_VERSION == 6
+     HTHEME   hTheme;            /* theme */
+ #endif
+@@ -1364,6 +1365,44 @@
+     TRACE("max string size %ld x %ld\n", lpSize->cx, lpSize->cy);
+ }
+ 
++/* Wrap after "columns" buttons; a separator ends the row and gets a row of
++ * its own, so every group of buttons starts on a new row. Returns the number
++ * of button rows (separator rows not counted). */
++static INT
++TOOLBAR_WrapColumns(TOOLBAR_INFO *infoPtr, INT columns)
++{
++    TBUTTON_INFO *btnPtr = infoPtr->buttons;
++    INT i, column = 0, last = -1, rows = 0;
++
++    for (i = 0; i < infoPtr->nNumButtons; i++)
++        btnPtr[i].fsState &= ~TBSTATE_WRAP;
++
++    for (i = 0; i < infoPtr->nNumButtons; i++)
++    {
++        if (btnPtr[i].fsState & TBSTATE_HIDDEN)
++            continue;
++
++        if (btnPtr[i].fsStyle & BTNS_SEP)
++        {
++            if (column && last >= 0)
++                btnPtr[last].fsState |= TBSTATE_WRAP;
++            btnPtr[i].fsState |= TBSTATE_WRAP;
++            column = 0;
++            last = i;
++            continue;
++        }
++
++        if (!column) rows++;
++        last = i;
++        if (++column >= columns)
++        {
++            btnPtr[i].fsState |= TBSTATE_WRAP;
++            column = 0;
++        }
++    }
++    return rows;
++}
++
+ /***********************************************************************
+ * 		TOOLBAR_WrapToolbar
+ *
+@@ -1392,6 +1431,14 @@
+     if( !(infoPtr->dwStyle & TBSTYLE_WRAPABLE) &&
+ 	!(infoPtr->dwExStyle & TBSTYLE_EX_VERTICAL) )  return;
+ 
++    /* After TB_SETROWS the rows keep their number of buttons when the
++       window is resized or buttons change, instead of wrapping by width. */
++    if (infoPtr->nRowsColumns)
++    {
++        TOOLBAR_WrapColumns(infoPtr, infoPtr->nRowsColumns);
++        return;
++    }
++
+     btnPtr = infoPtr->buttons;
+     x  = infoPtr->nIndent;
+     width = infoPtr->client_rect.right - infoPtr->client_rect.left;
+@@ -1857,6 +1904,16 @@
+     /* infoPtr->nRows is the number of rows on the toolbar */
+     infoPtr->nRows = nRows + nSepRows + 1;
+ 
++    /* With TB_SETROWS rows in a vertical toolbar, a separator is a line
++       between groups of rows: make it as wide as the toolbar. */
++    if (infoPtr->nRowsColumns && (infoPtr->dwStyle & CCS_VERT))
++    {
++        for (i = 0, btnPtr = infoPtr->buttons; i < infoPtr->nNumButtons; i++, btnPtr++)
++            if ((btnPtr->fsStyle & BTNS_SEP) && (btnPtr->fsState & TBSTATE_WRAP) &&
++                !(btnPtr->fsState & TBSTATE_HIDDEN))
++                btnPtr->rect.right = infoPtr->rcBound.right;
++    }
++
+     TRACE("toolbar button width %d\n", infoPtr->nButtonWidth);
+ }
+ 
+@@ -4927,89 +4984,40 @@
+ 
+     TRACE("Setting rows to %d (%d)\n", rows, bLarger);
+ 
+-    if(infoPtr->nRows != rows)
++    if(infoPtr->nRows != rows || !infoPtr->nRowsColumns)
+     {
+         TBUTTON_INFO *btnPtr = infoPtr->buttons;
+-        int curColumn = 0; /* Current column                      */
+-        int curRow    = 0; /* Current row                         */
+-        int hidden    = 0; /* Number of hidden buttons */
+-        int seps      = 0; /* Number of separators     */
+-        int idealWrap = 0; /* Ideal wrap point         */
+-        int i;
+-        BOOL wrap;
++        int buttons = 0, columns, i;
+ 
+         /*
+-           Calculate new size and wrap points - Under windows, setrows will
+-           change the dimensions if needed to show the number of requested
+-           rows (if CCS_NORESIZE is set), or will take up the whole window
+-           (if no CCS_NORESIZE).
+-
+-           Basic algorithm - If N buttons, and y rows requested, each row
+-           contains N/y buttons.
+-
+-           FIXME: Handling of separators not obvious from testing results
+-           FIXME: Take width of window into account?
++           Use the fewest buttons per row that fit into the requested number
++           of rows; every group of buttons (between separators) starts on a
++           new row and separators are not counted. When the requested number
++           cannot be met exactly, bLarger chooses the next larger number of
++           rows instead of the next smaller one (tbrows_results in
++           tests/toolbar.c, which pass on Windows).
+          */
+-
+-        /* Loop through the buttons one by one counting key items  */
+-        for (i = 0; i < infoPtr->nNumButtons; i++ )
+-        {
+-            btnPtr[i].fsState &= ~TBSTATE_WRAP;
+-            if (btnPtr[i].fsState & TBSTATE_HIDDEN)
+-                hidden++;
+-            else if (btnPtr[i].fsStyle & BTNS_SEP)
+-                seps++;
+-        }
+-
+-        /* FIXME: Separators make this quite complex */
+-        if (seps) FIXME("Separators unhandled\n");
+-
+-        /* Round up so more per line, i.e., less rows */
+-        idealWrap = (infoPtr->nNumButtons - hidden + (rows-1)) / (rows ? rows : 1);
+-
+-        /* Calculate ideal wrap point if we are allowed to grow, but cannot
+-           achieve the requested number of rows. */
+-        if (bLarger && idealWrap > 1)
+-        {
+-            int resRows = (infoPtr->nNumButtons + (idealWrap-1)) / idealWrap;
+-            int moreRows = (infoPtr->nNumButtons + (idealWrap-2)) / (idealWrap-1);
+-
+-            if (resRows < rows && moreRows > rows)
+-            {
+-                idealWrap--;
+-                TRACE("Changing idealWrap due to bLarger (now %d)\n", idealWrap);
+-            }
+-        }
+-
+-        curColumn = curRow = 0;
+-        wrap = FALSE;
+-        TRACE("Trying to wrap at %d (%d,%d,%d)\n", idealWrap,
+-              infoPtr->nNumButtons, hidden, rows);
+-
+-        for (i = 0; i < infoPtr->nNumButtons; i++ )
+-        {
+-            if (btnPtr[i].fsState & TBSTATE_HIDDEN)
+-                continue;
+-
+-            /* Step on, wrap if necessary or flag next to wrap */
+-            if (!wrap) {
+-                curColumn++;
+-            } else {
+-                wrap = FALSE;
+-                curColumn = 1;
+-                curRow++;
+-            }
+-
+-            if (curColumn > (idealWrap-1)) {
+-                wrap = TRUE;
+-                btnPtr[i].fsState |= TBSTATE_WRAP;
+-            }
+-        }
+-
+-        TRACE("Result - %d rows\n", curRow + 1);
++        for (i = 0; i < infoPtr->nNumButtons; i++)
++            if (!(btnPtr[i].fsState & TBSTATE_HIDDEN) && !(btnPtr[i].fsStyle & BTNS_SEP))
++                buttons++;
++
++        if (rows < 1) rows = 1;
++        for (columns = 1; columns < buttons; columns++)
++            if (TOOLBAR_WrapColumns(infoPtr, columns) <= rows)
++                break;
++        if (bLarger && columns > 1 && TOOLBAR_WrapColumns(infoPtr, columns) < rows)
++            columns--;
++        if (columns < 1) columns = 1;
++
++        TRACE("Trying to wrap at %d (%d buttons, %d rows)\n", columns, buttons, rows);
++        TOOLBAR_WrapColumns(infoPtr, columns);
++        infoPtr->nRowsColumns = columns;
+ 
+         /* recalculate toolbar */
+         TOOLBAR_CalcToolbar (infoPtr);
++        TRACE("Result - %d rows, %ld x %ld\n", infoPtr->nRows,
++              infoPtr->rcBound.right - infoPtr->rcBound.left,
++              infoPtr->rcBound.bottom - infoPtr->rcBound.top);
+ 
+         /* Resize if necessary (Only if NORESIZE is set - odd, but basically
+            if NORESIZE is NOT set, then the toolbar will always be resized to
