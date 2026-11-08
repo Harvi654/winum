@@ -1,0 +1,77 @@
+# Candidate validation only: production runtime vs production + v2, same tests.
+name: Test status-bar v2 (paired L2)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'topic/**']
+    paths:
+      - 'scripts/test-statusbar-v2.sh'
+      - 'scripts/statusbar-v2-l2.py'
+      - 'scripts/test-statusbar-v2-l2.py'
+      - '.github/workflows/test-statusbar-v2.yml'
+permissions:
+  contents: read
+concurrency:
+  group: statusbar-v2-l2-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [baseline, candidate]
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 360
+    steps:
+      - name: Dependencies (official Arch repositories)
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed git python mingw-w64-gcc xorg-server-xvfb xorg-xauth \
+            alsa-lib libpulse gnutls krb5 dbus fontconfig freetype2 ttf-dejavu \
+            libx11 libxext libxi libxrandr libxrender libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
+            wayland mesa libglvnd vulkan-icd-loader vulkan-headers \
+            gst-plugins-base-libs sdl2 libcups libgphoto2 sane libpcap v4l-utils pcsclite unixodbc ocl-icd opencl-headers giflib
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Validate result parser
+        run: python3 scripts/test-statusbar-v2-l2.py
+      - name: Build and run all comctl32 units in both PE architectures
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          export JOBS="$(nproc)"
+          export WINE_SB_L2_WORK=/tmp/statusbar-v2-l2
+          bash scripts/test-statusbar-v2.sh '${{ matrix.variant }}' out
+      - name: Build diagnostics on failure
+        if: failure()
+        run: tail -n 60 /tmp/statusbar-v2-l2/configure.log /tmp/statusbar-v2-l2/build.log || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: statusbar-v2-l2-${{ matrix.variant }}
+          path: out/*.json
+          if-no-files-found: error
+          retention-days: 30
+  compare:
+    needs: test
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: statusbar-v2-l2-*
+          path: results
+      - name: Compare complete paired coverage
+        run: |
+          set -euo pipefail
+          python3 scripts/statusbar-v2-l2.py compare results/statusbar-v2-l2-baseline \
+            results/statusbar-v2-l2-candidate | tee l2-report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: statusbar-v2-l2-report
+          path: l2-report.md
+          if-no-files-found: error
+          retention-days: 30
