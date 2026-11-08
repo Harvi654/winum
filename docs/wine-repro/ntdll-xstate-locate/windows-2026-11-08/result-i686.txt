@@ -1,0 +1,6 @@
+arch=32
+enabled_features=0x7
+context_length=1123 xstate_offset=60 xstate_length=320
+ok AVX located in a valid context
+ok disabled CET_U gives NULL without reading the XSAVE area
+SUMMARY checks=2 failures=0

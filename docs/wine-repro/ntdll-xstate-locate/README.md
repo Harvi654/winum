@@ -18,3 +18,10 @@ i686-w64-mingw32-gcc -O2 -Wall -o xstate-l1-i686.exe l1.c
 
 Expected on Windows: `ok` twice and `SUMMARY checks=2 failures=0`, or a
 `SKIP` line when the machine has no AVX or has CET_U enabled.
+
+## Result (Windows 10 VM on a Mac, 2026-11-08)
+
+Both architectures: `enabled_features=0x7` (x87, SSE, AVX; CET_U not
+enabled), `ok` for both checks, `SUMMARY checks=2 failures=0`. Files in
+`windows-2026-11-08/`. The check is the patch's Wine test check, unchanged
+in substance, run outside the `ntdll:exception` unit.

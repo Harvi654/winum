@@ -1,6 +1,6 @@
 # shell32-automation-zip-copy.patch
 
-<!-- winum-test: test-not-on-windows -->
+<!-- winum-test: l1 -->
 
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
@@ -25,7 +25,7 @@ Shell automation `CopyHere` copies from stored and deflated ZIP archives.
 | Level | Result |
 | --- | --- |
 | L0 | full builds full-1/full-2 |
-| L1 | Windows 10 VM (Mac host), L1 bundle of run 42483162074 (2026-11-08): shell32 shelldispatch x86_64 480 checks, 0 failures; i386 output lost (to be re-run) |
+| L1 | Windows 10 VM (Mac host), L1 bundle of run 42483162074 (2026-11-08): shell32 shelldispatch x86_64 480 / i386 466 checks, 0 failures |
 | L2 | not recorded |
 | L3 | x64 matrix of 16 positive/negative cases |
 | L4 | installation complete; Windows comparison: all 19,632 Design files identical (SHA-256) |
