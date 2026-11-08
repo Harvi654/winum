@@ -51,27 +51,37 @@ def load(path):
             merged[key] = r
     return merged, groups
 
-def uniform_shift(gone, new):
-    """the line offset if every new failure location is a vanished one in the
-    same file moved by one constant offset with the same count, else None"""
-    if not gone or len(gone) != len(new):
-        return None
-    def split(d):
-        out = []
+def split_moved(gone, new):
+    """Failures that a patch only moved: find the most common line offset
+    between vanished and new locations of the same file (same count), and
+    take every pair with that offset as moved. Returns (offset or None,
+    moved new locations, remaining new, remaining gone)."""
+    def parse(d):
+        out = {}
         for k, n in d.items():
             f, _, line = k.rpartition(':')
-            if not line.isdigit():
-                return None
-            out.append((f, int(line), n))
-        return sorted(out)
-    g, n = split(gone), split(new)
-    if g is None or n is None:
-        return None
-    shifts = {b[1] - a[1] for a, b in zip(g, n) if a[0] == b[0] and a[2] == b[2]}
-    if len(shifts) != 1 or any(a[0] != b[0] or a[2] != b[2] for a, b in zip(g, n)):
-        return None
-    d = shifts.pop()
-    return d if d else None
+            if line.isdigit():
+                out[k] = (f, int(line), n)
+        return out
+    g, n = parse(gone), parse(new)
+    offsets = {}
+    for gk, (gf, gl, gc) in g.items():
+        for nk, (nf, nl, nc) in n.items():
+            if gf == nf and gc == nc and nl != gl:
+                offsets[nl - gl] = offsets.get(nl - gl, 0) + 1
+    if not offsets:
+        return None, {}, dict(new), dict(gone)
+    off = max(offsets, key=offsets.get)
+    moved, rest_new, rest_gone = {}, dict(new), dict(gone)
+    for gk, (gf, gl, gc) in g.items():
+        nk = f"{gf}:{gl + off}"
+        if nk in rest_new and rest_new[nk] == gc:
+            moved[nk] = gc
+            del rest_new[nk]
+            del rest_gone[gk]
+    if not moved:
+        return None, {}, dict(new), dict(gone)
+    return off, moved, rest_new, rest_gone
 
 def compare(vpath, spath):
     (v, vg), (s, sg) = load(vpath), load(spath)
@@ -90,12 +100,11 @@ def compare(vpath, spath):
             continue
         new_at = {k: n for k, n in b["fail_at"].items() if n > a["fail_at"].get(k, 0)}
         gone_at = {k: n for k, n in a["fail_at"].items() if n > b["fail_at"].get(k, 0)}
-        shift = uniform_shift(gone_at, new_at)
+        shift, moved_at, new_at, gone_at = split_moved(gone_at, new_at)
         if shift is not None:
             # a patch added lines to the test file: the same failures, moved
             moved.append((key, "same failures moved by %+d lines: " % shift +
-                          ", ".join(f"{k} x{n}" for k, n in sorted(new_at.items()))))
-            new_at, gone_at = {}, {}
+                          ", ".join(f"{k} x{n}" for k, n in sorted(moved_at.items()))))
         if new_at:
             regress.append((key, "new failures: " + ", ".join(f"{k} x{n}" for k, n in sorted(new_at.items()))))
         if gone_at:
