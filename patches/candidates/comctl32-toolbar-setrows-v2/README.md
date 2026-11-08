@@ -30,8 +30,10 @@ Applies with `--fuzz=0` after `comctl32-toolbar-padding-height.patch`
 ## Open before it replaces v1
 
 - cross review by Codex;
-- L2: a `test-series` run with v2 in place of v1 (`toolbar.c:2134` must
-  pass, nothing new may fail);
+- L2: done 2026-11-08, run 42497038726 (`test-run/toolbar-v2`):
+  `toolbar.c:2134` passes in both architectures, no new comctl32 failure
+  (the remaining user32/comctl32 mouse-move failures belong to
+  `server-mousemove-on-show-hide`);
 - a Wine test for what Inventor needed - groups between separators in
   `TB_SETROWS` - measured on Windows first (MEASURE program); v1's
   separator handling was compared with Windows only visually;
