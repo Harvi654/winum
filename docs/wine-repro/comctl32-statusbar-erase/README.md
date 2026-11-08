@@ -132,6 +132,45 @@ launcher exited 1 before a program summary, so its runtime smoke is incomplete.
 These are fixture checks only. **Windows 10 x64/i686 values remain unmeasured;
 no fix or Wine regression-test expectations have been chosen.**
 
+## Intel maintainer measurement (2026-11-08)
+
+Arch Linux, KDE Wayland/XWayland, Intel HD 4000, normal winum 11.20-1
+at `c8614ea` (production v1 status-bar patch, not the v2 candidate).
+The x86_64 v5 and v6 MEASURE executables were built with MinGW GCC 16.2.0
+and both returned exit 0, 144 rows, zero errors. Actual class versions were
+5.81.4704 and 6.0.2600 respectively. All staged rows satisfied
+`prep_diff=0`, `update_before=0`; all rows had `marker_before=192` and nonempty
+old-glyph masks. Findings below summarize the supplied numeric measurements;
+raw logs are not committed.
+
+For the default-theme configurations, all three part styles and both target
+texts showed the same operation-level behaviour:
+
+| Operation | Measured winum v5 | Measured winum themed v6 | Windows comparison |
+| --- | --- | --- | --- |
+| `settext` | One erase, clean target (`diff_clean=0`) | One erase, clean target | Windows v5 does not erase; themed v6 does |
+| `invalidate_false`, `redraw_noerase` | No erase; marker 192 and 1325–1360 old glyph pixels retained | Same | Windows v5 clears them; themed v6 retains them |
+| `invalidate_true`, `redraw_erase` | One erase, clean target | One erase, clean target | Both Windows configurations clear them too |
+| `paint_no_update` | No erase; marker and old glyphs retained | Same | Qualitatively consistent with the unchanged image on Windows |
+
+With `custom_erase=1`, erasing operations left the subclass fill `182028`
+at the sampled old-only glyph pixel in both versions. Windows preserves it
+in themed v6 but replaces it with the control background in v5. Without
+the custom fill, the sampled clean background was `f5f5f5`; Windows used
+`f0f0f0`. Absolute glyph counts and theme colours are not cross-platform
+oracles; marker retention, clean-reference differences and erase delivery
+establish the behavioural comparison.
+
+The `classic=1` theme-disable call returned `8007007b` in both executables;
+v6 remained `theme=1`. Those rows do not measure unthemed v6. V5 reported
+`theme=0` throughout, including its usable default configurations.
+
+This confirms the already documented v1 divergence in v5 on another machine;
+it does not demonstrate an Intel graphics defect or explain Inventor's
+RT-dependent overlap. In particular, themed v6 leaving old pixels after a
+non-erasing invalidation also occurs on Windows. The v2 candidate and its
+validation remain separate from this production-build measurement.
+
 ## Windows results (2026-11-07)
 
 Windows 10, comctl32 5.82.10586 and 6.16.10586, all four executables exit 0,
