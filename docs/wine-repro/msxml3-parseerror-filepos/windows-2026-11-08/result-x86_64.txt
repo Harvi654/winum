@@ -1,0 +1,20 @@
+arch=64
+MEASURE class=DOMDocument30 state=new parseError_hr=0x00000000 errorCode_hr=0x00000001 errorCode=0x00000000 line_hr=0x00000001 line=0 linepos_hr=0x00000001 linepos=0 filepos_hr=0x00000001 filepos=0 filepos_null_hr=0x80070057 reason_hr=0x00000001 reason_len=0
+LOAD class=DOMDocument30 state=loadxml_empty hr=0x00000001 success=0
+MEASURE class=DOMDocument30 state=loadxml_empty parseError_hr=0x00000000 errorCode_hr=0x00000000 errorCode=0xc00ce558 line_hr=0x00000000 line=0 linepos_hr=0x00000000 linepos=0 filepos_hr=0x00000000 filepos=0 filepos_null_hr=0x80070057 reason_hr=0x00000000 reason_len=45
+LOAD class=DOMDocument30 state=loadxml_malformed hr=0x00000001 success=0
+MEASURE class=DOMDocument30 state=loadxml_malformed parseError_hr=0x00000000 errorCode_hr=0x00000000 errorCode=0xc00ce56d line_hr=0x00000000 line=1 linepos_hr=0x00000000 linepos=9 filepos_hr=0x00000000 filepos=8 filepos_null_hr=0x80070057 reason_hr=0x00000000 reason_len=47
+LOAD class=DOMDocument30 state=loadxml_second_line_error hr=0x00000001 success=0
+MEASURE class=DOMDocument30 state=loadxml_second_line_error parseError_hr=0x00000000 errorCode_hr=0x00000000 errorCode=0xc00ce56d line_hr=0x00000000 line=3 linepos_hr=0x00000000 linepos=3 filepos_hr=0x00000000 filepos=12 filepos_null_hr=0x80070057 reason_hr=0x00000000 reason_len=47
+LOAD class=DOMDocument30 state=loadxml_valid hr=0x00000000 success=1
+MEASURE class=DOMDocument30 state=loadxml_valid parseError_hr=0x00000000 errorCode_hr=0x00000001 errorCode=0x00000000 line_hr=0x00000001 line=0 linepos_hr=0x00000001 linepos=0 filepos_hr=0x00000001 filepos=0 filepos_null_hr=0x80070057 reason_hr=0x00000001 reason_len=0
+MEASURE class=DOMDocument60 state=new parseError_hr=0x00000000 errorCode_hr=0x00000001 errorCode=0x00000000 line_hr=0x00000001 line=0 linepos_hr=0x00000001 linepos=0 filepos_hr=0x00000001 filepos=0 filepos_null_hr=0x80070057 reason_hr=0x00000001 reason_len=0
+LOAD class=DOMDocument60 state=loadxml_empty hr=0x00000001 success=0
+MEASURE class=DOMDocument60 state=loadxml_empty parseError_hr=0x00000000 errorCode_hr=0x00000000 errorCode=0xc00ce558 line_hr=0x00000000 line=0 linepos_hr=0x00000000 linepos=0 filepos_hr=0x00000000 filepos=0 filepos_null_hr=0x80070057 reason_hr=0x00000000 reason_len=45
+LOAD class=DOMDocument60 state=loadxml_malformed hr=0x00000001 success=0
+MEASURE class=DOMDocument60 state=loadxml_malformed parseError_hr=0x00000000 errorCode_hr=0x00000000 errorCode=0xc00ce56d line_hr=0x00000000 line=1 linepos_hr=0x00000000 linepos=9 filepos_hr=0x00000000 filepos=8 filepos_null_hr=0x80070057 reason_hr=0x00000000 reason_len=47
+LOAD class=DOMDocument60 state=loadxml_second_line_error hr=0x00000001 success=0
+MEASURE class=DOMDocument60 state=loadxml_second_line_error parseError_hr=0x00000000 errorCode_hr=0x00000000 errorCode=0xc00ce56d line_hr=0x00000000 line=3 linepos_hr=0x00000000 linepos=3 filepos_hr=0x00000000 filepos=12 filepos_null_hr=0x80070057 reason_hr=0x00000000 reason_len=47
+LOAD class=DOMDocument60 state=loadxml_valid hr=0x00000000 success=1
+MEASURE class=DOMDocument60 state=loadxml_valid parseError_hr=0x00000000 errorCode_hr=0x00000001 errorCode=0x00000000 line_hr=0x00000001 line=0 linepos_hr=0x00000001 linepos=0 filepos_hr=0x00000001 filepos=0 filepos_null_hr=0x80070057 reason_hr=0x00000001 reason_len=0
+SUMMARY done

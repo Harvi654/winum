@@ -1,0 +1,21 @@
+arch=64 centre=310,271
+SCENARIO baseline                   moves=0 cursor=310,271 under=A
+SCENARIO cursor_set_same_pos        moves=1 cursor=310,271 under=A [A 16ms]
+SCENARIO show_toplevel_away         moves=1 cursor=310,271 under=A [A 15ms]
+SCENARIO hide_toplevel_away         moves=1 cursor=310,271 under=A [A 32ms]
+SCENARIO show_toplevel_under        moves=1 cursor=310,271 under=B_under [B_under 31ms]
+SCENARIO hide_toplevel_under        moves=1 cursor=310,271 under=A [A 16ms]
+SCENARIO show_child_away            moves=1 cursor=310,271 under=A [A 15ms]
+SCENARIO hide_child_away            moves=1 cursor=310,271 under=A [A 32ms]
+SCENARIO show_child_under           moves=1 cursor=310,271 under=C_under [C_under 16ms]
+SCENARIO hide_child_under           moves=1 cursor=310,271 under=A [A 31ms]
+SCENARIO burst_child_away_x5        moves=1 cursor=310,271 under=A [A 31ms]
+SCENARIO move_toplevel_away         moves=1 cursor=310,271 under=A [A 16ms]
+SCENARIO create_child_away_visible  moves=1 cursor=310,271 under=A [A 31ms]
+SCENARIO destroy_child_away         moves=1 cursor=310,271 under=A [A 16ms]
+SCENARIO create_child_under_visible moves=1 cursor=310,271 under=other [other 31ms]
+SCENARIO destroy_child_under        moves=1 cursor=310,271 under=A [A 32ms]
+SCENARIO invalidate_update_A        moves=0 cursor=310,271 under=A
+SCENARIO cursor_off_A_show_away     moves=0 cursor=5,5 under=other
+SCENARIO cursor_off_A_hide_away     moves=0 cursor=5,5 under=other
+SUMMARY done
