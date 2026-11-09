@@ -54,3 +54,41 @@ native internals are inspected. A requested second-model advisory in this
 batch was unavailable because of its usage limit; no independent review is
 claimed for this source. Native assertion L1 and runtime gates remain open;
 raw logs will not be committed.
+
+## Windows observations (2026-11-09)
+
+The two architectures match apart from bitness, exit 0, api_errors=0. All
+three own files are identified at initial indices A=0/B=1/C=2, all four
+states complete, and host_refs=1 after normal destruction. Setup and selection
+API calls return S_OK. Observations of the queried methods are:
+
+| State | All / selected counts | Items(selected), GetSelection(FALSE) | GetSelection(TRUE) |
+| --- | --- | --- | --- |
+| empty | 3 / 0 | 0x80070490, NULL array | S_OK, one own-folder item |
+| one (B) | 3 / 1 | S_OK, one B item | S_OK, one B item |
+| two (B/C) | 3 / 2 | S_OK, B and C | S_OK, B and C |
+| cleared | 3 / 0 | 0x80070490, NULL array | S_OK, one own-folder item |
+
+0x80070490 is HRESULT_FROM_WIN32(ERROR_NOT_FOUND), not E_FAIL. Selected
+Items and ItemCount with SVGIO_FLAG_VIEWORDER give the same measured counts
+and selected identities. All-view arrays contain all three own items; their
+observed default order changes from A/B/C to B/C/A after selection. Do not
+assert fixed ordering for SVGIO_ALLVIEW without an ordering flag or use that
+array order as a substitute for the actual view indices.
+
+GetSelectedItem uses an exclusive starting index in these observations:
+empty/cleared return S_FALSE and -1 for each tested start. With B selected,
+starts -1/0 return S_OK/index 1, while starts 1/2 return S_FALSE/-1. With B/C,
+starts -1/0 return 1, start 1 returns 2, start 2 returns S_FALSE/-1.
+GetSelectionState returns S_OK throughout: initially all 0; in the one state
+B=0x11, in the two state B=0x11/C=1; after clearing, B retains focus (0x10)
+while all selected bits are clear.
+
+The production selection/count implementation is only partially conforming:
+its empty selected Items and GetSelection(FALSE) return E_FAIL, which differs
+from the measured ERROR_NOT_FOUND HRESULT. A future candidate must retain
+these native expectations rather than hiding them or assuming the production
+patch already passes. NULL-output and invalid-PIDL behavior were not measured
+and must not acquire guessed assertions. This is a functional MEASURE, not
+native assertion L1; production code/series/marker remain unchanged. Raw
+logs are summarized rather than committed.
