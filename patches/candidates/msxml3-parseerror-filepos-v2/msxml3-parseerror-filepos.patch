@@ -67,17 +67,7 @@ NULL string is left as it was (not measured).
  static HRESULT WINAPI parseError_get_errorXPath(
 --- a/dlls/msxml3/tests/domdoc.c
 +++ b/dlls/msxml3/tests/domdoc.c
-@@ -6652,6 +6652,9 @@
- 
-     IXMLDOMElement_Release(root);
-     IXMLDOMDocument_Release(doc);
-+
-+    test_parseerror_filepos(&CLSID_DOMDocument30, "DOMDocument30");
-+    test_parseerror_filepos(&CLSID_DOMDocument60, "DOMDocument60");
-     free_bstrs();
- }
- 
-@@ -6788,7 +6791,7 @@
+@@ -6788,7 +6788,7 @@
      IStream_Release(stream);
  
      /* loaded data without xml declaration */
@@ -86,7 +76,7 @@ NULL string is left as it was (not measured).
      ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
  
      hr = CreateStreamOnHGlobal(NULL, TRUE, &stream);
-@@ -9723,7 +9726,7 @@
+@@ -9723,7 +9723,7 @@
  
      IXMLDOMElement_Release(elem);
  
@@ -95,7 +85,7 @@ NULL string is left as it was (not measured).
      ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
  
      hr = IXMLDOMDocument_get_documentElement(doc, &elem);
-@@ -12935,11 +12938,87 @@
+@@ -12935,11 +12935,87 @@
      free_bstrs();
  }
  
@@ -183,7 +173,7 @@ NULL string is left as it was (not measured).
  
      doc = create_document(&IID_IXMLDOMDocument);
  
-@@ -12953,6 +13032,15 @@
+@@ -12953,6 +13029,15 @@
      todo_wine
      check_interface(error, &IID_IXMLDOMParseError2, FALSE);
  
@@ -199,17 +189,19 @@ NULL string is left as it was (not measured).
      hr = IXMLDOMParseError_get_line(error, NULL);
      ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
  
-@@ -12963,7 +13051,9 @@
+@@ -12963,7 +13048,11 @@
      ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
  
      IXMLDOMParseError_Release(error);
 +
      IXMLDOMDocument_Release(doc);
++    test_parseerror_filepos(&CLSID_DOMDocument30, "DOMDocument30");
++    test_parseerror_filepos(&CLSID_DOMDocument60, "DOMDocument60");
 +    free_bstrs();
  }
  
  static void test_getAttributeNode(void)
-@@ -17803,7 +17893,7 @@
+@@ -17803,7 +17892,7 @@
      hr = IXMLDOMDocument2_loadXML(doc, _bstr_(szEmailXML), NULL);
      ok(hr == S_FALSE, "Unexpected hr %#lx.\n", hr);
  
