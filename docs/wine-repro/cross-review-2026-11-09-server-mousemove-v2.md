@@ -91,3 +91,15 @@ the ordering claim is stronger than the measurement, and a Windows-tested
 regression test plus Inventor dimension-update L4 remain open. Add the final
 run report when available and inspect the two affected units before closing
 the L2 finding. This review did not build or execute Wine locally.
+
+## Revision check: 54894ed (2026-11-09)
+
+Read the entire mouse-move revision diff. It changes only the comment and
+dated header paragraph, removing the unmeasured claim that the generated move
+arrives after the change's other messages. This addresses that documentation
+point; executable behaviour remains the same 16-ms debounce. The ordering,
+global-desktop state, allocation-failure and repeated-L2 observations above
+remain open. The earlier Actions input still exercises the same executable
+mouse-move change, but not the newly revised msxml3 test. Verdict unchanged:
+the timing experiment is supported; production promotion is not approved by
+this comment revision alone.
