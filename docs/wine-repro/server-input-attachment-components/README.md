@@ -165,8 +165,11 @@ bash scripts/build-l1-input-components.sh "$INPUT_L1"
 Alternatively the main Build MEASURE bundle workflow accepts
 `docs/wine-repro/batch4-measure/l1.list` as its list input. The old
 build-batch4-measure.yml is unchanged. The assertion L1 has not run yet;
-the measurement's exit 0 is not an assertion pass. The test-run/batch4-1
-pair will install identical new test bytes in vanilla and series, while
-only the series side receives the implementation. Its server-neighbor
+the measurement's exit 0 is not an assertion pass. [L2 run 42695491325](https://github.com/Harvi654/winum/actions/runs/42695491325)
+was started on test-run/batch4-1 at 36b639e (2026-11-09), result pending.
+The pair installs identical new test bytes in vanilla and series, while
+only the series side receives the implementation. Both paired source trees
+were strictly applied and checked against the full candidate before push.
+The tests-series-g1 artifact includes a native user32:attachment L1 bundle. Its server-neighbor
 coverage includes user32, win32u and gdi32. No maintainer desktop session
 was used by the cloud agent.

@@ -72,8 +72,11 @@ The prior measurement's exit 0 is not substituted for that check.
   the investigation README after final verification; not a full graphical
   L0 claim.
 - Native assertion L1: pending.
-- Paired L2: own test-run/batch4-1, prepared only after source/build checks.
-  Its new test must exist on both sides of the pair, with identical bytes.
+- Paired L2: [run 42695491325](https://github.com/Harvi654/winum/actions/runs/42695491325),
+  own test-run/batch4-1 at 36b639e. Started 2026-11-09; result pending.
+  Both variants were applied with --fuzz=0 before pushing: their new test
+  bytes match the candidate exactly, only series has the implementation.
+  The g1 series artifact includes user32:attachment for native L1.
 - Larger-code second-model advisory: literal data was independently
   checked against both native files, with no value mismatches; no obvious
   fixture blocker or recognizable copied code was identified in the
