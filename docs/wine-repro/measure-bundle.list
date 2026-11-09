@@ -5,5 +5,3 @@
 parseerror | docs/wine-repro/msxml3-parseerror-filepos/measure.c | -lole32 -loleaut32
 mousemove | docs/wine-repro/server-mousemove-show-hide/measure.c | -luser32 -lgdi32
 urlzones | docs/wine-repro/urlmon-zones/measure.c | -lurlmon -lole32
-tdoffset-low | docs/wine-repro/typedesc-offsets/measure.c | -loleaut32 -lole32 -luuid -static -DOFFSETS_BOUNDARY=0x8000
-tdoffset-high | docs/wine-repro/typedesc-offsets/measure.c | -loleaut32 -lole32 -luuid -static -DOFFSETS_BOUNDARY=0x10000
