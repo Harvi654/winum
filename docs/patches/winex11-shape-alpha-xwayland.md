@@ -1,6 +1,6 @@
 # winex11-shape-alpha-xwayland.patch
 
-<!-- winum-test: missing -->
+<!-- winum-test: l3-only: Xwayland compositor alpha and X11 shapes have no Windows counterpart; reproducer in docs/wine-repro/winex11-shape-alpha-xwayland -->
 
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
@@ -18,16 +18,18 @@ Under Xwayland a window clipped with `SetWindowRgn` gets an ARGB visual and the 
 
 ## Wine test
 
-None in the patch.
+No Windows test for Xwayland visual/compositor behavior. The own-dialog
+fixture with region reset and excluded-window controls is in
+[`winex11-shape-alpha-xwayland`](../wine-repro/winex11-shape-alpha-xwayland/README.md).
 
 ## Validation
 
 | Level | Result |
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
-| L1 | **no Wine test** - needs one, measured on Windows first |
+| L1 | L3 only: the changed X11/compositor path is absent on Windows |
 | L2 | not recorded per patch |
-| L3 | not recorded |
+| L3 | reproducer added 2026-11-09; x86_64/i686 strict build passed; paired Xwayland visual/input-region execution pending |
 | L4 | No black rectangles. (Inventor, maintainer) |
 | L5 | in Inventor's runtime since `wine-11.19-1` (2026-10-19); a week of use not formally recorded - maintainer to confirm |
 | Cross review | not recorded (written before the cross-review rule) |
