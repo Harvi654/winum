@@ -54,6 +54,15 @@ library with such a parameter.
 
 ## History
 
+- **v3 candidate, 2026-11-09:** the stored-description compatibility test
+  passed Windows 10 L1 in both architectures: 31 tests, zero failures/skips
+  and exit 0 each. The candidate preserves the measured encoded `0x2003`
+  VARTYPE instead of production v2's SAFEARRAY normalization. See its
+  [validation record](../../patches/candidates/oleaut32-typedesc-pointee-v3/README.md#windows-l1-2026-11-09).
+  It remains outside production pending paired L2 and the marshaller/CAD
+  concern in Claude's cross review. This page's production marker remains
+  `missing`; the production v2 patch is not the tested candidate.
+
 - **v1** (2026-10-16, Inventor `3e48163`): the fix; the SAFEARRAY
   description was a separate `calloc` that was never freed when the type
   library was released (one small block per such typedesc per load).

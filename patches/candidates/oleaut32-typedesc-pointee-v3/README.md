@@ -3,8 +3,9 @@
 Original, AI-assisted (Codex), LGPL-2.1-or-later. Candidate only; not submitted
 upstream. Replaces the production `oleaut32-typedesc-pointee.patch` in a private
 recipe, **not** an incremental patch to apply after it. No series or L1 marker
-is changed. Cross review, native L1 of the assertions, paired L2 and CAD remain
-pending.
+is changed. Native L1 passed on both architectures (2026-11-09). Claude's
+cross review approved the code with a marshaller/CAD validation blocker;
+paired L2 and CAD remain pending.
 
 ## Native evidence and bounded correction
 
@@ -71,3 +72,19 @@ paired oleaut32 typelib/tmarshal L2, and the consumers' CAD smoke tests.
   `-Wall -Wextra -Werror`, using the pinned Wine 11.20 headers. Bundle hashes
   verified. Native execution of these assertions is pending; the earlier
   MEASURE results are their oracle, not an L1 pass.
+
+## Windows L1 (2026-11-09)
+
+The maintainer ran the standalone bundle in offline Windows 10. Both
+x86_64 and i686 report **31 tests, 0 failures, 0 skipped**, with zero todos
+and flaky checks, and exit 0. This establishes L1 for this candidate's
+stored-type-description compatibility test. It does not validate production
+v2, which still has the non-native normalization and no integrated test.
+Raw logs are not committed.
+
+Claude's [cross review](../../../docs/wine-repro/cross-review-2026-11-08-typedesc-pointee-v3.md)
+approved the representation correction but identified the rpcrt4 typelib
+marshaller's missing encoded-array path as a validation risk. Keep the
+candidate outside production until paired typelib/tmarshal/rpcrt4 checks
+and Design Accelerator Shaft/gear L4 address that risk. The root patch page's
+marker remains unchanged because the tested candidate has not been promoted.
