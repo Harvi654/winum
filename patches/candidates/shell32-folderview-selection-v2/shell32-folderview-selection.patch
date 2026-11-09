@@ -225,7 +225,7 @@ diff --git a/dlls/shell32/tests/selection.c b/dlls/shell32/tests/selection.c
 new file mode 100644
 --- /dev/null
 +++ b/dlls/shell32/tests/selection.c
-@@ -0,0 +1,322 @@
+@@ -0,0 +1,326 @@
 +/* Original, AI-assisted (Codex), LGPL-2.1-or-later. */
 +#define COBJMACROS
 +#define CONST_VTABLE
@@ -237,6 +237,10 @@ new file mode 100644
 +#include "shlobj.h"
 +#include "shobjidl.h"
 +#include "wine/test.h"
++
++#ifndef SHCIDS_CANONICALONLY
++#define SHCIDS_CANONICALONLY 0x10000000
++#endif
 +
 +/* Original, AI-assisted (Codex), LGPL-2.1-or-later.
 + * Own Windows 10 MEASURE, x86_64/i686, 2026-11-09; valid functional inputs.

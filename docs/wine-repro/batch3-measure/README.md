@@ -182,3 +182,21 @@ on Windows 10 x86_64/i686: 200 checks, zero failures, 12 cases, 12 observed
 requests and exit 0 each. Wine-only todos are ordinary in the native wrapper,
 so all controls ran. Runtime pairing, review and promotion remain pending.
 Continue with folder-view selection, the final entry of this batch.
+
+The shell selection v2 candidate now corrects the measured empty-selection
+HRESULT and adds an exact-body native assertion bundle through
+scripts/build-l1-folder-selection.sh. Its four-state test checks counts,
+identity sets, exclusive iteration and focus with ordinary assertions.
+Native L1 and Wine runtime/review gates remain pending. This does not close
+the stopped MSI dialog fixture or the mspatcha PA19 decoder gap, and no
+production candidate is promoted by preparing the final batch entry.
+
+The final targeted assertion bundle can combine the first shell selection
+L1 with the offsets test's corrected writer-size todo revision. Build via
+scripts/build-l1-folder-selection.sh NEW_OUTPUT
+docs/wine-repro/batch3-measure/selection-offsets-l1.list. Both candidates'
+complete body parity is verified before compilation, and both source sets,
+all EXEs and the manifest are hashed. Complete native success requires
+40095/zero failures for offsets and 357/zero failures/four completed states
+for shell selection, on both architectures. Native execution remains pending;
+neither an expected count nor successful compilation is recorded as L1.

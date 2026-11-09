@@ -92,3 +92,25 @@ patch already passes. NULL-output and invalid-PIDL behavior were not measured
 and must not acquire guessed assertions. This is a functional MEASURE, not
 native assertion L1; production code/series/marker remain unchanged. Raw
 logs are summarized rather than committed.
+
+## Windows-derived assertion candidate
+
+The [v2 candidate](../../../patches/candidates/shell32-folderview-selection-v2/README.md)
+corrects the measured empty selected Items/GetSelection(FALSE) result to
+ERROR_NOT_FOUND and adds a Wine selection.c test. Its exact shared body
+checks all four measured states and public methods. Array membership uses
+identity sets, and selected-index expectations use mapped actual view indices;
+no unspecified default order or invalid-input contract is asserted.
+
+scripts/build-l1-folder-selection.sh verifies the full helper/test block
+before compiling standalone x86_64/i686 assertion executables. Their native
+L1 run remains pending; the original MEASURE is not an assertion pass. The
+view opens and closes itself, so do not click or change focus while it runs.
+Require four completed states, zero failures and exit 0 on both architectures.
+Both strict builds and test-body parity pass. The candidate README records
+ownership, error handling and remaining runtime/review gates. Production
+page/marker/series remain unchanged until the appropriate gates pass.
+The statically counted complete success path has 357 assertions; no native
+assertion results have yet been supplied. The optional combined list
+batch3-measure/selection-offsets-l1.list also builds the corrected offsets
+body for one VM run, after checking both candidates' exact-body parity.

@@ -1,0 +1,3 @@
+# One VM visit for the corrected offsets body and first shell selection L1.
+tdoffset-records-l1 | docs/wine-repro/typedesc-offsets/l1.c | -loleaut32 -lole32 -luuid -static
+folder-selection-l1 | docs/wine-repro/shell32-folderview-selection/l1.c | -Wextra -lshell32 -lole32 -luuid -static
