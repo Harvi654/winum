@@ -25,7 +25,9 @@ and limits implicit desktop reparenting to preserve already-compatible
 state. Its exact Wine assertion test passed on Windows 10 x86_64/i386
 (2026-11-09): 10195 checks per architecture, zero failures/skips and exit 0;
 see [the native L1 record](../wine-repro/server-input-attachment-components/l1-2026-11-09/README.md).
-Paired L2 and formal cross review remain pending. The production v1 still
+Claude approved v2 subject to paired L2 (d9119b4). Run 42695491325
+completed with compare exit 1; per-test attribution and candidate-specific
+L2 clearance remain pending. The production v1 still
 contains no test, so its marker remains missing until candidate promotion.
 
 ## Validation
@@ -34,7 +36,7 @@ contains no test, so its marker remains missing until candidate promotion.
 | --- | --- |
 | L0 | SOLIDWORKS full builds (full-1 2026-10-25, full-2 2026-10-26) |
 | L1 | production v1 has no test; separate v2 candidate passed Windows 10 x86_64/i386 (10195 checks each, 0 failures, 2026-11-09) |
-| L2 | not recorded |
+| L2 | v2 run 42695491325: compare exit 1, detailed attribution pending; no v2 clearance yet |
 | L3 | graph shim: 61,458 cases incl. allocation failures, 0 invariant failures, ASan/UBSan |
 | L4 | four GUI probes and typing in Installation Manager; combined CAD smoke |
 | L5 | in use since 2026-10-28 (maintainer to confirm a week) |

@@ -78,15 +78,21 @@ The prior measurement's exit 0 is not substituted for that check.
   This covers the exact candidate body, including its 44-scenario completion
   assertion; the standalone wrapper has not separately been run.
 - Paired L2: [run 42695491325](https://github.com/Harvi654/winum/actions/runs/42695491325),
-  own test-run/batch4-1 at 36b639e. Started 2026-11-09; result pending.
+  own test-run/batch4-1 at 36b639e. Completed 2026-11-09 with overall
+  **failure**: all ten matrix jobs completed and compare exited 1.
+  This does not yet identify whether attachment or a neighboring/unrelated
+  test regressed. Candidate-specific L2 is **not cleared**; see below.
   Both variants were applied with --fuzz=0 before pushing: their new test
   bytes match the candidate exactly, only series has the implementation.
   The g1 series artifact includes user32:attachment for native L1.
 - Larger-code second-model advisory: literal data was independently
   checked against both native files, with no value mismatches; no obvious
   fixture blocker or recognizable copied code was identified in the
-  bounded comparison (not proof of originality). Formal cross review for
-  promotion still belongs to the other assistant.
+  bounded comparison (not proof of originality).
+- Formal cross review: Claude at d9119b4, **approved subject to paired
+  L2**; see docs/wine-repro/cross-review-2026-11-09-server-input-attachment-components-v2.md.
+  P2's obsolete pending-L1 header is corrected without changing any diff
+  hunks. The two P3 observations are recorded below.
 - L4: SOLIDWORKS deferred under AGENTS.md; other applicable consumer smoke
   and normal-use validation have not been performed for v2.
 
@@ -99,3 +105,42 @@ reparent histories, callbacks and allocation failure through Windows.
 The old native graph shim is not a Windows oracle. In particular, this
 measurement does not establish a universal implicit-attachment lifetime
 rule beyond the tested early/late and direct/unparent sequences.
+
+## Paired L2 outcome (2026-11-09)
+
+Run 42695491325 completed in 1h 24m 12s, source 36b639e. The public run
+page reports failure and the compare job's annotation reports exit 1;
+eleven artifacts were produced, including l2-report and both g1 results.
+Only run/job metadata was retrieved here: the GitHub API request was
+Forbidden and the anonymous web log endpoint did not provide the report.
+The failure locations and counts have therefore not been inspected.
+Do not describe this as a passed candidate test or as a proven attachment
+regression from the aggregate status alone.
+
+Before promotion, inspect
+[l2-report](https://github.com/Harvi654/winum/actions/runs/42695491325/artifacts/13713784614)
+(`l2-report.md`) and the structured vanilla/series g1 results. Require
+zero ordinary failures in series user32:attachment on both architectures,
+check its expected todos, and inspect all new user32/win32u/gdi32 failures.
+Separate unrelated full-series changes and possible CI instability using
+the actual paired locations, not just the workflow conclusion. Claude's
+approval remains conditional until those results are accounted for.
+Production patches/series, the production patch and its missing marker
+remain unchanged.
+
+## Cross-review P3 open points
+
+- **Reparent after unparent.** The measured SetParent(child,NULL) retains
+  the old input association even after that child is destroyed. A later
+  SetParent of that now-top-level window under a third thread's child
+  adds the new host association without removing the retained one:
+  attach_parent_thread's top-level guard skips detaching the old group.
+  The Windows behavior of this history is unmeasured. Do not infer it
+  from the one-unparent case or alter the implementation without a public-
+  API measurement of that sequence and its surviving-host neighbors.
+- **Foreground dependence under Xvfb.** The test's SetForegroundWindow
+  call can be refused by the environment. Native L1 passed, but if paired
+  CI attachment results are intermittent, inspect that call and the
+  observed foreground/active/focus state first. This is an investigation
+  lead, not grounds for hiding failures with a todo or changing native
+  expected values before inspecting the actual L2 output.

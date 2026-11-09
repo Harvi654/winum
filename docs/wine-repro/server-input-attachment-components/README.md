@@ -172,7 +172,12 @@ See `l1-2026-11-09/` for privacy-checked original summaries, exit codes,
 hashes and provenance. This is the candidate's native assertion pass;
 the standalone wrapper has not separately run. The earlier MEASURE exit 0
 is not used as an assertion result. [L2 run 42695491325](https://github.com/Harvi654/winum/actions/runs/42695491325)
-was started on test-run/batch4-1 at 36b639e (2026-11-09), result pending.
+completed on test-run/batch4-1 at 36b639e (2026-11-09) with overall failure:
+compare exited 1 after all ten matrix jobs completed. Per-test attribution
+is pending retrieval of l2-report.md and the structured paired g1 output;
+no candidate-specific L2 pass or regression is inferred from that status.
+The candidate README records the result, retrieval limit and Claude's
+conditional cross-review approval (d9119b4), including both P3 open points.
 The pair installs identical new test bytes in vanilla and series, while
 only the series side receives the implementation. Both paired source trees
 were strictly applied and checked against the full candidate before push.
