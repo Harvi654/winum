@@ -1,0 +1,7 @@
+/* Original fixture, AI-assisted (Codex), LGPL-2.1-or-later. */
+import "unknwn.idl";
+[object, uuid(39643cf1-252f-4edf-9a9f-8da447d749da)]
+interface IWinumNdrProbe : IUnknown
+{
+    HRESULT Calculate([in] LONG input, [out] LONG *value);
+}
