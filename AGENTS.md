@@ -51,8 +51,11 @@ Their own AGENTS.md / HANDOFF.md cover the programs; this file covers Wine.
 - Tags and releases are made by the maintainer only (`git tag -s`,
   `gh release create --verify-tag`). A published release is never replaced;
   a fix is a new build number.
-- Push only to `github.com/Harvi654/winum` (`main`, or short `topic/<name>`
-  branches merged after their tests).
+- Push only to `github.com/Harvi654/winum`: `main`; short `topic/<name>`
+  branches merged after their tests; `test-run/<name>` branches for L2
+  runs of candidates (series with candidates copied in; never merged,
+  kept as the record of the run). No other branch names (such as a
+  tool's default `claude/...`).
 - A patch goes into `patches/series` only after cross review by a second
   assistant who did not write it, and after the validation below.
 - Every patch in `patches/series` has a Wine test that passed on Windows 10
@@ -98,6 +101,10 @@ Their own AGENTS.md / HANDOFF.md cover the programs; this file covers Wine.
 - **L4** the maintainer's smoke test in the program that needed the fix,
   **and in the other consumer when the DLL is shared** (start, part,
   assembly, drawing, save/reopen, restart, plus the feature itself).
+  When the program that needed the patch is not being worked on
+  (SOLIDWORKS and AutoCAD since 2026-11-09), its L4 is recorded as
+  deferred; the patch stays in the series with its L1 and L2, and it
+  must not change what vanilla Wine already does like Windows.
 - **L5** a week of normal use.
 
 ## Clean room
