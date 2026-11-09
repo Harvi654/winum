@@ -9,11 +9,7 @@ on:
       - 'scripts/com-stub-actctx-l2.py'
       - 'scripts/test-com-stub-actctx-l2.py'
       - '.github/workflows/test-com-stub-actctx.yml'
-      - 'scripts/statusbar-v2-l2.py'
-      - 'patches/*.patch'
-      - 'patches/series'
-      - 'patches/candidates/combase-stub-activation-context-v2/*.patch'
-      - 'wine/version.env'
+      - 'patches/candidates/combase-stub-activation-context-v2/**'
 permissions:
   contents: read
 concurrency:
