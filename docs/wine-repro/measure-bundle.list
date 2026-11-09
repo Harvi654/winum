@@ -34,3 +34,4 @@ mspatcha-signature-l1 | docs/wine-repro/mspatcha-pa19/l1.c | -Wextra -static
 toolbar-padding | docs/wine-repro/comctl32-toolbar-padding-height/measure.c | -Wextra -lgdi32 -static
 header-null-layout | docs/wine-repro/comctl32-header-null-layout/measure.c | -Wextra -municode -static
 ownerdraw-capture | docs/wine-repro/comctl32-ownerdraw-existing-capture/measure.c | -Wextra -static
+caret-rewrap | docs/wine-repro/riched20-caret-rewrap/measure.c | -Wextra -municode -lole32 -loleaut32 -luuid -static
