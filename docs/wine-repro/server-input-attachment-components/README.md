@@ -210,3 +210,21 @@ must be rerun. The coverage line separates completed and skipped scenarios;
 44 completed and zero skipped are required before claiming validation,
 including CI. The standalone wrapper fails on any skip. No v2 pass
 transfers to v3.
+
+Focused round-1 pair:
+[run 42713756358](https://github.com/Harvi654/winum/actions/runs/42713756358),
+test-run/batch4-2 at 83d7025, based on main 7f5fc01. Both source variants
+were strictly applied before push; test bytes match the final compiled
+v3 body exactly, and only series has the implementation. The branch-only
+workflow runs attachment on both PE architectures, rejects incomplete
+coverage/ordinary series failures and requires a vanilla target signal.
+Its coverage gate was checked against complete, all-skipped and ordinary-
+failure samples without executing Wine.
+
+Result pending. Artifact tests-series-g1 includes l1-bundle/run-tests.bat
+for the revised native Wine unit. Extract to a fresh Windows VM directory
+and return the two result-user32-attachment-*.txt files plus exitcodes.txt;
+require ATTACHMENT_COVERAGE completed=44 skipped=0 attempted=44 and no
+failures/skips. The CI artifact roots additionally contain
+attachment-coverage-series.json / attachment-coverage-vanilla.json and the
+usual results-*-g1.json for assessing Linux completion separately.
