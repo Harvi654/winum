@@ -141,3 +141,12 @@ summary retains pa19_decode_covered=0. The API subset has native L1; full
 decoder validation, candidate cross review and Wine runtime pairing remain
 open. Continue with the timezone entry; the stopped MSI UI fixture stays
 stopped and no production series entry is changed.
+
+The next timezone follow-up measures current display-label sources through
+read-only public registry/localization APIs and compares them with WMI
+without printing text. It also reports competing Bias relationships, whose
+values may coincide in the current timezone. The initial measurements alone
+do not establish those label/source contracts. Build just timezone-labels
+through timezone-labels.list for one targeted VM run before choosing a fix
+or new expected values; the main measure list includes the same entry.
+No timezone setting is changed and no candidate/L1 claim is made yet.

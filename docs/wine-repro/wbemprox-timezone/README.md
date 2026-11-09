@@ -70,3 +70,67 @@ as its oracle. Correcting those differences would be candidate work after
 the current MSI assertion gate, not a production change in this measurement
 record. No L1 pass or marker upgrade is inferred from MEASURE; raw logs are
 summarized rather than committed.
+
+## Read-only label-source follow-up
+
+The first observation does not establish Caption/Description's source or
+equality to one another. It also does not distinguish negated base Bias
+from negated standard/active total when StandardBias is zero and daylight
+time is inactive. Do not manufacture those relationships from matching
+lengths or one timezone's numeric result.
+
+measure-labels.c observes the current timezone only. It obtains Win32 and
+dynamic snapshots, opens the dynamic key under the public Windows Time
+Zones registry location read-only, and compares four possible sources:
+Display and MUI_Display, each raw and resolved by public RegLoadMUIStringW.
+It queries one Win32_TimeZone object and compares Caption, Description,
+StandardName and DaylightName with those sources and the Win32 names.
+Equality uses complete lengths/bytes, including an explicit Caption versus
+Description comparison. It also reports the three Bias fields and the
+alternative base/standard-total/active-total relationships. Numeric totals
+can still coincide; this does not independently prove a relationship for
+other timezones or seasons. The program changes no timezone or system setting.
+
+Outputs contain only fixed labels, numeric results/types/lengths and equality
+flags. No source text, registry path/key name, user/machine name or registry
+export is printed or committed. Public registry/localization calls are
+ordinary black-box API observations, not inspection of native DLL contents.
+Missing optional display values or failed resolution are printed as source
+observations; no expected success is guessed for them. A missing current
+timezone key, absence of every comparable source, WMI/COM setup failure,
+missing/extra object or changed snapshot makes the process fail.
+
+All four VARIANTs, BSTRs, COM references and the registry key are released.
+Each of two enumeration calls has a five-second bound, and an independent
+45-second watchdog covers the entire process, including cleanup. The
+Win32 and dynamic snapshots must be identical before/after. Zero exit alone
+is not a match oracle: inspect source availability, complete label types/
+lengths/equalities, both enumeration records and the unchanged snapshot.
+There are no assertions of unknown Windows label values and no L1 claim.
+
+Build only these two measurement EXEs:
+
+```sh
+bash scripts/build-measure-bundle.sh /path/to/NEW-output docs/wine-repro/batch3-measure/timezone-labels.list
+```
+
+Both architectures use -Wall -Wextra -Werror and the common original
+asInvoker/Windows-10 manifest. The new entry is also in the main measure list.
+Run run-measure.bat in a fresh offline Windows 10 folder with normal caller
+permissions. No dialogs, internet, application, administrator relaunch or
+manual timezone changes are needed. Return result-timezone-labels-x86_64.txt,
+result-timezone-labels-i686.txt and exitcodes.txt, including failures. Keep
+the VM timezone unchanged during observation. Native output is the next
+dependency before writing a candidate's label assertions or choosing its
+implementation. The production patch/page marker and series are unchanged.
+
+A read-only second-model advisory examined the complete new source and
+bundle entry. It found the observation-only scope, output privacy, bounds
+and ownership consistent, with no conspicuous copied nontrivial block.
+Ordinary public COM/WMI scaffolding is not an originality certificate. Its
+suggested defensive checks for success-with-NULL COM outputs are included.
+Both strict architecture builds and bundle checksums pass. The snapshot
+does not detect an independent external edit of registry label values while
+the WMI query runs; the program does not re-read those values afterward.
+Avoid such edits during measurement. Native source relationships remain
+unknown; this advisory is not L1 or formal candidate cross review.

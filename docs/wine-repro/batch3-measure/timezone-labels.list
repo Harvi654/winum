@@ -1,0 +1,2 @@
+# Read-only current-timezone label sources; native relationships still unknown.
+timezone-labels | docs/wine-repro/wbemprox-timezone/measure-labels.c | -Wextra -lwbemuuid -lole32 -loleaut32 -luuid -ladvapi32 -static

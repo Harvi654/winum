@@ -9,6 +9,7 @@ msi-null-stream | docs/wine-repro/msi-transform-null-stream/measure.c | -Wextra 
 msi-tree-property | docs/wine-repro/msi-selection-tree-directory-property/measure.c | -Wextra -lmsi -lcomctl32 -lole32 -static
 mspatcha-signature | docs/wine-repro/mspatcha-pa19/measure.c | -Wextra -static
 timezone | docs/wine-repro/wbemprox-timezone/measure.c | -Wextra -lwbemuuid -lole32 -loleaut32 -luuid -static
+timezone-labels | docs/wine-repro/wbemprox-timezone/measure-labels.c | -Wextra -lwbemuuid -lole32 -loleaut32 -luuid -ladvapi32 -static
 http-same-seek | docs/wine-repro/wininet-http-same-position-seek/measure.c | -Wextra -lwininet -lws2_32 -static
 folder-selection | docs/wine-repro/shell32-folderview-selection/measure.c | -Wextra -lshell32 -lole32 -luuid -static
 tdoffset-records | docs/wine-repro/typedesc-offsets/measure.c | -loleaut32 -lole32 -luuid -static
