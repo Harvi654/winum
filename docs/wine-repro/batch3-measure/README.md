@@ -16,6 +16,8 @@ Current entries:
 - mspatcha-signature: original raw/PE32 signature and normalization subset;
   PA19 decoder coverage remains blocked without an original producer,
   [limits and L3 proposal](../mspatcha-pa19/README.md).
+- timezone: all new WMI timezone fields and their relation to the current
+  Win32 snapshot, [scope](../wbemprox-timezone/README.md).
 
 Build one final bundle after all batch entries are prepared:
 
