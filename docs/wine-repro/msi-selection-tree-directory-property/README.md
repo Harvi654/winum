@@ -49,3 +49,19 @@ advisory was requested under AGENTS.md, but its session hit a usage limit
 before returning a review; no completed advisory or originality certification
 is claimed for this fixture. Native acceptance, Wine assertions and L1
 remain pending; raw output will not be committed.
+
+## Initial Windows result and fixture correction (2026-11-09)
+
+Both architectures exit 1 with identical observations: creating the Property
+table succeeds, but the first INSERT returns 1615 (ERROR_BAD_QUERY_SYNTAX).
+The second case fails at the same step. No dialog, selection, costing or
+property comparison was reached, so no native directory-binding contract
+can be inferred. This is our SQL fixture error, not evidence about the patch.
+
+Revision 2 adds explicit column lists to all 23 INSERT statements, including
+formatted Control rows. MSI SQL requires that syntax; the previous abbreviated
+INSERT INTO table VALUES form was rejected by Windows. The program prints
+FIXTURE revision=2 explicit_insert_columns=1 to distinguish the rerun. No
+expected property value is added. Both strict architecture builds pass;
+native setup and actual direct/indirect values still need a targeted rerun.
+No production implementation, marker or series changes.
