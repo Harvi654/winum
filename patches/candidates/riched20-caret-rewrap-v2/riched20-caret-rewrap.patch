@@ -1,0 +1,169 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] riched20: Rewrap a paragraph when the caret is placed before the repaint.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+ITextRange::SetText inserts text without rewrapping it; when the caret is
+then placed before the next repaint - ITextRange::Select, EM_SETSEL,
+EM_EXSETSEL, WM_SETFOCUS or ITextRange::ScrollIntoView - cursor_coords()
+finds the paragraph still marked MEPF_REWRAP and fails
+assert(~para->nFlags & MEPF_REWRAP). Inventor aborted that way when a
+dimension text was edited. Rewrap at that point instead.
+
+Windows 10 (x86_64 and i686, riched20 and msftedit; winum
+docs/wine-repro/riched20-caret-rewrap, windows-2026-11-09): none of those
+sequences fails; afterwards the text is wrapped, the selection is where it
+was set and the caret is at EM_POSFROMCHAR of the selection. The test
+checks exactly that, relative to EM_POSFROMCHAR, so font metrics do not
+enter.
+
+Not changed: on Windows the text is already wrapped right after SetText
+(EM_GETLINECOUNT counts the wrapped lines); Wine still wraps later.
+
+v2 (2026-11-09): adds the Wine test; the code change is the one of v1.
+
+--- a/dlls/riched20/caret.c
++++ b/dlls/riched20/caret.c
+@@ -229,7 +229,14 @@
+   int run_x;
+   HDC hdc = ITextHost_TxGetDC( editor->texthost );
+ 
+-  assert(~para->nFlags & MEPF_REWRAP);
++  /* The caret can be placed before the next repaint has rewrapped the text
++   * (e.g. a host that creates the caret right after changing the text);
++   * rewrap now instead of failing an assertion. */
++  if (para->nFlags & MEPF_REWRAP)
++  {
++    WARN( "paragraph needs rewrap, wrapping now\n" );
++    wrap_marked_paras_dc( editor, hdc, FALSE );
++  }
+ 
+   row = row_from_cursor( cursor );
+ 
+--- a/dlls/riched20/tests/richole.c
++++ b/dlls/riched20/tests/richole.c
+@@ -5565,6 +5565,117 @@
+   release_interfaces(&hwnd, &reole, &doc, &selection);
+ }
+ 
++/* The caret placed right after ITextRange::SetText, before a repaint, as
++ * measured on Windows 10 (riched20 and msftedit, x86_64 and i686): the
++ * text is wrapped, the selection is where it was set and the caret is at
++ * EM_POSFROMCHAR of the selection. */
++static void test_caret_after_settext(void)
++{
++    static const WCHAR long_text[] = L"alpha beta gamma delta epsilon zeta eta theta iota kappa";
++    static const char *triggers[] = { "Select", "EM_SETSEL", "EM_EXSETSEL", "WM_SETFOCUS", "ScrollIntoView" };
++    ITextDocument *doc;
++    IRichEditOle *ole;
++    ITextRange *range;
++    HWND parent, edit, other;
++    unsigned int c, t;
++    CHARRANGE cr;
++    POINTL pt;
++    POINT caret;
++    LRESULT ret;
++    HRESULT hr;
++    LONG line;
++    BSTR str;
++
++    for (c = 0; c < 2; c++)
++    for (t = 0; t < ARRAY_SIZE(triggers); t++)
++    {
++        winetest_push_context("%s, %s", c ? "append" : "replace", triggers[t]);
++        parent = CreateWindowA("static", "parent", WS_POPUP | WS_VISIBLE, 50, 50, 300, 300, NULL, NULL, NULL, NULL);
++        edit = CreateWindowA(RICHEDIT_CLASS20A, "abc", WS_CHILD | WS_VISIBLE | ES_MULTILINE | WS_BORDER,
++                             10, 10, 120, 200, parent, NULL, NULL, NULL);
++        other = CreateWindowA("edit", "", WS_CHILD | WS_VISIBLE, 150, 10, 60, 20, parent, NULL, NULL, NULL);
++        ok(parent && edit && other, "failed to create windows\n");
++        SetForegroundWindow(parent);
++        SetFocus(t == 3 ? other : edit);
++        if (GetFocus() != (t == 3 ? other : edit))
++        {
++            skip("could not set the focus\n");
++            DestroyWindow(parent);
++            winetest_pop_context();
++            continue;
++        }
++
++        ole = NULL;
++        SendMessageA(edit, EM_GETOLEINTERFACE, 0, (LPARAM)&ole);
++        ok(ole != NULL, "no IRichEditOle\n");
++        hr = IRichEditOle_QueryInterface(ole, &IID_ITextDocument, (void **)&doc);
++        ok(hr == S_OK, "got %#lx\n", hr);
++
++        hr = ITextDocument_Range(doc, c ? 3 : 0, 3, &range);
++        ok(hr == S_OK, "got %#lx\n", hr);
++        str = SysAllocString(long_text);
++        hr = ITextRange_SetText(range, str);
++        ok(hr == S_OK, "got %#lx\n", hr);
++        SysFreeString(str);
++        ITextRange_Release(range);
++
++        /* the caret is placed before any repaint */
++        switch (t)
++        {
++        case 0:
++            hr = ITextDocument_Range(doc, 23, 23, &range);
++            ok(hr == S_OK, "got %#lx\n", hr);
++            hr = ITextRange_Select(range);
++            ok(hr == S_OK, "got %#lx\n", hr);
++            ITextRange_Release(range);
++            break;
++        case 1:
++            ret = SendMessageA(edit, EM_SETSEL, 23, 23);
++            ok(ret == 23, "got %Id\n", ret);
++            break;
++        case 2:
++            cr.cpMin = cr.cpMax = 23;
++            ret = SendMessageA(edit, EM_EXSETSEL, 0, (LPARAM)&cr);
++            ok(ret == 23, "got %Id\n", ret);
++            break;
++        case 3:
++            SetFocus(edit);
++            ok(GetFocus() == edit, "got focus %p\n", GetFocus());
++            break;
++        case 4:
++            hr = ITextDocument_Range(doc, 23, 23, &range);
++            ok(hr == S_OK, "got %#lx\n", hr);
++            hr = ITextRange_ScrollIntoView(range, tomStart);
++            ok(hr == S_OK, "got %#lx\n", hr);
++            ITextRange_Release(range);
++            break;
++        }
++
++        ret = SendMessageA(edit, EM_GETLINECOUNT, 0, 0);
++        ok(ret > 1, "got %Id lines\n", ret);
++        SendMessageA(edit, EM_EXGETSEL, 0, (LPARAM)&cr);
++        if (t <= 2)
++        {
++            ok(cr.cpMin == 23 && cr.cpMax == 23, "got selection %ld,%ld\n", cr.cpMin, cr.cpMax);
++            line = SendMessageA(edit, EM_EXLINEFROMCHAR, 0, 23);
++            ok(line > 0, "got line %ld\n", line);
++        }
++        if (t <= 3)
++        {
++            /* the caret is where the selection is */
++            SendMessageA(edit, EM_POSFROMCHAR, (WPARAM)&pt, cr.cpMin);
++            ok(GetCaretPos(&caret), "GetCaretPos failed\n");
++            ok(caret.x == pt.x && caret.y == pt.y, "caret at %ld,%ld, character %ld at %ld,%ld\n",
++               caret.x, caret.y, cr.cpMin, pt.x, pt.y);
++        }
++
++        ITextDocument_Release(doc);
++        IRichEditOle_Release(ole);
++        DestroyWindow(parent);
++        winetest_pop_context();
++    }
++}
++
+ START_TEST(richole)
+ {
+   /* Must explicitly LoadLibrary(). The test has no references to functions in
+@@ -5609,4 +5720,5 @@
+   test_undo();
+   test_undo_control();
+   test_freeze();
++  test_caret_after_settext();
+ }

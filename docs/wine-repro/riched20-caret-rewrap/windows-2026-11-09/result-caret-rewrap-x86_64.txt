@@ -1,0 +1,314 @@
+MEASURE topic=riched20-caret-rewrap schema=1 bits=64
+CHILD_BEGIN dll=riched20 change=tom_replace trigger=range_select
+CALL dll=riched20 change=tom_replace trigger=range_select
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER hr=00000000
+STATE when=triggered sel=23,23 textlen=56 lines=4 pos=23 line=2 line_start=23 posfromchar=1,33 caret_ok=1 caret=1,33 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=56 lines=4 pos=23 line=2 line_start=23 posfromchar=1,33 caret_ok=1 caret=1,33 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=tom_replace trigger=range_select exit=00000000
+CHILD_BEGIN dll=riched20 change=tom_replace trigger=em_setsel
+CALL dll=riched20 change=tom_replace trigger=em_setsel
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER ret=23
+STATE when=triggered sel=23,23 textlen=56 lines=4 pos=23 line=2 line_start=23 posfromchar=1,33 caret_ok=1 caret=1,33 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=56 lines=4 pos=23 line=2 line_start=23 posfromchar=1,33 caret_ok=1 caret=1,33 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=tom_replace trigger=em_setsel exit=00000000
+CHILD_BEGIN dll=riched20 change=tom_replace trigger=em_exsetsel
+CALL dll=riched20 change=tom_replace trigger=em_exsetsel
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER ret=23
+STATE when=triggered sel=23,23 textlen=56 lines=4 pos=23 line=2 line_start=23 posfromchar=1,33 caret_ok=1 caret=1,33 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=56 lines=4 pos=23 line=2 line_start=23 posfromchar=1,33 caret_ok=1 caret=1,33 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=tom_replace trigger=em_exsetsel exit=00000000
+CHILD_BEGIN dll=riched20 change=tom_replace trigger=setfocus
+CALL dll=riched20 change=tom_replace trigger=setfocus
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=0,0 caret_matches=0 focus=0
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=0,0 caret_matches=0 focus=0
+TRIGGER focus=1
+STATE when=triggered sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=painted sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=tom_replace trigger=setfocus exit=00000000
+CHILD_BEGIN dll=riched20 change=tom_replace trigger=scrollintoview
+CALL dll=riched20 change=tom_replace trigger=scrollintoview
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER hr=00000000
+STATE when=triggered sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,-15 caret_ok=1 caret=-32000,-32000 caret_matches=0 focus=1
+STATE when=painted sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,-15 caret_ok=1 caret=-32000,-32000 caret_matches=0 focus=1
+CHILD_END dll=riched20 change=tom_replace trigger=scrollintoview exit=00000000
+CHILD_BEGIN dll=riched20 change=tom_replace trigger=none
+CALL dll=riched20 change=tom_replace trigger=none
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER none
+STATE when=triggered sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=painted sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=tom_replace trigger=none exit=00000000
+CHILD_BEGIN dll=riched20 change=tom_append trigger=range_select
+CALL dll=riched20 change=tom_append trigger=range_select
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER hr=00000000
+STATE when=triggered sel=23,23 textlen=59 lines=4 pos=23 line=1 line_start=14 posfromchar=73,17 caret_ok=1 caret=73,17 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=59 lines=4 pos=23 line=1 line_start=14 posfromchar=73,17 caret_ok=1 caret=73,17 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=tom_append trigger=range_select exit=00000000
+CHILD_BEGIN dll=riched20 change=tom_append trigger=em_setsel
+CALL dll=riched20 change=tom_append trigger=em_setsel
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER ret=23
+STATE when=triggered sel=23,23 textlen=59 lines=4 pos=23 line=1 line_start=14 posfromchar=73,17 caret_ok=1 caret=73,17 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=59 lines=4 pos=23 line=1 line_start=14 posfromchar=73,17 caret_ok=1 caret=73,17 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=tom_append trigger=em_setsel exit=00000000
+CHILD_BEGIN dll=riched20 change=tom_append trigger=em_exsetsel
+CALL dll=riched20 change=tom_append trigger=em_exsetsel
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER ret=23
+STATE when=triggered sel=23,23 textlen=59 lines=4 pos=23 line=1 line_start=14 posfromchar=73,17 caret_ok=1 caret=73,17 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=59 lines=4 pos=23 line=1 line_start=14 posfromchar=73,17 caret_ok=1 caret=73,17 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=tom_append trigger=em_exsetsel exit=00000000
+CHILD_BEGIN dll=riched20 change=tom_append trigger=setfocus
+CALL dll=riched20 change=tom_append trigger=setfocus
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=0,0 caret_matches=0 focus=0
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=0,0 caret_matches=0 focus=0
+TRIGGER focus=1
+STATE when=triggered sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=painted sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=tom_append trigger=setfocus exit=00000000
+CHILD_BEGIN dll=riched20 change=tom_append trigger=scrollintoview
+CALL dll=riched20 change=tom_append trigger=scrollintoview
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER hr=00000000
+STATE when=triggered sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,-15 caret_ok=1 caret=-32000,-32000 caret_matches=0 focus=1
+STATE when=painted sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,-15 caret_ok=1 caret=-32000,-32000 caret_matches=0 focus=1
+CHILD_END dll=riched20 change=tom_append trigger=scrollintoview exit=00000000
+CHILD_BEGIN dll=riched20 change=tom_append trigger=none
+CALL dll=riched20 change=tom_append trigger=none
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER none
+STATE when=triggered sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=painted sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=tom_append trigger=none exit=00000000
+CHILD_BEGIN dll=riched20 change=replacesel trigger=range_select
+CALL dll=riched20 change=replacesel trigger=range_select
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=changed sel=56,56 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=104,49 caret_matches=0 focus=1
+TRIGGER hr=00000000
+STATE when=triggered sel=23,23 textlen=56 lines=4 pos=23 line=2 line_start=23 posfromchar=1,33 caret_ok=1 caret=1,33 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=56 lines=4 pos=23 line=2 line_start=23 posfromchar=1,33 caret_ok=1 caret=1,33 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=replacesel trigger=range_select exit=00000000
+CHILD_BEGIN dll=riched20 change=replacesel trigger=em_setsel
+CALL dll=riched20 change=replacesel trigger=em_setsel
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=changed sel=56,56 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=104,49 caret_matches=0 focus=1
+TRIGGER ret=23
+STATE when=triggered sel=23,23 textlen=56 lines=4 pos=23 line=2 line_start=23 posfromchar=1,33 caret_ok=1 caret=1,33 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=56 lines=4 pos=23 line=2 line_start=23 posfromchar=1,33 caret_ok=1 caret=1,33 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=replacesel trigger=em_setsel exit=00000000
+CHILD_BEGIN dll=riched20 change=replacesel trigger=em_exsetsel
+CALL dll=riched20 change=replacesel trigger=em_exsetsel
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=changed sel=56,56 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=104,49 caret_matches=0 focus=1
+TRIGGER ret=23
+STATE when=triggered sel=23,23 textlen=56 lines=4 pos=23 line=2 line_start=23 posfromchar=1,33 caret_ok=1 caret=1,33 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=56 lines=4 pos=23 line=2 line_start=23 posfromchar=1,33 caret_ok=1 caret=1,33 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=replacesel trigger=em_exsetsel exit=00000000
+CHILD_BEGIN dll=riched20 change=replacesel trigger=setfocus
+CALL dll=riched20 change=replacesel trigger=setfocus
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=0,0 caret_matches=0 focus=0
+STATE when=changed sel=56,56 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=0,0 caret_matches=0 focus=0
+TRIGGER focus=1
+STATE when=triggered sel=56,56 textlen=56 lines=4 pos=56 line=3 line_start=40 posfromchar=104,49 caret_ok=1 caret=104,49 caret_matches=1 focus=1
+STATE when=painted sel=56,56 textlen=56 lines=4 pos=56 line=3 line_start=40 posfromchar=104,49 caret_ok=1 caret=104,49 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=replacesel trigger=setfocus exit=00000000
+CHILD_BEGIN dll=riched20 change=replacesel trigger=scrollintoview
+CALL dll=riched20 change=replacesel trigger=scrollintoview
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=changed sel=56,56 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=104,49 caret_matches=0 focus=1
+TRIGGER hr=00000000
+STATE when=triggered sel=56,56 textlen=56 lines=4 pos=56 line=3 line_start=40 posfromchar=104,33 caret_ok=1 caret=104,33 caret_matches=1 focus=1
+STATE when=painted sel=56,56 textlen=56 lines=4 pos=56 line=3 line_start=40 posfromchar=104,33 caret_ok=1 caret=104,33 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=replacesel trigger=scrollintoview exit=00000000
+CHILD_BEGIN dll=riched20 change=replacesel trigger=none
+CALL dll=riched20 change=replacesel trigger=none
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=changed sel=56,56 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=104,49 caret_matches=0 focus=1
+TRIGGER none
+STATE when=triggered sel=56,56 textlen=56 lines=4 pos=56 line=3 line_start=40 posfromchar=104,49 caret_ok=1 caret=104,49 caret_matches=1 focus=1
+STATE when=painted sel=56,56 textlen=56 lines=4 pos=56 line=3 line_start=40 posfromchar=104,49 caret_ok=1 caret=104,49 caret_matches=1 focus=1
+CHILD_END dll=riched20 change=replacesel trigger=none exit=00000000
+CHILD_BEGIN dll=msftedit change=tom_replace trigger=range_select
+CALL dll=msftedit change=tom_replace trigger=range_select
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER hr=00000000
+STATE when=triggered sel=23,23 textlen=56 lines=4 pos=23 line=1 line_start=17 posfromchar=34,18 caret_ok=1 caret=34,18 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=56 lines=4 pos=23 line=1 line_start=17 posfromchar=34,18 caret_ok=1 caret=34,18 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=tom_replace trigger=range_select exit=00000000
+CHILD_BEGIN dll=msftedit change=tom_replace trigger=em_setsel
+CALL dll=msftedit change=tom_replace trigger=em_setsel
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER ret=23
+STATE when=triggered sel=23,23 textlen=56 lines=4 pos=23 line=1 line_start=17 posfromchar=34,18 caret_ok=1 caret=34,18 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=56 lines=4 pos=23 line=1 line_start=17 posfromchar=34,18 caret_ok=1 caret=34,18 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=tom_replace trigger=em_setsel exit=00000000
+CHILD_BEGIN dll=msftedit change=tom_replace trigger=em_exsetsel
+CALL dll=msftedit change=tom_replace trigger=em_exsetsel
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER ret=23
+STATE when=triggered sel=23,23 textlen=56 lines=4 pos=23 line=1 line_start=17 posfromchar=34,18 caret_ok=1 caret=34,18 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=56 lines=4 pos=23 line=1 line_start=17 posfromchar=34,18 caret_ok=1 caret=34,18 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=tom_replace trigger=em_exsetsel exit=00000000
+CHILD_BEGIN dll=msftedit change=tom_replace trigger=setfocus
+CALL dll=msftedit change=tom_replace trigger=setfocus
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=0,0 caret_matches=0 focus=0
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=0,0 caret_matches=0 focus=0
+TRIGGER focus=1
+STATE when=triggered sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=painted sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=tom_replace trigger=setfocus exit=00000000
+CHILD_BEGIN dll=msftedit change=tom_replace trigger=scrollintoview
+CALL dll=msftedit change=tom_replace trigger=scrollintoview
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER hr=00000000
+STATE when=triggered sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,-16 caret_ok=1 caret=0,-32000 caret_matches=0 focus=1
+STATE when=painted sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,-16 caret_ok=1 caret=0,-32000 caret_matches=0 focus=1
+CHILD_END dll=msftedit change=tom_replace trigger=scrollintoview exit=00000000
+CHILD_BEGIN dll=msftedit change=tom_replace trigger=none
+CALL dll=msftedit change=tom_replace trigger=none
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER none
+STATE when=triggered sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=painted sel=0,0 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=tom_replace trigger=none exit=00000000
+CHILD_BEGIN dll=msftedit change=tom_append trigger=range_select
+CALL dll=msftedit change=tom_append trigger=range_select
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER hr=00000000
+STATE when=triggered sel=23,23 textlen=59 lines=4 pos=23 line=1 line_start=14 posfromchar=67,18 caret_ok=1 caret=67,18 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=59 lines=4 pos=23 line=1 line_start=14 posfromchar=67,18 caret_ok=1 caret=67,18 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=tom_append trigger=range_select exit=00000000
+CHILD_BEGIN dll=msftedit change=tom_append trigger=em_setsel
+CALL dll=msftedit change=tom_append trigger=em_setsel
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER ret=23
+STATE when=triggered sel=23,23 textlen=59 lines=4 pos=23 line=1 line_start=14 posfromchar=67,18 caret_ok=1 caret=67,18 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=59 lines=4 pos=23 line=1 line_start=14 posfromchar=67,18 caret_ok=1 caret=67,18 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=tom_append trigger=em_setsel exit=00000000
+CHILD_BEGIN dll=msftedit change=tom_append trigger=em_exsetsel
+CALL dll=msftedit change=tom_append trigger=em_exsetsel
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER ret=23
+STATE when=triggered sel=23,23 textlen=59 lines=4 pos=23 line=1 line_start=14 posfromchar=67,18 caret_ok=1 caret=67,18 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=59 lines=4 pos=23 line=1 line_start=14 posfromchar=67,18 caret_ok=1 caret=67,18 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=tom_append trigger=em_exsetsel exit=00000000
+CHILD_BEGIN dll=msftedit change=tom_append trigger=setfocus
+CALL dll=msftedit change=tom_append trigger=setfocus
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=0,0 caret_matches=0 focus=0
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=0,0 caret_matches=0 focus=0
+TRIGGER focus=1
+STATE when=triggered sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=painted sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=tom_append trigger=setfocus exit=00000000
+CHILD_BEGIN dll=msftedit change=tom_append trigger=scrollintoview
+CALL dll=msftedit change=tom_append trigger=scrollintoview
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER hr=00000000
+STATE when=triggered sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,-16 caret_ok=1 caret=0,-32000 caret_matches=0 focus=1
+STATE when=painted sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,-16 caret_ok=1 caret=0,-32000 caret_matches=0 focus=1
+CHILD_END dll=msftedit change=tom_append trigger=scrollintoview exit=00000000
+CHILD_BEGIN dll=msftedit change=tom_append trigger=none
+CALL dll=msftedit change=tom_append trigger=none
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+SETTEXT hr=00000000
+STATE when=changed sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+TRIGGER none
+STATE when=triggered sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=painted sel=0,0 textlen=59 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=tom_append trigger=none exit=00000000
+CHILD_BEGIN dll=msftedit change=replacesel trigger=range_select
+CALL dll=msftedit change=replacesel trigger=range_select
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=changed sel=56,56 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=37,52 caret_matches=0 focus=1
+TRIGGER hr=00000000
+STATE when=triggered sel=23,23 textlen=56 lines=4 pos=23 line=1 line_start=17 posfromchar=34,18 caret_ok=1 caret=34,18 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=56 lines=4 pos=23 line=1 line_start=17 posfromchar=34,18 caret_ok=1 caret=34,18 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=replacesel trigger=range_select exit=00000000
+CHILD_BEGIN dll=msftedit change=replacesel trigger=em_setsel
+CALL dll=msftedit change=replacesel trigger=em_setsel
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=changed sel=56,56 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=37,52 caret_matches=0 focus=1
+TRIGGER ret=23
+STATE when=triggered sel=23,23 textlen=56 lines=4 pos=23 line=1 line_start=17 posfromchar=34,18 caret_ok=1 caret=34,18 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=56 lines=4 pos=23 line=1 line_start=17 posfromchar=34,18 caret_ok=1 caret=34,18 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=replacesel trigger=em_setsel exit=00000000
+CHILD_BEGIN dll=msftedit change=replacesel trigger=em_exsetsel
+CALL dll=msftedit change=replacesel trigger=em_exsetsel
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=changed sel=56,56 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=37,52 caret_matches=0 focus=1
+TRIGGER ret=23
+STATE when=triggered sel=23,23 textlen=56 lines=4 pos=23 line=1 line_start=17 posfromchar=34,18 caret_ok=1 caret=34,18 caret_matches=1 focus=1
+STATE when=painted sel=23,23 textlen=56 lines=4 pos=23 line=1 line_start=17 posfromchar=34,18 caret_ok=1 caret=34,18 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=replacesel trigger=em_exsetsel exit=00000000
+CHILD_BEGIN dll=msftedit change=replacesel trigger=setfocus
+CALL dll=msftedit change=replacesel trigger=setfocus
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=0,0 caret_matches=0 focus=0
+STATE when=changed sel=56,56 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=0,0 caret_matches=0 focus=0
+TRIGGER focus=1
+STATE when=triggered sel=56,56 textlen=56 lines=4 pos=56 line=3 line_start=51 posfromchar=37,52 caret_ok=1 caret=37,52 caret_matches=1 focus=1
+STATE when=painted sel=56,56 textlen=56 lines=4 pos=56 line=3 line_start=51 posfromchar=37,52 caret_ok=1 caret=37,52 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=replacesel trigger=setfocus exit=00000000
+CHILD_BEGIN dll=msftedit change=replacesel trigger=scrollintoview
+CALL dll=msftedit change=replacesel trigger=scrollintoview
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=changed sel=56,56 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=37,52 caret_matches=0 focus=1
+TRIGGER hr=00000000
+STATE when=triggered sel=56,56 textlen=56 lines=4 pos=56 line=3 line_start=51 posfromchar=37,35 caret_ok=1 caret=37,35 caret_matches=1 focus=1
+STATE when=painted sel=56,56 textlen=56 lines=4 pos=56 line=3 line_start=51 posfromchar=37,35 caret_ok=1 caret=37,35 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=replacesel trigger=scrollintoview exit=00000000
+CHILD_BEGIN dll=msftedit change=replacesel trigger=none
+CALL dll=msftedit change=replacesel trigger=none
+STATE when=initial sel=0,0 textlen=3 lines=1 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=1,1 caret_matches=1 focus=1
+STATE when=changed sel=56,56 textlen=56 lines=4 pos=0 line=0 line_start=0 posfromchar=1,1 caret_ok=1 caret=37,52 caret_matches=0 focus=1
+TRIGGER none
+STATE when=triggered sel=56,56 textlen=56 lines=4 pos=56 line=3 line_start=51 posfromchar=37,52 caret_ok=1 caret=37,52 caret_matches=1 focus=1
+STATE when=painted sel=56,56 textlen=56 lines=4 pos=56 line=3 line_start=51 posfromchar=37,52 caret_ok=1 caret=37,52 caret_matches=1 focus=1
+CHILD_END dll=msftedit change=replacesel trigger=none exit=00000000
+SUMMARY topic=riched20-caret-rewrap api_errors=0 complete=1 expectations=none

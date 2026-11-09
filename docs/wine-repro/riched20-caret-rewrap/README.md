@@ -36,3 +36,23 @@ values rather than pixel values.
 Local check (Wine 9.0, not an oracle): Inventor's assertion
 (`caret.c, line 232`, exit 3) for `tom_replace` with every trigger and for
 `tom_append` with focus and `ScrollIntoView`, in both classes.
+
+## Windows observations (2026-11-09)
+
+Offline Windows 10 VM, `windows-2026-11-09/` (both architectures complete,
+`api_errors=0`, every child exit 0, no exception; identical apart from
+`bits=`). riched20 and msftedit behave alike (msftedit wraps at other
+positions):
+
+- No sequence fails. `ITextRange::Select` and `ScrollIntoView` return
+  S_OK, `EM_SETSEL`/`EM_EXSETSEL` return 23.
+- The text is wrapped already right after `ITextRange::SetText`
+  (`lines=4` at `when=changed`; Wine 9: 1 until something rewraps).
+- After `ITextRange::SetText` the selection stays at 0 (Wine 9: at the end
+  of the inserted text, 56).
+- After Select / `EM_SETSEL` / `EM_EXSETSEL` the selection is 23,23 on a
+  line > 0, and the caret is at `EM_POSFROMCHAR` of it; after focus, the
+  caret is at `EM_POSFROMCHAR` of the selection (0).
+- `ScrollIntoView(tomStart)` scrolls (`EM_POSFROMCHAR` of 0 becomes
+  negative) and does not move the caret.
+- `EM_REPLACESEL` (control) leaves the selection at the end, 56.
