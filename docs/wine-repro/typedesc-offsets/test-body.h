@@ -1,0 +1,210 @@
+/* BEGIN winum record offset test: original, AI-assisted (Codex), LGPL-2.1-or-later. */
+static DWORD record_offsets_dword(const BYTE *p)
+{
+    return (DWORD)p[0] | (DWORD)p[1] << 8 | (DWORD)p[2] << 16 | (DWORD)p[3] << 24;
+}
+static BOOL record_offsets_span(DWORD start, DWORD length, DWORD size)
+{
+    return start <= size && length <= size - start;
+}
+static BOOL record_offsets_coverage(const WCHAR *path)
+{
+    HANDLE file;
+    BYTE *data = NULL;
+    DWORD size, got, dir, desc, desc_size, arrays, array_size, i, count;
+    unsigned int signs = 0, highs = 0;
+    BOOL success = FALSE;
+
+    file = CreateFileW(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+    ok(file != INVALID_HANDLE_VALUE, "Coverage file open failed.\n");
+    if (file == INVALID_HANDLE_VALUE) return FALSE;
+    size = GetFileSize(file, NULL);
+    if (size < 0x54 || size > 32 * 1024 * 1024) goto invalid;
+    data = malloc(size);
+    if (!data || !ReadFile(file, data, size, &got, NULL) || got != size || memcmp(data, "MSFT", 4)) goto invalid;
+    count = record_offsets_dword(data + 0x20);
+    if (count != 10000) goto invalid;
+    dir = 0x54 + count * 4 + ((record_offsets_dword(data + 0x14) & 0x100) ? 4 : 0);
+    if (!record_offsets_span(dir, 15 * 16, size)) goto invalid;
+    desc = record_offsets_dword(data + dir + 9 * 16);
+    desc_size = record_offsets_dword(data + dir + 9 * 16 + 4);
+    arrays = record_offsets_dword(data + dir + 10 * 16);
+    array_size = record_offsets_dword(data + dir + 10 * 16 + 4);
+    if (!record_offsets_span(desc, desc_size, size) || desc_size % 8 ||
+        !record_offsets_span(arrays, array_size, size)) goto invalid;
+    for (i = 0; i < desc_size; i += 8)
+    {
+        DWORD vt = record_offsets_dword(data + desc + i) & 0xffff;
+        DWORD ref = record_offsets_dword(data + desc + i + 4), element;
+        if ((vt == VT_PTR || vt == VT_SAFEARRAY) && !(ref & 0x80000000))
+        {
+            if (ref % 8 || !record_offsets_span(ref, 8, desc_size)) goto invalid;
+            if (ref & 0x8000) signs |= 1;
+            if (ref >= 0x10000) highs |= 1;
+        }
+        if (vt != VT_CARRAY) continue;
+        if (!record_offsets_span(ref, 8, array_size)) goto invalid;
+        if (ref & 0x8000) signs |= 2;
+        if (ref >= 0x10000) highs |= 2;
+        element = record_offsets_dword(data + arrays + ref);
+        if (element & 0x80000000) continue;
+        if (element % 8 || !record_offsets_span(element, 8, desc_size)) goto invalid;
+        if (element & 0x8000) signs |= 4;
+        if (element >= 0x10000) highs |= 4;
+    }
+    ok(signs == 7 && highs == 7, "Missing reader boundary coverage: signs %#x, highs %#x.\n", signs, highs);
+    success = signs == 7 && highs == 7;
+    goto done;
+invalid:
+    ok(0, "Generated library format/coverage read failed.\n");
+done:
+    free(data);
+    CloseHandle(file);
+    return success;
+}
+static BOOL record_offsets_hr(HRESULT hr, const char *operation, unsigned int index)
+{
+    ok(hr == S_OK, "%s at %u returned %#lx.\n", operation, index, hr);
+    return hr == S_OK;
+}
+static void record_offsets_alias(ITypeLib *lib, unsigned int sample)
+{
+    ITypeInfo *info = NULL, *record = NULL;
+    TYPEATTR *attr = NULL, *record_attr = NULL;
+    VARDESC *field = NULL;
+    TYPEDESC td;
+    ARRAYDESC array;
+    SIZE_T got;
+    BOOL ret;
+    BSTR name = NULL;
+    WCHAR expected[40];
+
+    if (!record_offsets_hr(ITypeLib_GetTypeInfo(lib, sample * 2 + 1, &info), "GetTypeInfo", sample)) return;
+    if (!record_offsets_hr(ITypeInfo_GetTypeAttr(info, &attr), "GetTypeAttr", sample)) goto done;
+    ok(attr->typekind == TKIND_ALIAS, "Sample %u kind %u.\n", sample, attr->typekind);
+    if (attr->typekind != TKIND_ALIAS) goto done;
+    td = attr->tdescAlias;
+    ok(td.vt == VT_PTR, "Sample %u root vt %#x.\n", sample, td.vt);
+    if (td.vt != VT_PTR) goto done;
+    ret = ReadProcessMemory(GetCurrentProcess(), td.lptdesc, &td, sizeof(td), &got);
+    ok(ret && got == sizeof(td), "Sample %u outer pointee unreadable.\n", sample);
+    if (!ret || got != sizeof(td)) goto done;
+    ok(td.vt == VT_CARRAY, "Sample %u array vt %#x.\n", sample, td.vt);
+    if (td.vt != VT_CARRAY) goto done;
+    ret = ReadProcessMemory(GetCurrentProcess(), td.lpadesc, &array, sizeof(array), &got);
+    ok(ret && got == sizeof(array), "Sample %u array unreadable.\n", sample);
+    if (!ret || got != sizeof(array)) goto done;
+    ok(array.cDims == 1, "Sample %u dimensions %u.\n", sample, array.cDims);
+    if (array.cDims != 1) goto done;
+    ok(!array.rgbounds[0].lLbound && array.rgbounds[0].cElements == sample + 2,
+       "Sample %u bound %ld/%lu.\n", sample, array.rgbounds[0].lLbound, array.rgbounds[0].cElements);
+    td = array.tdescElem;
+    ok(td.vt == VT_PTR, "Sample %u element vt %#x.\n", sample, td.vt);
+    if (td.vt != VT_PTR) goto done;
+    ret = ReadProcessMemory(GetCurrentProcess(), td.lptdesc, &td, sizeof(td), &got);
+    ok(ret && got == sizeof(td), "Sample %u record pointee unreadable.\n", sample);
+    if (!ret || got != sizeof(td)) goto done;
+    ok(td.vt == VT_USERDEFINED, "Sample %u final vt %#x.\n", sample, td.vt);
+    if (td.vt != VT_USERDEFINED) goto done;
+    if (!record_offsets_hr(ITypeInfo_GetRefTypeInfo(info, td.hreftype, &record), "GetRefTypeInfo", sample)) goto done;
+    if (!record_offsets_hr(ITypeInfo_GetTypeAttr(record, &record_attr), "GetRefTypeAttr", sample)) goto done;
+    ok(record_attr->typekind == TKIND_RECORD && record_attr->cVars == 1 && record_attr->cbSizeInstance == 4,
+       "Sample %u record kind %u vars %u size %lu.\n", sample, record_attr->typekind,
+       record_attr->cVars, record_attr->cbSizeInstance);
+    if (!record_offsets_hr(ITypeInfo_GetVarDesc(record, 0, &field), "GetVarDesc", sample)) goto done;
+    ok(field->varkind == VAR_PERINSTANCE && field->elemdescVar.tdesc.vt == VT_I4,
+       "Sample %u field kind %u vt %#x.\n", sample, field->varkind, field->elemdescVar.tdesc.vt);
+    if (!record_offsets_hr(ITypeInfo_GetDocumentation(record, MEMBERID_NIL, &name, NULL, NULL, NULL), "GetDocumentation", sample)) goto done;
+    swprintf(expected, ARRAY_SIZE(expected), L"Record%u", sample);
+    ok(name && !wcscmp(name, expected), "Sample %u record name mismatch.\n", sample);
+done:
+    SysFreeString(name);
+    if (field) ITypeInfo_ReleaseVarDesc(record, field);
+    if (record_attr) ITypeInfo_ReleaseTypeAttr(record, record_attr);
+    if (record) ITypeInfo_Release(record);
+    if (attr) ITypeInfo_ReleaseTypeAttr(info, attr);
+    ITypeInfo_Release(info);
+}
+static void test_record_offsets(void)
+{
+    static const unsigned int samples[] = {0, 1500, 3000, 4999};
+    WCHAR directory[MAX_PATH], path[MAX_PATH] = {0}, fresh[MAX_PATH] = {0}, name[40];
+    ICreateTypeLib2 *create = NULL;
+    ICreateTypeInfo *record = NULL, *alias = NULL;
+    ITypeInfo *record_info = NULL;
+    ITypeLib *lib = NULL;
+    BOOL path_owned = FALSE, fresh_owned = FALSE, ret;
+    DWORD length;
+    HRESULT hr;
+    unsigned int i;
+
+    hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    ok(SUCCEEDED(hr), "CoInitializeEx returned %#lx.\n", hr);
+    if (FAILED(hr)) return;
+    length = GetTempPathW(ARRAY_SIZE(directory), directory);
+    ok(length && length < ARRAY_SIZE(directory), "Temporary directory failed.\n");
+    if (!length || length >= ARRAY_SIZE(directory)) goto done;
+    path_owned = GetTempFileNameW(directory, L"wtr", 0, path) != 0;
+    ok(path_owned, "Temporary writer filename failed.\n");
+    if (!path_owned) goto done;
+    fresh_owned = GetTempFileNameW(directory, L"wtl", 0, fresh) != 0;
+    ok(fresh_owned, "Temporary reader filename failed.\n");
+    if (!fresh_owned) goto done;
+    ret = DeleteFileW(path);
+    ok(ret, "Writer placeholder cleanup failed.\n");
+    if (!ret) goto done;
+    if (!record_offsets_hr(CreateTypeLib2(sizeof(void *) == 8 ? SYS_WIN64 : SYS_WIN32, path, &create), "CreateTypeLib2", 0)) goto done;
+    if (!record_offsets_hr(ICreateTypeLib2_SetName(create, L"WinumRecordOffsets"), "SetName", 0)) goto done;
+    for (i = 0; i < 5000; i++)
+    {
+        VARDESC var = {0};
+        ARRAYDESC bound = {0};
+        TYPEDESC user, pointer, array, root;
+        HREFTYPE href;
+        swprintf(name, ARRAY_SIZE(name), L"Record%u", i);
+        if (!record_offsets_hr(ICreateTypeLib2_CreateTypeInfo(create, name, TKIND_RECORD, &record), "CreateRecord", i)) goto done;
+        var.memid = MEMBERID_NIL;
+        var.varkind = VAR_PERINSTANCE;
+        var.elemdescVar.tdesc.vt = VT_I4;
+        if (!record_offsets_hr(ICreateTypeInfo_AddVarDesc(record, 0, &var), "AddVarDesc", i)) goto done;
+        if (!record_offsets_hr(ICreateTypeInfo_SetVarName(record, 0, L"value"), "SetVarName", i)) goto done;
+        if (!record_offsets_hr(ICreateTypeInfo_LayOut(record), "LayOut", i)) goto done;
+        if (!record_offsets_hr(ICreateTypeInfo_QueryInterface(record, &IID_ITypeInfo, (void **)&record_info), "GetRecordInfo", i)) goto done;
+        swprintf(name, ARRAY_SIZE(name), L"Alias%u", i);
+        if (!record_offsets_hr(ICreateTypeLib2_CreateTypeInfo(create, name, TKIND_ALIAS, &alias), "CreateAlias", i)) goto done;
+        if (!record_offsets_hr(ICreateTypeInfo_AddRefTypeInfo(alias, record_info, &href), "AddRefTypeInfo", i)) goto done;
+        user.vt = VT_USERDEFINED;
+        user.hreftype = href;
+        pointer.vt = VT_PTR;
+        pointer.lptdesc = &user;
+        bound.tdescElem = pointer;
+        bound.cDims = 1;
+        bound.rgbounds[0].cElements = i + 2;
+        array.vt = VT_CARRAY;
+        array.lpadesc = &bound;
+        root.vt = VT_PTR;
+        root.lptdesc = &array;
+        if (!record_offsets_hr(ICreateTypeInfo_SetTypeDescAlias(alias, &root), "SetTypeDescAlias", i)) goto done;
+        ICreateTypeInfo_Release(alias); alias = NULL;
+        ITypeInfo_Release(record_info); record_info = NULL;
+        ICreateTypeInfo_Release(record); record = NULL;
+    }
+    if (!record_offsets_hr(ICreateTypeLib2_SaveAllChanges(create), "SaveAllChanges", 0)) goto done;
+    ICreateTypeLib2_Release(create); create = NULL;
+    ret = CopyFileW(path, fresh, FALSE);
+    ok(ret, "CopyFileW failed.\n");
+    if (!ret || !record_offsets_coverage(fresh)) goto done;
+    if (!record_offsets_hr(LoadTypeLibEx(fresh, REGKIND_NONE, &lib), "LoadTypeLibEx", 0)) goto done;
+    ok(ITypeLib_GetTypeInfoCount(lib) == 10000, "Unexpected loaded type count.\n");
+    for (i = 0; i < ARRAY_SIZE(samples); i++) record_offsets_alias(lib, samples[i]);
+done:
+    if (lib) ITypeLib_Release(lib);
+    if (alias) ICreateTypeInfo_Release(alias);
+    if (record_info) ITypeInfo_Release(record_info);
+    if (record) ICreateTypeInfo_Release(record);
+    if (create) ICreateTypeLib2_Release(create);
+    if (path_owned) { ret = DeleteFileW(path); ok(ret || GetLastError() == ERROR_FILE_NOT_FOUND, "Writer cleanup failed.\n"); }
+    if (fresh_owned) { ret = DeleteFileW(fresh); ok(ret, "Reader cleanup failed.\n"); }
+    CoUninitialize();
+}
+/* END winum record offset test */

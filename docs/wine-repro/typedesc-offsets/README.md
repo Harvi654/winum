@@ -1,7 +1,8 @@
 # Typedesc offsets: native-writer record fixture (2026-11-09)
 
-Original, AI-assisted (Codex), LGPL-2.1-or-later. This is a MEASURE, with no
-asserted Windows descriptor values or L1 claim. Only public APIs and a read-only
+Original, AI-assisted (Codex), LGPL-2.1-or-later. The original program is a MEASURE;
+the companion assertion test now uses its returned Windows values. Native
+assertion L1 remains pending. Only public APIs and a read-only
 audit of our own generated type library are used. No vendor binary, symbol,
 source, registry export or native implementation is inspected.
 
@@ -18,10 +19,9 @@ Two preceding constructions did not yield an honest complete reader test:
    0xc0000374, i686 0xc0000005). Partial successful getters are not conformance.
    That probe is [retired here](../../archive/typedesc-offsets-serialized-measure-2026-11-09/README.md).
 
-This is one further construction attempt. If it does not bring the result
-closer, stop this direction under the three-attempt rule, record the evidence
-and proceed to the other batch tasks. No unearned l1/l3-only production marker
-will be added.
+This was the third construction attempt, with a stop required if it did not
+bring the result closer. The complete native run below establishes a usable
+oracle. No unearned l1/l3-only production marker is added.
 
 ## Construction
 
@@ -39,7 +39,7 @@ paths. The intended coverage requires `COVERAGE complete=1`; zero exit alone
 does not establish it. It reloads that copy, reports the total type count,
 samples aliases for records 0/1500/3000/4999, and reports returned descriptors,
 bounds, referenced record attributes, field VARTYPE and generated names.
-These return values are unknown until the native output arrives.
+The returned native values are recorded below.
 
 Before/after markers surround the public release and CoUninitialize calls.
 They identify the API boundary if another abnormal exit occurs without
@@ -56,9 +56,9 @@ exitcodes.txt. Both EXEs compile with MinGW GCC 14.2, -Wall -Wextra -Werror;
 no Windows runtime result is claimed from compilation.
 
 No production implementation, patch page marker or series is changed.
-Only after a complete native observation and actual boundary coverage should
-this construction become an ok()/todo_wine reader conformance test. The
-other batch-2 patches remain separate work.
+The complete native observation and actual boundary coverage now support the
+companion ok() reader conformance test. The other batch-2 patches remain
+separate work.
 
 A second-model read-only advisory checked the construction against open Wine
 11.20. The CARRAY element follows only PTR/USERDEFINED writer branches and
@@ -67,3 +67,46 @@ blocker was identified; this is not native execution or Claude's formal cross
 review. Unexpected getter output can still fault during traversal, so the
 process must reach SUMMARY and exit normally before its output is accepted
 as a complete observation.
+
+
+## Complete Windows MEASURE (2026-11-09)
+
+Both x86_64 and i686 processes exited 0 with `SUMMARY api_errors=0
+expectations=none`. All 40000 setup calls returned S_OK. SaveAllChanges and
+LoadTypeLibEx returned S_OK; the library had 10000 types, a 160000-byte
+descriptor table and an 80000-byte array-description table. The audit reported
+`COVERAGE complete=1`, with identical counts on both architectures:
+
+| Reader reference path | Low-word bit 15 set | Nonzero high word |
+| --- | ---: | ---: |
+| PTR/SAFEARRAY pointee | 4096 | 5904 |
+| CARRAY array-description offset | 2048 | 904 |
+| CARRAY complex element | 2048 | 2952 |
+
+All four samples (0/1500/3000/4999, type indices 1/3001/6001/9999) returned
+TKIND_ALIAS and PTR -> CARRAY -> PTR -> USERDEFINED. Every CARRAY had one
+dimension, lower bound 0 and element count sample+2 (2/1502/3002/5001).
+GetRefTypeInfo, GetTypeAttr, GetVarDesc and GetDocumentation all returned S_OK.
+Each referenced record was TKIND_RECORD with one VAR_PERINSTANCE VT_I4 field,
+size 4 and the generated name Record0/Record1500/Record3000/Record4999.
+Numeric HREFTYPE handles differ by architecture; only their resolved record
+identity is asserted. All release calls and CoUninitialize completed before
+SUMMARY. The same batch's other six programs also exited 0. Raw uploaded
+logs are not committed.
+
+## Reader assertion candidate
+
+The [v2 candidate](../../../patches/candidates/oleaut32-typedesc-z-offsets-v2/README.md)
+adds the measured checks to oleaut32/tests/typelib.c without changing the
+three production implementation hunks. `test-body.h` is the exact added block;
+`l1.c` wraps it with a standalone assertion reporter. The dedicated builder
+checks block identity before compiling:
+
+```sh
+bash scripts/build-l1-typedesc-offsets.sh /path/to/NEW-output
+```
+
+The generic bundle also builds `tdoffset-records-l1` for both architectures.
+Return its two result files and exitcodes.txt after run-measure.bat finishes
+in the offline Windows 10 VM. This is the assertion L1 still needed; the
+successful MEASURE is its oracle, not an assertion-test pass.
