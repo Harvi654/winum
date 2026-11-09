@@ -18,14 +18,19 @@ Wine MR 3870 (Aidan Khoury, 2023, never merged) ported to 11.19: 32-bit PE patch
 
 ## Wine test
 
-None in the patch.
+None in the production patch. The separate
+[v2 signature candidate](../../patches/candidates/mspatcha-signature-v2/README.md)
+adds an original Wine test for the Windows-measured signature/normalization
+API subset. Its exact-body standalone test passed 50 checks on Windows 10
+x86_64/i686. It does not apply or decode PA19 data, so this is not full-patch
+L1 and does not close the missing producer/decoder fixture gate.
 
 ## Validation
 
 | Level | Result |
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
-| L1 | **no Wine test** - needs one, measured on Windows first |
+| L1 | 2026-11-09: candidate signature API subset passes on Windows 10 x86_64/i686, 50 checks / zero failures / exit 0 each (c50734d sources). PA19 decode/reference-window coverage is absent; full-patch L1 remains open. |
 | L2 | not recorded per patch |
 | L3 | not recorded |
 | L4 | 2026.4 update installs. (Inventor, maintainer) |
@@ -34,7 +39,11 @@ None in the patch.
 
 ## Open points
 
-Third-party origin (Wine MR 3870); Wine test missing; licence LGPL like Wine.
+Third-party origin (Wine MR 3870), LGPL like Wine. The original reproducible
+PA19 producer and decoder/reference-window fixture remain missing. A large
+raw-buffer signature is not a large-reference-window test. No l3-only
+exception is claimed. The native-tested signature candidate still needs
+formal cross review and observed paired Wine runtime; it is not promoted.
 
 ## Evidence
 

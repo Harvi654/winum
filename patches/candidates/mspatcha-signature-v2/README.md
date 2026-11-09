@@ -74,6 +74,18 @@ no suspicious copied nontrivial block; public PE layouts are prescribed
 format declarations. This is a limited advisory, not proof of originality,
 formal candidate cross review or full third-party implementation review.
 
-Native assertion L1 for this subset, observed vanilla/patched runtime,
-paired mspatcha L2, formal cross review and full decoder validation remain
-open. Only summarized text results may be recorded from Windows.
+Observed vanilla/patched runtime, paired mspatcha L2, formal cross review and
+full decoder validation remain open. Only summarized text results may be
+recorded from Windows.
+
+## Native assertion L1 for the subset (2026-11-09)
+
+The maintainer's offline Windows 10 results for x86_64 and i686 both report
+SUMMARY checks=50 failures=0 pa19_decode_covered=0, with exit 0. These are the
+exact-body assertion executables prepared at c50734d, not the earlier MEASURE
+observations. Native assertion L1 therefore passes for the signature and
+normalization subset only. No raw logs or Windows binaries are committed.
+
+PA19 apply/decode and the large-old-file reference-window regression remain
+uncovered. This subset pass does not close the full-patch validation gate;
+the production marker stays missing, and patches/series is unchanged.

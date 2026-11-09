@@ -128,11 +128,22 @@ adds an original Wine signature.c test with all five native-derived cases.
 The production implementation diff is retained unchanged. Its entire test
 helper/function block is checked against the standalone source by
 scripts/build-l1-mspatcha-signature.sh. Expected successful native execution
-is 50 checks, zero failures and exit 0 on each architecture; that assertion
-run is still pending. The summary explicitly prints pa19_decode_covered=0.
+is 50 checks, zero failures and exit 0 on each architecture; the returned
+assertion results are below. The summary prints pa19_decode_covered=0.
 
 This makes the independently measured API subset reviewable without
 pretending it covers the decoder or solves the original large-reference
 fixture gap. No full-patch L1, l3-only exception or production marker upgrade
 is claimed. The native test requires only our generated buffers, not PA19
 data, Microsoft tools, vendor files or an application.
+
+## Native signature-subset assertion L1 (2026-11-09)
+
+The returned exact-body x86_64/i686 assertion results both report 50 checks,
+zero failures, pa19_decode_covered=0 and exit 0 (candidate/harness sources at
+c50734d, offline Windows 10). All five generated-input cases pass on both
+architectures. This is assertion L1 for that API subset, not just MEASURE.
+It does not establish PA19 apply/decode or reference-window correctness.
+Full-patch validation, paired Wine runtime and formal cross review remain
+open; the production marker and series are unchanged. Results are summarized
+without committing raw output or Windows files.

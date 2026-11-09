@@ -134,3 +134,10 @@ through scripts/build-l1-mspatcha-signature.sh before native assertion L1.
 Both strict standalone architectures and the full-series substituted DLL/test
 PE targets build, but runtime is pending. This does not close the original
 PA19 producer/decoder gap or grant full-patch L1; see the candidate's scope.
+
+The returned mspatcha signature assertion bundle passes all 50 checks on
+Windows 10 x86_64/i686, zero failures and exit 0 each (c50734d sources). Its
+summary retains pa19_decode_covered=0. The API subset has native L1; full
+decoder validation, candidate cross review and Wine runtime pairing remain
+open. Continue with the timezone entry; the stopped MSI UI fixture stays
+stopped and no production series entry is changed.
