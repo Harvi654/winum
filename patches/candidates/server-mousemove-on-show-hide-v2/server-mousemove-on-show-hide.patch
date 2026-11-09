@@ -22,11 +22,9 @@ move landed inside the next message sequence of Wine's own tests, which
 pass on Windows (comctl32 button "expected WM_PAINT, got WM_MOUSEMOVE",
 user32 test_mouse_input), in about half of the L2 runs.
 
-diff --git a/server/queue.c b/server/queue.c
-index 2449f0c8..7c44b93b 100644
 --- a/server/queue.c
 +++ b/server/queue.c
-@@ -589,6 +589,50 @@ void update_cursor_pos( struct desktop *desktop )
+@@ -589,6 +589,51 @@
      set_cursor_pos( desktop, desktop_shm->cursor.x, desktop_shm->cursor.y );
  }
  
@@ -78,11 +76,9 @@ index 2449f0c8..7c44b93b 100644
  /* retrieve default position and time for synthesized messages */
  static void get_message_defaults( struct msg_queue *queue, int *x, int *y, unsigned int *time )
  {
-diff --git a/server/user.h b/server/user.h
-index f1a1f07d..5f043be7 100644
 --- a/server/user.h
 +++ b/server/user.h
-@@ -124,6 +124,7 @@ extern void detach_thread_input( struct msg_queue *queue_from, struct msg_queue
+@@ -124,6 +124,7 @@
  extern void set_clip_rectangle( struct desktop *desktop, const struct rectangle *rect,
                                  unsigned int flags, int reset );
  extern void update_cursor_pos( struct desktop *desktop );
@@ -90,11 +86,9 @@ index f1a1f07d..5f043be7 100644
  extern void post_message( user_handle_t win, unsigned int message,
                            lparam_t wparam, lparam_t lparam );
  extern void send_notify_message( user_handle_t win, unsigned int message,
-diff --git a/server/window.c b/server/window.c
-index 3cd82b0c..76bcf667 100644
 --- a/server/window.c
 +++ b/server/window.c
-@@ -2770,6 +2770,8 @@ DECL_HANDLER(set_window_pos)
+@@ -2770,6 +2770,8 @@
      if ((win->style & old_style & WS_VISIBLE) && (memcmp( &old_client, &win->client_rect, sizeof(old_client) )
          || memcmp( &old_window, &win->window_rect, sizeof(old_window) )))
          update_cursor_pos( win->desktop );
