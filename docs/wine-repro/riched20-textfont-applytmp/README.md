@@ -32,3 +32,31 @@ colour, `CFE_AUTOCOLOR`, bold).
 Local check (Wine 9.0, not an oracle): `Reset(tomApplyTmp)` is ignored, the
 changes go straight into the text, and `Reset(tomApplyNow)` writes the
 cached colour back over a newer one (`applytmp_stale`).
+
+## Windows observations (2026-11-09)
+
+Offline Windows 10 VM, `windows-2026-11-09/` (both architectures complete,
+`api_errors=0`, identical apart from `bits=`). The two classes differ:
+
+msftedit (`RICHEDIT50W`):
+- `Reset(tomApplyTmp)` returns S_OK (also on a detached duplicate).
+- The changes after it return S_OK (`SetUnderline(tomWave)` included) but
+  are invisible: the font's getters and `EM_GETCHARFORMAT` keep the old
+  values (red, bold, no underline).
+- `Reset(tomApplyNow)` afterwards writes nothing - also after
+  `Reset(tomApplyLater)` (`applytmp_later`) and with nothing set.
+- `applytmp_stale`: the font object tracks the text (purple after the
+  `EM_SETCHARFORMAT`), and the purple stays after `tomApplyNow`: no stale
+  write.
+
+riched20 (`RichEdit20W`):
+- `Reset(tomApplyTmp)` returns E_INVALIDARG (also detached); the changes
+  that follow apply at once, as without a Reset (blue, not bold, wave
+  underline in the text and in the getters); `tomApplyNow` changes nothing
+  further and writes no stale values.
+
+Both: `applylater_now` (`tomApplyLater`, changes, `tomApplyNow`, on a
+fresh font object) - the changes are neither visible nor written. This
+differs from what Wine does (it applies them) and is outside the patch;
+Wine's own `test_ITextFont` uses `tomApplyLater` after `tomCacheParms`,
+a different state.

@@ -1,0 +1,50 @@
+# riched20-textfont-applytmp v2: Windows-derived test, tomApplyLater fix
+
+Candidate only: `patches/series`, the production patch and its page marker
+are unchanged. Substitute `riched20-textfont-applytmp.patch` from this
+folder for the production file at its place in the series (entry 24).
+
+## What changed from v1
+
+- `TextFont_Reset(tomApplyLater)` no longer clears the temporary state. In
+  v1 the sequence tomApplyTmp, changes, tomApplyLater, tomApplyNow wrote
+  the temporary changes into the text; Windows (msftedit) writes nothing.
+- A Wine header, and the test `test_textfont_applytmp` in
+  `dlls/msftedit/tests/richole.c` (msftedit, where Windows supports
+  tomApplyTmp; riched20's RichEdit20W returns E_INVALIDARG on Windows).
+
+## Windows basis
+
+MEASURE `docs/wine-repro/riched20-textfont-applytmp/`, results
+`windows-2026-11-09/`. "abc def ghi" green, "def" red and bold, a font
+object of "def":
+
+| Sequence | Windows msftedit | vanilla Wine | v1 | v2 |
+| --- | --- | --- | --- | --- |
+| tomApplyTmp, set blue / not bold, tomApplyNow | S_OK; getters and text stay red, bold; nothing written | changes applied at once | as Windows | as Windows |
+| same, text made purple after the font was taken | purple stays | cached red written back | as Windows | as Windows |
+| tomApplyTmp, set, tomApplyLater, tomApplyNow | nothing written | applied | **written** | as Windows |
+| tomApplyTmp, tomApplyNow, nothing set | nothing changes | cached values written (same here) | as Windows | as Windows |
+
+`todo_wine` in the test, differences outside this patch: Wine's
+`SetUnderline` rejects `tomWave` (Windows S_OK; with the patch it would be
+dropped anyway), and `Reset(tomApplyTmp)` on a detached duplicate returns
+E_NOTIMPL (Windows S_OK).
+
+## Open points
+
+- RichEdit20W: Windows rejects tomApplyTmp (E_INVALIDARG) and applies the
+  changes; Wine follows msftedit for both classes, since riched20 does not
+  know which class created the editor (only riched32's 1.0 emulation is
+  distinguished). Inventor's text editor works with the msftedit behaviour
+  (L4 of v1).
+- Temporary formatting is not displayed (no spell-check underline).
+- tomApplyLater on a fresh font object: Windows neither shows nor writes
+  the changes, Wine applies them - not part of this patch.
+
+## Validation of v2
+
+- L0: the full series applies at `--fuzz=0` on Wine 11.20 with this file
+  (and the caret-rewrap v2 candidate) substituted, 62/62 (2026-11-09).
+- L1 of the new test, L2, L4 (Inventor: inserting a symbol, text colours,
+  spell check), cross review (Codex): pending.

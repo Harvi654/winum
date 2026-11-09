@@ -1,0 +1,137 @@
+MEASURE topic=riched20-textfont-applytmp schema=1 bits=64
+LEGEND per character: u<bUnderlineType>/c<crTextColor as BBGGRR>[a=CFE_AUTOCOLOR]/b<bold>
+DLL riched20
+SEQUENCE seq=applytmp_now
+FONT seq=applytmp_now when=taken underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+RESET seq=applytmp_now mode=applytmp hr=80070057
+SET seq=applytmp_now underline_hr=00000000 forecolor_hr=00000000 bold_hr=00000000
+FONT seq=applytmp_now when=set underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+TEXT seq=applytmp_now when=set 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u8/cff0000/b0 5:u8/cff0000/b0 6:u8/cff0000/b0 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+RESET seq=applytmp_now mode=applynow hr=00000000
+FONT seq=applytmp_now when=applynow underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+TEXT seq=applytmp_now when=applynow 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u8/cff0000/b0 5:u8/cff0000/b0 6:u8/cff0000/b0 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+FONT seq=applytmp_now when=fresh underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+SEQUENCE seq=applytmp_stale
+FONT seq=applytmp_stale when=taken underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+FONT seq=applytmp_stale when=text_changed underline=00000000:0 forecolor=00000000:00800080 bold=00000000:-1
+RESET seq=applytmp_stale mode=applytmp hr=80070057
+SET seq=applytmp_stale underline_hr=00000000 forecolor_hr=00000000 bold_hr=00000000
+FONT seq=applytmp_stale when=set underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+TEXT seq=applytmp_stale when=set 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u8/cff0000/b0 5:u8/cff0000/b0 6:u8/cff0000/b0 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+RESET seq=applytmp_stale mode=applynow hr=00000000
+FONT seq=applytmp_stale when=applynow underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+TEXT seq=applytmp_stale when=applynow 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u8/cff0000/b0 5:u8/cff0000/b0 6:u8/cff0000/b0 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+FONT seq=applytmp_stale when=fresh underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+SEQUENCE seq=applytmp_only
+FONT seq=applytmp_only when=taken underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+RESET seq=applytmp_only mode=applytmp hr=80070057
+SET seq=applytmp_only underline_hr=00000000 forecolor_hr=00000000 bold_hr=00000000
+FONT seq=applytmp_only when=set underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+TEXT seq=applytmp_only when=set 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u8/cff0000/b0 5:u8/cff0000/b0 6:u8/cff0000/b0 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+FONT seq=applytmp_only when=fresh underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+SEQUENCE seq=applytmp_empty
+FONT seq=applytmp_empty when=taken underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+RESET seq=applytmp_empty mode=applytmp hr=80070057
+RESET seq=applytmp_empty mode=applynow hr=00000000
+FONT seq=applytmp_empty when=applynow underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+TEXT seq=applytmp_empty when=applynow 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u0/c0000ff/b1 5:u0/c0000ff/b1 6:u0/c0000ff/b1 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+FONT seq=applytmp_empty when=fresh underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+SEQUENCE seq=applytmp_later
+FONT seq=applytmp_later when=taken underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+RESET seq=applytmp_later mode=applytmp hr=80070057
+SET seq=applytmp_later underline_hr=00000000 forecolor_hr=00000000 bold_hr=00000000
+FONT seq=applytmp_later when=set underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+TEXT seq=applytmp_later when=set 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u8/cff0000/b0 5:u8/cff0000/b0 6:u8/cff0000/b0 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+RESET seq=applytmp_later mode=applylater hr=00000000
+FONT seq=applytmp_later when=applylater underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+TEXT seq=applytmp_later when=applylater 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u8/cff0000/b0 5:u8/cff0000/b0 6:u8/cff0000/b0 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+RESET seq=applytmp_later mode=applynow hr=00000000
+FONT seq=applytmp_later when=applynow underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+TEXT seq=applytmp_later when=applynow 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u8/cff0000/b0 5:u8/cff0000/b0 6:u8/cff0000/b0 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+FONT seq=applytmp_later when=fresh underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+SEQUENCE seq=applylater_now
+FONT seq=applylater_now when=taken underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+RESET seq=applylater_now mode=applylater hr=00000000
+SET seq=applylater_now underline_hr=00000000 forecolor_hr=00000000 bold_hr=00000000
+FONT seq=applylater_now when=set underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+TEXT seq=applylater_now when=set 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u0/c0000ff/b1 5:u0/c0000ff/b1 6:u0/c0000ff/b1 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+RESET seq=applylater_now mode=applynow hr=00000000
+FONT seq=applylater_now when=applynow underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+TEXT seq=applylater_now when=applynow 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u0/c0000ff/b1 5:u0/c0000ff/b1 6:u0/c0000ff/b1 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+FONT seq=applylater_now when=fresh underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+SEQUENCE seq=direct
+FONT seq=direct when=taken underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+SET seq=direct underline_hr=00000000 forecolor_hr=00000000 bold_hr=00000000
+FONT seq=direct when=set underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+TEXT seq=direct when=set 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u8/cff0000/b0 5:u8/cff0000/b0 6:u8/cff0000/b0 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+FONT seq=direct when=fresh underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+RESET seq=detached mode=applytmp hr=80070057
+RESET seq=detached mode=applynow hr=00000000
+DLL msftedit
+SEQUENCE seq=applytmp_now
+FONT seq=applytmp_now when=taken underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+RESET seq=applytmp_now mode=applytmp hr=00000000
+SET seq=applytmp_now underline_hr=00000000 forecolor_hr=00000000 bold_hr=00000000
+FONT seq=applytmp_now when=set underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+TEXT seq=applytmp_now when=set 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u0/c0000ff/b1 5:u0/c0000ff/b1 6:u0/c0000ff/b1 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+RESET seq=applytmp_now mode=applynow hr=00000000
+FONT seq=applytmp_now when=applynow underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+TEXT seq=applytmp_now when=applynow 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u0/c0000ff/b1 5:u0/c0000ff/b1 6:u0/c0000ff/b1 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+FONT seq=applytmp_now when=fresh underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+SEQUENCE seq=applytmp_stale
+FONT seq=applytmp_stale when=taken underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+FONT seq=applytmp_stale when=text_changed underline=00000000:0 forecolor=00000000:00800080 bold=00000000:-1
+RESET seq=applytmp_stale mode=applytmp hr=00000000
+SET seq=applytmp_stale underline_hr=00000000 forecolor_hr=00000000 bold_hr=00000000
+FONT seq=applytmp_stale when=set underline=00000000:0 forecolor=00000000:00800080 bold=00000000:-1
+TEXT seq=applytmp_stale when=set 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u0/c800080/b1 5:u0/c800080/b1 6:u0/c800080/b1 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+RESET seq=applytmp_stale mode=applynow hr=00000000
+FONT seq=applytmp_stale when=applynow underline=00000000:0 forecolor=00000000:00800080 bold=00000000:-1
+TEXT seq=applytmp_stale when=applynow 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u0/c800080/b1 5:u0/c800080/b1 6:u0/c800080/b1 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+FONT seq=applytmp_stale when=fresh underline=00000000:0 forecolor=00000000:00800080 bold=00000000:-1
+SEQUENCE seq=applytmp_only
+FONT seq=applytmp_only when=taken underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+RESET seq=applytmp_only mode=applytmp hr=00000000
+SET seq=applytmp_only underline_hr=00000000 forecolor_hr=00000000 bold_hr=00000000
+FONT seq=applytmp_only when=set underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+TEXT seq=applytmp_only when=set 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u0/c0000ff/b1 5:u0/c0000ff/b1 6:u0/c0000ff/b1 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+FONT seq=applytmp_only when=fresh underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+SEQUENCE seq=applytmp_empty
+FONT seq=applytmp_empty when=taken underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+RESET seq=applytmp_empty mode=applytmp hr=00000000
+RESET seq=applytmp_empty mode=applynow hr=00000000
+FONT seq=applytmp_empty when=applynow underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+TEXT seq=applytmp_empty when=applynow 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u0/c0000ff/b1 5:u0/c0000ff/b1 6:u0/c0000ff/b1 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+FONT seq=applytmp_empty when=fresh underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+SEQUENCE seq=applytmp_later
+FONT seq=applytmp_later when=taken underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+RESET seq=applytmp_later mode=applytmp hr=00000000
+SET seq=applytmp_later underline_hr=00000000 forecolor_hr=00000000 bold_hr=00000000
+FONT seq=applytmp_later when=set underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+TEXT seq=applytmp_later when=set 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u0/c0000ff/b1 5:u0/c0000ff/b1 6:u0/c0000ff/b1 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+RESET seq=applytmp_later mode=applylater hr=00000000
+FONT seq=applytmp_later when=applylater underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+TEXT seq=applytmp_later when=applylater 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u0/c0000ff/b1 5:u0/c0000ff/b1 6:u0/c0000ff/b1 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+RESET seq=applytmp_later mode=applynow hr=00000000
+FONT seq=applytmp_later when=applynow underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+TEXT seq=applytmp_later when=applynow 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u0/c0000ff/b1 5:u0/c0000ff/b1 6:u0/c0000ff/b1 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+FONT seq=applytmp_later when=fresh underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+SEQUENCE seq=applylater_now
+FONT seq=applylater_now when=taken underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+RESET seq=applylater_now mode=applylater hr=00000000
+SET seq=applylater_now underline_hr=00000000 forecolor_hr=00000000 bold_hr=00000000
+FONT seq=applylater_now when=set underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+TEXT seq=applylater_now when=set 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u0/c0000ff/b1 5:u0/c0000ff/b1 6:u0/c0000ff/b1 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+RESET seq=applylater_now mode=applynow hr=00000000
+FONT seq=applylater_now when=applynow underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+TEXT seq=applylater_now when=applynow 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u0/c0000ff/b1 5:u0/c0000ff/b1 6:u0/c0000ff/b1 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+FONT seq=applylater_now when=fresh underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+SEQUENCE seq=direct
+FONT seq=direct when=taken underline=00000000:0 forecolor=00000000:000000ff bold=00000000:-1
+SET seq=direct underline_hr=00000000 forecolor_hr=00000000 bold_hr=00000000
+FONT seq=direct when=set underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+TEXT seq=direct when=set 0:u0/c008000/b0 1:u0/c008000/b0 2:u0/c008000/b0 3:u0/c008000/b0 4:u8/cff0000/b0 5:u8/cff0000/b0 6:u8/cff0000/b0 7:u0/c008000/b0 8:u0/c008000/b0 9:u0/c008000/b0 10:u0/c008000/b0
+FONT seq=direct when=fresh underline=00000000:8 forecolor=00000000:00ff0000 bold=00000000:0
+RESET seq=detached mode=applytmp hr=00000000
+RESET seq=detached mode=applynow hr=00000000
+SUMMARY topic=riched20-textfont-applytmp api_errors=0 complete=1 expectations=none
