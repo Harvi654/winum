@@ -1,0 +1,3 @@
+# Batch 1 native observations (comctl32, riched20); one entry per patch.
+# The same entries are in docs/wine-repro/measure-bundle.list.
+toolbar-padding | docs/wine-repro/comctl32-toolbar-padding-height/measure.c | -Wextra -lgdi32 -static
