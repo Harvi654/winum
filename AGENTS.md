@@ -115,6 +115,14 @@ Their own AGENTS.md / HANDOFF.md cover the programs; this file covers Wine.
 - Not allowed: disassembly, debug symbols or source of Microsoft code,
   copying files out of Windows or the VM, looking inside vendor binaries
   beyond crash addresses.
+- Allowed: Microsoft's public documentation (learn.microsoft.com), to
+  understand an API, its parameters, structures, constants and error
+  codes, to choose what to measure, and to link from a Wine bug report.
+  It is never the source of a test's expected values: where it and a
+  measurement disagree, the measurement wins (it was wrong or silent
+  for parseError, SCF_WORD and the RichEdit classes, and res: zones).
+  Its text is not copied into code, comments or patches; describe it in
+  our own words.
 - AI may have seen other projects' code (Mesa, ReactOS, ...): write
   original code and say so in the patch; for a larger patch ask a second
   model whether it resembles a known project.
