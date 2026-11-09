@@ -14,6 +14,7 @@ timezone-l1 | docs/wine-repro/wbemprox-timezone/l1.c | -Wextra -lwbemuuid -lole3
 http-same-seek | docs/wine-repro/wininet-http-same-position-seek/measure.c | -Wextra -lwininet -lws2_32 -static
 http-same-seek-l1 | docs/wine-repro/wininet-http-same-position-seek/l1.c | -Wextra -lwininet -lws2_32 -static
 folder-selection | docs/wine-repro/shell32-folderview-selection/measure.c | -Wextra -lshell32 -lole32 -luuid -static
+folder-selection-l1 | docs/wine-repro/shell32-folderview-selection/l1.c | -Wextra -lshell32 -lole32 -luuid -static
 tdoffset-records | docs/wine-repro/typedesc-offsets/measure.c | -loleaut32 -lole32 -luuid -static
 tdoffset-records-l1 | docs/wine-repro/typedesc-offsets/l1.c | -loleaut32 -lole32 -luuid -static
 actctx-model | docs/wine-repro/ntdll-actctx-threadingmodel-case/measure.c | -static
