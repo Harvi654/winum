@@ -44,3 +44,29 @@ return both result-http-same-seek-*.txt and exitcodes.txt even on failure.
 If the loopback control cannot run, retain its failure rather than inferring
 a WinINet contract. Only text returns; raw logs will not be committed. Native
 assertion L1 and Wine runtime gates remain pending.
+
+## Windows observations (2026-11-09)
+
+Both architectures match apart from bitness, exit 0, api_errors=0; all 12
+cases finish and the server observes 12 requests. Every prefix matches and
+every final body has 16384 correct bytes, successful reads and EOF, including
+after rejected seek calls. Every individual case uses exactly one request.
+
+| Framing / mode | Seek position | Last error | Body preserved | Requests |
+| --- | --- | --- | --- | --- |
+| Content-Length, cached, FILE_CURRENT+0 | 17 | 0 | yes | 1 |
+| Content-Length, cached, FILE_BEGIN=17 | 17 | 0 | yes | 1 |
+| Content-Length, NO_CACHE_WRITE | INVALID_SET_FILE_POINTER | 12016 | yes | 1 |
+| Chunked, cached or NO_CACHE_WRITE, both tested origins | INVALID_SET_FILE_POINTER | 12016 | yes | 1 |
+| Close-delimited, cached or NO_CACHE_WRITE, both tested origins | INVALID_SET_FILE_POINTER | 12016 | yes | 1 |
+
+12016 is ERROR_INTERNET_INVALID_OPERATION. Each no-seek control also reads
+all original bytes with one request. The cached Content-Length cases are
+therefore a usable successful-no-op contract, and unsupported seek attempts
+must preserve subsequent body reading too. The measurements do not justify
+a broad claim that every HTTP framing allows same-position seeking. A future
+Wine test must distinguish the target cached-length case from independent
+chunked/close support differences, rather than marking a successful target
+as todo or treating unsupported native seeks as success. This is MEASURE,
+not native assertion L1. Production code/series/marker remain unchanged;
+raw logs are summarized rather than committed.
