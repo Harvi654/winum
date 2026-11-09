@@ -78,3 +78,47 @@ class control**. The proposed split answers the original design problem,
 but is not yet reliable as implemented. Retest the corrected pair on
 Windows and in paired riched20/msftedit L2; keep temporary-cycle follow-up
 and applicable Inventor validation separate.
+
+## Follow-up: v4 with SCF v5 (2026-11-09)
+
+Reviewed revision 4d5db1e after the SCF v5 follow-up. Read the full v4
+patch and README and its diff from v3, the existing test factory/release
+helpers, the range-validity/reset and font-construction paths, and the
+SCF producer's construction/initialization paths. Revisited the native
+per-class Reset rows on both architectures and the measurement's actual
+class creation. Unrelated TOM methods and suite contents were skimmed;
+no vendor implementation internals were read.
+
+- **P1 resolved by the explicit SCF v5 dependency.** The common editor
+  constructor now initializes msftedit to FALSE for every editor, including
+  windowless services. Only RichEdit50W window creation sets TRUE. V4's
+  README and patch header require that version; production SCF v1 still
+  does not supply the field. See the SCF review's v5 follow-up.
+- **P2 resolved.** The new local create_class_document helper calls
+  CreateWindowW with RichEdit20W for the direct-setter test, replacing the
+  ANSI suite factory without changing other tests' factories. It obtains
+  and releases the same IRichEditOle/ITextDocument ownership pair. The
+  additional same-process loop creates/destroys RichEdit50W then
+  RichEdit20W three times; its ordinary S_OK/E_INVALIDARG assertions match
+  both native applytmp_now Reset rows. The existing blue/not-bold checks
+  now exercise the actual measured W class, with no additional todo.
+- **P3 remains open**, as disclosed: later changes/second ApplyNow on one
+  font object await the temporary-cycle follow-up measurement. No output
+  for that sequence was supplied by this revision.
+
+The implementation hunks in dlls/riched20/richole.c and all msftedit test
+hunks are byte-identical to v3. The changed tests do not broaden the
+implementation, alter the existing narrow todos or replace Windows values.
+Both candidate patches apply with --fuzz=0 among all 62 production entries
+in a fresh pinned Wine 11.20 tree. The producer precedes its consumer at
+physical series lines 23/24 (logical patch positions 16/17). Both patch
+files match their production-position copies in test-run/batch1-4 at
+3e089b2, source for
+[L2 run 42698489281](https://github.com/Harvi654/winum/actions/runs/42698489281).
+
+Verdict: the former **P1/P2 are resolved** when textfont v4 is paired with
+SCF v5; no additional blocking issue was found in the revision. Exact
+revised native L1, the completed paired L2 and applicable Inventor smoke
+remain required. The author's local/forced-TRUE runs were not independently
+executed here; this source review claims no new runtime or full build pass.
+Production patches/series is unchanged.
