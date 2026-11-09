@@ -96,3 +96,45 @@ Wine test body; the successful MEASURE alone was not counted as L1. Raw
 uploaded logs are not committed. Formal cross review, vanilla/patched runtime
 comparison, paired L2 and consumer L4 remain open. The production patch still
 has no integrated test and is not promoted by this record.
+
+## candidates-4 failure analysis and test correction (2026-11-09)
+
+The maintainer reported four typelib.c:8953 size failures per architecture in
+Actions run 42594173229 on test-run/candidates-4: the referenced record has
+the correct kind and one field, but cbSizeInstance is zero. The test/patch
+copied onto that branch were read; no new runtime run is claimed here.
+
+This is an independent Wine writer gap exposed by an over-broad combined
+test assertion, not a defect in the three offset-reader changes. In public
+Wine 11.20, ICreateTypeLib2_fnCreateTypeInfo initializes TKIND_RECORD size
+to zero. AddVarDesc increments cVars and marks layout needed; LayOut handles
+member identifiers/vtables but does not compute a record's instance size.
+WMSFT_compile_typeinfo writes that unchanged cbSizeInstance to base->size,
+and MSFT_DoTypeInfo reads the stored size back. None of the candidate's
+offset hunks changes those paths. The Windows writer instead returns the
+measured size 4 for the same original I4 record.
+
+The corrected test keeps record kind/field count ordinary and separates
+only the Windows size-4 check into todo_wine. Every pointer/array boundary,
+tree, bounds, referenced record name and field-type assertion remains
+ordinary. The generated inputs and API sequence are unchanged. Native
+Windows treats the size check as ordinary too, including in the standalone
+wrapper. Expected size is still 4, never relaxed to Wine's zero.
+
+The header carries a dated v3 test-revision paragraph; the v2 directory is
+retained so existing candidate recipes still find the file. The three
+implementation hunks are unchanged. A complete revised native run should
+report 40095 checks, zero failures (four more checks after splitting the
+combined assertions). The previous 40091-check native L1 is historical
+evidence for the same expectations; exact revised-body L1 and paired Wine
+runtime must still be recorded. Wine is expected to report four size todos
+with no new ordinary failure, but a rerun is pending. Neither the production
+patch nor patches/series nor the candidates-4 branch is changed.
+
+Correction validation: both strict standalone MinGW builds and body parity
+pass. A fresh final 62-entry application passes --fuzz=0 and matches the
+compiled files. Complete oleaut32.dll and oleaut32_test.exe PE targets link
+for x86_64/i386 with the same focused configure flags documented above.
+Legacy mutable OLECHAR name buffers remove const-qualification warnings;
+their text and the fixture's API sequence are unchanged. No Wine runtime
+or revised exact-body native assertion pass is inferred from these builds.

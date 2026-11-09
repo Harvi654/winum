@@ -21,6 +21,8 @@ static void offsets_check(int condition, unsigned int line, const char *format, 
     va_start(args, format); vprintf(format, args); va_end(args);
 }
 #define ok(condition, ...) offsets_check(!!(condition), __LINE__, __VA_ARGS__)
+/* Native Windows: keep the Windows size expectation an ordinary assertion. */
+#define todo_wine
 #include "test-body.h"
 int main(void)
 {

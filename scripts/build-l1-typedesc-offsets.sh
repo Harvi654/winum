@@ -21,4 +21,4 @@ trap 'rm -f -- "$list"' EXIT
 printf '%s\n' 'tdoffset-records-l1 | docs/wine-repro/typedesc-offsets/l1.c | -loleaut32 -lole32 -luuid -static' > "$list"
 bash "$here/scripts/build-measure-bundle.sh" "$1" "$list"
 cp "$here/docs/wine-repro/typedesc-offsets/"{l1.c,test-body.h} "$here/LICENSE" "$1/"
-(cd "$1" && sha256sum ./*.exe ./*.c ./*.h LICENSE README.txt run-measure.bat > SHA256SUMS)
+(cd "$1" && sha256sum ./*.exe ./*.c ./*.h LICENSE README.txt run-measure.bat measure.manifest > SHA256SUMS)

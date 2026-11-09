@@ -119,3 +119,20 @@ report `SUMMARY checks=40091 failures=0`, no FAIL lines and exit 0. This is
 L1 of the same test body added to the v2 candidate. Cross review, Wine runtime
 comparison, paired L2 and CAD checks remain pending; the production series
 and its test marker are unchanged. Raw logs are not committed.
+
+## Wine size-zero failure and narrow assertion correction (2026-11-09)
+
+Run 42594173229 on candidates-4 was reported by the maintainer to fail the
+combined record metadata assertion four times per architecture because
+cbSizeInstance is zero. Source inspection identifies the writer: Wine's
+record constructor sets size zero, AddVarDesc/LayOut do not compute a record
+size, WMSFT_compile_typeinfo serializes that zero, and MSFT_DoTypeInfo copies
+the stored value. The descriptor-offset reader changes do not set this size.
+
+The fixture and all Windows values remain unchanged. Record kind/field
+count are now a separate ordinary assertion; only the Windows size-4 check
+is todo_wine for this independent writer gap. All offset/tree/bound/identity/
+field assertions stay ordinary. The native wrapper expands todo_wine to an
+ordinary assertion. A complete revised native run has 40095 checks; its
+exact-body L1 is pending even though the original 40091-check body passed.
+The candidate README records the reasoning and remaining runtime gates.

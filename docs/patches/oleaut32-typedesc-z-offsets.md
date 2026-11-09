@@ -54,3 +54,9 @@ Autodesk-Inventor-for-Linux [`docs/arch-hyprland.md`](https://github.com/Harvi65
   candidate. All three production implementation hunks are unchanged; both
   full-series recipes apply at fuzz 0 and focused oleaut32 DLL/test builds
   succeeded. No production patch or series change is made by this record.
+- 2026-11-09: Diagnosed candidates-4's size-zero failures as an independent
+  record-writer layout gap. The candidate now keeps kind/count and all
+  descriptor checks ordinary and marks only the native size-4 check todo_wine.
+  Reader implementation hunks and fixture/API inputs are unchanged. Revised
+  exact-body L1 and runtime pairing remain pending; the earlier native pass
+  applies to the original combined-assertion revision.
