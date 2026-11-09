@@ -122,7 +122,51 @@ bounded comparison (not proof of originality); its command-result and
 completion-status suggestions were applied before the final strict build.
 That advisory is not a native correctness result.
 
-Windows output is pending. Stop here for this patch: derive assertions
-only from that output, then prepare/review a candidate and paired Wine
-runtime checks. Production patch, page marker and `patches/series` stay
-unchanged.
+The MEASURE-only stage ended when the maintainer returned Windows output;
+the follow-up below records it and the candidate. Production patch, page
+marker and `patches/series` stay unchanged.
+
+## Returned Windows output and v2 assertion candidate (2026-11-09)
+
+`windows-2026-11-09/` contains the original structured results and exit
+codes from run 42659893206 after a full schema/privacy check. No user or
+machine names, paths or e-mails were found. Both architectures have 44
+complete scenarios, zero harness errors and exit 0; their content is
+identical apart from bits=32/64. The accompanying README and SHA256SUMS
+record provenance and exact files.
+
+The Wine assertion body copies 592 observed state checkpoints (2352 live
+thread snapshots) and 52 detach result/error records literally. The test
+does not derive its oracle from Wine or a model of input components.
+`patches/candidates/server-input-attachment-components-v2/` adds the unit
+`user32:attachment`, keeps the explicit component walk and preserves the
+old association when a child is moved to the desktop. The latter is
+required by the observation that SetParent(NULL) leaves A/B/C sharing
+input; v1 would newly clear B's active state even though vanilla already
+has its measured active A. Direct destruction differs on Windows and
+remains a narrow separate Wine todo for B, not for the surviving A/C pair.
+Self-detach's existing error-code difference is another narrow todo.
+
+All 62 series entries with v2 substituted applied using --fuzz=0 in a fresh
+pinned Wine 11.20 tree. The resulting changed files match the compiled
+tree byte for byte. A focused feature-disabled build linked wineserver
+and the full user32 test executable for x86_64 and i386. It is not a full
+graphical L0 or a Wine runtime pass. The standalone assertion body builds
+with -Wall -Wextra -Werror on both PE architectures; the native builder
+checks byte parity with the candidate and hashes its output.
+
+```bash
+export INPUT_L1="$HOME/.cache/winum-input-l1-$(date +%Y%m%d-%H%M%S)"
+cd "$HOME/winum"
+git pull
+bash scripts/build-l1-input-components.sh "$INPUT_L1"
+```
+
+Alternatively the main Build MEASURE bundle workflow accepts
+`docs/wine-repro/batch4-measure/l1.list` as its list input. The old
+build-batch4-measure.yml is unchanged. The assertion L1 has not run yet;
+the measurement's exit 0 is not an assertion pass. The test-run/batch4-1
+pair will install identical new test bytes in vanilla and series, while
+only the series side receives the implementation. Its server-neighbor
+coverage includes user32, win32u and gdi32. No maintainer desktop session
+was used by the cloud agent.

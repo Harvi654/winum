@@ -1,0 +1,2 @@
+# Exact native assertion body, after the batch 4 Windows MEASURE.
+input-components-l1 | docs/wine-repro/server-input-attachment-components/l1.c | -Wextra -luser32 -static

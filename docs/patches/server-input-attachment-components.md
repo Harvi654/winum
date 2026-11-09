@@ -18,7 +18,12 @@ Detaching one embedded window keeps the remaining input attachments connected; t
 
 ## Wine test
 
-None in the patch.
+None in production v1. The separate
+[`server-input-attachment-components-v2`](../../patches/candidates/server-input-attachment-components-v2/README.md)
+candidate adds user32:attachment from the maintainer's Windows measurements
+and limits implicit desktop reparenting to preserve already-compatible
+state. Exact assertion L1, paired L2 and formal cross review are pending;
+the production marker remains missing.
 
 ## Validation
 
