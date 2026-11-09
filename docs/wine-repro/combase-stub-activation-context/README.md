@@ -177,3 +177,20 @@ in the candidate Wine test. This confirms the assertions against Windows,
 not a conforming Wine implementation; the candidate remains BLOCKED while
 paired runtime comparison checks the production policy. Raw logs are not
 committed.
+
+
+## Paired Wine run launched (2026-11-09)
+
+[Actions run 42567082861](https://github.com/Harvi654/winum/actions/runs/42567082861)
+uses source commit 0ce44f0 and workflow Test COM stub capture (paired Wine).
+Both variants contain identical final assertions and all other production
+patches; only this capture implementation is omitted in without. The recipe
+checks passed locally, including a complete source comparison showing only
+the intended three implementation files differ. Six result-gate tests passed.
+
+The run was in progress when recorded; no runtime compatibility verdict is
+claimed. Resume by checking both matrix jobs and the compare report artifact.
+A red compare result may be the expected conformance finding; distinguish it
+from a failed build or incomplete test coverage before drawing conclusions.
+The candidate stays blocked pending actual paired results and review. No
+additional Windows VM run is needed for this stage.

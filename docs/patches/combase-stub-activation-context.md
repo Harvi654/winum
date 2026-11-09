@@ -37,7 +37,7 @@ native L1 passed, but production conformance has not been established.
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
 | L1 | v2 candidate: Windows 10 x86_64/i686, 291 checks each, 0 failures, exit 0 (2026-11-09). Production has no integrated test yet |
-| L2 | not recorded per patch |
+| L2 | Focused [paired Wine run 42567082861](https://github.com/Harvi654/winum/actions/runs/42567082861) launched on 2026-11-09; runtime verdict pending |
 | L3 | not recorded |
 | L4 | Stress Analysis mesh in Inventor 2026 (wine-11.20-2 onwards). (Inventor, maintainer) |
 | L5 | in Inventor's runtime since `wine-11.19-1` (2026-10-19); a week of use not formally recorded - maintainer to confirm |
