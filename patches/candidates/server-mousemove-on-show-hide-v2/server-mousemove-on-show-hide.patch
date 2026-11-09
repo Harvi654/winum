@@ -22,6 +22,11 @@ move landed inside the next message sequence of Wine's own tests, which
 pass on Windows (comctl32 button "expected WM_PAINT, got WM_MOUSEMOVE",
 user32 test_mouse_input), in about half of the L2 runs.
 
+v2 revised (2026-11-09, after cross review): the comment no longer says
+the move arrives after the messages the change itself causes; the
+measurement shows the delay and the coalescing, not the order of the
+other messages.
+
 --- a/server/queue.c
 +++ b/server/queue.c
 @@ -589,6 +589,51 @@
@@ -29,10 +34,10 @@ user32 test_mouse_input), in about half of the L2 runs.
  }
  
 +/* Windows sends the window under the cursor one mouse move after a window
-+ * is shown or hidden, a burst of changes giving one move, within one or two
-+ * timer ticks (15-32 ms measured); it arrives after the messages the change
-+ * itself causes (Inventor redraws its view after a sketch dimension edit
-+ * only then). */
++ * is shown, hidden, moved, created or destroyed, a burst of changes giving
++ * one move, within one or two timer ticks (15-32 ms measured). Inventor
++ * redraws its view after a sketch dimension edit only when that move
++ * arrives. */
 +static struct timeout_user *cursor_pos_timeout;
 +static struct desktop *cursor_pos_desktop;
 +

@@ -16,12 +16,19 @@ Wine returned E_NOTIMPL. SOLIDWORKS calls get_filepos after loadXML("")
 fails, and the E_NOTIMPL preceded its C++ exception.
 
 The change is limited to get_filepos: Wine does not record error positions
-(filepos stays 0, marked todo_wine), and the other getters returning S_OK
-without an error are left as they are.
+(filepos stays 0, marked todo_wine), and get_line and get_linepos, which
+still return S_OK without an error, are left as they are (get_errorCode
+and get_reason already return S_FALSE then).
 
 v2 (2026-11-08): v1 returned S_OK also without a parse error; its own
 test failed on Windows 10 (L1). Returns S_FALSE then, and the test covers
 the loadXML("") and malformed-XML cases measured on Windows.
+
+v2 revised (2026-11-09, after cross review): the new checks run on
+DOMDocument30 and DOMDocument60, the classes measured, with a new
+document for every load as in the measurement, and cover all measured
+states: new document, loadXML(""), "<a><b></a>" (8), an error on the
+third line (12) and a successful load; NULL is checked in each state.
 
 --- a/dlls/msxml3/parseerror.c
 +++ b/dlls/msxml3/parseerror.c
@@ -41,17 +48,123 @@ the loadXML("") and malformed-XML cases measured on Windows.
  static HRESULT WINAPI parseError_get_errorXPath(
 --- a/dlls/msxml3/tests/domdoc.c
 +++ b/dlls/msxml3/tests/domdoc.c
-@@ -12939,7 +12939,9 @@
+@@ -6652,6 +6652,9 @@
+ 
+     IXMLDOMElement_Release(root);
+     IXMLDOMDocument_Release(doc);
++
++    test_parseerror_filepos(&CLSID_DOMDocument30, "DOMDocument30");
++    test_parseerror_filepos(&CLSID_DOMDocument60, "DOMDocument60");
+     free_bstrs();
+ }
+ 
+@@ -6788,7 +6791,7 @@
+     IStream_Release(stream);
+ 
+     /* loaded data without xml declaration */
+-    hr = IXMLDOMDocument_loadXML(doc, _bstr_("<a/>"), &b);
++    hr = IXMLDOMDocument_loadXML(doc, _bstr_("<a><b/></a>"), &b);
+     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+ 
+     hr = CreateStreamOnHGlobal(NULL, TRUE, &stream);
+@@ -9723,7 +9726,7 @@
+ 
+     IXMLDOMElement_Release(elem);
+ 
+-    hr = IXMLDOMDocument_loadXML(doc, _bstr_("<a/>"), &b);
++    hr = IXMLDOMDocument_loadXML(doc, _bstr_("<a><b/></a>"), &b);
+     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+ 
+     hr = IXMLDOMDocument_get_documentElement(doc, &elem);
+@@ -12935,11 +12938,87 @@
+     free_bstrs();
+ }
+ 
++static void check_filepos_(unsigned line, IXMLDOMDocument *doc, HRESULT expect_hr, LONG expect, BOOL todo)
++{
++    IXMLDOMParseError *error;
++    LONG filepos;
++    HRESULT hr;
++
++    hr = IXMLDOMDocument_get_parseError(doc, &error);
++    ok_(__FILE__, line)(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++    if (FAILED(hr)) return;
++
++    filepos = -1;
++    hr = IXMLDOMParseError_get_filepos(error, &filepos);
++    ok_(__FILE__, line)(hr == expect_hr, "Unexpected hr %#lx.\n", hr);
++    todo_wine_if(todo)
++    ok_(__FILE__, line)(filepos == expect, "Unexpected file position %ld.\n", filepos);
++
++    hr = IXMLDOMParseError_get_filepos(error, NULL);
++    ok_(__FILE__, line)(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
++
++    IXMLDOMParseError_Release(error);
++}
++#define check_filepos(doc, hr, pos, todo) check_filepos_(__LINE__, doc, hr, pos, todo)
++
++/* Values measured on Windows 10, msxml3 and msxml6 alike, x86_64 and i686
++ * (winum docs/wine-repro/msxml3-parseerror-filepos/windows-2026-11-08). */
++static void test_parseerror_filepos(const GUID *clsid, const char *name)
++{
++    /* a new document for every load, as in the measurement */
++    static const struct
++    {
++        const char *xml;
++        HRESULT hr;
++        LONG filepos;
++        BOOL todo;
++    } loads[] =
++    {
++        { "", S_OK, 0 },
++        /* the position is the offset of the offending character */
++        { "<a><b></a>", S_OK, 8, TRUE },
++        { "<a>\n  <b>\n</a>", S_OK, 12, TRUE },
++        /* no error after a successful load */
++        { "<a><b/></a>", S_FALSE, 0 },
++    };
++    IXMLDOMDocument *doc;
++    VARIANT_BOOL b;
++    unsigned int i;
++    HRESULT hr;
++
++    if (!is_clsid_supported(clsid, &IID_IXMLDOMDocument))
++    {
++        win_skip("%s is not supported.\n", name);
++        return;
++    }
++    winetest_push_context("%s", name);
++
++    doc = _create_object(clsid, name, &IID_IXMLDOMDocument, __LINE__);
++    check_filepos(doc, S_FALSE, 0, FALSE);
++    IXMLDOMDocument_Release(doc);
++
++    for (i = 0; i < ARRAY_SIZE(loads); i++)
++    {
++        winetest_push_context("%u", i);
++        doc = _create_object(clsid, name, &IID_IXMLDOMDocument, __LINE__);
++        b = loads[i].hr == S_OK ? VARIANT_TRUE : VARIANT_FALSE;
++        hr = IXMLDOMDocument_loadXML(doc, _bstr_(loads[i].xml), &b);
++        ok(hr == (loads[i].hr == S_OK ? S_FALSE : S_OK), "Unexpected hr %#lx.\n", hr);
++        ok(b == (loads[i].hr == S_OK ? VARIANT_FALSE : VARIANT_TRUE), "Unexpected result %d.\n", b);
++        check_filepos(doc, loads[i].hr, loads[i].filepos, loads[i].todo);
++        IXMLDOMDocument_Release(doc);
++        winetest_pop_context();
++    }
++
++    winetest_pop_context();
++}
++
+ static void test_parseerror(void)
  {
      IXMLDOMParseError *error;
      IXMLDOMDocument *doc;
-+    VARIANT_BOOL b;
      HRESULT hr;
 +    LONG filepos;
  
      doc = create_document(&IID_IXMLDOMDocument);
  
-@@ -12953,6 +12955,15 @@
+@@ -12953,6 +13032,15 @@
      todo_wine
      check_interface(error, &IID_IXMLDOMParseError2, FALSE);
  
@@ -67,37 +180,22 @@ the loadXML("") and malformed-XML cases measured on Windows.
      hr = IXMLDOMParseError_get_line(error, NULL);
      ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
  
-@@ -12963,7 +12974,33 @@
+@@ -12963,7 +13051,9 @@
      ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
  
      IXMLDOMParseError_Release(error);
-+
-+    /* loadXML("") fails with a parse error at position 0 */
-+    b = VARIANT_TRUE;
-+    hr = IXMLDOMDocument_loadXML(doc, _bstr_(""), &b);
-+    ok(hr == S_FALSE, "Unexpected hr %#lx.\n", hr);
-+    ok(b == VARIANT_FALSE, "Unexpected result %d.\n", b);
-+    hr = IXMLDOMDocument_get_parseError(doc, &error);
-+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-+    filepos = -1;
-+    hr = IXMLDOMParseError_get_filepos(error, &filepos);
-+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-+    ok(filepos == 0, "Unexpected file position %ld.\n", filepos);
-+    IXMLDOMParseError_Release(error);
-+
-+    /* the position is the offset of the offending character */
-+    hr = IXMLDOMDocument_loadXML(doc, _bstr_("<a><b></a>"), &b);
-+    ok(hr == S_FALSE, "Unexpected hr %#lx.\n", hr);
-+    hr = IXMLDOMDocument_get_parseError(doc, &error);
-+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-+    filepos = -1;
-+    hr = IXMLDOMParseError_get_filepos(error, &filepos);
-+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-+    todo_wine ok(filepos == 8, "Unexpected file position %ld.\n", filepos);
-+    IXMLDOMParseError_Release(error);
 +
      IXMLDOMDocument_Release(doc);
 +    free_bstrs();
  }
  
  static void test_getAttributeNode(void)
+@@ -17803,7 +17893,7 @@
+     hr = IXMLDOMDocument2_loadXML(doc, _bstr_(szEmailXML), NULL);
+     ok(hr == S_FALSE, "Unexpected hr %#lx.\n", hr);
+ 
+-    hr = IXMLDOMDocument2_loadXML(doc, _bstr_("<a/>"), NULL);
++    hr = IXMLDOMDocument2_loadXML(doc, _bstr_("<a><b/></a>"), NULL);
+     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+ 
+     hr = IXMLDOMDocument2_cloneNode(doc, VARIANT_FALSE, &node);
