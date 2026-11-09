@@ -1,7 +1,8 @@
 # NdrStubCall3: NDR32 Windows MEASURE
 
-Original fixture, AI-assisted (Codex), LGPL-2.1-or-later. Native results are
-unknown. This prepares a functional oracle for rpcrt4-ndrstubcall3.patch;
+Original fixture, AI-assisted (Codex), LGPL-2.1-or-later. Initial native results are
+recorded below; the control faults, so no functional oracle is established.
+This prepares a functional oracle for rpcrt4-ndrstubcall3.patch;
 it is not an export-only conformance test or an L1 pass. Production patches,
 their markers and patches/series are unchanged.
 
@@ -97,3 +98,33 @@ watchdog was added. This is an advisory and limited resemblance check, not
 proof of originality, formal cross review or native execution. All four
 EXEs compile strictly and bundle hashes verify. Expected native values and
 any subsequent Wine conformance test remain pending Windows output.
+
+
+## Initial Windows results (2026-11-09): fixture blocked
+
+The maintainer ran the runtime bundle in offline Windows 10 and returned
+all four text outputs and exit codes. No vendor files or native internals
+were inspected. The observations are:
+
+| Mode | Architecture | Export | Last completed observation | Exit |
+| --- | --- | --- | --- | --- |
+| NdrStubCall2 control | x86_64 | present | DISPATCH, before_phase=0 | -1073741819 (0xc0000005) |
+| NdrStubCall2 control | i686 | present | DISPATCH, before_phase=0 | -1073741819 (0xc0000005) |
+| NdrStubCall3 probe | x86_64 | present | DISPATCH, before_phase=0 | -1073741819 (0xc0000005) |
+| NdrStubCall3 probe | i686 | absent | Complete availability-only SUMMARY | 0 |
+
+All three dispatching processes first reported S_OK for CoInitializeEx,
+NdrDllGetClassObject, CreateStub, CreateProxy and Connect. Their own channel
+reported method=3, bytes=4, representation=00000010. None reached SERVER,
+DISPATCH_DONE, CALL, CLEANUP or SUMMARY. The access violation is therefore
+inside the invocation interval, but its precise source is not established
+by this output. It is not evidence that a valid native NdrStubCall3 call
+should fault: the ordinary control fails too.
+
+The i686 absence is an availability observation only, consistent with this
+patch's win64 export scope; it is not functional coverage or an L1 pass.
+The control must be corrected and remeasured before writing conformance
+assertions from this fixture. No arbitrary exception value is turned into
+an expected result, no export-only test substitutes for dispatch, and no
+L3-only classification is claimed. The production patch, page marker and
+series remain unchanged. Raw outputs are summarized rather than committed.
