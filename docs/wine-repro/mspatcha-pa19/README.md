@@ -66,3 +66,43 @@ The broad third-party normalization/decoder port was inspected in relevant
 sections, not audited line by line as a cross review. No native internals or
 proprietary binary contents were inspected. Raw measurement logs will not
 be committed.
+
+## Returned x86_64 observations and incomplete i686 output (2026-11-09)
+
+The supplied x86_64 output completes all five cases with api_errors=0 and
+exit 0. Both exports are available. Every successful call retains the
+last-error sentinel 0xdeadbeef. Signature results are terminated hex strings:
+
+| Case / flags | Signature | Signature changed bytes | Normalize result / changed bytes |
+| --- | --- | ---: | --- |
+| raw-small / 0 | 6fea9368 | 0 | 1 / 0 |
+| raw-small / SIGNATURE_MD5 | d4883a545d61557ce12ff4e95350e997 | 0 | 1 / 0 |
+| raw-large / 0 | af841acf | 0 | 1 / 0 |
+| pe32 / 0 | 864575c5 | 6 | 1 / 0 |
+| pe32 / 00e50000 | e2fe48a8 | 0 | 1 / 0 |
+
+Do not equate standalone normalization with the normalization performed by
+signature generation: this fixture's PE32 signature call changed six bytes,
+while the independent Normalize call did not. Fresh input copies separate
+these observations. The buffer sizes, synthetic PE and flags are defined in
+measure.c; none of these values establish PA19 decoding or window-reference
+correctness.
+
+The batch records i686 exit 0, but no i686 text was supplied; the screenshot
+shows a zero-length output and Program Compatibility Assistant for that
+EXE. There is no MEASURE header or completed i686 observation to accept.
+A successful process exit or the assistant's installed-correctly response
+does not replace API output. The response does not enable compatibility
+mode, and already written text results remain usable. The precise cause of
+missing i686 stdout has not been established.
+
+The bundle builder now embeds an original asInvoker/Windows-10 manifest
+in both architectures of our measurement EXEs. This declares execution
+level and supported OS explicitly rather than relying on installer-name
+heuristics. It is metadata for our own EXEs; no runtime code or native API
+expectation is changed by it. Both resource tables and the embedded XML were
+checked in the built own binaries. Use a fresh VM folder for a targeted
+repeat of this entry; return both architectures so any manifest-dependent
+observation is visible. If i686 remains empty, preserve its exit code and
+last visible launch state rather than retrying with compatibility settings.
+Native assertion L1 and the full decoder gate remain open.
