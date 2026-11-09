@@ -67,24 +67,6 @@ NULL string is left as it was (not measured).
  static HRESULT WINAPI parseError_get_errorXPath(
 --- a/dlls/msxml3/tests/domdoc.c
 +++ b/dlls/msxml3/tests/domdoc.c
-@@ -6788,7 +6788,7 @@
-     IStream_Release(stream);
- 
-     /* loaded data without xml declaration */
--    hr = IXMLDOMDocument_loadXML(doc, _bstr_("<a/>"), &b);
-+    hr = IXMLDOMDocument_loadXML(doc, _bstr_("<a><b/></a>"), &b);
-     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
- 
-     hr = CreateStreamOnHGlobal(NULL, TRUE, &stream);
-@@ -9723,7 +9723,7 @@
- 
-     IXMLDOMElement_Release(elem);
- 
--    hr = IXMLDOMDocument_loadXML(doc, _bstr_("<a/>"), &b);
-+    hr = IXMLDOMDocument_loadXML(doc, _bstr_("<a><b/></a>"), &b);
-     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
- 
-     hr = IXMLDOMDocument_get_documentElement(doc, &elem);
 @@ -12935,11 +12935,87 @@
      free_bstrs();
  }
@@ -201,12 +183,3 @@ NULL string is left as it was (not measured).
  }
  
  static void test_getAttributeNode(void)
-@@ -17803,7 +17892,7 @@
-     hr = IXMLDOMDocument2_loadXML(doc, _bstr_(szEmailXML), NULL);
-     ok(hr == S_FALSE, "Unexpected hr %#lx.\n", hr);
- 
--    hr = IXMLDOMDocument2_loadXML(doc, _bstr_("<a/>"), NULL);
-+    hr = IXMLDOMDocument2_loadXML(doc, _bstr_("<a><b/></a>"), NULL);
-     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
- 
-     hr = IXMLDOMDocument2_cloneNode(doc, VARIANT_FALSE, &node);
