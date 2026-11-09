@@ -61,7 +61,8 @@ Both exits must be 0, with a completed `SUMMARY checks=... failures=0` and no
 FAIL lines. The standalone harness treats all todo_wine assertions as ordinary
 assertions, as required on Windows. The integrated Wine test uses Wine's own
 todo handling. Do not use the native harness to score a Wine runtime comparison.
-The earlier MEASURE supplies the oracle; native assertion L1 is still pending.
+The earlier MEASURE supplies the oracle; the native assertion L1 pass is
+recorded below.
 
 actctx-model-l1 is also in the main VM bundle list and the topic's l1.list.
 The generic builder does not perform candidate/body parity checking itself;
@@ -72,7 +73,7 @@ or use the dedicated builder before accepting new L1 evidence.
 
 - Complete native MEASURE: both architectures, exit 0, 2026-11-09.
 - Native assertion EXEs compiled for both architectures with -Wextra -Werror;
-  dedicated bundle checksums verified. Native assertion execution pending.
+  dedicated bundle checksums verified. Native assertion results are below.
 - All 62 patches apply with `--fuzz=0` when this replaces the production
   entry. The resulting ntdll/actctx.c is byte-identical to production.
 - Both ntdll DLLs and complete ntdll_test.exe targets linked (x86_64/i386),
@@ -97,3 +98,14 @@ cannot prove originality and does not replace Claude's formal cross review.
 One failure-path limit remains: an unexpected CloseHandle failure can retain
 a file handle until process exit; both close and subsequent cleanup failures
 are reported as failed assertions, never a pass.
+
+
+## Windows assertion L1 (2026-11-09)
+
+The maintainer ran the dedicated bundle in offline Windows 10. Both x86_64
+and i686 completed **609 checks, 0 failures**, no FAIL lines, and exit 0.
+All todo_wine assertions ran as ordinary native assertions. This establishes
+L1 for the same test body included in the v2 candidate, not just its preceding
+MEASURE. Raw uploaded logs are not committed. Formal cross review,
+vanilla/patched runtime comparison, paired L2 and consumer L4 remain open;
+the production patch still has no integrated test and is unchanged.

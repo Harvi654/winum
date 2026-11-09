@@ -74,7 +74,8 @@ there is no ntdll/tests/actctx.c in Wine 11.20. The v2 candidate adds
 an isolated ntdll test for this parser, using the same public API path. It
 checks the changed case-folding behaviour and retains unaffected controls,
 with independent discrepancies marked todo_wine. Its standalone native L1
-EXEs are compiled for both architectures; native assertion execution is pending. Full-series application and focused Wine build checks are recorded in the
+EXEs are compiled for both architectures; the native assertion results are
+recorded below. Full-series application and focused Wine build checks are recorded in the
 candidate README. Formal cross review and paired runtime checks remain open. The remaining batch-2 patches are separate work.
 
 
@@ -124,7 +125,16 @@ bash scripts/build-l1-actctx-model.sh /path/to/NEW-output
 
 Run run-measure.bat from the resulting directory in the offline Windows 10 VM
 and return result-actctx-model-l1-x86_64.txt,
-result-actctx-model-l1-i686.txt and exitcodes.txt. A complete zero-failure run
-with both exits 0 is the next L1 gate. The successful MEASURE alone does not
+result-actctx-model-l1-i686.txt and exitcodes.txt. The native assertion results below record the L1 gate. The successful MEASURE alone does not
 establish native execution of these new assertions. The main bundle also
 contains actctx-model-l1; l1.list can build just that entry.
+
+
+## Windows assertion L1 (2026-11-09)
+
+Both offline Windows 10 runs (x86_64/i686) report
+`SUMMARY checks=609 failures=0`, no FAIL lines, and exit 0. These are the
+shared Wine test assertions, including the rejection and omitted-model
+controls that are todos only under Wine. Raw logs are not committed. The
+production series and test marker are unchanged pending candidate review
+and Wine runtime validation.
