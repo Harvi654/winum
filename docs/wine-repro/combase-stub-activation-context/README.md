@@ -194,3 +194,32 @@ A red compare result may be the expected conformance finding; distinguish it
 from a failed build or incomplete test coverage before drawing conclusions.
 The candidate stays blocked pending actual paired results and review. No
 additional Windows VM run is needed for this stage.
+
+## Paired Wine run finished (2026-11-09)
+
+Run 42567082861 finished with **Failure**, duration 1h 10m 34s, at source
+commit `0ce44f091511899d1a6d72e63f83e6e916941031`. The public run and job
+pages establish these results:
+
+| Job | Failed step | Exit |
+| --- | --- | ---: |
+| [without](https://github.com/Harvi654/winum/actions/runs/42567082861/job/128995824066) | Build both PE architectures and run the focused COM units | 2 |
+| [with](https://github.com/Harvi654/winum/actions/runs/42567082861/job/128995823737) | Build both PE architectures and run the focused COM units | 2 |
+| [compare](https://github.com/Harvi654/winum/actions/runs/42567082861/job/129017062426) | Compare identical test coverage and Windows conformance | 1 |
+
+All three artifacts were uploaded: `com-stub-actctx-l2-without`,
+`com-stub-actctx-l2-with`, and `com-stub-actctx-l2-report`. Their contents
+were not available to this review: GitHub requires sign-in for the job logs,
+and authenticated artifact/API access was unavailable in the environment.
+The public annotations do not identify the underlying failure.
+
+L2 is **not established**. In particular, this is not sufficient evidence of
+the expected conformance conflict or of a new patch regression. The runtime
+collector uses exit 2 for setup, missing coverage, timeout or unfinished
+results; complete assertion failures alone do not make its run command
+return 2. The combined build/run step annotation cannot identify which case
+occurred. Read the small report and both variants' `inputs.json` and
+`results.json` before choosing a correction or another runner invocation.
+If a result file is absent, retain that fact rather than interpreting the
+missing run as a passed control. No rerun was requested here. The candidate,
+production implementation, series and validation marker remain unchanged.
