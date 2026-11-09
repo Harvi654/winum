@@ -2,3 +2,4 @@
 # The same entries are in docs/wine-repro/measure-bundle.list.
 toolbar-padding | docs/wine-repro/comctl32-toolbar-padding-height/measure.c | -Wextra -lgdi32 -static
 header-null-layout | docs/wine-repro/comctl32-header-null-layout/measure.c | -Wextra -municode -static
+ownerdraw-capture | docs/wine-repro/comctl32-ownerdraw-existing-capture/measure.c | -Wextra -static

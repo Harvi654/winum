@@ -33,3 +33,4 @@ msi-null-stream-l1 | docs/wine-repro/msi-transform-null-stream/l1.c | -Wextra -l
 mspatcha-signature-l1 | docs/wine-repro/mspatcha-pa19/l1.c | -Wextra -static
 toolbar-padding | docs/wine-repro/comctl32-toolbar-padding-height/measure.c | -Wextra -lgdi32 -static
 header-null-layout | docs/wine-repro/comctl32-header-null-layout/measure.c | -Wextra -municode -static
+ownerdraw-capture | docs/wine-repro/comctl32-ownerdraw-existing-capture/measure.c | -Wextra -static
