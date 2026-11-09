@@ -1,0 +1,2 @@
+# Native assertion L1 for this topic; same entry as the main bundle.
+actctx-model-l1 | docs/wine-repro/ntdll-actctx-threadingmodel-case/l1.c | -Wextra -static

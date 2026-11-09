@@ -8,3 +8,4 @@ urlzones | docs/wine-repro/urlmon-zones/measure.c | -lurlmon -lole32
 tdoffset-records | docs/wine-repro/typedesc-offsets/measure.c | -loleaut32 -lole32 -luuid -static
 tdoffset-records-l1 | docs/wine-repro/typedesc-offsets/l1.c | -loleaut32 -lole32 -luuid -static
 actctx-model | docs/wine-repro/ntdll-actctx-threadingmodel-case/measure.c | -static
+actctx-model-l1 | docs/wine-repro/ntdll-actctx-threadingmodel-case/l1.c | -Wextra -static

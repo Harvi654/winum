@@ -1,8 +1,8 @@
 # Activation-context COM threading model: Windows MEASURE
 
 Original, AI-assisted (Codex), LGPL-2.1-or-later. Text output only; native
-Windows values are not yet known. This measures the next batch-2 patch,
-`ntdll-actctx-threadingmodel-case.patch`, before adding conformance assertions.
+Windows values were returned on 2026-11-09. This measures the batch-2 patch,
+`ntdll-actctx-threadingmodel-case.patch`, and supplies the candidate conformance assertions.
 No production patch, series entry or test marker is changed.
 
 ## What is observed
@@ -39,8 +39,9 @@ file or arbitrary CLSID can be supplied.
 
 ## Build and offline Windows run
 
-Both architectures compile with MinGW GCC 14.2, -Wall -Wextra -Werror. This
-is compile validation, not execution on Windows or Wine. The main
+Both architectures compile with MinGW GCC 14.2, -Wall -Wextra -Werror.
+Compilation alone did not establish native execution; the completed Windows
+MEASURE is recorded below. The main
 `docs/wine-repro/measure-bundle.list` includes actctx-model; for this topic
 alone use its single-entry list:
 
@@ -69,17 +70,61 @@ has itself run on Windows.
 ## Test placement and remaining work
 
 The existing open Wine activation-context tests live in kernel32/tests/actctx.c;
-there is no ntdll/tests/actctx.c in Wine 11.20. After native observations, add
-an isolated ntdll test for this parser, using the same public API path. A new test
-must distinguish the changed parser from the case-sensitive vanilla result,
-keep unaffected controls, and be compiled for both architectures for native
-L1. Formal cross review, full-series application/build and paired runtime
-checks then remain necessary. The remaining batch-2 patches are separate work.
+there is no ntdll/tests/actctx.c in Wine 11.20. The v2 candidate adds
+an isolated ntdll test for this parser, using the same public API path. It
+checks the changed case-folding behaviour and retains unaffected controls,
+with independent discrepancies marked todo_wine. Its standalone native L1
+EXEs are compiled for both architectures; native assertion execution is pending. Full-series application and focused Wine build checks are recorded in the
+candidate README. Formal cross review and paired runtime checks remain open. The remaining batch-2 patches are separate work.
 
 
 A second-model read-only advisory checked the complete program against the
 open Wine parser and activation-context tests. Its suggested runtimeVersion
 control was added before native measurement. No other blocker or conspicuous
 copied block was identified; this does not prove originality or constitute
-formal cross review. Native execution and all expected model values remain
-pending.
+formal cross review. The complete native observations and assertion-test state are recorded below.
+
+
+## Complete Windows MEASURE (2026-11-09)
+
+Both architectures exited 0 and returned identical output apart from the bitness
+header: attempted=42, created=34, rejected=8, queried=34, query_failed=0,
+setup_errors=0, complete=1. All 42 CASE_END records completed. For each accepted
+manifest, FindActCtxSectionGuid succeeded and the copied prefix had format 1,
+record size 120 and flags 0. Reported data lengths were 120 for comClass and
+226 for clrClass; the test asserts a readable prefix, not that total length.
+
+| Attribute value | comClass | clrClass |
+| --- | --- | --- |
+| Apartment (title/lower/upper/mixed) | accepted, model 1 | accepted, model 1 |
+| Free (title/lower/upper/mixed) | accepted, model 2 | accepted, model 2 |
+| Both (title/lower/upper/mixed) | accepted, model 4 | accepted, model 4 |
+| Neutral (title/lower/upper/mixed) | accepted, model 5 | accepted, model 5 |
+| Omitted | accepted, model 3 | accepted, model 4 |
+| Empty | rejected, error 14001 | rejected, error 14001 |
+| WinumInvalid | rejected, error 14001 | rejected, error 14001 |
+| Leading/trailing space around Free | rejected, error 14001 | rejected, error 14001 |
+
+14001 is ERROR_SXS_CANT_GEN_ACTCTX. These eight rejections were observations,
+not failed setup. No COM server or CLR execution was needed. Raw uploaded
+logs are not committed.
+
+## Windows-derived assertion test
+
+The [v2 candidate](../../../patches/candidates/ntdll-actctx-threadingmodel-case-v2/README.md)
+keeps the production parser change and adds the isolated ntdll Wine test.
+The case-folding assertions use ordinary ok(); independent rejection/default
+differences use todo_wine. test-body.h is the exact integrated test block.
+l1.c supplies a native-only reporter which treats all assertions, including
+todos, as ordinary checks. It is not a substitute for Wine's runtime harness.
+
+```sh
+bash scripts/build-l1-actctx-model.sh /path/to/NEW-output
+```
+
+Run run-measure.bat from the resulting directory in the offline Windows 10 VM
+and return result-actctx-model-l1-x86_64.txt,
+result-actctx-model-l1-i686.txt and exitcodes.txt. A complete zero-failure run
+with both exits 0 is the next L1 gate. The successful MEASURE alone does not
+establish native execution of these new assertions. The main bundle also
+contains actctx-model-l1; l1.list can build just that entry.
