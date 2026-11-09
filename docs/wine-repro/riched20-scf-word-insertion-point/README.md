@@ -25,3 +25,56 @@ Measured, `RichEdit20W` and `RICHEDIT50W`:
 
 Local check (Wine 9.0, not an oracle): at the point right after "gaj"
 (point 6) `SCF_SELECTION | SCF_WORD` reformats "gaj" - the reported bug.
+
+## Windows observations (2026-11-09)
+
+Offline Windows 10 VM, `windows-2026-11-09/` (both architectures complete,
+`api_errors=0`, identical apart from `bits=`). riched20 and msftedit agree
+on the points below.
+
+Text 0 `ab cd  e_f1 g.h i'j k-l`, all in one format, bold with
+`SCF_SELECTION | SCF_WORD` at an empty insertion point (`|` = the point):
+
+| Point | Windows formats | Patch v1 formats a word (word character on both sides) |
+| --- | --- | --- |
+| `|ab` (0), `|cd`, `|e_f1`, `|g`, `|i`, `|k`, end | nothing | no |
+| `a|b`, `c|d` (inside) | `ab`, `cd` (no space) | yes (Wine's word range) |
+| `ab|␣` (end of word, before a space) | `ab ` | **no** |
+| `cd|␣␣`, `cd␣|␣` | `cd  ` | **no** |
+| `e|_f1`, `e_|f1` | nothing | **yes** |
+| `f|1` | `f1` | yes |
+| `f1|␣` | `f1 ` | **no** |
+| `g|.h`, `g.|h` | nothing | no |
+| `h|␣` | `h ` | **no** |
+| `i|'j` | `i'` | **no** |
+| `i'|j` | nothing | no |
+| `i'j|␣` | `i'j ` | **no** |
+| `k|-l`, `k-|l` | nothing | no |
+
+Bold rows: the patch's condition gives the other answer than Windows. The
+range Wine formats when the condition holds (Wine's word movement, with or
+without the trailing space) is still to be checked on Wine 11.20.
+
+The insertion point itself becomes bold in
+every case (`insert_bold=1`, the typed `X` is bold). `SCF_WORD` without
+`SCF_SELECTION` changes nothing and does not make the point bold.
+Selections format exactly the selection with either flag set.
+
+Inventor's sequence (`FACE`, "ab gaj cd" in Arial, "gaj" in Courier New,
+Times New Roman at the point):
+
+| Point | Windows `SCF_SELECTION|SCF_WORD` |
+| --- | --- |
+| `ab|␣gaj` (2, same format on both sides) | `ab ` |
+| `|gaj` (3) | nothing |
+| `g|aj`, `ga|j` (4, 5) | `gaj` (no space) |
+| `gaj|␣cd` (6, the format changes at the point) | nothing - Inventor's case |
+| `|cd` (7) | nothing |
+
+So Windows' rule is not the patch's "a word character on both sides":
+the end of a word before a space is formatted in uniform text (point 2)
+but not where the format changes (point 6), inside a word only the word
+characters are taken, `_ . -` separate words while `'` joins `i'j` in one
+direction only. The patch gets Inventor's case right and the word starts,
+and differs elsewhere; at `ab|␣` vanilla Wine (9.0 local run) formatted
+`ab ` like Windows, the patch formats nothing. No single rule is derived from these 46 points yet.
