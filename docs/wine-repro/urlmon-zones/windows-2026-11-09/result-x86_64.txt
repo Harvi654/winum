@@ -1,0 +1,15 @@
+create hr=0x00000000
+url=res:///btn.xmx/icon.png map hr=0x00000000 zone=3 secur hr=0x00000000 secur=res:///btn.xmx/icon.png
+url=res:///%prodname%btn.xmx/RIBBON/icon.png map hr=0x80070057 zone=-1 secur hr=0x00000000 secur=res:///%prodname%btn.xmx/RIBBON/icon.png
+url=res://shell32.dll/#2/#130 map hr=0x00000000 zone=0 secur hr=0x00000000 secur=file://C:\Windows\SYSTEM32\shell32.dll
+url=res://notexisting.dll/x.png map hr=0x00000000 zone=3 secur hr=0x00000000 secur=res://notexisting.dll/x.png
+url=res: map hr=0x00000000 zone=-1 secur hr=0x00000000 secur=res:
+url=res:x map hr=0x00000000 zone=-1 secur hr=0x00000000 secur=res:x
+url=unknownscheme:abc map hr=0x00000000 zone=3 secur hr=0x00000000 secur=unknownscheme:abc
+url=unknownscheme://host/path map hr=0x00000000 zone=3 secur hr=0x00000000 secur=unknownscheme://host/path
+url=x map hr=0x80070057 zone=-1 secur hr=0x00000000 secur=x
+url=about:blank map hr=0x00000000 zone=3 secur hr=0x00000000 secur=about:blank
+url=file:///C:/Windows/notepad.exe map hr=0x00000000 zone=0 secur hr=0x00000000 secur=file:///C:/Windows/notepad.exe
+url=http://localhost/ map hr=0x00000000 zone=1 secur hr=0x00000000 secur=http://localhost/
+url=http://www.example.com/ map hr=0x00000000 zone=3 secur hr=0x00000000 secur=http://www.example.com/
+url= map hr=0x80070057 zone=-1 secur hr=0x00000000 secur=

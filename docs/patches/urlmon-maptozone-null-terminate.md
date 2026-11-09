@@ -34,6 +34,8 @@ None in the patch.
 
 ## Open points
 
+Windows values measured 2026-11-09 (`docs/wine-repro/urlmon-zones/`); test first in `patches/tests-first/urlmon-tests-res-zones.patch` (URLs `x`, `""`, `unknownscheme:` that reach the copy path in Wine).
+
 Wine test missing; added for AutoCAD, not Inventor.
 
 ## Evidence

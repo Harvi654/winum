@@ -34,6 +34,8 @@ None in the patch.
 
 ## Open points
 
+Measured 2026-11-09 (`docs/wine-repro/urlmon-zones/`): Windows puts a `res:///` URL without a module in zone 3 (Internet), not 0, and fails the literal `%prodname%` URL with E_INVALIDARG. The patch is to be corrected to the Windows value and checked again in AutoCAD; test first in `patches/tests-first/urlmon-tests-res-zones.patch`.
+
 Wine test missing; Windows zone for res: without a module not measured by our own program.
 
 ## Evidence
