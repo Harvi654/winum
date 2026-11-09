@@ -18,14 +18,19 @@ The typedesc table offsets of a VT_PTR/VT_SAFEARRAY pointee and a VT_CARRAY elem
 
 ## Wine test
 
-None in the patch.
+None in the production patch. The
+[v2 candidate](../../patches/candidates/oleaut32-typedesc-z-offsets-v2/README.md)
+adds a type library compatibility test comparing stored type descriptions
+with Windows. It constructs its own records and aliases using public APIs,
+checks actual offset boundary coverage and reloads a fresh-path copy. No
+vendor type library is used.
 
 ## Validation
 
 | Level | Result |
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
-| L1 | **no Wine test** - needs one, measured on Windows first |
+| L1 | v2 candidate: Windows 10 x86_64/i686, 40091 checks each, 0 failures, exit 0 (2026-11-09). Production has no integrated test yet |
 | L2 | not recorded per patch |
 | L3 | not recorded |
 | L4 | Design Accelerator Shaft works. (Inventor, maintainer) |
@@ -34,9 +39,18 @@ None in the patch.
 
 ## Open points
 
-Wine test missing (needs a synthetic type library with a large typedesc table).
+Candidate test passed native L1; formal cross review, vanilla/patched runtime
+comparison and paired L2 remain open before promotion. The production marker
+stays missing because its patch does not yet include that test.
 
 ## Evidence
 
 Autodesk-Inventor-for-Linux [`docs/arch-hyprland.md`](https://github.com/Harvi654/Autodesk-Inventor-for-Linux/blob/main/docs/arch-hyprland.md) (search for the patch name).
 
+
+## History
+
+- 2026-11-09: Recorded complete native MEASURE and assertion L1 for the v2
+  candidate. All three production implementation hunks are unchanged; both
+  full-series recipes apply at fuzz 0 and focused oleaut32 DLL/test builds
+  succeeded. No production patch or series change is made by this record.

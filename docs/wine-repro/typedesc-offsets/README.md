@@ -2,7 +2,7 @@
 
 Original, AI-assisted (Codex), LGPL-2.1-or-later. The original program is a MEASURE;
 the companion assertion test now uses its returned Windows values. Native
-assertion L1 remains pending. Only public APIs and a read-only
+assertion L1 passed on both architectures (2026-11-09). Only public APIs and a read-only
 audit of our own generated type library are used. No vendor binary, symbol,
 source, registry export or native implementation is inspected.
 
@@ -108,5 +108,14 @@ bash scripts/build-l1-typedesc-offsets.sh /path/to/NEW-output
 
 The generic bundle also builds `tdoffset-records-l1` for both architectures.
 Return its two result files and exitcodes.txt after run-measure.bat finishes
-in the offline Windows 10 VM. This is the assertion L1 still needed; the
-successful MEASURE is its oracle, not an assertion-test pass.
+in the offline Windows 10 VM. The successful MEASURE supplies the oracle; native assertion results are
+recorded below.
+
+
+## Windows assertion L1 (2026-11-09)
+
+The dedicated bundle completed on offline Windows 10: x86_64 and i686 each
+report `SUMMARY checks=40091 failures=0`, no FAIL lines and exit 0. This is
+L1 of the same test body added to the v2 candidate. Cross review, Wine runtime
+comparison, paired L2 and CAD checks remain pending; the production series
+and its test marker are unchanged. Raw logs are not committed.

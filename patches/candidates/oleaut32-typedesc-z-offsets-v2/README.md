@@ -58,7 +58,7 @@ as execution of these new assertions.
 
 - Native MEASURE: complete on Windows 10, both architectures, 2026-11-09.
 - Standalone L1 compile: MinGW GCC 14.2, `-Wall -Wextra -Werror`, both
-  architectures; Windows execution of the assertions pending.
+  architectures; native assertion results are recorded below.
 - All 62 patches apply with `--fuzz=0` when this replaces the z-offsets
   entry, both with production pointee v2 and the pointee-v3 candidate.
 - With production pointee v2 and this candidate, both oleaut32 DLL targets
@@ -85,3 +85,14 @@ cross review. One workflow limit remains: the generic bundle compiles l1.c
 without the dedicated builder's parity check. The bodies were checked equal
 for this revision; recheck parity before accepting evidence after any later
 candidate/body change, or use the dedicated builder.
+
+
+## Windows assertion L1 (2026-11-09)
+
+The maintainer ran the dedicated standalone bundle in offline Windows 10.
+Both x86_64 and i686 completed **40091 checks, 0 failures**, with exit 0
+and no FAIL lines. This establishes native L1 for this candidate's shared
+Wine test body; the successful MEASURE alone was not counted as L1. Raw
+uploaded logs are not committed. Formal cross review, vanilla/patched runtime
+comparison, paired L2 and consumer L4 remain open. The production patch still
+has no integrated test and is not promoted by this record.
