@@ -134,3 +134,31 @@ does not detect an independent external edit of registry label values while
 the WMI query runs; the program does not re-read those values afterward.
 Avoid such edits during measurement. Native source relationships remain
 unknown; this advisory is not L1 or formal candidate cross review.
+
+## Returned label-source observations (2026-11-09)
+
+Both architecture outputs match apart from bitness; both exit 0, api_errors=0,
+and the Win32/dynamic snapshots are unchanged. The timezone is in standard
+time, automatic daylight adjustment is enabled, and StandardBias is zero.
+The query returns one object, then S_FALSE with no object.
+
+- Raw Display is REG_SZ, available and 38 characters long. Caption and
+  Description are BSTR/CIM_STRING and each equals that complete string;
+  they also equal one another. Neither equals either Win32 name.
+- Raw MUI_Display is REG_SZ and 15 characters long; none of the four WMI
+  labels equals it. Resolving MUI_Display returns 2 (ERROR_FILE_NOT_FOUND).
+  Resolving the plain Display value returns 13 (ERROR_INVALID_DATA).
+  These resolution failures are observations, not a reason to discard the
+  successful raw-source comparison or to assume localized text was resolved.
+- StandardName and DaylightName equal their respective Win32 names, each
+  length 21. All four label Get calls return S_OK, VT_BSTR/CIM_STRING.
+- Bias is -480, versus Win32 base +480, VT_I4/CIM_SINT32. StandardBias is 0,
+  VT_I4/CIM_UINT32; DaylightBias is -60, VT_I4/CIM_SINT32.
+
+Negated base, standard-total and active-total models all give -480 in this
+sample. It still does not select among them in other seasons or with a
+nonzero standard adjustment. Only raw Display equality in this unresolved-
+MUI setup was established; successful MUI localization and custom timezone
+fallbacks remain unmeasured. Candidate tests must state these limits instead
+of extrapolating unknown native results. No raw log, registry data string,
+vendor file, assertion L1 or production marker change is recorded here.
