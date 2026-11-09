@@ -55,7 +55,8 @@ values hide the mismatch, and no unmeasured replacement propagation scheme
 is implemented. A passing Windows L1 alone will not make this a passing
 production Wine fix. Keep the existing CAD workaround unchanged until the
 scope, paired runtime evidence, independent review and CAD validation justify
-a correction. The patch page and its marker remain unchanged pending L1.
+a correction. Native L1 is recorded below; the production marker stays
+missing because the production patch still has no integrated test.
 
 ## Native assertion L1
 
@@ -84,7 +85,7 @@ future changes or use the dedicated builder before accepting evidence.
 ## Preparation validation
 
 - Complete Windows MEASURE: both architectures, 2026-11-09. Native assertion
-  execution is pending; MEASURE was not counted as assertion L1.
+  L1 passed separately, as recorded below; MEASURE was not counted as L1.
 - Both standalone native assertion EXEs compile with MinGW GCC 14.2 and
   -Wall -Wextra -Werror. Dedicated bundle checksums verify.
 - All 62 patches apply with --fuzz=0 when this replaces the production entry.
@@ -106,3 +107,13 @@ parity and balanced COM/handle ownership, and checked the local STA shortcut
 separately from MTA dispatch. An explicit winuser.h dependency is included for
 the message pump. No conspicuous copied block was identified; this is not
 proof of originality, formal cross review or a Wine runtime pass.
+
+
+## Windows assertion L1 (2026-11-09)
+
+Both offline Windows 10 runs (x86_64/i686) completed **291 checks, 0 failures**,
+no FAIL lines, with exit 0. This establishes L1 for the candidate's shared
+Wine test body, including all 48 callback observations and client restoration
+checks. Raw logs are not committed. The candidate stays BLOCKED: a Windows
+pass validates the test, not the production capture policy. Paired Wine
+runtime comparison, independent review and consumer validation remain open.

@@ -163,7 +163,17 @@ bash scripts/build-l1-com-stub-actctx.sh /path/to/NEW-output
 
 Run run-measure.bat in a fresh Windows VM directory and return
 result-com-stub-actctx-l1-x86_64.txt,
-result-com-stub-actctx-l1-i686.txt and exitcodes.txt. A completed zero-failure
-run of these assertions with both exits 0 is the next L1 gate; the successful
-MEASURE alone was not counted as L1. Production patches and series remain
+result-com-stub-actctx-l1-i686.txt and exitcodes.txt. The completed native L1
+assertion results are recorded below; the successful MEASURE alone was not
+counted as L1. Production patches and series remain
 unchanged. The remaining batch patches are separate work.
+
+
+## Windows assertion L1 (2026-11-09)
+
+Both architectures completed `SUMMARY checks=291 failures=0`, no FAIL lines,
+and exit 0 in the maintainer's offline Windows 10 VM. The same test body is
+in the candidate Wine test. This confirms the assertions against Windows,
+not a conforming Wine implementation; the candidate remains BLOCKED while
+paired runtime comparison checks the production policy. Raw logs are not
+committed.
