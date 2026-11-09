@@ -10,3 +10,4 @@ tdoffset-records-l1 | docs/wine-repro/typedesc-offsets/l1.c | -loleaut32 -lole32
 actctx-model | docs/wine-repro/ntdll-actctx-threadingmodel-case/measure.c | -static
 actctx-model-l1 | docs/wine-repro/ntdll-actctx-threadingmodel-case/l1.c | -Wextra -static
 com-stub-actctx | docs/wine-repro/combase-stub-activation-context/measure.c | -Wextra -lole32 -luuid -static
+com-stub-actctx-l1 | docs/wine-repro/combase-stub-activation-context/l1.c | -Wextra -lole32 -luuid -static

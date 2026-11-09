@@ -1,7 +1,7 @@
 # COM stub activation context: Windows MEASURE
 
 Original, AI-assisted (Codex), LGPL-2.1-or-later. Native context-selection
-values are unknown until the maintainer returns Windows output. This measures
+observations were returned on 2026-11-09; aggregate results are below. This measures
 `combase-stub-activation-context.patch` before adding conformance assertions.
 No production patch, series entry or test marker is changed.
 
@@ -101,8 +101,9 @@ unaffected controls and context restoration. The production patch captures
 an activation context when a stub manager is created and activates it around
 IRpcStubBuffer_Invoke. This experiment tests that claim through actual calls;
 metadata lookup on the exporting thread alone would not cover it.
-Native assertion L1, formal cross review, full-series build and paired Wine
-runtime/consumer validation are not claimed by this MEASURE.
+Native assertion L1, formal cross review and paired Wine runtime/consumer
+validation are not established by this MEASURE. Focused candidate build
+validation is recorded in the candidate README.
 
 
 A second-model read-only advisory checked the design and full program against
@@ -113,3 +114,56 @@ Its follow-up found no blocking COM/handle ownership issue. Watchdog stdio
 was then removed to avoid waiting on a stuck thread's output lock. No
 conspicuous copied block was identified; this is not proof of originality,
 formal cross review or native execution.
+
+
+## Complete Windows observations (2026-11-09)
+
+The x86_64/i686 outputs are identical apart from the bitness header. Both exit
+0: scenarios=8, calls=48, setup_errors=0, complete=1. All marker self-checks
+passed. Every scenario completed six callbacks; each client call reported one
+callback, E_NOTIMPL (the response deliberately chosen by our own object), NULL
+output, and unchanged before/after masks. All GetCurrentActCtx and
+CoGetApartmentType queries succeeded.
+
+For both streams in every construction/marshaling variant:
+
+| Server apartment | Client phase none | Client phase A | Client phase B |
+| --- | ---: | ---: | ---: |
+| STA callback marker | 0 | 0 | 0 |
+| MTA callback marker | 0 | 1 | 2 |
+
+STA callbacks ran on the creator thread, not the client, with apartment=3
+(MAINSTA), qualifier=0. MTA callbacks ran on neither creator nor client, with
+apartment=1 (MTA), qualifier=0. Context A/B during construction or the first
+and second marshaling did not select a persistent callback marker. The
+client's context was restored after every call; the server creator thread's
+before/after baseline and final client baseline were 0. The no-context
+controls also completed after the context-bearing scenarios. Raw logs are
+not committed.
+
+This observation does **not** validate the patch's broad first-marshaling
+capture explanation. It is evidence for standard-marshaled IClassFactory in
+these in-process STA/MTA cases, not every COM interface or native internal
+mechanism. The candidate documents the local STA shortcut separately from
+the MTA dispatch_rpc path. A paired Wine comparison must establish actual
+baseline/patch behavior before a scope correction is proposed.
+
+## Windows-derived regression candidate
+
+The [v2 candidate](../../../patches/candidates/combase-stub-activation-context-v2/README.md)
+adds the measured ordinary-ok regression to combase/tests/stub_actctx.c,
+keeping the production implementation unchanged for comparison. It is
+**blocked**, since the current policy is not a conforming fix for the observed
+MTA cases. No expected values or todos conceal that conflict. test-body.h is
+the exact added block; l1.c supplies the native assertion reporter.
+
+```sh
+bash scripts/build-l1-com-stub-actctx.sh /path/to/NEW-output
+```
+
+Run run-measure.bat in a fresh Windows VM directory and return
+result-com-stub-actctx-l1-x86_64.txt,
+result-com-stub-actctx-l1-i686.txt and exitcodes.txt. A completed zero-failure
+run of these assertions with both exits 0 is the next L1 gate; the successful
+MEASURE alone was not counted as L1. Production patches and series remain
+unchanged. The remaining batch patches are separate work.
