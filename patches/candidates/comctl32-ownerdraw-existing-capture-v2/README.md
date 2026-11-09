@@ -18,9 +18,11 @@ Wine's own user32 button already takes the capture first.
 
 ## The change
 
-`dlls/comctl32_v6/button.c`, `WM_LBUTTONDOWN`: `SetCapture` before
-`SetFocus` for every non-split button; split buttons keep their order
-(focus, dropdown check, capture), which was not measured.
+`dlls/comctl32_v6/button.c`, `WM_LBUTTONDOWN`: an owner-drawn button
+calls `SetCapture` before `SetFocus`. Other button types keep Wine's order:
+theirs was not measured (no parent drawing to mark the focus), and a patch
+for a paused program must not change what vanilla already does like
+Windows (AGENTS.md).
 
 ## Test
 
@@ -37,22 +39,23 @@ loses the capture to it, `F` the parent's `WM_DRAWITEM` with `ODA_FOCUS`,
 | the button held the capture before | `CFS` | `FCS` | `FS` | `CFS` |
 | another window held the capture | `OFS` | `FOS` | `FOS` | `OFS` |
 
-(Wine columns: expected from the source; to be confirmed by the local run
-and L2.) Also: after the down the button has capture and focus, after the
+(vanilla and v2 columns confirmed by the local run below; v1 from the
+source.) Also: after the down the button has capture and focus, after the
 up one `BN_CLICKED` and no capture. The test skips when the parent cannot
 be made the foreground window.
 
 ## Open points
 
-- **SOLIDWORKS L4 is required again**: v2 changes behaviour that v1 fixed
-  in a different way. If the PropertyManager buttons do not react with v2,
-  the next step is a `+msg` trace of one click (filtered) and a MEASURE of
-  whatever the superclass does differently - not a return to v1, which
-  contradicts Windows.
-- The order for push buttons and check boxes is not measured (no parent
-  drawing); v2 changes them too, consistent with user32. A follow-up
-  MEASURE that logs `WM_SETFOCUS` would close this.
-- Inventor uses the same v6 buttons; its smoke test covers this too.
+- SOLIDWORKS' L4 is deferred (AGENTS.md, 2026-11-09). When it is done:
+  if the PropertyManager buttons do not react with v2, the next step is a
+  filtered `+msg` trace of one click and a MEASURE of what the superclass
+  does differently - not a return to v1, which contradicts Windows.
+  Hypothesis: the superclass arms the press when the focus is drawn and
+  disarms it on the capture change, so only the order matters.
+- The order for push buttons and check boxes is not measured; they are
+  unchanged.
+- Inventor uses the same v6 buttons; its smoke test covers owner-drawn
+  buttons there.
 
 ## Validation of v2
 
@@ -61,3 +64,17 @@ be made the foreground window.
   (2026-11-09); the later themed-checkbox patch still applies.
 - L1 of the new test, L2, L4 (SOLIDWORKS, Inventor), cross review (Codex):
   pending.
+
+## Local run (2026-11-09)
+
+Wine 11.20 built locally for x86_64 (Ubuntu, X11 under Xvfb), test units run
+with the new tests applied, first on vanilla DLLs, then with all six batch 1
+v2 candidates. Quick feedback only; L2 is the CI run.
+
+| | vanilla | v2 |
+| --- | --- | --- |
+| comctl32:button | 3 failures, all in `test_ownerdraw_capture` (`FCS`, `FCS`, `FOS`) | 12023 tests, 0 failures |
+
+Round 1 of the fix: passed. (A first local version changed the order for
+all non-split buttons; it was limited to owner-drawn buttons before
+commit, the test result is the same.)

@@ -20,12 +20,14 @@ repeated SetCapture for owner-drawn buttons, so the superclass got no
 WM_CAPTURECHANGED at all - which Windows does send. v2 keeps the message
 and gives it the Windows order.
 
-The change is limited to non-split buttons; split buttons keep their
-dropdown check between focus and capture (not measured).
+The change is limited to owner-drawn buttons, the type whose order was
+measured (the focus is drawn through the parent); the order of the other
+types is unchanged.
 
 v2 (2026-11-09): replaces v1 (skip SetCapture for BS_OWNERDRAW when the
 button already holds the capture), which the Windows measurement
-contradicts; adds the Wine test. Needs the SOLIDWORKS smoke test again.
+contradicts; adds the Wine test. SOLIDWORKS' smoke test (L4) is
+deferred.
 
 --- a/dlls/comctl32/tests/button.c
 +++ b/dlls/comctl32/tests/button.c
@@ -153,35 +155,23 @@ contradicts; adds the Wine test. Needs the SOLIDWORKS smoke test again.
      test_radiobutton_focus();
 --- a/dlls/comctl32_v6/button.c
 +++ b/dlls/comctl32_v6/button.c
-@@ -600,20 +600,27 @@
-         }
+@@ -601,6 +601,10 @@
          /* fall through */
      case WM_LBUTTONDOWN:
-+    {
-+        BOOL split = (btn_type == BS_SPLITBUTTON || btn_type == BS_DEFSPLITBUTTON) &&
-+                     !(infoPtr->split_style & BCSS_NOSPLIT);
-+
          infoPtr->state |= BUTTON_BTNPRESSED;
-+        /* The capture is taken before the focus, as in user32's buttons; a
-+         * window that loses the capture is told so before the button draws
-+         * its focus. */
-+        if (!split) SetCapture( hWnd );
++        /* An owner-drawn button takes the capture before the focus, as in
++         * user32's buttons: the window that loses the capture is told so
++         * before the button draws its focus. */
++        if (btn_type == BS_OWNERDRAW) SetCapture( hWnd );
          SetFocus( hWnd );
  
--        if ((btn_type == BS_SPLITBUTTON || btn_type == BS_DEFSPLITBUTTON) &&
--            !(infoPtr->split_style & BCSS_NOSPLIT) &&
--            notify_split_button_dropdown(infoPtr, &pt, hWnd))
-+        if (split && notify_split_button_dropdown(infoPtr, &pt, hWnd))
-         {
-             infoPtr->state &= ~BUTTON_BTNPRESSED;
+         if ((btn_type == BS_SPLITBUTTON || btn_type == BS_DEFSPLITBUTTON) &&
+@@ -611,7 +615,7 @@
              break;
          }
  
 -        SetCapture( hWnd );
-+        if (split) SetCapture( hWnd );
++        if (btn_type != BS_OWNERDRAW) SetCapture( hWnd );
          SendMessageW( hWnd, BM_SETSTATE, TRUE, 0 );
          break;
-+    }
  
-     case WM_KEYUP:
- 	if (wParam != VK_SPACE)
