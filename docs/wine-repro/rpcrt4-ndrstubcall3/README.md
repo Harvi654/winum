@@ -128,3 +128,35 @@ assertions from this fixture. No arbitrary exception value is turned into
 an expected result, no export-only test substitutes for dispatch, and no
 L3-only classification is claimed. The production patch, page marker and
 series remain unchanged. Raw outputs are summarized rather than committed.
+
+
+## Schema-2 diagnostic: unchanged generated stub
+
+A read-only second-model advisory rechecked our own metadata and public
+Wine/MinGW declarations after the native faults. It found no justified
+offset-table or calling-convention correction. Reaching DISPATCH confirms
+slot 3 dispatch, not acceptance by the native interpreter. The minimal fake
+channel may lack context normally supplied by COM, but that is a hypothesis;
+no reserved RPCOLEMESSAGE fields are populated by guess.
+
+`generated-control.c` (mode 0) now keeps WIDL's original interpreted stub,
+server metadata and NULL dispatch table. The same factory/proxy/channel
+round trip runs without our dispatch wrapper or copied stub-table entries.
+Its successful control would report input=35, value=42, server_calls=1 and
+stub_calls=0, with balanced cleanup and complete SUMMARY. Mode 2 still
+expects stub_calls=1. Schema 2 adds CALL_BEGIN to locate a fault even when
+the generated control has no wrapper log. The functionally unknown mode-3
+result remains an observation. All six EXEs build with -Wextra -Werror.
+
+```sh
+export NDR_DIAGNOSTIC="$HOME/.cache/winum-ndr-diagnostic-$(date +%Y%m%d-%H%M%S)"
+bash scripts/build-measure-bundle.sh "$NDR_DIAGNOSTIC" docs/wine-repro/rpcrt4-ndrstubcall3/diagnostic.list
+```
+
+Run run-measure.bat in a fresh offline Windows directory and return all
+result-*.txt and exitcodes.txt. If the unchanged generated control faults
+too, the fake-channel path is not an accepted native control: move to a
+documented real COM transport before interpreting NdrStubCall3. If it works,
+investigate the wrapper/copied metadata difference first. This is the
+second fixture iteration, not a Wine fix or native L1; do not keep guessing
+metadata across repeated unsuccessful iterations.

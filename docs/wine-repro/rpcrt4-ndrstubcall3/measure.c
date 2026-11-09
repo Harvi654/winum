@@ -153,14 +153,14 @@ int main(void)
     union { FARPROC raw;stub_call_fn call; } proc;
     setvbuf(stdout,NULL,_IONBF,0);
     SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);
-    printf("MEASURE topic=ndrstubcall3 schema=1 bits=%u mode=%u\n",(unsigned)(8*sizeof(void*)),STUB_CALL_VERSION);
+    printf("MEASURE topic=ndrstubcall3 schema=2 bits=%u mode=%u\n",(unsigned)(8*sizeof(void*)),STUB_CALL_VERSION);
     cancel=CreateEventW(NULL,TRUE,FALSE,NULL);
     if(!cancel) {printf("ERROR operation=CreateEventW error=%lu\n",GetLastError());return 1;}
     watchdog=CreateThread(NULL,0,watchdog_thread,cancel,0,NULL);
     if(!watchdog) {printf("ERROR operation=CreateThread error=%lu\n",GetLastError());CloseHandle(cancel);return 1;}
     module=LoadLibraryW(L"rpcrt4.dll");
     if (!module) {printf("ERROR operation=LoadLibraryW error=%lu\n",GetLastError());api_errors++;goto done_module;}
-    proc.raw=GetProcAddress(module,STUB_CALL_VERSION==2?"NdrStubCall2":"NdrStubCall3");dispatch=proc.call;
+    proc.raw=GetProcAddress(module,STUB_CALL_VERSION==3?"NdrStubCall3":"NdrStubCall2");dispatch=proc.call;
     printf("EXPORT mode=%u available=%u\n",STUB_CALL_VERSION,dispatch!=NULL);
     if (!dispatch) goto done_module;
     if (!api(CoInitializeEx(NULL,COINIT_APARTMENTTHREADED),"CoInitializeEx")) goto done_module;
@@ -175,17 +175,21 @@ int main(void)
         server_info.nCount=1;server_info.pSyntaxInfo=&syntax;
         server_info.ProcString=NULL;server_info.FmtStringOffset=NULL;
     }
-    stub_vtable.header.pServerInfo=&server_info;
-    stub_vtable.header.pDispatchTable=methods;
-    proxy_info.pStubVtblList=(const PCInterfaceStubVtblList *)stub_list;
+    if (STUB_CALL_VERSION)
+    {
+        stub_vtable.header.pServerInfo=&server_info;
+        stub_vtable.header.pDispatchTable=methods;
+        proxy_info.pStubVtblList=(const PCInterfaceStubVtblList *)stub_list;
+    }
     if (!api(NdrDllGetClassObject(&proxy_clsid,&IID_IPSFactoryBuffer,(void**)&ps,files,&proxy_clsid,&factory),"NdrDllGetClassObject")) goto done;
     if (!api(IPSFactoryBuffer_CreateStub(ps,&IID_IWinumNdrProbe,(IUnknown*)&object.iface,&channel.stub),"CreateStub")) goto done;
     if (!api(IPSFactoryBuffer_CreateProxy(ps,NULL,&IID_IWinumNdrProbe,&proxy,(void**)&client),"CreateProxy")) goto done;
     if (!api(IRpcProxyBuffer_Connect(proxy,&channel.iface),"Connect")) goto done;
+    printf("CALL_BEGIN mode=%u generated_stub=%u\n",STUB_CALL_VERSION,STUB_CALL_VERSION==0);
     hr=IWinumNdrProbe_Calculate(client,35,&value);
     printf("CALL hr=%08lx value=%ld server_calls=%u stub_calls=%u stub_result=%08lx phase=%lu\n",
            (DWORD)hr,value,server_calls,stub_calls,(DWORD)stub_result,stub_phase);
-    if (STUB_CALL_VERSION==2 && (hr!=S_OK||server_calls!=1||stub_calls!=1||value!=42)) api_errors++;
+    if (STUB_CALL_VERSION!=3 && (hr!=S_OK||server_calls!=1||stub_calls!=(STUB_CALL_VERSION!=0)||value!=42)) api_errors++;
 done:
     if (proxy) IRpcProxyBuffer_Disconnect(proxy);
     if (client) IWinumNdrProbe_Release(client);
