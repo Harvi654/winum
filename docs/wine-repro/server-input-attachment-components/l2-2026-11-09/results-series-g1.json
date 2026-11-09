@@ -1,0 +1,740 @@
+{
+ "user32.i386.attachment": {
+  "exit": "255",
+  "fail_at": {
+   "attachment.c:769": 1191,
+   "attachment.c:772": 1186
+  },
+  "fail_msg": {
+   "attachment.c:769": "Test failed: isolated-nonedge-reverse0-anchorA isolated observer D: active 000C00E2, expected 00000000",
+   "attachment.c:772": "Test failed: isolated-nonedge-reverse0-anchorA isolated observer D: focus 000C00E2, expected 00000000"
+  },
+  "failures": 2377,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 10195,
+  "todo": 12
+ },
+ "user32.i386.broadcast": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 32,
+  "todo": 0
+ },
+ "user32.i386.class": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 1,
+  "tests": 2139,
+  "todo": 9
+ },
+ "user32.i386.clipboard": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 54976,
+  "todo": 0
+ },
+ "user32.i386.combo": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 493,
+  "todo": 25
+ },
+ "user32.i386.cursoricon": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 5225,
+  "todo": 24
+ },
+ "user32.i386.dce": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 212,
+  "todo": 9
+ },
+ "user32.i386.dde": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 1032,
+  "todo": 23
+ },
+ "user32.i386.dialog": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 1006,
+  "todo": 93
+ },
+ "user32.i386.edit": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 10,
+  "tests": 263145,
+  "todo": 3
+ },
+ "user32.i386.generated": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 0,
+  "todo": 0
+ },
+ "user32.i386.input": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 2,
+  "skipped": 0,
+  "tests": 6161,
+  "todo": 46
+ },
+ "user32.i386.listbox": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 1532,
+  "todo": 6
+ },
+ "user32.i386.menu": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 1,
+  "tests": 14360,
+  "todo": 17
+ },
+ "user32.i386.monitor": {
+  "exit": "60",
+  "fail_at": {
+   "monitor.c:1266": 1,
+   "monitor.c:1277": 2,
+   "monitor.c:1283": 2,
+   "monitor.c:1297": 2,
+   "monitor.c:1319": 2,
+   "monitor.c:1329": 2,
+   "monitor.c:1347": 2,
+   "monitor.c:1357": 2,
+   "monitor.c:2678": 1,
+   "monitor.c:2782": 3,
+   "monitor.c:3003": 1,
+   "monitor.c:3024": 1,
+   "monitor.c:3105": 1,
+   "monitor.c:3115": 1,
+   "monitor.c:3128": 1,
+   "monitor.c:3143": 1,
+   "monitor.c:3239": 8,
+   "monitor.c:3614": 2,
+   "monitor.c:3615": 2,
+   "monitor.c:3624": 5,
+   "monitor.c:3625": 5,
+   "monitor.c:3642": 2,
+   "monitor.c:3643": 2,
+   "monitor.c:3652": 5,
+   "monitor.c:3653": 5,
+   "monitor.c:524": 2,
+   "monitor.c:933": 1,
+   "monitor.c:970": 1,
+   "monitor.c:978": 1,
+   "monitor.c:991": 1,
+   "monitor.c:998": 1
+  },
+  "fail_msg": {
+   "monitor.c:1266": "Test failed: ChangeDisplaySettingsExA \\\\.\\DISPLAY1 returned -2.",
+   "monitor.c:1277": "Test failed: Device \\\\.\\DISPLAY1 test 0 expect dmPelsWidth 640, got 1280",
+   "monitor.c:1283": "Test failed: Device \\\\.\\DISPLAY1 expect dmPelsWidth 800, got 1280",
+   "monitor.c:1297": "Test failed: Device \\\\.\\DISPLAY1 expect dmPelsWidth 800, got 1280",
+   "monitor.c:1319": "Test failed: Device \\\\.\\DISPLAY1 test 0 expect dmPelsWidth 640, got 1280",
+   "monitor.c:1329": "Test failed: Device \\\\.\\DISPLAY1 test 0 expect dmPelsWidth 640, got 1280",
+   "monitor.c:1347": "Test failed: Device \\\\.\\DISPLAY1 test 0 expect dmPelsWidth 640, got 1280",
+   "monitor.c:1357": "Test failed: Device \\\\.\\DISPLAY1 test 0 expect dmPelsWidth 640, got 1280",
+   "monitor.c:2678": "Test failed: Expected VREFRESH 0, got 1.",
+   "monitor.c:2782": "Test failed: bpp 32: Expected VREFRESH 0, got 1.",
+   "monitor.c:3003": "Test failed: Failed to find a different resolution.",
+   "monitor.c:3024": "Test failed: Expected VREFRESH 0, got 1.",
+   "monitor.c:3105": "Test failed: Expected VREFRESH 0, got 1.",
+   "monitor.c:3115": "Test failed: Failed to find a different resolution for \\\\.\\DISPLAY1.",
+   "monitor.c:3128": "Test failed: Expected VREFRESH 0, got 1.",
+   "monitor.c:3143": "Test failed: Expected VREFRESH 0, got 1.",
+   "monitor.c:3239": "Test failed: ChangeDisplaySettingsExA \\\\.\\DISPLAY1 returned unexpected -2.",
+   "monitor.c:3614": "Test succeeded inside todo block: ctx -3: got MDT_ANGULAR_DPI x 96",
+   "monitor.c:3615": "Test succeeded inside todo block: ctx -3: got MDT_ANGULAR_DPI y 96",
+   "monitor.c:3624": "Test succeeded inside todo block: ctx 0: got MDT_ANGULAR_DPI x 96",
+   "monitor.c:3625": "Test succeeded inside todo block: ctx 0: got MDT_ANGULAR_DPI y 96",
+   "monitor.c:3642": "Test succeeded inside todo block: ctx -3: got MDT_RAW_DPI x 96",
+   "monitor.c:3643": "Test succeeded inside todo block: ctx -3: got MDT_RAW_DPI y 96",
+   "monitor.c:3652": "Test succeeded inside todo block: ctx 0: got MDT_RAW_DPI x 96",
+   "monitor.c:3653": "Test succeeded inside todo block: ctx 0: got MDT_RAW_DPI y 96",
+   "monitor.c:524": "Test failed: Unexpected ChangeDisplaySettingsExA() return code for vid_modes_test[1]: -2",
+   "monitor.c:933": "Test failed: Failed to find a different mode.",
+   "monitor.c:970": "Test failed: Got unexpected dmFields 0x3c00a0.",
+   "monitor.c:978": "Test failed: Expected dmDisplayFrequency not zero.",
+   "monitor.c:991": "Test failed: Got unexpected dmFields 0x3c00a0.",
+   "monitor.c:998": "Test failed: Expected dmDisplayFrequency not zero."
+  },
+  "failures": 60,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 11,
+  "tests": 2363,
+  "todo": 38
+ },
+ "user32.i386.msg": {
+  "exit": "1",
+  "fail_at": {
+   "msg.c:5730": 1
+  },
+  "fail_msg": {
+   "msg.c:5730": "Test succeeded inside todo block: ShowWindow(SW_SHOWMAXIMIZED):overlapped: 35: marked \"todo_wine\" but succeeds"
+  },
+  "failures": 1,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 3,
+  "tests": 32452,
+  "todo": 251
+ },
+ "user32.i386.resource": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 140,
+  "todo": 0
+ },
+ "user32.i386.scroll": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 243,
+  "todo": 5
+ },
+ "user32.i386.static": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 508,
+  "todo": 0
+ },
+ "user32.i386.sysparams": {
+  "exit": "8",
+  "fail_at": {
+   "sysparams.c:3434": 4,
+   "sysparams.c:3454": 4
+  },
+  "fail_msg": {
+   "sysparams.c:3434": "Test failed: Expect dmFields to contain 0x7c0080, got 0x3c00a0",
+   "sysparams.c:3454": "Test failed: Expect dmDisplayFrequency not zero"
+  },
+  "failures": 8,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 7446,
+  "todo": 25
+ },
+ "user32.i386.text": {
+  "exit": "1",
+  "fail_at": {
+   "text.c:682": 1
+  },
+  "fail_msg": {
+   "text.c:682": "Test failed: Unexpected uiLengthDrawn 6"
+  },
+  "failures": 1,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 656263,
+  "todo": 0
+ },
+ "user32.i386.uitools": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 42,
+  "todo": 0
+ },
+ "user32.i386.win": {
+  "exit": "6",
+  "fail_at": {
+   "win.c:10846": 1,
+   "win.c:10847": 1,
+   "win.c:4866": 1,
+   "win.c:4870": 1,
+   "win.c:4879": 1,
+   "win.c:4882": 1
+  },
+  "fail_msg": {
+   "win.c:10846": "Test failed: transparent window didn't get WM_NCHITTEST message",
+   "win.c:10847": "Test failed: button under static window didn't get WM_LBUTTONUP",
+   "win.c:4866": "Test failed: hwnd 026500F2/026500F2 message 0200",
+   "win.c:4870": "Test failed: hwnd 026500F2/026500F2 message 0201",
+   "win.c:4879": "Test failed: hwnd 005A00E0/005A00E0 message 0202",
+   "win.c:4882": "Test failed: hwnd 005A00E0/005A00E0 message 0201"
+  },
+  "failures": 6,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 2,
+  "tests": 69291,
+  "todo": 150
+ },
+ "user32.i386.winstation": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 337,
+  "todo": 10
+ },
+ "user32.i386.wsprintf": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 2,
+  "tests": 86,
+  "todo": 0
+ },
+ "user32.x86_64.attachment": {
+  "exit": "255",
+  "fail_at": {
+   "attachment.c:769": 1186,
+   "attachment.c:772": 1184
+  },
+  "fail_msg": {
+   "attachment.c:769": "Test failed: isolated-nonedge-reverse0-anchorA isolated observer D: active 000000000001007E, expected 0000000000000000",
+   "attachment.c:772": "Test failed: isolated-nonedge-reverse0-anchorA isolated observer D: focus 000000000001007E, expected 0000000000000000"
+  },
+  "failures": 2370,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 10195,
+  "todo": 12
+ },
+ "user32.x86_64.broadcast": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 32,
+  "todo": 0
+ },
+ "user32.x86_64.class": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 1,
+  "tests": 2139,
+  "todo": 9
+ },
+ "user32.x86_64.clipboard": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 54976,
+  "todo": 0
+ },
+ "user32.x86_64.combo": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 493,
+  "todo": 25
+ },
+ "user32.x86_64.cursoricon": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 5225,
+  "todo": 24
+ },
+ "user32.x86_64.dce": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 212,
+  "todo": 9
+ },
+ "user32.x86_64.dde": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 1032,
+  "todo": 23
+ },
+ "user32.x86_64.dialog": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 1006,
+  "todo": 93
+ },
+ "user32.x86_64.edit": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 10,
+  "tests": 263145,
+  "todo": 3
+ },
+ "user32.x86_64.generated": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 0,
+  "todo": 0
+ },
+ "user32.x86_64.input": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 1,
+  "skipped": 0,
+  "tests": 6167,
+  "todo": 45
+ },
+ "user32.x86_64.listbox": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 1532,
+  "todo": 6
+ },
+ "user32.x86_64.menu": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 1,
+  "tests": 15230,
+  "todo": 17
+ },
+ "user32.x86_64.monitor": {
+  "exit": "60",
+  "fail_at": {
+   "monitor.c:1266": 1,
+   "monitor.c:1277": 2,
+   "monitor.c:1283": 2,
+   "monitor.c:1297": 2,
+   "monitor.c:1319": 2,
+   "monitor.c:1329": 2,
+   "monitor.c:1347": 2,
+   "monitor.c:1357": 2,
+   "monitor.c:2678": 1,
+   "monitor.c:2782": 3,
+   "monitor.c:3003": 1,
+   "monitor.c:3024": 1,
+   "monitor.c:3105": 1,
+   "monitor.c:3115": 1,
+   "monitor.c:3128": 1,
+   "monitor.c:3143": 1,
+   "monitor.c:3239": 8,
+   "monitor.c:3614": 2,
+   "monitor.c:3615": 2,
+   "monitor.c:3624": 5,
+   "monitor.c:3625": 5,
+   "monitor.c:3642": 2,
+   "monitor.c:3643": 2,
+   "monitor.c:3652": 5,
+   "monitor.c:3653": 5,
+   "monitor.c:524": 2,
+   "monitor.c:933": 1,
+   "monitor.c:970": 1,
+   "monitor.c:978": 1,
+   "monitor.c:991": 1,
+   "monitor.c:998": 1
+  },
+  "fail_msg": {
+   "monitor.c:1266": "Test failed: ChangeDisplaySettingsExA \\\\.\\DISPLAY1 returned -2.",
+   "monitor.c:1277": "Test failed: Device \\\\.\\DISPLAY1 test 0 expect dmPelsWidth 640, got 1280",
+   "monitor.c:1283": "Test failed: Device \\\\.\\DISPLAY1 expect dmPelsWidth 800, got 1280",
+   "monitor.c:1297": "Test failed: Device \\\\.\\DISPLAY1 expect dmPelsWidth 800, got 1280",
+   "monitor.c:1319": "Test failed: Device \\\\.\\DISPLAY1 test 0 expect dmPelsWidth 640, got 1280",
+   "monitor.c:1329": "Test failed: Device \\\\.\\DISPLAY1 test 0 expect dmPelsWidth 640, got 1280",
+   "monitor.c:1347": "Test failed: Device \\\\.\\DISPLAY1 test 0 expect dmPelsWidth 640, got 1280",
+   "monitor.c:1357": "Test failed: Device \\\\.\\DISPLAY1 test 0 expect dmPelsWidth 640, got 1280",
+   "monitor.c:2678": "Test failed: Expected VREFRESH 0, got 1.",
+   "monitor.c:2782": "Test failed: bpp 32: Expected VREFRESH 0, got 1.",
+   "monitor.c:3003": "Test failed: Failed to find a different resolution.",
+   "monitor.c:3024": "Test failed: Expected VREFRESH 0, got 1.",
+   "monitor.c:3105": "Test failed: Expected VREFRESH 0, got 1.",
+   "monitor.c:3115": "Test failed: Failed to find a different resolution for \\\\.\\DISPLAY1.",
+   "monitor.c:3128": "Test failed: Expected VREFRESH 0, got 1.",
+   "monitor.c:3143": "Test failed: Expected VREFRESH 0, got 1.",
+   "monitor.c:3239": "Test failed: ChangeDisplaySettingsExA \\\\.\\DISPLAY1 returned unexpected -2.",
+   "monitor.c:3614": "Test succeeded inside todo block: ctx -3: got MDT_ANGULAR_DPI x 96",
+   "monitor.c:3615": "Test succeeded inside todo block: ctx -3: got MDT_ANGULAR_DPI y 96",
+   "monitor.c:3624": "Test succeeded inside todo block: ctx 0: got MDT_ANGULAR_DPI x 96",
+   "monitor.c:3625": "Test succeeded inside todo block: ctx 0: got MDT_ANGULAR_DPI y 96",
+   "monitor.c:3642": "Test succeeded inside todo block: ctx -3: got MDT_RAW_DPI x 96",
+   "monitor.c:3643": "Test succeeded inside todo block: ctx -3: got MDT_RAW_DPI y 96",
+   "monitor.c:3652": "Test succeeded inside todo block: ctx 0: got MDT_RAW_DPI x 96",
+   "monitor.c:3653": "Test succeeded inside todo block: ctx 0: got MDT_RAW_DPI y 96",
+   "monitor.c:524": "Test failed: Unexpected ChangeDisplaySettingsExA() return code for vid_modes_test[1]: -2",
+   "monitor.c:933": "Test failed: Failed to find a different mode.",
+   "monitor.c:970": "Test failed: Got unexpected dmFields 0x3c00a0.",
+   "monitor.c:978": "Test failed: Expected dmDisplayFrequency not zero.",
+   "monitor.c:991": "Test failed: Got unexpected dmFields 0x3c00a0.",
+   "monitor.c:998": "Test failed: Expected dmDisplayFrequency not zero."
+  },
+  "failures": 60,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 11,
+  "tests": 2368,
+  "todo": 39
+ },
+ "user32.x86_64.msg": {
+  "exit": "1",
+  "fail_at": {
+   "msg.c:5730": 1
+  },
+  "fail_msg": {
+   "msg.c:5730": "Test succeeded inside todo block: ShowWindow(SW_SHOWMAXIMIZED):overlapped: 35: marked \"todo_wine\" but succeeds"
+  },
+  "failures": 1,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 3,
+  "tests": 32452,
+  "todo": 251
+ },
+ "user32.x86_64.resource": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 140,
+  "todo": 0
+ },
+ "user32.x86_64.scroll": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 243,
+  "todo": 5
+ },
+ "user32.x86_64.static": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 508,
+  "todo": 0
+ },
+ "user32.x86_64.sysparams": {
+  "exit": "8",
+  "fail_at": {
+   "sysparams.c:3434": 4,
+   "sysparams.c:3454": 4
+  },
+  "fail_msg": {
+   "sysparams.c:3434": "Test failed: Expect dmFields to contain 0x7c0080, got 0x3c00a0",
+   "sysparams.c:3454": "Test failed: Expect dmDisplayFrequency not zero"
+  },
+  "failures": 8,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 7446,
+  "todo": 25
+ },
+ "user32.x86_64.text": {
+  "exit": "1",
+  "fail_at": {
+   "text.c:682": 1
+  },
+  "fail_msg": {
+   "text.c:682": "Test failed: Unexpected uiLengthDrawn 6"
+  },
+  "failures": 1,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 656263,
+  "todo": 0
+ },
+ "user32.x86_64.uitools": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 42,
+  "todo": 0
+ },
+ "user32.x86_64.win": {
+  "exit": "2",
+  "fail_at": {
+   "win.c:10846": 1,
+   "win.c:10847": 1
+  },
+  "fail_msg": {
+   "win.c:10846": "Test failed: transparent window didn't get WM_NCHITTEST message",
+   "win.c:10847": "Test failed: button under static window didn't get WM_LBUTTONUP"
+  },
+  "failures": 2,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 2,
+  "tests": 69367,
+  "todo": 148
+ },
+ "user32.x86_64.winstation": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 0,
+  "tests": 337,
+  "todo": 10
+ },
+ "user32.x86_64.wsprintf": {
+  "exit": null,
+  "fail_at": {},
+  "fail_msg": {},
+  "failures": 0,
+  "finished": true,
+  "flaky": 0,
+  "skipped": 2,
+  "tests": 86,
+  "todo": 0
+ }
+}

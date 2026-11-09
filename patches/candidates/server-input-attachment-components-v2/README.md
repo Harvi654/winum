@@ -80,8 +80,9 @@ The prior measurement's exit 0 is not substituted for that check.
 - Paired L2: [run 42695491325](https://github.com/Harvi654/winum/actions/runs/42695491325),
   own test-run/batch4-1 at 36b639e. Completed 2026-11-09 with overall
   **failure**: all ten matrix jobs completed and compare exited 1.
-  This does not yet identify whether attachment or a neighboring/unrelated
-  test regressed. Candidate-specific L2 is **not cleared**; see below.
+  Returned g1 JSON confirms **2377 ordinary attachment failures on i386
+  and 2370 on x86_64**, despite both units completing. Candidate-specific
+  L2 **fails its assertion gate**; see the absolute results below.
   Both variants were applied with --fuzz=0 before pushing: their new test
   bytes match the candidate exactly, only series has the implementation.
   The g1 series artifact includes user32:attachment for native L1.
@@ -116,26 +117,43 @@ report and its analysis are recorded in
 docs/wine-repro/server-input-attachment-components/l2-2026-11-09/.
 It reports 420 units, six units with new failure locations, five with
 removed locations, two moved and 39 other changes. Both attachment
-architectures remove failures at :769/:772/:774 with no new locations
-listed. This delta is not an absolute zero-failure/completion assertion;
-the structured g1 summaries are still needed.
+architectures reduce counts at :769/:772 and eliminate :774. The report's
+"fixed" label does not mean zero remaining failures at every listed site.
+The subsequently returned g1 JSON gives the actual assertion outcome:
+
+| Architecture | Vanilla failures | Series failures | Checks each | Todos each | Finished / exit |
+| --- | --- | --- | --- | --- | --- |
+| i386 | 2569 | 2377 | 10195 | 12 | yes / 255 |
+| x86_64 | 2561 | 2370 | 10195 | 12 | yes / 255 |
+
+Both series units complete all 44 scenarios, with zero flaky/skipped
+checks. The 12 todos are the existing eight direct-destruction and four
+self-detach error observations; none was added to excuse these failures.
+All ordinary series failures are active/focus mismatches, including the
+initial isolated observer D before explicit attachment/removal. That same
+initial mismatch appears in vanilla. Initial activation/foreground state
+is the first diagnostic lead, not an established cause of all failures.
+Capture failures fall from 96 to zero on both architectures. These results
+are a failing Wine assertion gate, while the native Windows L1 remains a
+pass. The recorded JSON and detailed site counts are in the L2 directory.
 
 The neighboring user32.i386.win has four new mouse-message failures
 (:4866/:4870/:4879/:4882) after hiding/reopening a popup. Their cause is
-not established and requires the paired data and a focused rerun before
-clearing the neighbor gate. Other new locations are in toolbar, exception
+not established. The paired data confirms the i386 win unit increases
+from two to six failures; x86_64 stays at two, with only baseline failures
+shifted by 157 source lines. A focused rerun/attribution is still needed
+before clearing the neighbor gate. Other new locations are in toolbar, exception
 and sec_mgr; no new gdi32/win32u locations are listed. Do not infer either
 a passed candidate or a proven input-components regression from this
 full-series comparison alone.
 
-Before promotion, inspect
-[l2-report](https://github.com/Harvi654/winum/actions/runs/42695491325/artifacts/13713784614)
-(`l2-report.md`) and the structured vanilla/series g1 results. Require
-zero ordinary failures in series user32:attachment on both architectures,
-check its expected todos, and inspect all new user32/win32u/gdi32 failures.
-Separate unrelated full-series changes and possible CI instability using
-the actual paired locations, not just the workflow conclusion. Claude's
-approval remains conditional until those results are accounted for.
+Before promotion, diagnose the initial-state mismatch in an isolated
+paired attachment run and establish zero ordinary failures on the series
+side without changing native expected values. Resolve or attribute the
+neighboring i386 mouse-message failures using a focused paired rerun.
+No new g1 failure location beyond that win sequence is reported, but fewer
+attachment failures are not a passing gate. Claude's approval remains
+conditional until those issues are accounted for.
 Production patches/series, the production patch and its missing marker
 remain unchanged.
 

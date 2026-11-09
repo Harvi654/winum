@@ -32,8 +32,9 @@ limit that preserves the old host too. The x86_64 and i686 measurements
 are identical except bitness; expected values are never computed from
 Wine's attachment graph. Native assertion L1 passed on Windows 10
 x86_64/i386: 10195 checks each, zero failures/skips. Paired L2 run
-42695491325 ended with comparison exit 1; candidate-specific L2 is not
-yet cleared (see the candidate README).
+42695491325 completed the assertion unit but still reports 2377 i386 and
+2370 x86_64 ordinary active/focus failures under Xvfb. L2 is not cleared
+(see the candidate README); no native expected value or todo was changed.
 
 diff --git a/server/queue.c b/server/queue.c
 --- a/server/queue.c

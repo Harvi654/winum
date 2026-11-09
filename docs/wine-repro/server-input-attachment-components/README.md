@@ -173,9 +173,17 @@ hashes and provenance. This is the candidate's native assertion pass;
 the standalone wrapper has not separately run. The earlier MEASURE exit 0
 is not used as an assertion result. [L2 run 42695491325](https://github.com/Harvi654/winum/actions/runs/42695491325)
 completed on test-run/batch4-1 at 36b639e (2026-11-09) with overall failure:
-compare exited 1 after all ten matrix jobs completed. Per-test attribution
-is pending retrieval of l2-report.md and the structured paired g1 output;
-no candidate-specific L2 pass or regression is inferred from that status.
+compare exited 1 after all ten matrix jobs completed. The returned report
+and both g1 JSON summaries confirm that series user32:attachment finishes
+but fails 2377 ordinary active/focus checks on i386 and 2370 on x86_64;
+vanilla fails 2569/2561. Both execute 10195 checks with the same 12 expected
+todos, no skips/flaky checks, and exit 255. Capture failures drop from 96
+to zero on both architectures. The earliest active/focus mismatch is
+already in isolated observer D before explicit attachments, in both
+variants; initial activation/foreground conditions need investigation.
+The neighboring i386 win unit also adds four mouse-message failures.
+See l2-2026-11-09/ for privacy-checked original summaries, absolute counts
+and next diagnostic. L2 is not cleared; native Windows L1 remains passed.
 The candidate README records the result, retrieval limit and Claude's
 conditional cross-review approval (d9119b4), including both P3 open points.
 The pair installs identical new test bytes in vanilla and series, while
