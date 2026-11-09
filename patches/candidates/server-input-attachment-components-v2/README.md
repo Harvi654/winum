@@ -71,7 +71,12 @@ The prior measurement's exit 0 is not substituted for that check.
 - Full-series --fuzz=0 and focused server/test compilation: recorded in
   the investigation README after final verification; not a full graphical
   L0 claim.
-- Native assertion L1: pending.
+- Native assertion L1: **passed**, Windows 10 x86_64/i386, 2026-11-09.
+  Wine user32:attachment from the run's tests-series-g1 L1 bundle executed
+  10195 checks per architecture, 0 failures/todos/flaky/skips and exit 0.
+  See docs/wine-repro/server-input-attachment-components/l1-2026-11-09/.
+  This covers the exact candidate body, including its 44-scenario completion
+  assertion; the standalone wrapper has not separately been run.
 - Paired L2: [run 42695491325](https://github.com/Harvi654/winum/actions/runs/42695491325),
   own test-run/batch4-1 at 36b639e. Started 2026-11-09; result pending.
   Both variants were applied with --fuzz=0 before pushing: their new test
@@ -86,8 +91,9 @@ The prior measurement's exit 0 is not substituted for that check.
   and normal-use validation have not been performed for v2.
 
 The broad observation table also checks creation/activation neighbors.
-Exact-body native L1 is needed to establish its stability; a failure must
-be investigated rather than changing Windows values to the Wine result.
+The exact-body native L1 passed in the returned run; repeated-run stability
+has not been measured. Any later native failure must be investigated rather
+than changing Windows values to the Wine result.
 Unmeasured: different desktops/DPI, cross-process behavior, repeated
 reparent histories, callbacks and allocation failure through Windows.
 The old native graph shim is not a Windows oracle. In particular, this

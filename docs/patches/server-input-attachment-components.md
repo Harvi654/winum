@@ -22,15 +22,18 @@ None in production v1. The separate
 [`server-input-attachment-components-v2`](../../patches/candidates/server-input-attachment-components-v2/README.md)
 candidate adds user32:attachment from the maintainer's Windows measurements
 and limits implicit desktop reparenting to preserve already-compatible
-state. Exact assertion L1, paired L2 and formal cross review are pending;
-the production marker remains missing.
+state. Its exact Wine assertion test passed on Windows 10 x86_64/i386
+(2026-11-09): 10195 checks per architecture, zero failures/skips and exit 0;
+see [the native L1 record](../wine-repro/server-input-attachment-components/l1-2026-11-09/README.md).
+Paired L2 and formal cross review remain pending. The production v1 still
+contains no test, so its marker remains missing until candidate promotion.
 
 ## Validation
 
 | Level | Result |
 | --- | --- |
 | L0 | SOLIDWORKS full builds (full-1 2026-10-25, full-2 2026-10-26) |
-| L1 | no Wine test (server change); Windows reference missing |
+| L1 | production v1 has no test; separate v2 candidate passed Windows 10 x86_64/i386 (10195 checks each, 0 failures, 2026-11-09) |
 | L2 | not recorded |
 | L3 | graph shim: 61,458 cases incl. allocation failures, 0 invariant failures, ASan/UBSan |
 | L4 | four GUI probes and typing in Installation Manager; combined CAD smoke |

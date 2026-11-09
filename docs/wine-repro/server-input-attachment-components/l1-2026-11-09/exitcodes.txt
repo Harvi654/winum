@@ -1,0 +1,2 @@
+user32 attachment x86_64=0
+user32 attachment i386=0
