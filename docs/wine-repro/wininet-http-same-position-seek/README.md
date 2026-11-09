@@ -56,9 +56,9 @@ after rejected seek calls. Every individual case uses exactly one request.
 | --- | --- | --- | --- | --- |
 | Content-Length, cached, FILE_CURRENT+0 | 17 | 0 | yes | 1 |
 | Content-Length, cached, FILE_BEGIN=17 | 17 | 0 | yes | 1 |
-| Content-Length, NO_CACHE_WRITE | INVALID_SET_FILE_POINTER | 12016 | yes | 1 |
-| Chunked, cached or NO_CACHE_WRITE, both tested origins | INVALID_SET_FILE_POINTER | 12016 | yes | 1 |
-| Close-delimited, cached or NO_CACHE_WRITE, both tested origins | INVALID_SET_FILE_POINTER | 12016 | yes | 1 |
+| Content-Length, NO_CACHE_WRITE, FILE_CURRENT+0 | INVALID_SET_FILE_POINTER | 12016 | yes | 1 |
+| Chunked, cached FILE_CURRENT/FILE_BEGIN or NO_CACHE_WRITE FILE_CURRENT | INVALID_SET_FILE_POINTER | 12016 | yes | 1 |
+| Close-delimited, cached FILE_CURRENT/FILE_BEGIN or NO_CACHE_WRITE FILE_CURRENT | INVALID_SET_FILE_POINTER | 12016 | yes | 1 |
 
 12016 is ERROR_INTERNET_INVALID_OPERATION. Each no-seek control also reads
 all original bytes with one request. The cached Content-Length cases are
