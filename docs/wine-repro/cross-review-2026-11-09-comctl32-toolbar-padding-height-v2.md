@@ -75,3 +75,13 @@ height regression and its missing regression assertion. Keep the candidate
 outside the production series until corrected and reviewed, then verify
 the exact revision with native L1 and paired comctl32 L2. The existing
 Inventor palette result does not rule out the neighboring regression.
+
+## Follow-up: v3 in 687afe6 (2026-11-09)
+
+P1 is resolved in source: no-text height retains DEFPAD_CY and an unchanged
+bitmap size no longer recalculates it. P2 is resolved by ordinary assertions
+for that exact sequence, including the no-string controls. P3 is resolved
+by the text-dependent implementation/header description. See the separate
+v3 review for full scope and the new P2 evidence gate: -1,-1 after custom
+padding still needs the already-written follow-up's Windows output.
+These closures do not claim exact v3 L1/L2 or palette L4 has passed.
