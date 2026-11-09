@@ -57,3 +57,14 @@ Queue destruction and detach-all are outside the change.
 
 Solidworks-for-Linux `docs/wine-input-fix.md`; overview in `docs/patch-status.md`.
 
+
+
+## Current test revision (2026-11-10)
+
+V3 prepared all 44 scenarios but still failed 301/305 active/focus checks,
+starting in a no-edge local-focus control. The separate
+[v4 candidate](../../patches/candidates/server-input-attachment-components-v4/README.md)
+keeps the implementation unchanged and separates actor-relative component
+checks from exact inactive-queue state. Both scopes must pass new native
+L1; Wine must report which scope ran. New native/paired validation and
+review of the revised test are pending; the production marker stays missing.

@@ -257,3 +257,28 @@ focus probe of B, with observer A becoming NULL rather than retaining its
 own active/focus window. Thus preparation now succeeds; the remaining
 independent-queue state difference calls for the maintainer's second
 option, separating component/API checks from absolute inactive-queue state.
+
+
+## V4 scope separation, round 2 (2026-11-10)
+
+[V4](../../../patches/candidates/server-input-attachment-components-v4/README.md)
+always checks component relations against a positive live native actor,
+literal capture and the measured API/error results. Exact unrelated
+inactive-queue state is a separate runtime view gated by the first no-edge
+probe-B control before any attachment. Failure of that control skips only
+the absolute subtest; all 44 component scenarios still run, including
+post-detach positive/negative membership. No target failure becomes a skip.
+
+The native wrapper requires both views over all 592 checkpoints; the
+component predicates therefore execute on Windows as well as Wine.
+ATTACHMENT_SCOPE makes a missing absolute view explicit. Under Wine with
+absolute_state=0, unrelated inactive window-versus-NULL retention is not
+validated there, even if the component view passes. Original tables,
+server hunks, graph operations and behavioral todo scope are unchanged.
+All 592 rows have positive references, with 322 sharing beyond the actor.
+
+Both PE native builds pass -Werror; all 62 patches strictly apply, and
+both user32 EXEs plus the server link in the focused source build. No
+runtime pass is claimed. V4 native L1 and paired L2 remain pending. Keep
+its new native test for the combined VM round after textfont-followup2,
+rather than rerunning v3 now. Previous sources/results are retained.

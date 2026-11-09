@@ -1,5 +1,9 @@
 # Server input attachment components v3: foreground setup, round 1
 
+**Superseded for testing by [v4](../server-input-attachment-components-v4/README.md)**
+(separate component and absolute observations, round 2). V3 sources and
+evidence are retained; the default native builder now targets v4.
+
 Candidate only; replaces v2 in an experimental build. Production
 patches/series, the production patch and its marker remain unchanged.
 The server/queue.c and server/window.c hunks are byte-identical to v2.

@@ -1,0 +1,1514 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] server: Preserve input components and desktop reparent associations.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not
+submitted upstream.
+
+Windows 10 x86_64/i686, measured through public APIs with our own windows
+(docs/wine-repro/server-input-attachment-components/windows-2026-11-09,
+bundle run 42659893206), preserves remaining explicit AttachThreadInput
+components when one reference is removed: chains, bridges, cycles and
+repeated/reversed edges. Focus, active and captured windows stay in the
+component of the active anchor. Nonedges fail without splitting input.
+
+Vanilla split only the from queue, breaking surviving links and moving
+active/focus away from the foreground input object. Keep the v1 component
+walk and retain the active component's input object. Allocation failure
+restores the removed reference; detach-all is unchanged.
+
+The measured implicit child sequences differ: SetParent(child, NULL)
+retains the shared input association, including after that child is later
+destroyed, whereas direct destruction detaches its old host on Windows.
+Do not split the old parent group when moving a child to the desktop.
+Otherwise v1 would newly clear the old host's active window, a field that
+vanilla preserves like Windows. Direct-destruction detachment and the
+self-detach error-code discrepancy remain separate Wine gaps, limited
+todo_wine assertions in the test. No claim covers unmeasured desktop,
+DPI, cross-process or allocator-failure Windows behavior.
+
+v4 (2026-11-10, separation round 2): round 1 reached every initial state
+but still found 301/305 ordinary failures, beginning in a no-edge local
+focus probe. Always check component relations to an exact, positive live
+actor using the literal native rows, plus unchanged capture and API/error
+assertions. Keep full absolute inactive-queue state as a separate view:
+the first no-edge probe establishes its prerequisite before any attachment,
+and can skip only that view. Report both scopes; do not call an absolute
+skip full Wine validation. Native L1 must execute both views over all 592
+checkpoints. No server hunk or native table changes; the existing narrow
+direct-destruction and self-error todos retain their behavioral scope.
+V4 native L1 and paired L2 are pending.
+
+v3 (2026-11-09, foreground setup round 1): create hidden own windows,
+show them without incidental activation, seed independent queues to the
+measured initial pattern and drain their events. Check actual foreground,
+active and focus state before any edge or child is created. If that
+initial prerequisite cannot be reached, skip the scenario explicitly;
+never skip a failed assertion after attachments exist. Report completed
+and skipped coverage separately. The literal Windows oracle, existing
+todos and all implementation hunks are unchanged. V3 needs its own native
+L1 rerun and paired L2; v2's native pass is not transferred to this body.
+
+v2 (2026-11-09): add a Wine test with literal observed state checkpoints
+and invalid/duplicate reference results, plus the measured desktop-reparent
+limit that preserves the old host too. The x86_64 and i686 measurements
+are identical except bitness; expected values are never computed from
+Wine's attachment graph. Native assertion L1 passed on Windows 10
+x86_64/i386: 10195 checks each, zero failures/skips. Paired L2 run
+42695491325 completed the assertion unit but still reports 2377 i386 and
+2370 x86_64 ordinary active/focus failures under Xvfb. L2 is not cleared
+(see the candidate README); no native expected value or todo was changed.
+
+diff --git a/server/queue.c b/server/queue.c
+--- a/server/queue.c
++++ b/server/queue.c
+@@ -1495,11 +1495,91 @@
+     release_object( old_input );
+ }
+ 
++/* Return the queues reachable through the remaining undirected attachments. */
++static size_t collect_input_component( struct thread_input *input, struct msg_queue *seed,
++                                       struct msg_queue **queues )
++{
++    struct attachment *attach;
++    struct msg_queue *other;
++    size_t count = 1, i, j;
++
++    queues[0] = seed;
++    for (i = 0; i < count; ++i)
++    {
++        LIST_FOR_EACH_ENTRY( attach, &input->attachments, struct attachment, entry )
++        {
++            if (attach->queue_from == queues[i]) other = attach->queue_to;
++            else if (attach->queue_to == queues[i]) other = attach->queue_from;
++            else continue;
++            for (j = 0; j < count; ++j) if (queues[j] == other) break;
++            if (j == count) queues[count++] = other;
++        }
++    }
++    return count;
++}
++
++/* Split a disconnected component, keeping the active window's input object. */
++static int split_thread_input( struct msg_queue *queue_from, struct msg_queue *queue_to,
++                               struct desktop *desktop )
++{
++    struct thread_input *old_input = queue_from->input, *new_input;
++    struct attachment *attach, *next;
++    struct msg_queue **queues;
++    struct thread *owner;
++    size_t capacity = 1, count, i;
++
++    LIST_FOR_EACH_ENTRY( attach, &old_input->attachments, struct attachment, entry )
++    {
++        if (capacity > ~(size_t)0 / sizeof(*queues) - 2)
++        {
++            set_error( STATUS_NO_MEMORY );
++            return 0;
++        }
++        capacity += 2;
++    }
++    if (!(queues = mem_alloc( capacity * sizeof(*queues) ))) return 0;
++    count = collect_input_component( old_input, queue_from, queues );
++    for (i = 0; i < count; ++i) if (queues[i] == queue_to) break;
++    if (i < count)  /* another path still connects the two endpoints */
++    {
++        free( queues );
++        return 1;
++    }
++
++    /* The foreground desktop still points at old_input. Do not move its active
++     * window's queue to the new object while leaving foreground input behind. */
++    if (old_input->shared->active && (owner = get_window_thread( old_input->shared->active )))
++    {
++        for (i = 0; i < count; ++i) if (queues[i] == owner->queue) break;
++        release_object( owner );
++        if (i < count) count = collect_input_component( old_input, queue_to, queues );
++    }
++    if (!(new_input = create_thread_input( desktop )))
++    {
++        free( queues );
++        return 0;
++    }
++
++    grab_object( old_input );
++    for (i = 0; i < count; ++i) assign_thread_input( queues[i], new_input );
++    LIST_FOR_EACH_ENTRY_SAFE( attach, next, &old_input->attachments, struct attachment, entry )
++    {
++        if (attach->queue_from->input != new_input) continue;
++        assert( attach->queue_to->input == new_input );
++        list_remove( &attach->entry );
++        list_add_tail( &new_input->attachments, &attach->entry );
++    }
++    release_object( old_input );
++    release_object( new_input );
++    free( queues );
++    return 1;
++}
++
+ /* detach two thread input data structures */
+ void detach_thread_input( struct msg_queue *queue_from, struct msg_queue *queue_to, struct desktop *desktop )
+ {
+     struct thread_input *old_input = queue_from->input, *new_input;
+-    struct attachment *attach, *next;
++    struct attachment *attach, *next, *removed = NULL;
+     int count = 0;
+ 
+     LIST_FOR_EACH_ENTRY_SAFE( attach, next, &old_input->attachments, struct attachment, entry )
+@@ -1508,15 +1588,18 @@
+         if (attach->queue_to != queue_from && (!queue_to || attach->queue_to != queue_to)) continue;
+         if (count++ && queue_to) break;
+         list_remove( &attach->entry );
+-        free( attach );
++        if (queue_to) removed = attach;
++        else free( attach );
+     }
+     if (queue_to)
+     {
+         if (!count) return set_error( STATUS_INVALID_PARAMETER );
+-        if (count > 1) return;
+-    }
+-    /* TODO: detaching a thread may create two separate thread input graphs */
+-
++        if (count > 1 || split_thread_input( queue_from, queue_to, desktop )) free( removed );
++        else list_add_tail( &old_input->attachments, &removed->entry );
++        return;
++    }
++
++    /* Moving one queue to another desktop still removes all its attachments. */
+     if (!(new_input = create_thread_input( desktop ))) return;
+     assign_thread_input( queue_from, new_input );
+     release_object( new_input );
+diff --git a/server/window.c b/server/window.c
+--- a/server/window.c
++++ b/server/window.c
+@@ -425,7 +425,9 @@
+ 
+     if (parent)
+     {
+-        attach_parent_thread( win, false );
++        /* Reparenting a child to the desktop retains its input association.
++         * In particular, another child can still share input with that host. */
++        if (!is_desktop_window( parent )) attach_parent_thread( win, false );
+         if (win->parent) release_object( win->parent );
+         win->parent = (struct window *)grab_object( parent );
+         attach_parent_thread( win, true );
+diff --git a/dlls/user32/tests/Makefile.in b/dlls/user32/tests/Makefile.in
+--- a/dlls/user32/tests/Makefile.in
++++ b/dlls/user32/tests/Makefile.in
+@@ -5,6 +5,7 @@
+ testdll_IMPORTS = user32
+ 
+ SOURCES = \
++	attachment.c \
+ 	broadcast.c \
+ 	class.c \
+ 	clipboard.c \
+diff --git a/dlls/user32/tests/attachment.c b/dlls/user32/tests/attachment.c
+new file mode 100644
+--- /dev/null
++++ b/dlls/user32/tests/attachment.c
+@@ -0,0 +1,1304 @@
++/*
++ * Input attachment component tests.
++ *
++ * Original, AI-assisted (Codex), LGPL-2.1-or-later.
++ * This library is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
++ * Lesser General Public License for more details.
++ */
++#include <stdarg.h>
++#include <stdio.h>
++#include <string.h>
++#include "windef.h"
++#include "winbase.h"
++#include "winuser.h"
++#include "wine/test.h"
++
++/* Original, AI-assisted (Codex), LGPL-2.1-or-later. */
++#define THREADS 4
++#define COMMAND (WM_APP + 31)
++enum operation { FOCUS, ACTIVATE, CAPTURE, RELEASE, CHILD_CREATE, CHILD_FOCUS,
++                 CHILD_UNPARENT, CHILD_DESTROY, STOP, PREPARE, DRAIN, ACTIVATE_START };
++struct worker
++{
++    HANDLE thread, ready;
++    DWORD tid;
++    HWND window, children[2];
++    unsigned int index;
++    BOOL foreground_ret;
++    HWND active, focus, foreground;
++};
++struct edge { unsigned int from, to; };
++struct graph
++{
++    const char *name;
++    unsigned int count, cuts;
++    struct edge edges[5], remove[3];
++    int exit_worker;
++    unsigned int other_anchor;
++};
++static struct worker workers[THREADS];
++static const char *scenario;
++static unsigned int completed_scenarios, skipped_scenarios, detach_call;
++static BOOL scenario_skipped;
++static int absolute_supported = -1;
++static unsigned int component_snapshots, absolute_snapshots, component_positive_checks;
++static LONG attachment_errors;
++
++static const struct graph graphs[] =
++{
++    { "isolated-nonedge", 0, 1, {{0,0}}, {{0,1}}, -1, 1 },
++    { "pair", 1, 1, {{0,1}}, {{0,1}}, -1, 1 },
++    { "chain", 2, 1, {{0,1},{1,2}}, {{1,2}}, -1, 2 },
++    { "bridge", 3, 1, {{0,1},{1,2},{2,3}}, {{1,2}}, -1, 3 },
++    { "cycle", 3, 2, {{0,1},{1,2},{2,0}}, {{0,1},{1,2}}, -1, 2 },
++    { "duplicate", 2, 3, {{0,1},{0,1}}, {{0,1},{0,1},{0,1}}, -1, 1 },
++    { "opposite-edges", 2, 2, {{0,1},{1,0}}, {{0,1},{1,0}}, -1, 1 },
++    { "connected-nonedge", 2, 1, {{0,1},{1,2}}, {{0,2}}, -1, 2 },
++    { "self-detach", 1, 1, {{0,1}}, {{0,0}}, -1, 1 },
++    { "exit-neighbor", 2, 0, {{0,1},{1,2}}, {{0,0}}, 2, 2 },
++};
++
++struct expected_state
++{
++    const char *scenario, *stage, *active, *focus, *capture;
++};
++
++/* Literal Windows observations; . is NULL, a/b are C's child windows,
++ * and - is an exited thread. No graph algorithm generates the oracle. */
++static const struct expected_state expected_states[] =
++{
++    { "isolated-nonedge-reverse0-anchorA", "isolated", "A...", "A...", "...." },
++    { "isolated-nonedge-reverse0-anchorA", "joined", "A...", "A...", "...." },
++    { "isolated-nonedge-reverse0-anchorA", "joined-probe-A", "A...", "A...", "...." },
++    { "isolated-nonedge-reverse0-anchorA", "joined-probe-B", "AB..", "AB..", "...." },
++    { "isolated-nonedge-reverse0-anchorA", "joined-probe-C", "ABC.", "ABC.", "...." },
++    { "isolated-nonedge-reverse0-anchorA", "joined-probe-D", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse0-anchorA", "cut0-before", "ABCD", "ABCD", "A..." },
++    { "isolated-nonedge-reverse0-anchorA", "cut0-passive", "ABCD", "ABCD", "A..." },
++    { "isolated-nonedge-reverse0-anchorA", "cut0-probe-A", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse0-anchorA", "cut0-probe-B", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse0-anchorA", "cut0-probe-C", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse0-anchorA", "cut0-probe-D", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse0-anchorB", "isolated", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse0-anchorB", "joined", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse0-anchorB", "joined-probe-A", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse0-anchorB", "joined-probe-B", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse0-anchorB", "joined-probe-C", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse0-anchorB", "joined-probe-D", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse0-anchorB", "cut0-before", "ABCD", "ABCD", ".B.." },
++    { "isolated-nonedge-reverse0-anchorB", "cut0-passive", "ABCD", "ABCD", ".B.." },
++    { "isolated-nonedge-reverse0-anchorB", "cut0-probe-A", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse0-anchorB", "cut0-probe-B", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse0-anchorB", "cut0-probe-C", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse0-anchorB", "cut0-probe-D", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorA", "joined", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorA", "joined-probe-A", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorA", "joined-probe-B", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorA", "joined-probe-C", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorA", "joined-probe-D", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorA", "cut0-before", "ABCD", "ABCD", "A..." },
++    { "isolated-nonedge-reverse1-anchorA", "cut0-passive", "ABCD", "ABCD", "A..." },
++    { "isolated-nonedge-reverse1-anchorA", "cut0-probe-A", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorA", "cut0-probe-B", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorA", "cut0-probe-C", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorA", "cut0-probe-D", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorB", "isolated", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorB", "joined", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorB", "joined-probe-A", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorB", "joined-probe-B", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorB", "joined-probe-C", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorB", "joined-probe-D", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorB", "cut0-before", "ABCD", "ABCD", ".B.." },
++    { "isolated-nonedge-reverse1-anchorB", "cut0-passive", "ABCD", "ABCD", ".B.." },
++    { "isolated-nonedge-reverse1-anchorB", "cut0-probe-A", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorB", "cut0-probe-B", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorB", "cut0-probe-C", "ABCD", "ABCD", "...." },
++    { "isolated-nonedge-reverse1-anchorB", "cut0-probe-D", "ABCD", "ABCD", "...." },
++    { "pair-reverse0-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "pair-reverse0-anchorA", "joined", "BBCD", "BBCD", "...." },
++    { "pair-reverse0-anchorA", "joined-probe-A", "AACD", "AACD", "...." },
++    { "pair-reverse0-anchorA", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "pair-reverse0-anchorA", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "pair-reverse0-anchorA", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "pair-reverse0-anchorA", "cut0-before", "AACD", "AACD", "AA.." },
++    { "pair-reverse0-anchorA", "cut0-passive", "A.CD", "A.CD", "A..." },
++    { "pair-reverse0-anchorA", "cut0-probe-A", "A.CD", "A.CD", "...." },
++    { "pair-reverse0-anchorA", "cut0-probe-B", "ABCD", "ABCD", "...." },
++    { "pair-reverse0-anchorA", "cut0-probe-C", "ABCD", "ABCD", "...." },
++    { "pair-reverse0-anchorA", "cut0-probe-D", "ABCD", "ABCD", "...." },
++    { "pair-reverse0-anchorB", "isolated", "ABCD", "ABCD", "...." },
++    { "pair-reverse0-anchorB", "joined", "BBCD", "BBCD", "...." },
++    { "pair-reverse0-anchorB", "joined-probe-A", "AACD", "AACD", "...." },
++    { "pair-reverse0-anchorB", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "pair-reverse0-anchorB", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "pair-reverse0-anchorB", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "pair-reverse0-anchorB", "cut0-before", "BBCD", "BBCD", "BB.." },
++    { "pair-reverse0-anchorB", "cut0-passive", ".BCD", ".BCD", ".B.." },
++    { "pair-reverse0-anchorB", "cut0-probe-A", "ABCD", "ABCD", "...." },
++    { "pair-reverse0-anchorB", "cut0-probe-B", "ABCD", "ABCD", "...." },
++    { "pair-reverse0-anchorB", "cut0-probe-C", "ABCD", "ABCD", "...." },
++    { "pair-reverse0-anchorB", "cut0-probe-D", "ABCD", "ABCD", "...." },
++    { "pair-reverse1-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "pair-reverse1-anchorA", "joined", "BBCD", "BBCD", "...." },
++    { "pair-reverse1-anchorA", "joined-probe-A", "AACD", "AACD", "...." },
++    { "pair-reverse1-anchorA", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "pair-reverse1-anchorA", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "pair-reverse1-anchorA", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "pair-reverse1-anchorA", "cut0-before", "AACD", "AACD", "AA.." },
++    { "pair-reverse1-anchorA", "cut0-passive", "A.CD", "A.CD", "A..." },
++    { "pair-reverse1-anchorA", "cut0-probe-A", "A.CD", "A.CD", "...." },
++    { "pair-reverse1-anchorA", "cut0-probe-B", "ABCD", "ABCD", "...." },
++    { "pair-reverse1-anchorA", "cut0-probe-C", "ABCD", "ABCD", "...." },
++    { "pair-reverse1-anchorA", "cut0-probe-D", "ABCD", "ABCD", "...." },
++    { "pair-reverse1-anchorB", "isolated", "ABCD", "ABCD", "...." },
++    { "pair-reverse1-anchorB", "joined", "BBCD", "BBCD", "...." },
++    { "pair-reverse1-anchorB", "joined-probe-A", "AACD", "AACD", "...." },
++    { "pair-reverse1-anchorB", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "pair-reverse1-anchorB", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "pair-reverse1-anchorB", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "pair-reverse1-anchorB", "cut0-before", "BBCD", "BBCD", "BB.." },
++    { "pair-reverse1-anchorB", "cut0-passive", ".BCD", ".BCD", ".B.." },
++    { "pair-reverse1-anchorB", "cut0-probe-A", "ABCD", "ABCD", "...." },
++    { "pair-reverse1-anchorB", "cut0-probe-B", "ABCD", "ABCD", "...." },
++    { "pair-reverse1-anchorB", "cut0-probe-C", "ABCD", "ABCD", "...." },
++    { "pair-reverse1-anchorB", "cut0-probe-D", "ABCD", "ABCD", "...." },
++    { "chain-reverse0-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "chain-reverse0-anchorA", "joined", "CCCD", "CCCD", "...." },
++    { "chain-reverse0-anchorA", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "chain-reverse0-anchorA", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "chain-reverse0-anchorA", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "chain-reverse0-anchorA", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "chain-reverse0-anchorA", "cut0-before", "AAAD", "AAAD", "AAA." },
++    { "chain-reverse0-anchorA", "cut0-passive", "AA.D", "AA.D", "AA.." },
++    { "chain-reverse0-anchorA", "cut0-probe-A", "AA.D", "AA.D", "...." },
++    { "chain-reverse0-anchorA", "cut0-probe-B", "BB.D", "BB.D", "...." },
++    { "chain-reverse0-anchorA", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "chain-reverse0-anchorA", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "chain-reverse0-anchorC", "isolated", "ABCD", "ABCD", "...." },
++    { "chain-reverse0-anchorC", "joined", "CCCD", "CCCD", "...." },
++    { "chain-reverse0-anchorC", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "chain-reverse0-anchorC", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "chain-reverse0-anchorC", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "chain-reverse0-anchorC", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "chain-reverse0-anchorC", "cut0-before", "CCCD", "CCCD", "CCC." },
++    { "chain-reverse0-anchorC", "cut0-passive", "..CD", "..CD", "..C." },
++    { "chain-reverse0-anchorC", "cut0-probe-A", "AACD", "AACD", "...." },
++    { "chain-reverse0-anchorC", "cut0-probe-B", "BBCD", "BBCD", "...." },
++    { "chain-reverse0-anchorC", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "chain-reverse0-anchorC", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "chain-reverse1-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "chain-reverse1-anchorA", "joined", "CCCD", "CCCD", "...." },
++    { "chain-reverse1-anchorA", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "chain-reverse1-anchorA", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "chain-reverse1-anchorA", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "chain-reverse1-anchorA", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "chain-reverse1-anchorA", "cut0-before", "AAAD", "AAAD", "AAA." },
++    { "chain-reverse1-anchorA", "cut0-passive", "AA.D", "AA.D", "AA.." },
++    { "chain-reverse1-anchorA", "cut0-probe-A", "AA.D", "AA.D", "...." },
++    { "chain-reverse1-anchorA", "cut0-probe-B", "BB.D", "BB.D", "...." },
++    { "chain-reverse1-anchorA", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "chain-reverse1-anchorA", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "chain-reverse1-anchorC", "isolated", "ABCD", "ABCD", "...." },
++    { "chain-reverse1-anchorC", "joined", "CCCD", "CCCD", "...." },
++    { "chain-reverse1-anchorC", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "chain-reverse1-anchorC", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "chain-reverse1-anchorC", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "chain-reverse1-anchorC", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "chain-reverse1-anchorC", "cut0-before", "CCCD", "CCCD", "CCC." },
++    { "chain-reverse1-anchorC", "cut0-passive", "..CD", "..CD", "..C." },
++    { "chain-reverse1-anchorC", "cut0-probe-A", "AACD", "AACD", "...." },
++    { "chain-reverse1-anchorC", "cut0-probe-B", "BBCD", "BBCD", "...." },
++    { "chain-reverse1-anchorC", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "chain-reverse1-anchorC", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "bridge-reverse0-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "bridge-reverse0-anchorA", "joined", "DDDD", "DDDD", "...." },
++    { "bridge-reverse0-anchorA", "joined-probe-A", "AAAA", "AAAA", "...." },
++    { "bridge-reverse0-anchorA", "joined-probe-B", "BBBB", "BBBB", "...." },
++    { "bridge-reverse0-anchorA", "joined-probe-C", "CCCC", "CCCC", "...." },
++    { "bridge-reverse0-anchorA", "joined-probe-D", "DDDD", "DDDD", "...." },
++    { "bridge-reverse0-anchorA", "cut0-before", "AAAA", "AAAA", "AAAA" },
++    { "bridge-reverse0-anchorA", "cut0-passive", "AA..", "AA..", "AA.." },
++    { "bridge-reverse0-anchorA", "cut0-probe-A", "AA..", "AA..", "...." },
++    { "bridge-reverse0-anchorA", "cut0-probe-B", "BB..", "BB..", "...." },
++    { "bridge-reverse0-anchorA", "cut0-probe-C", "BBCC", "BBCC", "...." },
++    { "bridge-reverse0-anchorA", "cut0-probe-D", "BBDD", "BBDD", "...." },
++    { "bridge-reverse0-anchorD", "isolated", "ABCD", "ABCD", "...." },
++    { "bridge-reverse0-anchorD", "joined", "DDDD", "DDDD", "...." },
++    { "bridge-reverse0-anchorD", "joined-probe-A", "AAAA", "AAAA", "...." },
++    { "bridge-reverse0-anchorD", "joined-probe-B", "BBBB", "BBBB", "...." },
++    { "bridge-reverse0-anchorD", "joined-probe-C", "CCCC", "CCCC", "...." },
++    { "bridge-reverse0-anchorD", "joined-probe-D", "DDDD", "DDDD", "...." },
++    { "bridge-reverse0-anchorD", "cut0-before", "DDDD", "DDDD", "DDDD" },
++    { "bridge-reverse0-anchorD", "cut0-passive", "..DD", "..DD", "..DD" },
++    { "bridge-reverse0-anchorD", "cut0-probe-A", "AADD", "AADD", "...." },
++    { "bridge-reverse0-anchorD", "cut0-probe-B", "BBDD", "BBDD", "...." },
++    { "bridge-reverse0-anchorD", "cut0-probe-C", "BBCC", "BBCC", "...." },
++    { "bridge-reverse0-anchorD", "cut0-probe-D", "BBDD", "BBDD", "...." },
++    { "bridge-reverse1-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "bridge-reverse1-anchorA", "joined", "DDDD", "DDDD", "...." },
++    { "bridge-reverse1-anchorA", "joined-probe-A", "AAAA", "AAAA", "...." },
++    { "bridge-reverse1-anchorA", "joined-probe-B", "BBBB", "BBBB", "...." },
++    { "bridge-reverse1-anchorA", "joined-probe-C", "CCCC", "CCCC", "...." },
++    { "bridge-reverse1-anchorA", "joined-probe-D", "DDDD", "DDDD", "...." },
++    { "bridge-reverse1-anchorA", "cut0-before", "AAAA", "AAAA", "AAAA" },
++    { "bridge-reverse1-anchorA", "cut0-passive", "AA..", "AA..", "AA.." },
++    { "bridge-reverse1-anchorA", "cut0-probe-A", "AA..", "AA..", "...." },
++    { "bridge-reverse1-anchorA", "cut0-probe-B", "BB..", "BB..", "...." },
++    { "bridge-reverse1-anchorA", "cut0-probe-C", "BBCC", "BBCC", "...." },
++    { "bridge-reverse1-anchorA", "cut0-probe-D", "BBDD", "BBDD", "...." },
++    { "bridge-reverse1-anchorD", "isolated", "ABCD", "ABCD", "...." },
++    { "bridge-reverse1-anchorD", "joined", "DDDD", "DDDD", "...." },
++    { "bridge-reverse1-anchorD", "joined-probe-A", "AAAA", "AAAA", "...." },
++    { "bridge-reverse1-anchorD", "joined-probe-B", "BBBB", "BBBB", "...." },
++    { "bridge-reverse1-anchorD", "joined-probe-C", "CCCC", "CCCC", "...." },
++    { "bridge-reverse1-anchorD", "joined-probe-D", "DDDD", "DDDD", "...." },
++    { "bridge-reverse1-anchorD", "cut0-before", "DDDD", "DDDD", "DDDD" },
++    { "bridge-reverse1-anchorD", "cut0-passive", "..DD", "..DD", "..DD" },
++    { "bridge-reverse1-anchorD", "cut0-probe-A", "AADD", "AADD", "...." },
++    { "bridge-reverse1-anchorD", "cut0-probe-B", "BBDD", "BBDD", "...." },
++    { "bridge-reverse1-anchorD", "cut0-probe-C", "BBCC", "BBCC", "...." },
++    { "bridge-reverse1-anchorD", "cut0-probe-D", "BBDD", "BBDD", "...." },
++    { "cycle-reverse0-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "cycle-reverse0-anchorA", "joined", "CCCD", "CCCD", "...." },
++    { "cycle-reverse0-anchorA", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "cycle-reverse0-anchorA", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "cycle-reverse0-anchorA", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "cycle-reverse0-anchorA", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "cycle-reverse0-anchorA", "cut0-before", "AAAD", "AAAD", "AAA." },
++    { "cycle-reverse0-anchorA", "cut0-passive", "AAAD", "AAAD", "AAA." },
++    { "cycle-reverse0-anchorA", "cut0-probe-A", "AAAD", "AAAD", "...." },
++    { "cycle-reverse0-anchorA", "cut0-probe-B", "BBBD", "BBBD", "...." },
++    { "cycle-reverse0-anchorA", "cut0-probe-C", "CCCD", "CCCD", "...." },
++    { "cycle-reverse0-anchorA", "cut0-probe-D", "CCCD", "CCCD", "...." },
++    { "cycle-reverse0-anchorA", "cut1-before", "AAAD", "AAAD", "AAA." },
++    { "cycle-reverse0-anchorA", "cut1-passive", "A.AD", "A.AD", "A.A." },
++    { "cycle-reverse0-anchorA", "cut1-probe-A", "A.AD", "A.AD", "...." },
++    { "cycle-reverse0-anchorA", "cut1-probe-B", "ABAD", "ABAD", "...." },
++    { "cycle-reverse0-anchorA", "cut1-probe-C", "CBCD", "CBCD", "...." },
++    { "cycle-reverse0-anchorA", "cut1-probe-D", "CBCD", "CBCD", "...." },
++    { "cycle-reverse0-anchorC", "isolated", "ABCD", "ABCD", "...." },
++    { "cycle-reverse0-anchorC", "joined", "CCCD", "CCCD", "...." },
++    { "cycle-reverse0-anchorC", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "cycle-reverse0-anchorC", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "cycle-reverse0-anchorC", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "cycle-reverse0-anchorC", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "cycle-reverse0-anchorC", "cut0-before", "CCCD", "CCCD", "CCC." },
++    { "cycle-reverse0-anchorC", "cut0-passive", "CCCD", "CCCD", "CCC." },
++    { "cycle-reverse0-anchorC", "cut0-probe-A", "AAAD", "AAAD", "...." },
++    { "cycle-reverse0-anchorC", "cut0-probe-B", "BBBD", "BBBD", "...." },
++    { "cycle-reverse0-anchorC", "cut0-probe-C", "CCCD", "CCCD", "...." },
++    { "cycle-reverse0-anchorC", "cut0-probe-D", "CCCD", "CCCD", "...." },
++    { "cycle-reverse0-anchorC", "cut1-before", "CCCD", "CCCD", "CCC." },
++    { "cycle-reverse0-anchorC", "cut1-passive", "C.CD", "C.CD", "C.C." },
++    { "cycle-reverse0-anchorC", "cut1-probe-A", "A.AD", "A.AD", "...." },
++    { "cycle-reverse0-anchorC", "cut1-probe-B", "ABAD", "ABAD", "...." },
++    { "cycle-reverse0-anchorC", "cut1-probe-C", "CBCD", "CBCD", "...." },
++    { "cycle-reverse0-anchorC", "cut1-probe-D", "CBCD", "CBCD", "...." },
++    { "cycle-reverse1-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "cycle-reverse1-anchorA", "joined", "CCCD", "CCCD", "...." },
++    { "cycle-reverse1-anchorA", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "cycle-reverse1-anchorA", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "cycle-reverse1-anchorA", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "cycle-reverse1-anchorA", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "cycle-reverse1-anchorA", "cut0-before", "AAAD", "AAAD", "AAA." },
++    { "cycle-reverse1-anchorA", "cut0-passive", "AAAD", "AAAD", "AAA." },
++    { "cycle-reverse1-anchorA", "cut0-probe-A", "AAAD", "AAAD", "...." },
++    { "cycle-reverse1-anchorA", "cut0-probe-B", "BBBD", "BBBD", "...." },
++    { "cycle-reverse1-anchorA", "cut0-probe-C", "CCCD", "CCCD", "...." },
++    { "cycle-reverse1-anchorA", "cut0-probe-D", "CCCD", "CCCD", "...." },
++    { "cycle-reverse1-anchorA", "cut1-before", "AAAD", "AAAD", "AAA." },
++    { "cycle-reverse1-anchorA", "cut1-passive", "A.AD", "A.AD", "A.A." },
++    { "cycle-reverse1-anchorA", "cut1-probe-A", "A.AD", "A.AD", "...." },
++    { "cycle-reverse1-anchorA", "cut1-probe-B", "ABAD", "ABAD", "...." },
++    { "cycle-reverse1-anchorA", "cut1-probe-C", "CBCD", "CBCD", "...." },
++    { "cycle-reverse1-anchorA", "cut1-probe-D", "CBCD", "CBCD", "...." },
++    { "cycle-reverse1-anchorC", "isolated", "ABCD", "ABCD", "...." },
++    { "cycle-reverse1-anchorC", "joined", "CCCD", "CCCD", "...." },
++    { "cycle-reverse1-anchorC", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "cycle-reverse1-anchorC", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "cycle-reverse1-anchorC", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "cycle-reverse1-anchorC", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "cycle-reverse1-anchorC", "cut0-before", "CCCD", "CCCD", "CCC." },
++    { "cycle-reverse1-anchorC", "cut0-passive", "CCCD", "CCCD", "CCC." },
++    { "cycle-reverse1-anchorC", "cut0-probe-A", "AAAD", "AAAD", "...." },
++    { "cycle-reverse1-anchorC", "cut0-probe-B", "BBBD", "BBBD", "...." },
++    { "cycle-reverse1-anchorC", "cut0-probe-C", "CCCD", "CCCD", "...." },
++    { "cycle-reverse1-anchorC", "cut0-probe-D", "CCCD", "CCCD", "...." },
++    { "cycle-reverse1-anchorC", "cut1-before", "CCCD", "CCCD", "CCC." },
++    { "cycle-reverse1-anchorC", "cut1-passive", "C.CD", "C.CD", "C.C." },
++    { "cycle-reverse1-anchorC", "cut1-probe-A", "A.AD", "A.AD", "...." },
++    { "cycle-reverse1-anchorC", "cut1-probe-B", "ABAD", "ABAD", "...." },
++    { "cycle-reverse1-anchorC", "cut1-probe-C", "CBCD", "CBCD", "...." },
++    { "cycle-reverse1-anchorC", "cut1-probe-D", "CBCD", "CBCD", "...." },
++    { "duplicate-reverse0-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorA", "joined", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse0-anchorA", "joined-probe-A", "AACD", "AACD", "...." },
++    { "duplicate-reverse0-anchorA", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse0-anchorA", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse0-anchorA", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse0-anchorA", "cut0-before", "AACD", "AACD", "AA.." },
++    { "duplicate-reverse0-anchorA", "cut0-passive", "AACD", "AACD", "AA.." },
++    { "duplicate-reverse0-anchorA", "cut0-probe-A", "AACD", "AACD", "...." },
++    { "duplicate-reverse0-anchorA", "cut0-probe-B", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse0-anchorA", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse0-anchorA", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse0-anchorA", "cut1-before", "AACD", "AACD", "AA.." },
++    { "duplicate-reverse0-anchorA", "cut1-passive", "A.CD", "A.CD", "A..." },
++    { "duplicate-reverse0-anchorA", "cut1-probe-A", "A.CD", "A.CD", "...." },
++    { "duplicate-reverse0-anchorA", "cut1-probe-B", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorA", "cut1-probe-C", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorA", "cut1-probe-D", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorA", "cut2-before", "ABCD", "ABCD", "A..." },
++    { "duplicate-reverse0-anchorA", "cut2-passive", "ABCD", "ABCD", "A..." },
++    { "duplicate-reverse0-anchorA", "cut2-probe-A", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorA", "cut2-probe-B", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorA", "cut2-probe-C", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorA", "cut2-probe-D", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorB", "isolated", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorB", "joined", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse0-anchorB", "joined-probe-A", "AACD", "AACD", "...." },
++    { "duplicate-reverse0-anchorB", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse0-anchorB", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse0-anchorB", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse0-anchorB", "cut0-before", "BBCD", "BBCD", "BB.." },
++    { "duplicate-reverse0-anchorB", "cut0-passive", "BBCD", "BBCD", "BB.." },
++    { "duplicate-reverse0-anchorB", "cut0-probe-A", "AACD", "AACD", "...." },
++    { "duplicate-reverse0-anchorB", "cut0-probe-B", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse0-anchorB", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse0-anchorB", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse0-anchorB", "cut1-before", "BBCD", "BBCD", "BB.." },
++    { "duplicate-reverse0-anchorB", "cut1-passive", ".BCD", ".BCD", ".B.." },
++    { "duplicate-reverse0-anchorB", "cut1-probe-A", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorB", "cut1-probe-B", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorB", "cut1-probe-C", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorB", "cut1-probe-D", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorB", "cut2-before", "ABCD", "ABCD", ".B.." },
++    { "duplicate-reverse0-anchorB", "cut2-passive", "ABCD", "ABCD", ".B.." },
++    { "duplicate-reverse0-anchorB", "cut2-probe-A", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorB", "cut2-probe-B", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorB", "cut2-probe-C", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse0-anchorB", "cut2-probe-D", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorA", "joined", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse1-anchorA", "joined-probe-A", "AACD", "AACD", "...." },
++    { "duplicate-reverse1-anchorA", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse1-anchorA", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse1-anchorA", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse1-anchorA", "cut0-before", "AACD", "AACD", "AA.." },
++    { "duplicate-reverse1-anchorA", "cut0-passive", "AACD", "AACD", "AA.." },
++    { "duplicate-reverse1-anchorA", "cut0-probe-A", "AACD", "AACD", "...." },
++    { "duplicate-reverse1-anchorA", "cut0-probe-B", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse1-anchorA", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse1-anchorA", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse1-anchorA", "cut1-before", "AACD", "AACD", "AA.." },
++    { "duplicate-reverse1-anchorA", "cut1-passive", "A.CD", "A.CD", "A..." },
++    { "duplicate-reverse1-anchorA", "cut1-probe-A", "A.CD", "A.CD", "...." },
++    { "duplicate-reverse1-anchorA", "cut1-probe-B", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorA", "cut1-probe-C", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorA", "cut1-probe-D", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorA", "cut2-before", "ABCD", "ABCD", "A..." },
++    { "duplicate-reverse1-anchorA", "cut2-passive", "ABCD", "ABCD", "A..." },
++    { "duplicate-reverse1-anchorA", "cut2-probe-A", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorA", "cut2-probe-B", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorA", "cut2-probe-C", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorA", "cut2-probe-D", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorB", "isolated", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorB", "joined", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse1-anchorB", "joined-probe-A", "AACD", "AACD", "...." },
++    { "duplicate-reverse1-anchorB", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse1-anchorB", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse1-anchorB", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse1-anchorB", "cut0-before", "BBCD", "BBCD", "BB.." },
++    { "duplicate-reverse1-anchorB", "cut0-passive", "BBCD", "BBCD", "BB.." },
++    { "duplicate-reverse1-anchorB", "cut0-probe-A", "AACD", "AACD", "...." },
++    { "duplicate-reverse1-anchorB", "cut0-probe-B", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse1-anchorB", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse1-anchorB", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "duplicate-reverse1-anchorB", "cut1-before", "BBCD", "BBCD", "BB.." },
++    { "duplicate-reverse1-anchorB", "cut1-passive", ".BCD", ".BCD", ".B.." },
++    { "duplicate-reverse1-anchorB", "cut1-probe-A", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorB", "cut1-probe-B", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorB", "cut1-probe-C", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorB", "cut1-probe-D", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorB", "cut2-before", "ABCD", "ABCD", ".B.." },
++    { "duplicate-reverse1-anchorB", "cut2-passive", "ABCD", "ABCD", ".B.." },
++    { "duplicate-reverse1-anchorB", "cut2-probe-A", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorB", "cut2-probe-B", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorB", "cut2-probe-C", "ABCD", "ABCD", "...." },
++    { "duplicate-reverse1-anchorB", "cut2-probe-D", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse0-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse0-anchorA", "joined", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse0-anchorA", "joined-probe-A", "AACD", "AACD", "...." },
++    { "opposite-edges-reverse0-anchorA", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse0-anchorA", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse0-anchorA", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse0-anchorA", "cut0-before", "AACD", "AACD", "AA.." },
++    { "opposite-edges-reverse0-anchorA", "cut0-passive", "AACD", "AACD", "AA.." },
++    { "opposite-edges-reverse0-anchorA", "cut0-probe-A", "AACD", "AACD", "...." },
++    { "opposite-edges-reverse0-anchorA", "cut0-probe-B", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse0-anchorA", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse0-anchorA", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse0-anchorA", "cut1-before", "AACD", "AACD", "AA.." },
++    { "opposite-edges-reverse0-anchorA", "cut1-passive", "A.CD", "A.CD", "A..." },
++    { "opposite-edges-reverse0-anchorA", "cut1-probe-A", "A.CD", "A.CD", "...." },
++    { "opposite-edges-reverse0-anchorA", "cut1-probe-B", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse0-anchorA", "cut1-probe-C", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse0-anchorA", "cut1-probe-D", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse0-anchorB", "isolated", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse0-anchorB", "joined", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse0-anchorB", "joined-probe-A", "AACD", "AACD", "...." },
++    { "opposite-edges-reverse0-anchorB", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse0-anchorB", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse0-anchorB", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse0-anchorB", "cut0-before", "BBCD", "BBCD", "BB.." },
++    { "opposite-edges-reverse0-anchorB", "cut0-passive", "BBCD", "BBCD", "BB.." },
++    { "opposite-edges-reverse0-anchorB", "cut0-probe-A", "AACD", "AACD", "...." },
++    { "opposite-edges-reverse0-anchorB", "cut0-probe-B", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse0-anchorB", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse0-anchorB", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse0-anchorB", "cut1-before", "BBCD", "BBCD", "BB.." },
++    { "opposite-edges-reverse0-anchorB", "cut1-passive", ".BCD", ".BCD", ".B.." },
++    { "opposite-edges-reverse0-anchorB", "cut1-probe-A", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse0-anchorB", "cut1-probe-B", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse0-anchorB", "cut1-probe-C", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse0-anchorB", "cut1-probe-D", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse1-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse1-anchorA", "joined", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse1-anchorA", "joined-probe-A", "AACD", "AACD", "...." },
++    { "opposite-edges-reverse1-anchorA", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse1-anchorA", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse1-anchorA", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse1-anchorA", "cut0-before", "AACD", "AACD", "AA.." },
++    { "opposite-edges-reverse1-anchorA", "cut0-passive", "AACD", "AACD", "AA.." },
++    { "opposite-edges-reverse1-anchorA", "cut0-probe-A", "AACD", "AACD", "...." },
++    { "opposite-edges-reverse1-anchorA", "cut0-probe-B", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse1-anchorA", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse1-anchorA", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse1-anchorA", "cut1-before", "AACD", "AACD", "AA.." },
++    { "opposite-edges-reverse1-anchorA", "cut1-passive", "A.CD", "A.CD", "A..." },
++    { "opposite-edges-reverse1-anchorA", "cut1-probe-A", "A.CD", "A.CD", "...." },
++    { "opposite-edges-reverse1-anchorA", "cut1-probe-B", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse1-anchorA", "cut1-probe-C", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse1-anchorA", "cut1-probe-D", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse1-anchorB", "isolated", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse1-anchorB", "joined", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse1-anchorB", "joined-probe-A", "AACD", "AACD", "...." },
++    { "opposite-edges-reverse1-anchorB", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse1-anchorB", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse1-anchorB", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse1-anchorB", "cut0-before", "BBCD", "BBCD", "BB.." },
++    { "opposite-edges-reverse1-anchorB", "cut0-passive", "BBCD", "BBCD", "BB.." },
++    { "opposite-edges-reverse1-anchorB", "cut0-probe-A", "AACD", "AACD", "...." },
++    { "opposite-edges-reverse1-anchorB", "cut0-probe-B", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse1-anchorB", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse1-anchorB", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "opposite-edges-reverse1-anchorB", "cut1-before", "BBCD", "BBCD", "BB.." },
++    { "opposite-edges-reverse1-anchorB", "cut1-passive", ".BCD", ".BCD", ".B.." },
++    { "opposite-edges-reverse1-anchorB", "cut1-probe-A", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse1-anchorB", "cut1-probe-B", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse1-anchorB", "cut1-probe-C", "ABCD", "ABCD", "...." },
++    { "opposite-edges-reverse1-anchorB", "cut1-probe-D", "ABCD", "ABCD", "...." },
++    { "connected-nonedge-reverse0-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "connected-nonedge-reverse0-anchorA", "joined", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse0-anchorA", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "connected-nonedge-reverse0-anchorA", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "connected-nonedge-reverse0-anchorA", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse0-anchorA", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse0-anchorA", "cut0-before", "AAAD", "AAAD", "AAA." },
++    { "connected-nonedge-reverse0-anchorA", "cut0-passive", "AAAD", "AAAD", "AAA." },
++    { "connected-nonedge-reverse0-anchorA", "cut0-probe-A", "AAAD", "AAAD", "...." },
++    { "connected-nonedge-reverse0-anchorA", "cut0-probe-B", "BBBD", "BBBD", "...." },
++    { "connected-nonedge-reverse0-anchorA", "cut0-probe-C", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse0-anchorA", "cut0-probe-D", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse0-anchorC", "isolated", "ABCD", "ABCD", "...." },
++    { "connected-nonedge-reverse0-anchorC", "joined", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse0-anchorC", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "connected-nonedge-reverse0-anchorC", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "connected-nonedge-reverse0-anchorC", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse0-anchorC", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse0-anchorC", "cut0-before", "CCCD", "CCCD", "CCC." },
++    { "connected-nonedge-reverse0-anchorC", "cut0-passive", "CCCD", "CCCD", "CCC." },
++    { "connected-nonedge-reverse0-anchorC", "cut0-probe-A", "AAAD", "AAAD", "...." },
++    { "connected-nonedge-reverse0-anchorC", "cut0-probe-B", "BBBD", "BBBD", "...." },
++    { "connected-nonedge-reverse0-anchorC", "cut0-probe-C", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse0-anchorC", "cut0-probe-D", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse1-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "connected-nonedge-reverse1-anchorA", "joined", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse1-anchorA", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "connected-nonedge-reverse1-anchorA", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "connected-nonedge-reverse1-anchorA", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse1-anchorA", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse1-anchorA", "cut0-before", "AAAD", "AAAD", "AAA." },
++    { "connected-nonedge-reverse1-anchorA", "cut0-passive", "AAAD", "AAAD", "AAA." },
++    { "connected-nonedge-reverse1-anchorA", "cut0-probe-A", "AAAD", "AAAD", "...." },
++    { "connected-nonedge-reverse1-anchorA", "cut0-probe-B", "BBBD", "BBBD", "...." },
++    { "connected-nonedge-reverse1-anchorA", "cut0-probe-C", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse1-anchorA", "cut0-probe-D", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse1-anchorC", "isolated", "ABCD", "ABCD", "...." },
++    { "connected-nonedge-reverse1-anchorC", "joined", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse1-anchorC", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "connected-nonedge-reverse1-anchorC", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "connected-nonedge-reverse1-anchorC", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse1-anchorC", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse1-anchorC", "cut0-before", "CCCD", "CCCD", "CCC." },
++    { "connected-nonedge-reverse1-anchorC", "cut0-passive", "CCCD", "CCCD", "CCC." },
++    { "connected-nonedge-reverse1-anchorC", "cut0-probe-A", "AAAD", "AAAD", "...." },
++    { "connected-nonedge-reverse1-anchorC", "cut0-probe-B", "BBBD", "BBBD", "...." },
++    { "connected-nonedge-reverse1-anchorC", "cut0-probe-C", "CCCD", "CCCD", "...." },
++    { "connected-nonedge-reverse1-anchorC", "cut0-probe-D", "CCCD", "CCCD", "...." },
++    { "self-detach-reverse0-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "self-detach-reverse0-anchorA", "joined", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse0-anchorA", "joined-probe-A", "AACD", "AACD", "...." },
++    { "self-detach-reverse0-anchorA", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse0-anchorA", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse0-anchorA", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse0-anchorA", "cut0-before", "AACD", "AACD", "AA.." },
++    { "self-detach-reverse0-anchorA", "cut0-passive", "AACD", "AACD", "AA.." },
++    { "self-detach-reverse0-anchorA", "cut0-probe-A", "AACD", "AACD", "...." },
++    { "self-detach-reverse0-anchorA", "cut0-probe-B", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse0-anchorA", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse0-anchorA", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse0-anchorB", "isolated", "ABCD", "ABCD", "...." },
++    { "self-detach-reverse0-anchorB", "joined", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse0-anchorB", "joined-probe-A", "AACD", "AACD", "...." },
++    { "self-detach-reverse0-anchorB", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse0-anchorB", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse0-anchorB", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse0-anchorB", "cut0-before", "BBCD", "BBCD", "BB.." },
++    { "self-detach-reverse0-anchorB", "cut0-passive", "BBCD", "BBCD", "BB.." },
++    { "self-detach-reverse0-anchorB", "cut0-probe-A", "AACD", "AACD", "...." },
++    { "self-detach-reverse0-anchorB", "cut0-probe-B", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse0-anchorB", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse0-anchorB", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse1-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "self-detach-reverse1-anchorA", "joined", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse1-anchorA", "joined-probe-A", "AACD", "AACD", "...." },
++    { "self-detach-reverse1-anchorA", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse1-anchorA", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse1-anchorA", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse1-anchorA", "cut0-before", "AACD", "AACD", "AA.." },
++    { "self-detach-reverse1-anchorA", "cut0-passive", "AACD", "AACD", "AA.." },
++    { "self-detach-reverse1-anchorA", "cut0-probe-A", "AACD", "AACD", "...." },
++    { "self-detach-reverse1-anchorA", "cut0-probe-B", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse1-anchorA", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse1-anchorA", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse1-anchorB", "isolated", "ABCD", "ABCD", "...." },
++    { "self-detach-reverse1-anchorB", "joined", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse1-anchorB", "joined-probe-A", "AACD", "AACD", "...." },
++    { "self-detach-reverse1-anchorB", "joined-probe-B", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse1-anchorB", "joined-probe-C", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse1-anchorB", "joined-probe-D", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse1-anchorB", "cut0-before", "BBCD", "BBCD", "BB.." },
++    { "self-detach-reverse1-anchorB", "cut0-passive", "BBCD", "BBCD", "BB.." },
++    { "self-detach-reverse1-anchorB", "cut0-probe-A", "AACD", "AACD", "...." },
++    { "self-detach-reverse1-anchorB", "cut0-probe-B", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse1-anchorB", "cut0-probe-C", "BBCD", "BBCD", "...." },
++    { "self-detach-reverse1-anchorB", "cut0-probe-D", "BBCD", "BBCD", "...." },
++    { "exit-neighbor-reverse0-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "exit-neighbor-reverse0-anchorA", "joined", "CCCD", "CCCD", "...." },
++    { "exit-neighbor-reverse0-anchorA", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "exit-neighbor-reverse0-anchorA", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "exit-neighbor-reverse0-anchorA", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "exit-neighbor-reverse0-anchorA", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "exit-neighbor-reverse0-anchorA", "exit-before", "AAAD", "AAAD", "...." },
++    { "exit-neighbor-reverse0-anchorA", "exit-passive", "AA-D", "AA-D", "..-." },
++    { "exit-neighbor-reverse0-anchorA", "exit-probe-A", "AA-D", "AA-D", "..-." },
++    { "exit-neighbor-reverse0-anchorA", "exit-probe-B", "BB-D", "BB-D", "..-." },
++    { "exit-neighbor-reverse0-anchorA", "exit-probe-D", "BB-D", "BB-D", "..-." },
++    { "exit-neighbor-reverse0-anchorC", "isolated", "ABCD", "ABCD", "...." },
++    { "exit-neighbor-reverse0-anchorC", "joined", "CCCD", "CCCD", "...." },
++    { "exit-neighbor-reverse0-anchorC", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "exit-neighbor-reverse0-anchorC", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "exit-neighbor-reverse0-anchorC", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "exit-neighbor-reverse0-anchorC", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "exit-neighbor-reverse0-anchorC", "exit-before", "CCCD", "CCCD", "...." },
++    { "exit-neighbor-reverse0-anchorC", "exit-passive", "BB-D", "BB-D", "..-." },
++    { "exit-neighbor-reverse0-anchorC", "exit-probe-A", "AA-D", "AA-D", "..-." },
++    { "exit-neighbor-reverse0-anchorC", "exit-probe-B", "BB-D", "BB-D", "..-." },
++    { "exit-neighbor-reverse0-anchorC", "exit-probe-D", "BB-D", "BB-D", "..-." },
++    { "exit-neighbor-reverse1-anchorA", "isolated", "ABCD", "ABCD", "...." },
++    { "exit-neighbor-reverse1-anchorA", "joined", "CCCD", "CCCD", "...." },
++    { "exit-neighbor-reverse1-anchorA", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "exit-neighbor-reverse1-anchorA", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "exit-neighbor-reverse1-anchorA", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "exit-neighbor-reverse1-anchorA", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "exit-neighbor-reverse1-anchorA", "exit-before", "AAAD", "AAAD", "...." },
++    { "exit-neighbor-reverse1-anchorA", "exit-passive", "AA-D", "AA-D", "..-." },
++    { "exit-neighbor-reverse1-anchorA", "exit-probe-A", "AA-D", "AA-D", "..-." },
++    { "exit-neighbor-reverse1-anchorA", "exit-probe-B", "BB-D", "BB-D", "..-." },
++    { "exit-neighbor-reverse1-anchorA", "exit-probe-D", "BB-D", "BB-D", "..-." },
++    { "exit-neighbor-reverse1-anchorC", "isolated", "ABCD", "ABCD", "...." },
++    { "exit-neighbor-reverse1-anchorC", "joined", "CCCD", "CCCD", "...." },
++    { "exit-neighbor-reverse1-anchorC", "joined-probe-A", "AAAD", "AAAD", "...." },
++    { "exit-neighbor-reverse1-anchorC", "joined-probe-B", "BBBD", "BBBD", "...." },
++    { "exit-neighbor-reverse1-anchorC", "joined-probe-C", "CCCD", "CCCD", "...." },
++    { "exit-neighbor-reverse1-anchorC", "joined-probe-D", "CCCD", "CCCD", "...." },
++    { "exit-neighbor-reverse1-anchorC", "exit-before", "CCCD", "CCCD", "...." },
++    { "exit-neighbor-reverse1-anchorC", "exit-passive", "BB-D", "BB-D", "..-." },
++    { "exit-neighbor-reverse1-anchorC", "exit-probe-A", "AA-D", "AA-D", "..-." },
++    { "exit-neighbor-reverse1-anchorC", "exit-probe-B", "BB-D", "BB-D", "..-." },
++    { "exit-neighbor-reverse1-anchorC", "exit-probe-D", "BB-D", "BB-D", "..-." },
++    { "children-late0-unparent0", "one-child", "ABAD", "aBaD", "...." },
++    { "children-late0-unparent0", "two-children", "AAAD", "aaaD", "...." },
++    { "children-late0-unparent0", "destroy-passive", "A.AD", "a.aD", "...." },
++    { "children-late0-unparent0", "destroy-refocus", "A.AD", "a.aD", "...." },
++    { "children-late0-unparent1", "one-child", "ABAD", "aBaD", "...." },
++    { "children-late0-unparent1", "two-children", "AAAD", "aaaD", "...." },
++    { "children-late0-unparent1", "unparent-passive", "AAAD", "aaaD", "...." },
++    { "children-late0-unparent1", "unparent-refocus", "AAAD", "aaaD", "...." },
++    { "children-late0-unparent1", "destroy-passive", "AAAD", "aaaD", "...." },
++    { "children-late0-unparent1", "destroy-refocus", "AAAD", "aaaD", "...." },
++    { "children-late1-unparent0", "one-child", "CBCD", "CBCD", "...." },
++    { "children-late1-unparent0", "two-children", "AAAD", "aaaD", "...." },
++    { "children-late1-unparent0", "destroy-passive", "A.AD", "a.aD", "...." },
++    { "children-late1-unparent0", "destroy-refocus", "A.AD", "a.aD", "...." },
++    { "children-late1-unparent1", "one-child", "CBCD", "CBCD", "...." },
++    { "children-late1-unparent1", "two-children", "AAAD", "aaaD", "...." },
++    { "children-late1-unparent1", "unparent-passive", "AAAD", "aaaD", "...." },
++    { "children-late1-unparent1", "unparent-refocus", "AAAD", "aaaD", "...." },
++    { "children-late1-unparent1", "destroy-passive", "AAAD", "aaaD", "...." },
++    { "children-late1-unparent1", "destroy-refocus", "AAAD", "aaaD", "...." },
++};
++
++struct expected_detach
++{
++    const char *scenario;
++    unsigned int call;
++    BOOL result;
++    DWORD error;
++};
++static const struct expected_detach expected_detaches[] =
++{
++    { "isolated-nonedge-reverse0-anchorA", 0, 0, 0x00000057 },
++    { "isolated-nonedge-reverse0-anchorB", 0, 0, 0x00000057 },
++    { "isolated-nonedge-reverse1-anchorA", 0, 0, 0x00000057 },
++    { "isolated-nonedge-reverse1-anchorB", 0, 0, 0x00000057 },
++    { "pair-reverse0-anchorA", 0, 1, 0xdeadbeef },
++    { "pair-reverse0-anchorB", 0, 1, 0xdeadbeef },
++    { "pair-reverse1-anchorA", 0, 1, 0xdeadbeef },
++    { "pair-reverse1-anchorB", 0, 1, 0xdeadbeef },
++    { "chain-reverse0-anchorA", 0, 1, 0xdeadbeef },
++    { "chain-reverse0-anchorC", 0, 1, 0xdeadbeef },
++    { "chain-reverse1-anchorA", 0, 1, 0xdeadbeef },
++    { "chain-reverse1-anchorC", 0, 1, 0xdeadbeef },
++    { "bridge-reverse0-anchorA", 0, 1, 0xdeadbeef },
++    { "bridge-reverse0-anchorD", 0, 1, 0xdeadbeef },
++    { "bridge-reverse1-anchorA", 0, 1, 0xdeadbeef },
++    { "bridge-reverse1-anchorD", 0, 1, 0xdeadbeef },
++    { "cycle-reverse0-anchorA", 0, 1, 0xdeadbeef },
++    { "cycle-reverse0-anchorA", 1, 1, 0xdeadbeef },
++    { "cycle-reverse0-anchorC", 0, 1, 0xdeadbeef },
++    { "cycle-reverse0-anchorC", 1, 1, 0xdeadbeef },
++    { "cycle-reverse1-anchorA", 0, 1, 0xdeadbeef },
++    { "cycle-reverse1-anchorA", 1, 1, 0xdeadbeef },
++    { "cycle-reverse1-anchorC", 0, 1, 0xdeadbeef },
++    { "cycle-reverse1-anchorC", 1, 1, 0xdeadbeef },
++    { "duplicate-reverse0-anchorA", 0, 1, 0xdeadbeef },
++    { "duplicate-reverse0-anchorA", 1, 1, 0xdeadbeef },
++    { "duplicate-reverse0-anchorA", 2, 0, 0x00000057 },
++    { "duplicate-reverse0-anchorB", 0, 1, 0xdeadbeef },
++    { "duplicate-reverse0-anchorB", 1, 1, 0xdeadbeef },
++    { "duplicate-reverse0-anchorB", 2, 0, 0x00000057 },
++    { "duplicate-reverse1-anchorA", 0, 1, 0xdeadbeef },
++    { "duplicate-reverse1-anchorA", 1, 1, 0xdeadbeef },
++    { "duplicate-reverse1-anchorA", 2, 0, 0x00000057 },
++    { "duplicate-reverse1-anchorB", 0, 1, 0xdeadbeef },
++    { "duplicate-reverse1-anchorB", 1, 1, 0xdeadbeef },
++    { "duplicate-reverse1-anchorB", 2, 0, 0x00000057 },
++    { "opposite-edges-reverse0-anchorA", 0, 1, 0xdeadbeef },
++    { "opposite-edges-reverse0-anchorA", 1, 1, 0xdeadbeef },
++    { "opposite-edges-reverse0-anchorB", 0, 1, 0xdeadbeef },
++    { "opposite-edges-reverse0-anchorB", 1, 1, 0xdeadbeef },
++    { "opposite-edges-reverse1-anchorA", 0, 1, 0xdeadbeef },
++    { "opposite-edges-reverse1-anchorA", 1, 1, 0xdeadbeef },
++    { "opposite-edges-reverse1-anchorB", 0, 1, 0xdeadbeef },
++    { "opposite-edges-reverse1-anchorB", 1, 1, 0xdeadbeef },
++    { "connected-nonedge-reverse0-anchorA", 0, 0, 0x00000057 },
++    { "connected-nonedge-reverse0-anchorC", 0, 0, 0x00000057 },
++    { "connected-nonedge-reverse1-anchorA", 0, 0, 0x00000057 },
++    { "connected-nonedge-reverse1-anchorC", 0, 0, 0x00000057 },
++    { "self-detach-reverse0-anchorA", 0, 0, 0x00000057 },
++    { "self-detach-reverse0-anchorB", 0, 0, 0x00000057 },
++    { "self-detach-reverse1-anchorA", 0, 0, 0x00000057 },
++    { "self-detach-reverse1-anchorB", 0, 0, 0x00000057 },
++};
++
++static void attachment_error(const char *operation, DWORD error)
++{
++    InterlockedIncrement(&attachment_errors);
++    ok(0, "%s failed, error %lu\n", operation, error);
++}
++
++static HWND expected_window(char c)
++{
++    if (c == '.') return NULL;
++    if (c == 'a') return workers[2].children[0];
++    if (c == 'b') return workers[2].children[1];
++    if (c >= 'A' && c <= 'D') return workers[c - 'A'].window;
++    return NULL;
++}
++
++/* The component view checks positive sharing with a known live actor and
++ * negative sharing for unrelated queues. An unrelated inactive queue may
++ * retain its own window or become NULL without changing this relation.
++ * All expectations still come from the literal Windows row, not a graph
++ * algorithm or from the observed Wine handles. */
++static void snapshot(const char *stage, unsigned int actor)
++{
++    const struct expected_state *expect = NULL;
++    GUITHREADINFO info[THREADS];
++    BOOL valid[THREADS] = {0};
++    unsigned int i, reference = actor;
++    HWND active, focus;
++
++    for (i = 0; i < ARRAY_SIZE(expected_states); ++i)
++        if (!strcmp(expected_states[i].scenario, scenario) && !strcmp(expected_states[i].stage, stage))
++        { expect = &expected_states[i]; break; }
++    ok(expect != NULL, "%s: no expectation for %s\n", scenario, stage);
++    if (!expect) return;
++    for (i = 0; i < THREADS; ++i)
++    {
++        if (!workers[i].thread) continue;
++        memset(&info[i], 0, sizeof(info[i]));
++        info[i].cbSize = sizeof(info[i]);
++        valid[i] = GetGUIThreadInfo(workers[i].tid, &info[i]);
++        ok(valid[i], "%s %s observer %c: GetGUIThreadInfo failed, error %lu\n",
++           scenario, stage, 'A' + i, GetLastError());
++    }
++
++    /* This first graph has no edges. Probe B is a baseline control before
++     * any attach/detach operation: can an unrelated A keep its own state
++     * while B sets local focus? It gates only the extra absolute view. */
++    if (absolute_supported < 0 && !strcmp(scenario, "isolated-nonedge-reverse0-anchorA") &&
++        !strcmp(stage, "joined-probe-B"))
++    {
++        absolute_supported = valid[0] && info[0].hwndActive == expected_window(expect->active[0]) &&
++                             info[0].hwndFocus == expected_window(expect->focus[0]) &&
++                             GetForegroundWindow() == workers[0].window;
++        if (!absolute_supported)
++            skip("Absolute inactive-queue state prerequisite absent in the independent probe; "
++                 "all component/API checks continue\n");
++    }
++
++    /* After the active actor exits, use a live, positive native reference.
++     * Never infer membership by comparing all observed NULL fields. */
++    if (!workers[reference].thread || !expected_window(expect->active[reference]) ||
++        !expected_window(expect->focus[reference]))
++    {
++        for (reference = 0; reference < THREADS; ++reference)
++            if (workers[reference].thread && expected_window(expect->active[reference]) &&
++                expected_window(expect->focus[reference])) break;
++    }
++    ok(reference < THREADS, "%s %s: no positive live reference\n", scenario, stage);
++    if (reference == THREADS || !valid[reference]) return;
++    active = expected_window(expect->active[reference]);
++    focus = expected_window(expect->focus[reference]);
++    winetest_push_context("%s %s reference %c", scenario, stage, 'A' + reference);
++    ok(info[reference].hwndActive == active, "active %p, expected actor %p\n",
++       info[reference].hwndActive, active);
++    ok(info[reference].hwndFocus == focus, "focus %p, expected actor %p\n",
++       info[reference].hwndFocus, focus);
++    winetest_pop_context();
++    ++component_snapshots;
++    if (absolute_supported != 0) ++absolute_snapshots;
++
++    for (i = 0; i < THREADS; ++i)
++    {
++        BOOL missing_destroy_split, same_active, same_focus;
++        if (!workers[i].thread || !valid[i]) continue;
++        winetest_push_context("%s %s observer %c", scenario, stage, 'A' + i);
++        missing_destroy_split = i == 1 && strstr(scenario, "-unparent0") &&
++                                !strncmp(stage, "destroy-", 8);
++        same_active = expect->active[i] == expect->active[reference];
++        same_focus = expect->focus[i] == expect->focus[reference];
++        component_positive_checks += same_active + same_focus;
++        /* The existing direct-destruction gap is the same in both views;
++         * no other mismatch is turned into a todo or prerequisite skip. */
++        todo_wine_if(missing_destroy_split)
++        ok((info[i].hwndActive == active) == same_active,
++           "shares active with %c: got %p, actor %p, expected %d\n",
++           'A' + reference, info[i].hwndActive, active, same_active);
++        todo_wine_if(missing_destroy_split)
++        ok((info[i].hwndFocus == focus) == same_focus,
++           "shares focus with %c: got %p, actor %p, expected %d\n",
++           'A' + reference, info[i].hwndFocus, focus, same_focus);
++        if (absolute_supported != 0)
++        {
++            todo_wine_if(missing_destroy_split)
++            ok(info[i].hwndActive == expected_window(expect->active[i]), "absolute active %p, expected %p\n",
++               info[i].hwndActive, expected_window(expect->active[i]));
++            todo_wine_if(missing_destroy_split)
++            ok(info[i].hwndFocus == expected_window(expect->focus[i]), "absolute focus %p, expected %p\n",
++               info[i].hwndFocus, expected_window(expect->focus[i]));
++        }
++        /* Capture retention and splitting stay unconditional. */
++        ok(info[i].hwndCapture == expected_window(expect->capture[i]), "capture %p, expected %p\n",
++           info[i].hwndCapture, expected_window(expect->capture[i]));
++        winetest_pop_context();
++    }
++}
++
++/* Process this thread's queued and pending driver events within a bound.
++ * No attachment, synthetic input or foreign window is used to gain focus. */
++static void drain_events(void)
++{
++    ULONGLONG end = GetTickCount64() + 200;
++    MSG msg;
++    do
++    {
++        while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
++        {
++            if (msg.message == WM_QUIT)
++            {
++                PostQuitMessage((int)msg.wParam);
++                return;
++            }
++            TranslateMessage(&msg);
++            DispatchMessageW(&msg);
++            if (GetTickCount64() >= end) return;
++        }
++        if (MsgWaitForMultipleObjects(0, NULL, FALSE, 100, QS_ALLINPUT) == WAIT_TIMEOUT) return;
++    } while (GetTickCount64() < end);
++}
++
++static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wp, LPARAM lp)
++{
++    struct worker *w = (struct worker *)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
++    HWND previous = NULL;
++    DWORD error;
++    BOOL ret = TRUE;
++    unsigned int attempt;
++    if (message == WM_NCCREATE)
++    {
++        const CREATESTRUCTW *cs = (const CREATESTRUCTW *)lp;
++        SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)cs->lpCreateParams);
++    }
++    if (message != COMMAND) return DefWindowProcW(hwnd, message, wp, lp);
++    SetLastError(0xdeadbeef);
++    switch (wp)
++    {
++    case FOCUS:
++        previous = SetFocus(hwnd);
++        error = GetLastError();
++        ret = GetFocus() == hwnd;
++        break;
++    case ACTIVATE:
++        /* Preserve the measured one-shot operation once a graph exists. */
++        w->foreground_ret = SetForegroundWindow(hwnd);
++        SetActiveWindow(hwnd);
++        SetFocus(hwnd);
++        w->foreground = GetForegroundWindow();
++        w->active = GetActiveWindow();
++        w->focus = GetFocus();
++        ret = w->foreground == hwnd && w->active == hwnd && w->focus == hwnd;
++        break;
++    case ACTIVATE_START:
++        for (attempt = 0; attempt < 3; ++attempt)
++        {
++            ShowWindow(hwnd, SW_SHOW);
++            w->foreground_ret = SetForegroundWindow(hwnd);
++            SetActiveWindow(hwnd);
++            SetFocus(hwnd);
++            drain_events();
++            w->foreground = GetForegroundWindow();
++            w->active = GetActiveWindow();
++            w->focus = GetFocus();
++            ret = w->foreground == hwnd && w->active == hwnd && w->focus == hwnd;
++            if (ret) break;
++        }
++        break;
++    case PREPARE:
++        ShowWindow(hwnd, SW_SHOWNOACTIVATE);
++        UpdateWindow(hwnd);
++        drain_events();
++        SetActiveWindow(lp ? hwnd : NULL);
++        SetFocus(lp ? hwnd : NULL);
++        ReleaseCapture();
++        drain_events();
++        ret = GetActiveWindow() == (lp ? hwnd : NULL) && GetFocus() == (lp ? hwnd : NULL);
++        break;
++    case DRAIN:
++        drain_events();
++        break;
++    case CAPTURE:
++        previous = SetCapture(hwnd);
++        error = GetLastError();
++        ret = GetCapture() == hwnd;
++        break;
++    case RELEASE:
++        ret = ReleaseCapture();
++        error = GetLastError();
++        break;
++    case CHILD_CREATE:
++        if (lp < 0 || lp > 1 || w->index != 2) return FALSE;
++        w->children[lp] = CreateWindowExW(0, L"WinumAttachmentMeasure", L"child",
++                WS_CHILD | WS_VISIBLE, 5, 5, 50, 30, workers[lp].window,
++                NULL, GetModuleHandleW(NULL), NULL);
++        error = GetLastError();
++        ret = w->children[lp] != NULL;
++        break;
++    case CHILD_FOCUS:
++        previous = SetFocus(w->children[0]);
++        error = GetLastError();
++        ret = GetFocus() == w->children[0];
++        break;
++    case CHILD_UNPARENT:
++        previous = SetParent(w->children[1], NULL);
++        error = GetLastError();
++        ret = previous != NULL;
++        break;
++    case CHILD_DESTROY:
++        ret = DestroyWindow(w->children[1]);
++        error = GetLastError();
++        w->children[1] = NULL;
++        break;
++    case STOP: PostQuitMessage(0); return TRUE;
++    default: return FALSE;
++    }
++    if (!ret && (wp == CHILD_CREATE || wp == CHILD_UNPARENT || wp == CHILD_DESTROY))
++        attachment_error("OwnChildOperation", error);
++    return ret;
++}
++
++static DWORD WINAPI worker_main(void *arg)
++{
++    struct worker *w = arg;
++    MSG msg;
++    int ret;
++    w->window = CreateWindowExW(0, L"WinumAttachmentMeasure", L"Input attachment MEASURE",
++            WS_OVERLAPPEDWINDOW, 20 + 130 * w->index, 30,
++            120, 140, NULL, NULL, GetModuleHandleW(NULL), w);
++    if (!w->window) attachment_error("CreateOwnWindow", GetLastError());
++    if (!SetEvent(w->ready)) attachment_error("SignalReady", GetLastError());
++    if (!w->window) return 1;
++    while ((ret = GetMessageW(&msg, NULL, 0, 0)) > 0)
++    {
++        TranslateMessage(&msg);
++        DispatchMessageW(&msg);
++    }
++    if (ret < 0) attachment_error("GetMessageW", GetLastError());
++    if (w->children[1]) DestroyWindow(w->children[1]);
++    if (w->children[0]) DestroyWindow(w->children[0]);
++    DestroyWindow(w->window);
++    return 0;
++}
++
++static BOOL send_command(unsigned int worker, enum operation op, LPARAM arg, DWORD_PTR *result)
++{
++    if (!SendMessageTimeoutW(workers[worker].window, COMMAND, op, arg,
++                             SMTO_ABORTIFHUNG, 5000, result))
++    {
++        attachment_error("SendOwnCommand", GetLastError());
++        return FALSE;
++    }
++    return TRUE;
++}
++
++static BOOL command(unsigned int worker, enum operation op, LPARAM arg)
++{
++    DWORD_PTR result;
++    if (!send_command(worker, op, arg, &result)) return FALSE;
++    /* A NULL previous focus/capture is not a failed operation. Only the
++     * fixture's own create/unparent/destroy results are prerequisites;
++     * focus/activation/capture outcomes themselves are measurements. */
++    if ((op == CHILD_CREATE || op == CHILD_UNPARENT || op == CHILD_DESTROY) && !result)
++        return FALSE;
++    return TRUE;
++}
++
++/* A skip is permitted only before any attachment or child creation.
++ * Once a graph exists, setup or observed-state failures stay failures. */
++static BOOL skip_activation(unsigned int anchor, const char *stage)
++{
++    if (!scenario_skipped)
++    {
++        skip("%s: %s prerequisite not reached, anchor %c foreground_ret=%d "
++             "foreground=%p active=%p focus=%p expected=%p\n", scenario, stage,
++             'A' + anchor, workers[anchor].foreground_ret, GetForegroundWindow(),
++             workers[anchor].active, workers[anchor].focus, workers[anchor].window);
++        scenario_skipped = TRUE;
++        ++skipped_scenarios;
++    }
++    return FALSE;
++}
++
++static BOOL activate_anchor(unsigned int anchor, const char *stage)
++{
++    DWORD_PTR result;
++    if (!send_command(anchor, ACTIVATE, 0, &result)) return FALSE;
++    if (!result)
++    {
++        InterlockedIncrement(&attachment_errors);
++        ok(0, "%s: %s activation failed after graph creation, foreground=%p active=%p focus=%p\n",
++           scenario, stage, GetForegroundWindow(), workers[anchor].active, workers[anchor].focus);
++        return FALSE;
++    }
++    return TRUE;
++}
++
++static BOOL prepare_start(unsigned int anchor, const struct expected_state *expect)
++{
++    unsigned int attempt, i;
++    DWORD_PTR result;
++    GUITHREADINFO info;
++    BOOL matches;
++
++    /* Seed only independent queues, before any explicit or child attachment.
++     * The initial active/focus pattern comes from the measured isolated row.
++     * Child cases start from independent own-window state, then test the
++     * unchanged measured child-creation sequence. */
++    for (attempt = 0; attempt < 2; ++attempt)
++    {
++        for (i = 0; i < THREADS; ++i)
++            if (!send_command(i, PREPARE, !expect || expect->active[i] != '.', &result)) return FALSE;
++        if (!send_command(anchor, ACTIVATE_START, 0, &result)) return FALSE;
++        matches = result != 0;
++        for (i = 0; i < THREADS; ++i)
++            if (!command(i, DRAIN, 0)) return FALSE;
++        if (GetForegroundWindow() != workers[anchor].window) matches = FALSE;
++        for (i = 0; i < THREADS; ++i)
++        {
++            HWND active = expect ? expected_window(expect->active[i]) : workers[i].window;
++            HWND focus = expect ? expected_window(expect->focus[i]) : workers[i].window;
++            memset(&info, 0, sizeof(info));
++            info.cbSize = sizeof(info);
++            if (!GetGUIThreadInfo(workers[i].tid, &info))
++            {
++                attachment_error("ReadInitialOwnQueue", GetLastError());
++                return FALSE;
++            }
++            if (!IsWindowVisible(workers[i].window) || info.hwndActive != active ||
++                info.hwndFocus != focus || info.hwndCapture)
++            {
++                matches = FALSE;
++                trace("INITIAL %s attempt=%u observer=%c visible=%d active=%p/%p focus=%p/%p capture=%p\n",
++                      scenario, attempt, 'A' + i, IsWindowVisible(workers[i].window),
++                      info.hwndActive, active, info.hwndFocus, focus, info.hwndCapture);
++            }
++        }
++        if (matches) return TRUE;
++    }
++    return skip_activation(anchor, "initial independent queues");
++}
++
++static void stop_worker(unsigned int i)
++{
++    if (!workers[i].thread) return;
++    if (WaitForSingleObject(workers[i].thread, 0) == WAIT_TIMEOUT)
++        command(i, STOP, 0);
++    if (WaitForSingleObject(workers[i].thread, 7000) != WAIT_OBJECT_0)
++    {
++        /* Do not terminate an individual thread holding USER locks. */
++        attachment_error("JoinOwnWorker", ERROR_TIMEOUT);
++        TerminateProcess(GetCurrentProcess(), 2);
++    }
++    CloseHandle(workers[i].thread);
++    CloseHandle(workers[i].ready);
++    workers[i].thread = workers[i].ready = NULL;
++    workers[i].window = NULL;
++}
++
++static BOOL start_workers(void)
++{
++    unsigned int i;
++    memset(workers, 0, sizeof(workers));
++    for (i = 0; i < THREADS; ++i)
++    {
++        workers[i].index = i;
++        workers[i].ready = CreateEventW(NULL, TRUE, FALSE, NULL);
++        if (!workers[i].ready) { attachment_error("CreateReady", GetLastError()); return FALSE; }
++        workers[i].thread = CreateThread(NULL, 0, worker_main, &workers[i], 0, &workers[i].tid);
++        if (!workers[i].thread)
++        {
++            attachment_error("CreateOwnWorker", GetLastError());
++            CloseHandle(workers[i].ready);
++            workers[i].ready = NULL;
++            return FALSE;
++        }
++        if (WaitForSingleObject(workers[i].ready, 7000) != WAIT_OBJECT_0 || !workers[i].window)
++        { attachment_error("WaitOwnWorker", ERROR_TIMEOUT); return FALSE; }
++    }
++    return TRUE;
++}
++
++static BOOL edge_call(unsigned int from, unsigned int to, BOOL attach)
++{
++    const struct expected_detach *expect = NULL;
++    unsigned int i;
++    DWORD error;
++    BOOL ret;
++    SetLastError(0xdeadbeef);
++    ret = AttachThreadInput(workers[from].tid, workers[to].tid, attach);
++    error = GetLastError();
++    if (attach)
++    {
++        ok(ret, "%s: attach %c-%c failed, error %lu\n", scenario, 'A' + from, 'A' + to, error);
++        return ret;
++    }
++    for (i = 0; i < ARRAY_SIZE(expected_detaches); ++i)
++        if (!strcmp(expected_detaches[i].scenario, scenario) && expected_detaches[i].call == detach_call)
++        { expect = &expected_detaches[i]; break; }
++    ok(expect != NULL, "%s: missing detach expectation %u\n", scenario, detach_call);
++    ++detach_call;
++    if (expect)
++    {
++        ok(ret == expect->result, "%s: detach %c-%c returned %d, expected %d\n",
++           scenario, 'A' + from, 'A' + to, ret, expect->result);
++        if (!ret)
++        {
++            /* Wine rejects self-detach with access denied instead of invalid parameter. */
++            todo_wine_if(from == to)
++            ok(error == expect->error, "%s: got error %lu, expected %lu\n", scenario, error, expect->error);
++        }
++    }
++    return ret;
++}
++
++static BOOL probe_focus(const char *stage)
++{
++    unsigned int i;
++    char label[64];
++    for (i = 0; i < THREADS; ++i)
++    {
++        if (!workers[i].thread) continue;
++        if (!command(i, FOCUS, 0)) return FALSE;
++        snprintf(label, sizeof(label), "%s-probe-%c", stage, 'A' + i);
++        snapshot(label, i);
++    }
++    return TRUE;
++}
++
++static BOOL graph_case(const struct graph *g, BOOL reverse, unsigned int anchor)
++{
++    char name[96], stage[40];
++    const struct expected_state *initial = NULL;
++    unsigned int i;
++    BOOL reached_end = FALSE;
++    LONG errors_before = attachment_errors;
++    snprintf(name, sizeof(name), "%s-reverse%d-anchor%c", g->name, reverse, 'A' + anchor);
++    scenario = name;
++    detach_call = 0;
++    scenario_skipped = FALSE;
++    for (i = 0; i < ARRAY_SIZE(expected_states); ++i)
++        if (!strcmp(expected_states[i].scenario, scenario) && !strcmp(expected_states[i].stage, "isolated"))
++        { initial = &expected_states[i]; break; }
++    ok(initial != NULL, "%s: missing initial-state oracle\n", scenario);
++    if (!initial || !start_workers()) goto cleanup;
++    if (!prepare_start(anchor, initial)) goto cleanup;
++    snapshot("isolated", anchor);
++    for (i = 0; i < g->count; ++i)
++    {
++        if (!edge_call(g->edges[i].from, g->edges[i].to, TRUE))
++        { attachment_error("EstablishOwnGraph", ERROR_INVALID_DATA); goto cleanup; }
++    }
++    snapshot("joined", anchor);
++    if (!probe_focus("joined")) goto cleanup;
++    for (i = 0; i < g->cuts; ++i)
++    {
++        if (!activate_anchor(anchor, "before cut")) goto cleanup;
++        if (!command(anchor, CAPTURE, 0)) goto cleanup;
++        snprintf(stage, sizeof(stage), "cut%u-before", i);
++        snapshot(stage, anchor);
++        edge_call(reverse ? g->remove[i].to : g->remove[i].from,
++                  reverse ? g->remove[i].from : g->remove[i].to, FALSE);
++        snprintf(stage, sizeof(stage), "cut%u-passive", i);
++        snapshot(stage, anchor);
++        if (!command(anchor, RELEASE, 0)) goto cleanup;
++        snprintf(stage, sizeof(stage), "cut%u", i);
++        if (!probe_focus(stage)) goto cleanup;
++    }
++    if (g->exit_worker >= 0)
++    {
++        if (!activate_anchor(anchor, "before worker exit")) goto cleanup;
++        snapshot("exit-before", anchor);
++        stop_worker(g->exit_worker);
++        snapshot("exit-passive", anchor);
++        if (!probe_focus("exit")) goto cleanup;
++    }
++    reached_end = TRUE;
++cleanup:
++    /* Stopping all own threads also removes their explicit attachments. */
++    for (i = THREADS; i-- > 0;) stop_worker(i);
++    reached_end = reached_end && attachment_errors == errors_before;
++
++    return reached_end;
++}
++
++static BOOL child_case(BOOL late, BOOL unparent)
++{
++    char name[64];
++    unsigned int i;
++    BOOL reached_end = FALSE;
++    LONG errors_before = attachment_errors;
++    snprintf(name, sizeof(name), "children-late%d-unparent%d", late, unparent);
++    scenario = name;
++    scenario_skipped = FALSE;
++
++    if (!start_workers()) goto cleanup;
++    if (!prepare_start(0, NULL)) goto cleanup;
++    if (!command(2, CHILD_CREATE, 0)) goto cleanup;
++    if (!late && !command(2, CHILD_FOCUS, 0)) goto cleanup;
++    snapshot("one-child", 0);
++    if (!command(2, CHILD_CREATE, 1)) goto cleanup;
++    if (!command(2, CHILD_FOCUS, 0)) goto cleanup;
++    snapshot("two-children", 0);
++    if (unparent)
++    {
++        if (!command(2, CHILD_UNPARENT, 0)) goto cleanup;
++        snapshot("unparent-passive", 0);
++        if (!command(2, CHILD_FOCUS, 0)) goto cleanup;
++        snapshot("unparent-refocus", 0);
++    }
++    if (!command(2, CHILD_DESTROY, 0)) goto cleanup;
++    snapshot("destroy-passive", 0);
++    if (!command(2, CHILD_FOCUS, 0)) goto cleanup;
++    snapshot("destroy-refocus", 0);
++    reached_end = TRUE;
++cleanup:
++    for (i = THREADS; i-- > 0;) stop_worker(i);
++    reached_end = reached_end && attachment_errors == errors_before;
++
++    return reached_end;
++}
++
++static void test_input_components(void)
++{
++    WNDCLASSW wc = {0};
++    unsigned int i, reverse, late, unparent;
++    BOOL ret;
++    wc.lpfnWndProc = window_proc;
++    wc.hInstance = GetModuleHandleW(NULL);
++    wc.lpszClassName = L"WinumAttachmentMeasure";
++    ret = RegisterClassW(&wc);
++    ok(ret, "RegisterClass failed, error %lu\n", GetLastError());
++    if (!ret) return;
++    for (i = 0; i < ARRAY_SIZE(graphs); ++i)
++        for (reverse = 0; reverse < 2; ++reverse)
++        {
++            completed_scenarios += graph_case(&graphs[i], reverse, 0);
++            completed_scenarios += graph_case(&graphs[i], reverse, graphs[i].other_anchor);
++        }
++    for (late = 0; late < 2; ++late)
++        for (unparent = 0; unparent < 2; ++unparent)
++            completed_scenarios += child_case(late, unparent);
++    ret = UnregisterClassW(wc.lpszClassName, wc.hInstance);
++    ok(ret, "UnregisterClass failed, error %lu\n", GetLastError());
++    ok(completed_scenarios + skipped_scenarios == 44, "completed %u, skipped %u scenarios\n",
++       completed_scenarios, skipped_scenarios);
++    trace("ATTACHMENT_COVERAGE completed=%u skipped=%u attempted=44\n",
++          completed_scenarios, skipped_scenarios);
++    trace("ATTACHMENT_SCOPE component_snapshots=%u absolute_snapshots=%u absolute_state=%d positive_checks=%u\n",
++          component_snapshots, absolute_snapshots, absolute_supported, component_positive_checks);
++}
++
++START_TEST(attachment)
++{
++    test_input_components();
++}
