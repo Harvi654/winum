@@ -11,6 +11,8 @@ Current entries:
 
 - msi-null-stream: original compound-storage transform with a NULL OBJECT
   row and populated binary control; [scope](../msi-transform-null-stream/README.md).
+- msi-tree-property: own MSI dialog with direct-directory/indirect browse
+  bindings and own-process tree automation; [scope](../msi-selection-tree-directory-property/README.md).
 
 Build one final bundle after all batch entries are prepared:
 

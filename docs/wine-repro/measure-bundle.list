@@ -6,6 +6,7 @@ parseerror | docs/wine-repro/msxml3-parseerror-filepos/measure.c | -lole32 -lole
 mousemove | docs/wine-repro/server-mousemove-show-hide/measure.c | -luser32 -lgdi32
 urlzones | docs/wine-repro/urlmon-zones/measure.c | -lurlmon -lole32
 msi-null-stream | docs/wine-repro/msi-transform-null-stream/measure.c | -Wextra -lmsi -lole32 -static
+msi-tree-property | docs/wine-repro/msi-selection-tree-directory-property/measure.c | -Wextra -lmsi -lcomctl32 -lole32 -static
 tdoffset-records | docs/wine-repro/typedesc-offsets/measure.c | -loleaut32 -lole32 -luuid -static
 tdoffset-records-l1 | docs/wine-repro/typedesc-offsets/l1.c | -loleaut32 -lole32 -luuid -static
 actctx-model | docs/wine-repro/ntdll-actctx-threadingmodel-case/measure.c | -static
