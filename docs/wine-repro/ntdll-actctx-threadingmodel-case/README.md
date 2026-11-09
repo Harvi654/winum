@@ -152,3 +152,15 @@ checks its equality with test-body.h. The expected Windows values and cases
 are unchanged. Both standalone architectures compile with -Wextra -Werror;
 refreshed native assertion execution and kernel32.actctx L2 are pending.
 The main bundle's actctx-model-l1 entry builds this revised reader.
+
+
+## Revised reader Windows L1 (2026-11-09)
+
+The maintainer returned the runtime bundle's x86_64 and i686 results for
+the direct comclassredirect_data reader relocated to kernel32/tests/actctx.c.
+Both report `SUMMARY checks=575 failures=0`, no FAIL lines, and exit 0.
+This supersedes the pending native refresh above; the earlier 609-check
+result remains evidence for the historical ReadProcessMemory version only.
+All todo_wine checks execute as ordinary assertions in the native harness.
+Kernel32 actctx paired L2 and consumer validation remain open. No production
+patch, series entry or validation marker is changed. Raw logs are not committed.

@@ -131,3 +131,15 @@ layout from the existing Wine test.
 The complete series applies at fuzz 0 and standalone EXEs compile on both
 architectures with -Wall -Wextra -Werror. Refreshed native assertion L1 and
 kernel32 actctx L2 remain open; the 609-check result above is historical.
+
+
+## Revised reader Windows L1 (2026-11-09)
+
+The maintainer returned the runtime bundle's x86_64 and i686 results for
+the direct comclassredirect_data reader relocated to kernel32/tests/actctx.c.
+Both report `SUMMARY checks=575 failures=0`, no FAIL lines, and exit 0.
+This supersedes the pending native refresh above; the earlier 609-check
+result remains evidence for the historical ReadProcessMemory version only.
+All todo_wine checks execute as ordinary assertions in the native harness.
+Kernel32 actctx paired L2 and consumer validation remain open. No production
+patch, series entry or validation marker is changed. Raw logs are not committed.

@@ -30,7 +30,7 @@ todo_wine controls for rejection and omitted-model defaults.
 | Level | Result |
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
-| L1 | v2 candidate: Windows 10 x86_64/i686, pre-review body: 609 checks each, 0 failures, exit 0 (2026-11-09); relocated direct-reader refresh pending. Production has no integrated test yet |
+| L1 | v2 candidate: Windows 10 x86_64/i686, reviewed direct reader: 575 checks each, 0 failures, exit 0 (2026-11-09); historical pre-review body: 609 checks each. Production has no integrated test yet |
 | L2 | not recorded per patch |
 | L3 | not recorded |
 | L4 | Stress Analysis runs. (Inventor, maintainer) |
@@ -60,3 +60,7 @@ Autodesk-Inventor-for-Linux [`docs/arch-hyprland.md`](https://github.com/Harvi65
   delimiter markers. Expected values and production parser code are
   unchanged. Complete kernel32 test EXEs and ntdll DLLs linked for both
   architectures; refreshed native reader L1 and kernel32.actctx L2 remain open.
+
+- 2026-11-09, native refresh: The revised direct reader passed 575 checks
+  with zero failures and exit 0 on both Windows 10 architectures. Kernel32
+  actctx L2 remains open.
