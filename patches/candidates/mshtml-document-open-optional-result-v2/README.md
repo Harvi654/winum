@@ -47,7 +47,8 @@ Run run-measure.bat from a fresh directory in offline Windows 10. Return
 result-mshtml-open-l1-x86_64.txt, result-mshtml-open-l1-i686.txt and
 exitcodes.txt, including any failed or incomplete process. A complete
 successful assertion run should report 34 checks and zero failures, exit 0.
-The MEASURE's successful API calls do not substitute for this assertion L1.
+The MEASURE's successful API calls do not substitute for assertion L1;
+the completed assertion results are recorded below.
 
 The builder checks byte-for-byte equality of the named function in the
 patch and test-body.h, without BEGIN/END markers. l1.c compiles that body
@@ -68,8 +69,9 @@ to production; only the header and dom.c test are added.
 - Standalone x86_64/i686 builds with -Wall -Wextra -Werror passed and bundle
   checksums verified on 2026-11-09. Compilation is not native execution.
 - Full-series apply and complete DLL/test build results are recorded below.
-- Native assertion L1, formal cross review, Gecko-enabled paired mshtml.dom
-  L2 and consumer validation are pending. The production page marker stays
+- Native assertion L1 passed on both architectures (34 checks each); formal
+  cross review, Gecko-enabled paired mshtml.dom L2 and consumer validation
+  are pending. The production page marker stays
   missing until the native-tested candidate can be reviewed and promoted.
 
 A read-only second-model advisory checked both complete original sources

@@ -2,7 +2,7 @@
 
 Original, AI-assisted (Codex), LGPL-2.1-or-later. The completed Windows
 observations are recorded below. A conformance candidate is now available;
-native assertion L1 is pending. Production patches, series and test marker
+native assertion L1 passed on both architectures. Production patches, series and test marker
 are unchanged.
 
 ## Controlled documents and result-pointer modes
@@ -125,8 +125,8 @@ architectures with -Wextra -Werror. Its wrapper uses CoInitialize like the
 Wine dom unit, rather than the MEASURE's OleInitialize; refreshed native
 assertion execution must validate that complete fixture. A successful native
 run should reach SUMMARY checks=34 failures=0 and exit 0 on both architectures.
-Return both result-mshtml-open-l1-*.txt and exitcodes.txt. Formal cross review,
-native assertion L1 and Gecko-enabled paired Wine runtime remain open; the
+Return both result-mshtml-open-l1-*.txt and exitcodes.txt. Native assertion L1 is now recorded below. Formal cross review and
+Gecko-enabled paired Wine runtime remain open; the
 production patch page and test marker are not upgraded by the MEASURE alone.
 
 
