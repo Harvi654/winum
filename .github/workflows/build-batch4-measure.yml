@@ -1,0 +1,34 @@
+# Batch-only automatic build; no Wine runtime and no release publication.
+name: Build batch 4 MEASURE bundle
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/wine-repro/server-input-attachment-components/input-components.c'
+      - 'docs/wine-repro/batch4-measure/measure.list'
+      - 'docs/wine-repro/batch3-measure/measure-support.h'
+      - 'scripts/build-measure-bundle.sh'
+      - '.github/workflows/build-batch4-measure.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    steps:
+      - name: MinGW (official Arch repositories)
+        run: pacman -Syu --noconfirm --needed git mingw-w64-gcc
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build only the batch 4 list
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash scripts/build-measure-bundle.sh out/measure-bundle docs/wine-repro/batch4-measure/measure.list
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: batch4-measure-bundle
+          path: out/measure-bundle/
+          retention-days: 30

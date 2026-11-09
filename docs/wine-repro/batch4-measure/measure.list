@@ -1,0 +1,2 @@
+# name | own source | MinGW options and import libraries
+input-components | docs/wine-repro/server-input-attachment-components/input-components.c | -Wextra -luser32 -static
