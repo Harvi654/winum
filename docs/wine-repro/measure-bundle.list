@@ -13,3 +13,5 @@ com-stub-actctx | docs/wine-repro/combase-stub-activation-context/measure.c | -W
 com-stub-actctx-l1 | docs/wine-repro/combase-stub-activation-context/l1.c | -Wextra -lole32 -luuid -static
 ndrstub-control | docs/wine-repro/rpcrt4-ndrstubcall3/control.c | -Wextra -lrpcrt4 -lole32 -luuid -static
 ndrstub-call3 | docs/wine-repro/rpcrt4-ndrstubcall3/measure.c | -Wextra -lrpcrt4 -lole32 -luuid -static
+mshtml-open-control | docs/wine-repro/mshtml-document-open-optional-result/control.c | -Wextra -lole32 -loleaut32 -luuid -static
+mshtml-open-null | docs/wine-repro/mshtml-document-open-optional-result/measure.c | -Wextra -lole32 -loleaut32 -luuid -static

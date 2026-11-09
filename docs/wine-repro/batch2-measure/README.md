@@ -119,3 +119,36 @@ the separate v3 candidate; its L1 remains pending. No production patch revision,
 `winum-test` marker, or series change is claimed by these observations.
 This initial bundle covers the two typedesc investigations only; the remaining
 four batch-2 investigations are not claimed complete or included.
+
+## Remaining runtime observations (2026-11-09)
+
+The first typedesc bundle above is historical. Its completed candidates and
+follow-up fixtures have their own pages. The next unknown contracts are now
+packaged sequentially, one patch per commit, for a single offline VM visit:
+
+- [rpcrt4 NdrStubCall3](../rpcrt4-ndrstubcall3/README.md): original WIDL/SDK
+  functional fixture, separate NdrStubCall2 control and syntax-entry probe.
+  Native acceptance is unknown; the current Wine implementation is win64-only.
+- [mshtml open optional result](../mshtml-document-open-optional-result/README.md):
+  separate result-pointer/NULL processes with fresh, initialized and own-stream
+  loaded documents. A successful native control is required.
+- The reviewed actctx reader from the threading-model candidate is also built
+  for a native refresh after moving it to kernel32 and using the typed record.
+  Its earlier 609-check native result is historical.
+
+```sh
+export RUNTIME_MEASURE="$HOME/.cache/winum-runtime-measure-$(date +%Y%m%d-%H%M%S)"
+bash scripts/build-measure-bundle.sh "$RUNTIME_MEASURE" docs/wine-repro/batch2-measure/runtime.list
+```
+
+Copy the full output directory to a fresh directory in offline Windows 10 and
+run run-measure.bat once. Return all result-*.txt and exitcodes.txt; a ZIP
+containing only those text files is fine. No additional compiler, SDK, CAD
+program, generated proxy DLL or network is needed in the VM. The NDR metadata
+is checked-in output generated from our own IDL by open Wine 11.20 WIDL.
+Do not send the executables or any system DLL from Windows.
+
+The actctx program is an assertion test. The NDR/MSHTML programs are MEASUREs:
+zero exit alone cannot establish their expected semantics or native L1.
+Unknown values must come from the returned native results before the Wine
+conformance tests are written. Partial/crashed processes must also be returned.

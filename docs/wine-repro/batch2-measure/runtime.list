@@ -1,0 +1,6 @@
+# One offline VM run: revised actctx reader plus the remaining unknown contracts.
+actctx-model-l1 | docs/wine-repro/ntdll-actctx-threadingmodel-case/l1.c | -Wextra -static
+ndrstub-control | docs/wine-repro/rpcrt4-ndrstubcall3/control.c | -Wextra -lrpcrt4 -lole32 -luuid -static
+ndrstub-call3 | docs/wine-repro/rpcrt4-ndrstubcall3/measure.c | -Wextra -lrpcrt4 -lole32 -luuid -static
+mshtml-open-control | docs/wine-repro/mshtml-document-open-optional-result/control.c | -Wextra -lole32 -loleaut32 -luuid -static
+mshtml-open-null | docs/wine-repro/mshtml-document-open-optional-result/measure.c | -Wextra -lole32 -loleaut32 -luuid -static

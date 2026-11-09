@@ -1,0 +1,3 @@
+# Same entries as the main bundle; preserve controls even after a probe fault.
+mshtml-open-control | docs/wine-repro/mshtml-document-open-optional-result/control.c | -Wextra -lole32 -loleaut32 -luuid -static
+mshtml-open-null | docs/wine-repro/mshtml-document-open-optional-result/measure.c | -Wextra -lole32 -loleaut32 -luuid -static
