@@ -18,6 +18,8 @@ Current entries:
   [limits and L3 proposal](../mspatcha-pa19/README.md).
 - timezone: all new WMI timezone fields and their relation to the current
   Win32 snapshot, [scope](../wbemprox-timezone/README.md).
+- http-same-seek: own loopback server and 12 framing/seek observations,
+  [scope](../wininet-http-same-position-seek/README.md).
 
 Build one final bundle after all batch entries are prepared:
 
