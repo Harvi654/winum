@@ -1,0 +1,82 @@
+# Isolated COM capture experiment; the candidate stays blocked until reviewed.
+name: Test COM stub capture (paired Wine)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'topic/**']
+    paths:
+      - 'scripts/test-com-stub-actctx.sh'
+      - 'scripts/com-stub-actctx-l2.py'
+      - 'scripts/test-com-stub-actctx-l2.py'
+      - '.github/workflows/test-com-stub-actctx.yml'
+      - 'scripts/statusbar-v2-l2.py'
+      - 'patches/*.patch'
+      - 'patches/series'
+      - 'patches/candidates/combase-stub-activation-context-v2/*.patch'
+      - 'wine/version.env'
+permissions:
+  contents: read
+concurrency:
+  group: com-stub-actctx-l2-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [without, with]
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 360
+    steps:
+      - name: Dependencies (official Arch repositories)
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed git python mingw-w64-gcc xorg-server-xvfb xorg-xauth \
+            alsa-lib libpulse gnutls krb5 dbus fontconfig freetype2 ttf-dejavu \
+            libx11 libxext libxi libxrandr libxrender libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
+            wayland mesa libglvnd vulkan-icd-loader vulkan-headers \
+            gst-plugins-base-libs sdl2 libcups libgphoto2 sane libpcap v4l-utils pcsclite unixodbc ocl-icd opencl-headers giflib
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Validate result parser
+        run: python3 scripts/test-com-stub-actctx-l2.py
+      - name: Build both PE architectures and run the focused COM units
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          export JOBS="$(nproc)"
+          export COM_STUB_WORK=/tmp/com-stub-actctx-l2
+          bash scripts/test-com-stub-actctx.sh '${{ matrix.variant }}' out
+      - name: Build diagnostics on failure
+        if: failure()
+        run: tail -n 60 /tmp/com-stub-actctx-l2/configure.log /tmp/com-stub-actctx-l2/build.log || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: com-stub-actctx-l2-${{ matrix.variant }}
+          path: out/*.json
+          if-no-files-found: error
+          retention-days: 30
+  compare:
+    needs: test
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: com-stub-actctx-l2-*
+          path: results
+      - name: Compare identical test coverage and Windows conformance
+        run: |
+          set -euo pipefail
+          python3 scripts/com-stub-actctx-l2.py compare results/com-stub-actctx-l2-without \
+            results/com-stub-actctx-l2-with | tee l2-report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: com-stub-actctx-l2-report
+          path: l2-report.md
+          if-no-files-found: error
+          retention-days: 30

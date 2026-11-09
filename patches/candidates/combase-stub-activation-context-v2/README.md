@@ -117,3 +117,38 @@ Wine test body, including all 48 callback observations and client restoration
 checks. Raw logs are not committed. The candidate stays BLOCKED: a Windows
 pass validates the test, not the production capture policy. Paired Wine
 runtime comparison, independent review and consumer validation remain open.
+
+
+## Isolated paired Wine comparison
+
+The workflow **Test COM stub capture (paired Wine)** runs automatically when
+its recipe, candidate, shared parser or applied production inputs change.
+It builds Wine 11.20 twice from the same pinned/SHA-256-verified archive:
+
+- without: all other production patches, plus exactly the final candidate
+  tests, omitting this implementation;
+- with: the same production series with the full candidate replacing this
+  patch, so the runtime is the existing production capture policy.
+
+No checkout series file is edited. Both recipes apply at fuzz 0; a local
+complete source comparison found exactly the intended three implementation
+files different. Preparation enforces the candidate's touched-file allowlist
+and records input/test hashes. Both variants run the new unit plus existing
+combase roapi/string, ole32 marshal, oleaut32 tmarshal and rpcrt4 cstub units
+in x86_64/i386 under Xvfb with fresh private prefixes. This is a focused pair,
+not the full neighbouring DLL L2.
+
+Only bounded inputs/results JSON and the comparison report are artifacts;
+raw runtime logs stay on the runner. The new unit must have at least its 291
+native checks, no skips/todos/flaky checks, a consistent completed summary,
+and zero failures in the with variant. Shared new-unit failures never pass
+as conformance. Per-scenario failure signatures expose regressions even when
+total counts and source line numbers are unchanged. The compare job is
+expected to remain red if the current production implementation disagrees
+with the Windows-tested regression.
+
+The source/recipe checks and six parser tests passed locally; runtime results
+are recorded only after the Actions jobs finish. The paired-runner's design
+and full scripts were read by a second model. Its trigger/input isolation
+and configure-feature suggestions were added before launch; the advisory
+is not formal cross review or runtime evidence.
