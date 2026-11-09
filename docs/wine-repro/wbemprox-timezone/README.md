@@ -162,3 +162,21 @@ MUI setup was established; successful MUI localization and custom timezone
 fallbacks remain unmeasured. Candidate tests must state these limits instead
 of extrapolating unknown native results. No raw log, registry data string,
 vendor file, assertion L1 or production marker change is recorded here.
+
+## Windows-derived assertion candidate
+
+The [v2 candidate](../../../patches/candidates/wbemprox-timezone-v2/README.md)
+adds a Wine timezone.c unit and corrects the measured Bias sign, StandardBias
+metadata and raw Display labels. Its shared test block is verified by
+scripts/build-l1-timezone.sh before standalone compilation. Full execution
+in the measured stable standard-time setup should report 104 checks, zero
+failures and zero skips; native assertion L1 has not yet run.
+
+The unit always requires the class and observed property types/presence.
+Unknown seasonal/disabled-DST/nonzero-standard-adjustment contexts omit the
+value comparisons with an explicit skip, rather than guessing Windows
+results. Label comparisons need a readable raw Display. A zero exit with
+skips is partial coverage and cannot close the candidate's full native gate.
+Unmeasured MUI/custom-zone fallbacks remain open, and the existing empty-
+label fallback is not presented as a Windows oracle. Production page/marker
+and patches/series remain unchanged pending native L1 and cross review.

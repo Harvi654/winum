@@ -150,3 +150,13 @@ do not establish those label/source contracts. Build just timezone-labels
 through timezone-labels.list for one targeted VM run before choosing a fix
 or new expected values; the main measure list includes the same entry.
 No timezone setting is changed and no candidate/L1 claim is made yet.
+
+The returned label follow-up now establishes exact raw Display equality
+for Caption/Description on both architectures; MUI resolution failed in the
+sample, and the competing Bias models remain equal in standard time with
+zero standard adjustment. The separate timezone v2 candidate corrects the
+measured differences and adds an exact-body native assertion bundle through
+scripts/build-l1-timezone.sh. Require zero failures and zero skips in the
+measured setup before claiming its L1. Unknown seasonal/localized/custom
+cases are documented, not silently inferred. The production marker/series
+remain unchanged.
