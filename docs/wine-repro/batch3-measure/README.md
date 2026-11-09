@@ -20,6 +20,8 @@ Current entries:
   Win32 snapshot, [scope](../wbemprox-timezone/README.md).
 - http-same-seek: own loopback server and 12 framing/seek observations,
   [scope](../wininet-http-same-position-seek/README.md).
+- folder-selection: standard shell view over three own files and four
+  selection states, [scope](../shell32-folderview-selection/README.md).
 
 Build one final bundle after all batch entries are prepared:
 
@@ -41,3 +43,19 @@ DLL shutdown on a possibly stuck thread; it need not print SUMMARY.
 Successful observations print SUMMARY complete=1 expectations=none. Each
 topic page also specifies which positive controls are necessary before
 treating that completed output as usable measurement coverage.
+
+## Final bundle preparation (2026-11-09)
+
+All six entries build for x86_64 and i686 with -Wall -Wextra -Werror, and
+the 12-executable bundle's SHA256SUMS verify. These are compile checks, not
+native runs or L1 passes. The MSI and shell fixtures briefly show their own
+windows; leave mouse/keyboard alone until the batch finishes. HTTP needs
+only loopback access, WMI only the local service. No internet or application
+installation is needed in the offline Windows VM.
+
+Native outputs are the next dependency before writing Wine assertions or
+revising production patches. The mspatcha entry covers only public signature
+and normalization APIs, explicitly not PA19 decoding or old-reference-window
+behavior; its original patch-input producer and proposed L3 remain a separate
+gap. No exception is granted by this bundle. The maintainer's rpcrt4 decision,
+files and candidates-4 test branch were left untouched.
