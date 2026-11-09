@@ -228,3 +228,20 @@ require ATTACHMENT_COVERAGE completed=44 skipped=0 attempted=44 and no
 failures/skips. The CI artifact roots additionally contain
 attachment-coverage-series.json / attachment-coverage-vanilla.json and the
 usual results-*-g1.json for assessing Linux completion separately.
+
+### Round-1 status checked 2026-11-10
+
+After the requested toolbar/textfont cross reviews, the focused batch4-2
+run was still in progress (one of two matrix jobs complete). The series
+job 129489804779 completed its build/test/bundle step, then failed
+"Require complete attachment coverage and inspect absolute result" with
+exit 1. The standard summary alone does not identify which coverage or
+absolute-result condition failed.
+
+[tests-series-g1](https://github.com/Harvi654/winum/actions/runs/42713756358/artifacts/13718849558)
+is available. Its root attachment-coverage-series.json contains both
+architectures' completion/skip counts and absolute test results; that is
+the next required input to distinguish an unreached prerequisite from
+post-setup failures before changing the test again. The native v3 L1
+bundle is in the same artifact. No second setup round or new unrelated
+patch investigation was started on the basis of the aggregate failure.
