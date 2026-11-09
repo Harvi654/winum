@@ -134,5 +134,20 @@ count are now a separate ordinary assertion; only the Windows size-4 check
 is todo_wine for this independent writer gap. All offset/tree/bound/identity/
 field assertions stay ordinary. The native wrapper expands todo_wine to an
 ordinary assertion. A complete revised native run has 40095 checks; its
-exact-body L1 is pending even though the original 40091-check body passed.
+returned exact-body L1 result is recorded below. The original 40091-check
+body's pass remains historical evidence.
 The candidate README records the reasoning and remaining runtime gates.
+
+## Corrected-body native L1 (2026-11-09)
+
+Both architectures of the revised test pass on offline Windows 10:
+SUMMARY checks=40095 failures=0, no FAIL lines and exit 0 each. The combined
+bundle recipe at 8400e60 verifies this body against the candidate before
+compilation; the assertion revision is 1ef60e0. The Wine-only size todo
+expands to an ordinary assertion in the native wrapper, preserving the
+measured size-4 contract along with every reader check. Revised native L1
+is now passed, not inferred from the older 40091-check run.
+
+Observed Wine behavior after the correction, paired L2 and formal review
+remain open. No new Wine runtime pass, production promotion or test-marker
+upgrade is claimed. Only summarized text evidence is committed.

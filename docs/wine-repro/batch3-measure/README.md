@@ -200,3 +200,13 @@ all EXEs and the manifest are hashed. Complete native success requires
 40095/zero failures for offsets and 357/zero failures/four completed states
 for shell selection, on both architectures. Native execution remains pending;
 neither an expected count nor successful compilation is recorded as L1.
+
+## Combined native follow-up returned (2026-11-09)
+
+The corrected offsets assertion body from 1ef60e0 now passes on Windows 10
+x86_64/i686: 40095 checks, zero failures and exit 0 each, using the combined
+recipe available at 8400e60. Its Wine-only size todo is ordinary in the
+native wrapper; the Windows size-4 expectation is still checked. This closes
+the revised-body native gate, not the pending Wine runtime/paired L2 or
+formal review. The original 40091-check run is preserved as historical
+evidence. No production series or marker changes follow from this record.

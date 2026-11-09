@@ -126,8 +126,8 @@ retained so existing candidate recipes still find the file. The three
 implementation hunks are unchanged. A complete revised native run should
 report 40095 checks, zero failures (four more checks after splitting the
 combined assertions). The previous 40091-check native L1 is historical
-evidence for the same expectations; exact revised-body L1 and paired Wine
-runtime must still be recorded. Wine is expected to report four size todos
+evidence for the same expectations; the revised-body L1 is recorded below,
+and paired Wine runtime remains open. Wine is expected to report four size todos
 with no new ordinary failure, but a rerun is pending. Neither the production
 patch nor patches/series nor the candidates-4 branch is changed.
 
@@ -138,3 +138,21 @@ for x86_64/i386 with the same focused configure flags documented above.
 Legacy mutable OLECHAR name buffers remove const-qualification warnings;
 their text and the fixture's API sequence are unchanged. No Wine runtime
 or revised exact-body native assertion pass is inferred from these builds.
+
+## Corrected-body Windows assertion L1 (2026-11-09)
+
+The maintainer returned both results from the combined offsets/selection
+bundle available at 8400e60. The corrected offsets body from 1ef60e0 passes
+on offline Windows 10: x86_64 and i686 each report SUMMARY checks=40095
+failures=0 and exit 0, with no FAIL lines. The native wrapper treats the
+Wine-only size todo as an ordinary assertion, so the expected Windows
+record size remains 4 and is checked for all four sampled records.
+
+This establishes L1 for the actual split-assertion revision, superseding
+the pending rerun noted during its preparation. The earlier 40091-check
+pass remains historical evidence for the original combined assertion.
+No raw logs or Windows files are committed. This native pass does not
+verify the predicted four writer-size todos in Wine; the corrected Wine
+runtime and paired oleaut32 L2 still need to be recorded. Formal cross
+review and remaining consumer validation stay open. No production patch,
+test marker, series entry or candidates-4 branch is changed.

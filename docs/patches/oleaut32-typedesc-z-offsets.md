@@ -30,7 +30,7 @@ vendor type library is used.
 | Level | Result |
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
-| L1 | v2 candidate: Windows 10 x86_64/i686, 40091 checks each, 0 failures, exit 0 (2026-11-09). Production has no integrated test yet |
+| L1 | Corrected candidate body: Windows 10 x86_64/i686, 40095 checks each, 0 failures, exit 0 (2026-11-09; assertion revision 1ef60e0, combined recipe at 8400e60). Original body passed 40091 checks. Production has no integrated test yet |
 | L2 | not recorded per patch |
 | L3 | not recorded |
 | L4 | Design Accelerator Shaft works. (Inventor, maintainer) |
@@ -60,3 +60,7 @@ Autodesk-Inventor-for-Linux [`docs/arch-hyprland.md`](https://github.com/Harvi65
   Reader implementation hunks and fixture/API inputs are unchanged. Revised
   exact-body L1 and runtime pairing remain pending; the earlier native pass
   applies to the original combined-assertion revision.
+- 2026-11-09: The corrected exact-body assertion revision also passes native
+  L1 on both architectures: 40095 checks, zero failures and exit 0 each.
+  Native checks retain size 4; the todo is Wine-only. Corrected Wine runtime,
+  paired L2, formal cross review and promotion remain pending.
