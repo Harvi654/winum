@@ -24,3 +24,22 @@ non-crashing ones are tested.
 
 Local check (Wine 9.0, not an oracle): all four NULL variants crash
 (`c0000005`), the valid layout returns 1.
+
+## Windows observations (2026-11-09)
+
+Offline Windows 10 VM, `windows-2026-11-09/` (both architectures complete,
+`api_errors=0`, no exceptions; identical apart from pointer width).
+comctl32 5.82 and 6.16, A and W, `HDS_BUTTONS` with and without
+`HDS_HIDDEN` behave the same:
+
+- `valid`: returns 1; `WINDOWPOS` x=5, y=7, cx=200, cy = header height
+  (20 in v5, 24 in v6; 0 with `HDS_HIDDEN`), `hwndInsertAfter` NULL,
+  flags `SWP_NOZORDER | SWP_NOACTIVATE` (0x14); `prc->top` moves down by
+  the height (not with `HDS_HIDDEN`).
+- `null_layout`, `null_prc`, `null_pwpos`, `null_both`: no crash, returns
+  0, last error unchanged (`deadbeef`), the given `RECT` and `WINDOWPOS`
+  untouched (0xcc fill kept); the control still answers.
+
+So Windows checks both members as well, before writing anything; patch v1
+checked only the `HDLAYOUT` pointer. Wine also sets only `SWP_NOZORDER`
+(0x4) in the valid case - a separate difference, not part of the patch.

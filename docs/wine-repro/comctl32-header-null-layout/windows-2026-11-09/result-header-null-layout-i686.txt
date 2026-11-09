@@ -1,0 +1,282 @@
+MEASURE topic=comctl32-header-null-layout schema=1 bits=32
+CHILD_BEGIN v=5 style=buttons layout=valid unicode=0
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=buttons layout=valid unicode=0
+RETURN ret=1 error=deadbeef
+STATE rc=5,27,205,107 pos_after=00000000,x=5,y=7,cx=200,cy=20,flags=00000014
+AFTER count=1
+CHILD_END v=5 style=buttons layout=valid unicode=0 exit=00000000
+CHILD_BEGIN v=5 style=buttons layout=valid unicode=1
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=buttons layout=valid unicode=1
+RETURN ret=1 error=deadbeef
+STATE rc=5,27,205,107 pos_after=00000000,x=5,y=7,cx=200,cy=20,flags=00000014
+AFTER count=1
+CHILD_END v=5 style=buttons layout=valid unicode=1 exit=00000000
+CHILD_BEGIN v=5 style=buttons layout=null_layout unicode=0
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=buttons layout=null_layout unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=buttons layout=null_layout unicode=0 exit=00000000
+CHILD_BEGIN v=5 style=buttons layout=null_layout unicode=1
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=buttons layout=null_layout unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=buttons layout=null_layout unicode=1 exit=00000000
+CHILD_BEGIN v=5 style=buttons layout=null_prc unicode=0
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=buttons layout=null_prc unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=buttons layout=null_prc unicode=0 exit=00000000
+CHILD_BEGIN v=5 style=buttons layout=null_prc unicode=1
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=buttons layout=null_prc unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=buttons layout=null_prc unicode=1 exit=00000000
+CHILD_BEGIN v=5 style=buttons layout=null_pwpos unicode=0
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=buttons layout=null_pwpos unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=buttons layout=null_pwpos unicode=0 exit=00000000
+CHILD_BEGIN v=5 style=buttons layout=null_pwpos unicode=1
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=buttons layout=null_pwpos unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=buttons layout=null_pwpos unicode=1 exit=00000000
+CHILD_BEGIN v=5 style=buttons layout=null_both unicode=0
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=buttons layout=null_both unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=buttons layout=null_both unicode=0 exit=00000000
+CHILD_BEGIN v=5 style=buttons layout=null_both unicode=1
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=buttons layout=null_both unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=buttons layout=null_both unicode=1 exit=00000000
+CHILD_BEGIN v=5 style=hidden layout=valid unicode=0
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=hidden layout=valid unicode=0
+RETURN ret=1 error=deadbeef
+STATE rc=5,7,205,107 pos_after=00000000,x=5,y=7,cx=200,cy=0,flags=00000014
+AFTER count=1
+CHILD_END v=5 style=hidden layout=valid unicode=0 exit=00000000
+CHILD_BEGIN v=5 style=hidden layout=valid unicode=1
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=hidden layout=valid unicode=1
+RETURN ret=1 error=deadbeef
+STATE rc=5,7,205,107 pos_after=00000000,x=5,y=7,cx=200,cy=0,flags=00000014
+AFTER count=1
+CHILD_END v=5 style=hidden layout=valid unicode=1 exit=00000000
+CHILD_BEGIN v=5 style=hidden layout=null_layout unicode=0
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=hidden layout=null_layout unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=hidden layout=null_layout unicode=0 exit=00000000
+CHILD_BEGIN v=5 style=hidden layout=null_layout unicode=1
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=hidden layout=null_layout unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=hidden layout=null_layout unicode=1 exit=00000000
+CHILD_BEGIN v=5 style=hidden layout=null_prc unicode=0
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=hidden layout=null_prc unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=hidden layout=null_prc unicode=0 exit=00000000
+CHILD_BEGIN v=5 style=hidden layout=null_prc unicode=1
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=hidden layout=null_prc unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=hidden layout=null_prc unicode=1 exit=00000000
+CHILD_BEGIN v=5 style=hidden layout=null_pwpos unicode=0
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=hidden layout=null_pwpos unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=hidden layout=null_pwpos unicode=0 exit=00000000
+CHILD_BEGIN v=5 style=hidden layout=null_pwpos unicode=1
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=hidden layout=null_pwpos unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=hidden layout=null_pwpos unicode=1 exit=00000000
+CHILD_BEGIN v=5 style=hidden layout=null_both unicode=0
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=hidden layout=null_both unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=hidden layout=null_both unicode=0 exit=00000000
+CHILD_BEGIN v=5 style=hidden layout=null_both unicode=1
+COMCTL32 requested=5 dll=5.82
+CALL v=5 style=hidden layout=null_both unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=5 style=hidden layout=null_both unicode=1 exit=00000000
+CHILD_BEGIN v=6 style=buttons layout=valid unicode=0
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=buttons layout=valid unicode=0
+RETURN ret=1 error=deadbeef
+STATE rc=5,31,205,107 pos_after=00000000,x=5,y=7,cx=200,cy=24,flags=00000014
+AFTER count=1
+CHILD_END v=6 style=buttons layout=valid unicode=0 exit=00000000
+CHILD_BEGIN v=6 style=buttons layout=valid unicode=1
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=buttons layout=valid unicode=1
+RETURN ret=1 error=deadbeef
+STATE rc=5,31,205,107 pos_after=00000000,x=5,y=7,cx=200,cy=24,flags=00000014
+AFTER count=1
+CHILD_END v=6 style=buttons layout=valid unicode=1 exit=00000000
+CHILD_BEGIN v=6 style=buttons layout=null_layout unicode=0
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=buttons layout=null_layout unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=buttons layout=null_layout unicode=0 exit=00000000
+CHILD_BEGIN v=6 style=buttons layout=null_layout unicode=1
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=buttons layout=null_layout unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=buttons layout=null_layout unicode=1 exit=00000000
+CHILD_BEGIN v=6 style=buttons layout=null_prc unicode=0
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=buttons layout=null_prc unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=buttons layout=null_prc unicode=0 exit=00000000
+CHILD_BEGIN v=6 style=buttons layout=null_prc unicode=1
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=buttons layout=null_prc unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=buttons layout=null_prc unicode=1 exit=00000000
+CHILD_BEGIN v=6 style=buttons layout=null_pwpos unicode=0
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=buttons layout=null_pwpos unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=buttons layout=null_pwpos unicode=0 exit=00000000
+CHILD_BEGIN v=6 style=buttons layout=null_pwpos unicode=1
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=buttons layout=null_pwpos unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=buttons layout=null_pwpos unicode=1 exit=00000000
+CHILD_BEGIN v=6 style=buttons layout=null_both unicode=0
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=buttons layout=null_both unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=buttons layout=null_both unicode=0 exit=00000000
+CHILD_BEGIN v=6 style=buttons layout=null_both unicode=1
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=buttons layout=null_both unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=buttons layout=null_both unicode=1 exit=00000000
+CHILD_BEGIN v=6 style=hidden layout=valid unicode=0
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=hidden layout=valid unicode=0
+RETURN ret=1 error=deadbeef
+STATE rc=5,7,205,107 pos_after=00000000,x=5,y=7,cx=200,cy=0,flags=00000014
+AFTER count=1
+CHILD_END v=6 style=hidden layout=valid unicode=0 exit=00000000
+CHILD_BEGIN v=6 style=hidden layout=valid unicode=1
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=hidden layout=valid unicode=1
+RETURN ret=1 error=deadbeef
+STATE rc=5,7,205,107 pos_after=00000000,x=5,y=7,cx=200,cy=0,flags=00000014
+AFTER count=1
+CHILD_END v=6 style=hidden layout=valid unicode=1 exit=00000000
+CHILD_BEGIN v=6 style=hidden layout=null_layout unicode=0
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=hidden layout=null_layout unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=hidden layout=null_layout unicode=0 exit=00000000
+CHILD_BEGIN v=6 style=hidden layout=null_layout unicode=1
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=hidden layout=null_layout unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=hidden layout=null_layout unicode=1 exit=00000000
+CHILD_BEGIN v=6 style=hidden layout=null_prc unicode=0
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=hidden layout=null_prc unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=hidden layout=null_prc unicode=0 exit=00000000
+CHILD_BEGIN v=6 style=hidden layout=null_prc unicode=1
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=hidden layout=null_prc unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=hidden layout=null_prc unicode=1 exit=00000000
+CHILD_BEGIN v=6 style=hidden layout=null_pwpos unicode=0
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=hidden layout=null_pwpos unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=hidden layout=null_pwpos unicode=0 exit=00000000
+CHILD_BEGIN v=6 style=hidden layout=null_pwpos unicode=1
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=hidden layout=null_pwpos unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=hidden layout=null_pwpos unicode=1 exit=00000000
+CHILD_BEGIN v=6 style=hidden layout=null_both unicode=0
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=hidden layout=null_both unicode=0
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=hidden layout=null_both unicode=0 exit=00000000
+CHILD_BEGIN v=6 style=hidden layout=null_both unicode=1
+COMCTL32 requested=6 dll=6.16
+CALL v=6 style=hidden layout=null_both unicode=1
+RETURN ret=0 error=deadbeef
+STATE rc=5,7,205,107 pos_after=CCCCCCCC,x=-858993460,y=-858993460,cx=-858993460,cy=-858993460,flags=cccccccc
+AFTER count=1
+CHILD_END v=6 style=hidden layout=null_both unicode=1 exit=00000000
+SUMMARY topic=comctl32-header-null-layout api_errors=0 complete=1 expectations=none
