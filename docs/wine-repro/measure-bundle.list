@@ -32,3 +32,4 @@ ndrstub-com-call3 | docs/wine-repro/rpcrt4-ndrstubcall3/com-measure.c | -Wextra 
 msi-null-stream-l1 | docs/wine-repro/msi-transform-null-stream/l1.c | -Wextra -lmsi -lole32 -static
 mspatcha-signature-l1 | docs/wine-repro/mspatcha-pa19/l1.c | -Wextra -static
 toolbar-padding | docs/wine-repro/comctl32-toolbar-padding-height/measure.c | -Wextra -lgdi32 -static
+header-null-layout | docs/wine-repro/comctl32-header-null-layout/measure.c | -Wextra -municode -static
