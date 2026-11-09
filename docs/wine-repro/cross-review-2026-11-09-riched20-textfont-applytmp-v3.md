@@ -122,3 +122,12 @@ revised native L1, the completed paired L2 and applicable Inventor smoke
 remain required. The author's local/forced-TRUE runs were not independently
 executed here; this source review claims no new runtime or full build pass.
 Production patches/series is unchanged.
+
+## Follow-up: v5 (2026-11-10)
+
+The new Windows output supports the second-ApplyNow correction and direct
+setter control; the second temporary cycle remains an admitted narrow
+todo. The new cache refresh also loses the old cached font-name BSTR.
+See [the v5 review](cross-review-2026-11-10-riched20-textfont-applytmp-v5.md)
+for the P2 ownership finding, partially answered P3 and pending L1/L2.
+The earlier class/initialization P1/P2 fixes remain intact.
