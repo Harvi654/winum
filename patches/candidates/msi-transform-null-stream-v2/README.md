@@ -17,8 +17,8 @@ dlls/msi/tests/db.c, with private prefixed helpers and one call after that
 existing test. Its transform schema/encoding/strings/rows/blob are identical
 to MEASURE. It uses unique owned temporary files, including placeholders
 overwritten by MSI/IStorage, instead of the original private directory.
-The native L1 must validate that complete assertion fixture too; a measured
-format alone does not count as assertion L1.
+The complete assertion fixture has now passed native L1 on both architectures;
+the earlier MEASURE alone was not counted as assertion L1.
 
 The test checks both rows, notes, NULL/read semantics and the positive binary
 control. Vanilla's missing-stream branch drops the NULL row, so the count and
@@ -30,8 +30,8 @@ unchanged, with an original test and a dated v2 header paragraph.
 This regression does not prove that every failed OpenStream is a valid NULL
 field: corrupt or inaccessible non-NULL stream handling remains unmeasured.
 It does not change that broader production workaround's scope or grant a
-release exception. Native assertion L1, cross review, paired MSI L2 and
-consumer validation remain prerequisites for promotion.
+release exception. Cross review, paired MSI L2 and consumer validation remain
+prerequisites for promotion.
 
 ## L1 bundle
 
@@ -51,8 +51,8 @@ result-msi-null-stream-l1-*.txt plus exitcodes.txt, even if incomplete.
 Complete successful execution should report 43 checks and zero failures.
 The main MEASURE list also contains the L1 entry; use the dedicated builder
 to check body parity before accepting results. No vendor MSI or SDK tool is
-needed. Native assertion execution is pending; no production marker upgrade
-is claimed.
+needed. The returned native assertion results are recorded below; no production
+marker upgrade is claimed for the unchanged production patch.
 
 ## Application and checks
 
@@ -78,12 +78,25 @@ A second-model read-only advisory read the complete original test/harness
 and candidate against the native observations and db.c insertion context.
 It found the assertions aligned, ownership balanced and no conspicuous
 copied nontrivial block. It highlighted the temp-placeholder setup difference,
-which the pending exact-body L1 must validate. This limited advisory is not
+which the subsequent exact-body L1 validated. This limited advisory is not
 proof of originality, formal cross review or native execution.
 
 The builder optionally accepts a BUNDLE_LIST containing the exact MSI L1
 entry, allowing the targeted batch-3 follow-up to share one VM visit with
 the two incomplete measurements. It still verifies the full candidate test
 block before compiling. The common builder now embeds an explicit original
-asInvoker/Windows-10 manifest; the pending native assertion run validates
+asInvoker/Windows-10 manifest; the returned native assertion results validate
 these actual EXEs, not an earlier build's metadata.
+
+## Windows assertion L1 (2026-11-09)
+
+The targeted bundle built from b08e0e1's sources was run in the maintainer's
+offline Windows 10 VM. Both x86_64 and i686 report SUMMARY checks=43 failures=0
+and exit 0. These are the exact-body assertion results, including creation
+over the owned temporary placeholders, successful transform application,
+retention of the NULL row and the positive four-byte binary control. The
+native L1 gate for this candidate passes. Only the summarized text results
+are recorded; no Windows files or raw logs are committed.
+
+Observed vanilla/patched Wine runtime comparison and paired MSI L2 are still
+pending. This candidate is not promoted and patches/series is unchanged.

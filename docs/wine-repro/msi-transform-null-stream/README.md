@@ -81,7 +81,18 @@ the builder verifies its equality to the patch. Assertions are ordinary
 ok(), including the valid binary control and NULL stream's result 13.
 
 The assertion fixture uses unique owned temporary files rather than the
-MEASURE's directory and is therefore itself still subject to native L1.
-Successful MEASURE is not promoted to an assertion pass. Cross review,
-paired runtime and consumer gates also remain open; production page and
-test marker stay unchanged until a native-tested candidate is promoted.
+MEASURE's directory. The returned assertion results below validate that setup;
+successful MEASURE alone was not promoted to an assertion pass. Cross review,
+paired runtime and consumer gates remain open. The production test marker
+stays unchanged until the candidate is promoted.
+
+## Windows assertion L1 (2026-11-09)
+
+The exact-body standalone test from the v2 candidate passed on offline
+Windows 10: x86_64 and i686 each report 43 checks, zero failures and exit 0.
+This includes the NULL row's key/note/read semantics and the populated binary
+control. The targeted bundle used b08e0e1's sources and the common original
+asInvoker/Windows-10 manifest. This is native assertion L1 for the candidate,
+not just the earlier MEASURE observation and not a Wine runtime comparison.
+Raw results are summarized only. Cross review, paired MSI L2 and promotion
+are still pending; the production patch and patches/series are unchanged.

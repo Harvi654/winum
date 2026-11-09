@@ -18,14 +18,21 @@ Patch rows whose header lives in `MsiPatchHeaders` (NULL `Header` stream) are no
 
 ## Wine test
 
-None in the patch.
+None in the production patch. The separate
+[v2 candidate](../../patches/candidates/msi-transform-null-stream-v2/README.md)
+adds a Windows-derived test in dlls/msi/tests/db.c. Its original transform
+contains a NULL OBJECT row and a populated four-byte binary control; Windows
+retains both rows. The exact-body standalone assertion test passed native
+L1 on both architectures. Cross review and paired MSI L2 remain pending;
+the candidate is not yet in patches/series, so the production marker remains
+missing.
 
 ## Validation
 
 | Level | Result |
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
-| L1 | **no Wine test** - needs one, measured on Windows first |
+| L1 | 2026-11-09: v2 candidate exact-body test passes on offline Windows 10 x86_64/i686, 43 checks / zero failures / exit 0 each (b08e0e1 sources). Production patch has no test until candidate promotion. |
 | L2 | not recorded per patch |
 | L3 | not recorded |
 | L4 | 2026.4 update installs and starts. (Inventor, maintainer) |
@@ -34,7 +41,9 @@ None in the patch.
 
 ## Open points
 
-Wine test missing.
+Promote the native-tested v2 candidate only after cross review, paired MSI L2
+and the remaining consumer gates. Observed vanilla/patched runtime results
+have not yet been recorded.
 
 ## Evidence
 
