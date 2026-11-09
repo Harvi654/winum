@@ -2,7 +2,7 @@
 # Original, AI-assisted (Codex), LGPL-2.1-or-later.
 # Build the exact Wine candidate function with our native assertion harness.
 set -euo pipefail
-[[ $# == 1 ]] || { echo 'Usage: build-l1-msi-null-stream.sh NEW_OUTPUT' >&2; exit 2; }
+[[ $# == 1 || $# == 2 ]] || { echo 'Usage: build-l1-msi-null-stream.sh NEW_OUTPUT [BUNDLE_LIST]' >&2; exit 2; }
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 python3 - "$here" <<'PY'
 from pathlib import Path
@@ -16,9 +16,15 @@ body = (root / 'docs/wine-repro/msi-transform-null-stream/test-body.h').read_tex
 if added[start:end] + '\n' != body:
     sys.exit('Candidate test and standalone test body differ')
 PY
-list="$(mktemp)"
-trap 'rm -f -- "$list"' EXIT
-printf '%s\n' 'msi-null-stream-l1 | docs/wine-repro/msi-transform-null-stream/l1.c | -Wextra -lmsi -lole32 -static' > "$list"
+entry='msi-null-stream-l1 | docs/wine-repro/msi-transform-null-stream/l1.c | -Wextra -lmsi -lole32 -static'
+if [[ $# == 2 ]]; then
+    list="$(realpath -e -- "$2")"
+    grep -Fqx -- "$entry" "$list" || { echo 'Bundle list must contain the exact MSI L1 entry' >&2; exit 2; }
+else
+    list="$(mktemp)"
+    trap 'rm -f -- "$list"' EXIT
+    printf '%s\n' "$entry" > "$list"
+fi
 bash "$here/scripts/build-measure-bundle.sh" "$1" "$list"
 cp "$here/docs/wine-repro/msi-transform-null-stream/"{l1.c,test-body.h} "$here/LICENSE" "$1/"
-(cd "$1" && sha256sum ./*.exe ./*.c ./*.h LICENSE README.txt run-measure.bat > SHA256SUMS)
+(cd "$1" && sha256sum ./*.exe ./*.c ./*.h LICENSE README.txt run-measure.bat measure.manifest > SHA256SUMS)

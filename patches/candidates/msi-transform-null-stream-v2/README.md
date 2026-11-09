@@ -48,6 +48,7 @@ are released. A timeout may leave its own temporary files and is not a pass.
 
 Run run-measure.bat in a fresh offline Windows directory and return both
 result-msi-null-stream-l1-*.txt plus exitcodes.txt, even if incomplete.
+Complete successful execution should report 43 checks and zero failures.
 The main MEASURE list also contains the L1 entry; use the dedicated builder
 to check body parity before accepting results. No vendor MSI or SDK tool is
 needed. Native assertion execution is pending; no production marker upgrade
@@ -79,3 +80,10 @@ It found the assertions aligned, ownership balanced and no conspicuous
 copied nontrivial block. It highlighted the temp-placeholder setup difference,
 which the pending exact-body L1 must validate. This limited advisory is not
 proof of originality, formal cross review or native execution.
+
+The builder optionally accepts a BUNDLE_LIST containing the exact MSI L1
+entry, allowing the targeted batch-3 follow-up to share one VM visit with
+the two incomplete measurements. It still verifies the full candidate test
+block before compiling. The common builder now embeds an explicit original
+asInvoker/Windows-10 manifest; the pending native assertion run validates
+these actual EXEs, not an earlier build's metadata.
