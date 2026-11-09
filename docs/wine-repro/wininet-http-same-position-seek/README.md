@@ -70,3 +70,23 @@ chunked/close support differences, rather than marking a successful target
 as todo or treating unsupported native seeks as success. This is MEASURE,
 not native assertion L1. Production code/series/marker remain unchanged;
 raw logs are summarized rather than committed.
+
+## Windows-derived assertion candidate
+
+The [v2 candidate](../../../patches/candidates/wininet-same-position-seek-v2/README.md)
+keeps the one-line implementation fix unchanged and adds the 12 native
+observations to Wine's existing http.c test unit. Its original independent
+loopback actor preserves the measured headers/body/API matrix; only the
+private cache URL gains a PID/tick suffix. The entire helper/test block is
+checked by scripts/build-l1-http-same-seek.sh against the standalone source
+before compilation. Full successful native execution should report 200
+checks, zero failures, 12 completed cases and 12 server-observed requests.
+
+Cached-length seek results, all body/EOF comparisons and request counts
+are ordinary assertions. Wine-only todos are confined to the separate
+cached chunked/close-delimited seek-rejection gap; the native wrapper treats
+those checks as ordinary too. No assertion guesses NO_CACHE_WRITE FILE_BEGIN
+or broader HTTP modes. The shared 45-second cooperative budget and native
+60-second watchdog bound fixture execution. Exact-body native L1 and paired
+Wine runtime still need observation; production page/marker/series are
+unchanged pending validation and cross review.

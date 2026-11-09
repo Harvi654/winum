@@ -167,3 +167,12 @@ each. The documented standard-time value assertions all ran. Broader
 timezone modes, paired Wine runtime, cross review and promotion remain
 open. Continue with the HTTP same-position seek entry; production series
 and markers are unchanged.
+
+The next HTTP candidate keeps its production one-line buffer-preservation
+fix unchanged and adds all 12 measured HTTP cases to Wine's http.c test.
+Build the exact standalone body through scripts/build-l1-http-same-seek.sh.
+Full native success requires 200 checks, zero failures, 12 cases and 12
+server-observed requests. Target/body/count assertions are ordinary; only
+the independent Wine cached chunked/close seek-rejection gap has Wine todos.
+Native assertion L1, runtime pairing and review are pending; no production
+series or marker change is made.
