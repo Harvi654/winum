@@ -18,14 +18,19 @@ Open/Place: clicking a file did not fill in the file name, double-click did noth
 
 ## Wine test
 
-None in the patch.
+None in the production patch. The separate
+[v2 candidate](../../patches/candidates/shell32-folderview-selection-v2/README.md)
+adds a Windows-derived test in dlls/shell32/tests/selection.c and corrects
+the empty selected-array result from E_FAIL to ERROR_NOT_FOUND. Its
+exact-body native test passes all four measured functional states on both
+architectures. The candidate is not yet in patches/series.
 
 ## Validation
 
 | Level | Result |
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
-| L1 | **no Wine test** - needs one, measured on Windows first |
+| L1 | 2026-11-09: v2 candidate exact-body test passes on offline Windows 10 x86_64/i686, 357 checks / zero failures / four states / exit 0 each (candidate completed 6c87a74, combined recipe at 8400e60). Production has no test until candidate promotion. |
 | L2 | not recorded per patch |
 | L3 | not recorded |
 | L4 | Click and double-click work. (Inventor, maintainer) |
@@ -34,7 +39,10 @@ None in the patch.
 
 ## Open points
 
-Wine test missing.
+Candidate native L1 is passed, but observed vanilla/patched behavior, paired
+shell32 L2, formal cross review and consumer validation remain open.
+Invalid-input, concurrent-mutation and OOM-injection coverage is not claimed.
+No production marker upgrade or promotion is made by the native result.
 
 ## Evidence
 

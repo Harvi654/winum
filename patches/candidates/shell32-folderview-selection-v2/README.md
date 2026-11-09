@@ -71,7 +71,7 @@ Run run-measure.bat in a fresh offline Windows 10 directory. The two runs
 briefly show their own view windows: leave mouse/keyboard/focus alone and
 let the program close each window itself. Return
 result-folder-selection-l1-x86_64.txt, result-folder-selection-l1-i686.txt
-and exitcodes.txt even on failure. Native assertion execution is pending.
+and exitcodes.txt even on failure. Returned native results are recorded below.
 Complete successful execution has 357 checks, four states, zero failures
 and exit 0. This is a static path count, not a native result. The
 standalone process has an independent 45-second watchdog; a timeout exits 2
@@ -92,8 +92,8 @@ offsets sources are kept in a separate source subdirectory to avoid name
 collisions. Return both pairs of result files and exitcodes.txt; revised
 offsets success is 40095 checks, zero failures, while shell selection is
 357 checks, zero failures and completed_states=4. Previous successful native
-expectations are retained; neither revised assertion body is claimed passed
-until its own native results return.
+expectations are retained; native passes are recorded only from the returned
+assertion results, not inferred from those expectations.
 
 ## Application and checks
 
@@ -121,6 +121,22 @@ resemblance beyond ordinary COM/Wine patterns and reuse of our own original
 fixture. This is not an originality certificate, native L1 or formal cross
 review for promotion.
 
-Native exact-body L1, paired shell32 L2, observed vanilla/patched behavior,
-Claude's formal cross review and consumer validation remain open. No
-production marker upgrade, candidate promotion or series change is claimed.
+Paired shell32 L2, observed vanilla/patched behavior, Claude's formal cross
+review and consumer validation remain open. No production marker upgrade,
+candidate promotion or series change is claimed.
+
+## Windows exact-body assertion L1 (2026-11-09)
+
+Both architecture results from the combined recipe available at 8400e60
+pass on the maintainer's offline Windows 10 VM: x86_64 and i686 each report
+SUMMARY checks=357 failures=0 completed_states=4 and exit 0. The candidate
+and combined builder were completed in 6c87a74. All four functional states
+ran, including the ordinary ERROR_NOT_FOUND empty-selection assertions,
+selected/folder array identities, index iteration and focus checks.
+
+This is native assertion L1 of the exact shared body, not just the earlier
+MEASURE or the static expected count. No raw logs or Windows files are
+committed. The fixed-view native pass does not expand coverage to invalid
+inputs, concurrent view mutations, OOM injection or other unmeasured cases.
+Wine runtime pairing and the review/consumer gates above remain open; the
+production patch, missing production test marker and series are unchanged.

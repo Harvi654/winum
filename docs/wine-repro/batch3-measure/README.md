@@ -210,3 +210,13 @@ native wrapper; the Windows size-4 expectation is still checked. This closes
 the revised-body native gate, not the pending Wine runtime/paired L2 or
 formal review. The original 40091-check run is preserved as historical
 evidence. No production series or marker changes follow from this record.
+
+The same returned bundle also passes shell selection L1 on both Windows 10
+architectures: 357 checks, zero failures, all four states and exit 0 each.
+This covers the native functional selection matrix, including the measured
+ERROR_NOT_FOUND result. The shell candidate/builder completed at 6c87a74;
+the combined recipe is available at 8400e60. Paired Wine runtime, formal
+cross review and remaining consumer validation stay open. No candidate is
+promoted and production markers/series are unchanged. The stopped MSI UI
+fixture and the unmeasured mspatcha PA19 decoder remain separate open gaps;
+the two native passes do not close the entire batch's release gates.

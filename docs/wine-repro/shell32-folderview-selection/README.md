@@ -104,13 +104,27 @@ no unspecified default order or invalid-input contract is asserted.
 
 scripts/build-l1-folder-selection.sh verifies the full helper/test block
 before compiling standalone x86_64/i686 assertion executables. Their native
-L1 run remains pending; the original MEASURE is not an assertion pass. The
+L1 results are recorded below; the original MEASURE is not an assertion pass. The
 view opens and closes itself, so do not click or change focus while it runs.
 Require four completed states, zero failures and exit 0 on both architectures.
 Both strict builds and test-body parity pass. The candidate README records
 ownership, error handling and remaining runtime/review gates. Production
 page/marker/series remain unchanged until the appropriate gates pass.
-The statically counted complete success path has 357 assertions; no native
-assertion results have yet been supplied. The optional combined list
+The statically counted complete success path has 357 assertions. The optional combined list
 batch3-measure/selection-offsets-l1.list also builds the corrected offsets
 body for one VM run, after checking both candidates' exact-body parity.
+
+## Windows exact-body assertion L1 (2026-11-09)
+
+The maintainer's offline Windows 10 results complete on both architectures:
+357 checks, zero failures, four completed states and exit 0 each. The
+combined recipe available at 8400e60 verifies both test bodies; shell
+candidate/builder completion is 6c87a74. Empty selected arrays, own-folder
+fallback, selected identities/counts, exclusive index iteration and focus
+all pass as ordinary assertions. Native L1 is now established for this
+functional matrix, not inferred from the original MEASURE.
+
+Invalid inputs, concurrent mutations and OOM behavior were not newly
+measured by this run. Observed Wine before/after behavior, paired shell32
+L2, formal cross review and consumer validation remain pending. Production
+patch/marker/series stay unchanged. Only summarized text is committed.
