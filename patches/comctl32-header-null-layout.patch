@@ -1,11 +1,113 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] comctl32/header: Fail HDM_LAYOUT for a NULL layout or NULL members.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 (x86_64 and i686, comctl32 5.82 and 6.16, A and W, with and
+without HDS_HIDDEN; winum docs/wine-repro/comctl32-header-null-layout,
+windows-2026-11-09): HDM_LAYOUT with lParam NULL, or with an HDLAYOUT whose
+prc, pwpos or both are NULL, returns FALSE, leaves the last error alone
+and writes neither the RECT nor the WINDOWPOS that was given. Wine
+dereferenced the pointers; SOLIDWORKS sends a NULL layout at start and
+crashed.
+
+v2 (2026-11-09): v1 checked only lParam. The measurement shows that NULL
+members fail the same way without writing the other member, so the check
+covers them; adds the Wine test.
+
 --- a/dlls/comctl32/header.c
 +++ b/dlls/comctl32/header.c
 @@ -1495,6 +1495,8 @@
  static LRESULT
  HEADER_Layout (HEADER_INFO *infoPtr, LPHDLAYOUT lpLayout)
  {
-+    if (!lpLayout) return FALSE;
++    if (!lpLayout || !lpLayout->prc || !lpLayout->pwpos) return FALSE;
 +
      lpLayout->pwpos->hwndInsertAfter = 0;
      lpLayout->pwpos->x = lpLayout->prc->left;
      lpLayout->pwpos->y = lpLayout->prc->top;
+--- a/dlls/comctl32/tests/header.c
++++ b/dlls/comctl32/tests/header.c
+@@ -935,6 +935,65 @@
+     DestroyWindow(hChild);
+ }
+ 
++/* HDM_LAYOUT with a NULL HDLAYOUT or NULL members fails and changes
++ * nothing, as measured on Windows 10 (v5 and v6, A and W, with and without
++ * HDS_HIDDEN). */
++static void test_hdm_layout_null(HWND hParent)
++{
++    static const DWORD styles[] = { HDS_BUTTONS, HDS_BUTTONS | HDS_HIDDEN };
++    HDLAYOUT layout;
++    WINDOWPOS pos;
++    unsigned int i, j;
++    LRESULT ret;
++    HWND header;
++    RECT rect;
++
++    for (i = 0; i < ARRAY_SIZE(styles); i++)
++    {
++        header = CreateWindowExA(0, WC_HEADERA, NULL, WS_CHILD | WS_VISIBLE | styles[i],
++                                 0, 0, 300, 30, hParent, (HMENU)1, GetModuleHandleA(NULL), NULL);
++        ok(header != NULL, "failed to create header\n");
++
++        SetLastError(0xdeadbeef);
++        ret = SendMessageA(header, HDM_LAYOUT, 0, 0);
++        ok(!ret, "style %#lx: got %Id\n", styles[i], ret);
++        ok(GetLastError() == 0xdeadbeef, "style %#lx: got error %lu\n", styles[i], GetLastError());
++        ret = SendMessageW(header, HDM_LAYOUT, 0, 0);
++        ok(!ret, "style %#lx: got %Id\n", styles[i], ret);
++
++        /* 0: prc NULL, 1: pwpos NULL, 2: both */
++        for (j = 0; j < 3; j++)
++        {
++            SetRect(&rect, 5, 7, 205, 107);
++            memset(&pos, 0xcc, sizeof(pos));
++            layout.prc = j == 1 ? &rect : NULL;
++            layout.pwpos = j == 0 ? &pos : NULL;
++            SetLastError(0xdeadbeef);
++            ret = SendMessageA(header, HDM_LAYOUT, 0, (LPARAM)&layout);
++            ok(!ret, "style %#lx, case %u: got %Id\n", styles[i], j, ret);
++            ok(GetLastError() == 0xdeadbeef, "style %#lx, case %u: got error %lu\n", styles[i], j, GetLastError());
++            ok(rect.left == 5 && rect.top == 7 && rect.right == 205 && rect.bottom == 107,
++               "style %#lx, case %u: got rect %s\n", styles[i], j, wine_dbgstr_rect(&rect));
++            ok(pos.x == (int)0xcccccccc && pos.cy == (int)0xcccccccc && pos.flags == 0xcccccccc,
++               "style %#lx, case %u: WINDOWPOS changed\n", styles[i], j);
++        }
++
++        /* the control still works */
++        SetRect(&rect, 5, 7, 205, 107);
++        layout.prc = &rect;
++        layout.pwpos = &pos;
++        ret = SendMessageA(header, HDM_LAYOUT, 0, (LPARAM)&layout);
++        ok(ret == TRUE, "style %#lx: got %Id\n", styles[i], ret);
++        ok(pos.x == 5 && pos.y == 7 && pos.cx == 200, "style %#lx: got %d,%d,%d\n", styles[i], pos.x, pos.y, pos.cx);
++        if (styles[i] & HDS_HIDDEN)
++            ok(!pos.cy && rect.top == 7, "style %#lx: got cy %d, top %ld\n", styles[i], pos.cy, rect.top);
++        else
++            ok(pos.cy > 0 && rect.top == 7 + pos.cy, "style %#lx: got cy %d, top %ld\n", styles[i], pos.cy, rect.top);
++
++        DestroyWindow(header);
++    }
++}
++
+ static void test_hdm_ordertoindex(HWND hParent)
+ {
+     HWND hChild;
+@@ -1920,6 +1979,7 @@
+     test_hdm_getitemrect(parent_hwnd);
+     test_hdm_hittest(parent_hwnd);
+     test_hdm_layout(parent_hwnd);
++    test_hdm_layout_null(parent_hwnd);
+     test_hdm_ordertoindex(parent_hwnd);
+     test_hdm_sethotdivider(parent_hwnd);
+     test_hdm_imageMessages(parent_hwnd);
+@@ -1940,6 +2000,7 @@
+     test_hds_nosizing(parent_hwnd);
+     test_item_auto_format(parent_hwnd);
+     test_hdm_layout(parent_hwnd);
++    test_hdm_layout_null(parent_hwnd);
+ 
+     uninit_winevent_hook();
+ 
