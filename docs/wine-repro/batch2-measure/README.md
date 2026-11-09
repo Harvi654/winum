@@ -193,3 +193,21 @@ The minimal-channel fixture has no working native control and is blocked.
 Do not repeat followup.list unchanged or derive a conformance oracle from
 those faults. The next RPC fixture must use a real COM marshaling path;
 these completed mshtml results remain valid independently of the RPC failures.
+
+
+## Third RPC bundle returned; native gate stopped (2026-11-09)
+
+The real-COM generated and NdrStubCall2 controls now succeed on x86_64/i686:
+S_OK, value=42, one server call on its STA creator and balanced observed
+object references. The x64 NdrStubCall3 probe reaches its wrapper but not
+our method or DISPATCH_DONE; the client receives RPC_E_SERVERFAULT. i686
+has no export. All six processes exit 0 because they completed observations;
+the probe's functional=0 is not a passed conformance test.
+
+The third iteration provides working controls but no accepted native
+NdrStubCall3 fixture. That gate remains blocked and this fixture direction
+is stopped; do not request another guessed-metadata bundle. The topic
+[conclusion and L3 proposal](../rpcrt4-ndrstubcall3/README.md#conclusion-and-stop-point)
+records the exact limit and best hypothesis. No exception is converted into
+a success-path assertion or l3-only waiver. Mshtml and the reviewed actctx
+reader retain their completed native L1 gates. Production series is unchanged.

@@ -1,10 +1,11 @@
 # NdrStubCall3: NDR32 Windows MEASURE
 
-Original fixture, AI-assisted (Codex), LGPL-2.1-or-later. Initial native results are
-recorded below; the control faults, so no functional oracle is established.
-This prepares a functional oracle for rpcrt4-ndrstubcall3.patch;
-it is not an export-only conformance test or an L1 pass. Production patches,
-their markers and patches/series are unchanged.
+Original fixture, AI-assisted (Codex), LGPL-2.1-or-later. All three native
+fixture iterations are recorded below. Real COM transport now gives working
+NdrStubCall2 controls, but the x64 NdrStubCall3 probe does not reach the server.
+No functional native NdrStubCall3 oracle or L1 is established. **Stopped after
+the third iteration; do not rerun the historical bundles unchanged.**
+Production patches, their markers and patches/series are unchanged.
 
 ## Own SDK fixture
 
@@ -265,3 +266,80 @@ acceptance and all resulting expected values remain unknown. Even if the
 controls work, a rejected mode-3 metadata shape alone must not be called a
 functional native NdrStubCall3 oracle. Do not keep modifying it beyond this
 third round without stopping and recording the evidence limit.
+
+
+## Schema-3 Windows results (2026-11-09): controls work, probe blocked
+
+The maintainer returned all six outputs and exitcodes.txt from the real COM
+transport bundle. Every process exited 0. That means completed measurement
+execution, not six successful functional tests. All registration, marshaling,
+unmarshaling, revocation and disconnection APIs printed S_OK where invoked.
+
+| Program | Architecture | Client result | Server / explicit wrapper calls | functional | Cleanup |
+| --- | --- | --- | --- | --- | --- |
+| Generated control | x86_64, i686 | S_OK, value=42 | 1 / 0 | 1 | object_refs=1 |
+| NdrStubCall2 control | x86_64, i686 | S_OK, value=42 | 1 / 1 | 1 | object_refs=1 |
+| NdrStubCall3 probe | x86_64 | RPC_E_SERVERFAULT (0x80010105), value=0 | 0 / 1 | 0 | object_refs=1 |
+| NdrStubCall3 probe | i686 | Export absent; no call | 0 / 0 | 0 | Not initialized |
+
+The controls' callbacks reported input=35, output_present=1, on_creator=1
+and on_client=0. Both explicit NdrStubCall2 wrappers received method=3,
+bytes=8, before_phase=0 and returned normally with result=0, after_phase=2.
+Thus the real COM path supplies a working NDR32 control on both architectures.
+Its request size differs from the minimal channel's four bytes; this does
+not isolate which transport detail caused the earlier faults.
+
+The x64 NdrStubCall3 probe reached DISPATCH with method=3, bytes=8 and
+before_phase=0, but produced neither DISPATCH_DONE nor SERVER. COM returned
+RPC_E_SERVERFAULT to the client and the process completed normal cleanup
+with api_errors=0 and functional=0. This is the HRESULT observed at the COM
+boundary, not a normal return from NdrStubCall3 and not the underlying
+exception code. It does not establish a valid native NdrStubCall3 contract.
+The i686 process reported available=0, completed=0 and functional=0; its
+zero exit is only an availability observation. No raw logs are committed.
+
+### Conclusion and stop point
+
+Standard COM transport resolves the control failure, so these results are
+closer than the first two iterations. However, the one-NDR32-entry metadata
+shape is still not demonstrated as accepted by native NdrStubCall3. The
+best remaining hypothesis is a mismatch between this synthetic server
+metadata/syntax-selection setup and what that native entry point requires;
+the underlying exception and precise requirement are unknown. Acceptance by
+NdrStubCall2 does not prove acceptance by NdrStubCall3. The measurements do
+not show a Windows defect or justify treating RPC_E_SERVERFAULT as the
+expected result of a valid call.
+
+Stop this fixture direction after its third iteration, as planned under
+AGENTS.md's three-round rule. No fourth guessed metadata variant or VM run
+is requested. Before reopening it, an independently justified public-API
+metadata design with a successful native NdrStubCall3 control is needed.
+Only open-source generators/declarations and our original IDL may supply
+that design; native binary internals remain outside scope.
+
+An honest successful-dispatch conformance test for this patch cannot yet be
+written from these outputs. An export-only test would miss the implemented
+interpreter, and encoding the observed server fault would validate this
+unaccepted fixture rather than the intended functionality. No candidate
+patch is invented and no production test marker or series entry changes.
+This is a blocked native gate, not proof that Windows testing is impossible.
+
+### Proposed L3 while the native gate is blocked
+
+The existing real-COM programs can serve as a Wine-only synthetic subset
+reproducer: run identical binaries in isolated prefixes against paired Wine
+11.20 builds without and with rpcrt4-ndrstubcall3.patch, keeping other inputs
+identical. First require successful generated/NdrStubCall2 controls on both
+architectures. Then record whether the patched win64 probe reaches our
+method once, returns the chosen value 42, completes DISPATCH_DONE and normal
+cleanup; record baseline export availability separately. A skipped/missing
+export, incomplete process or failed control is not a passing L3 run.
+
+This would exercise the patch's claimed NDR32 syntax-entry subset and its
+transport, not establish native compatibility, NDR64 support, alternate
+syntax selection, fallback behavior or general safety of generated stubs.
+It has not been run as L3 here. It cannot replace missing L1 or justify
+`winum-test: l3-only`, because the native API exists and its valid-call
+contract remains unresolved. Review the supported scope before deciding
+how to handle that release gate. Existing CAD workaround behavior is
+retained; no implementation removal or scope change is made by this record.
