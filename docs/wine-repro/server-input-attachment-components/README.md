@@ -282,3 +282,28 @@ both user32 EXEs plus the server link in the focused source build. No
 runtime pass is claimed. V4 native L1 and paired L2 remain pending. Keep
 its new native test for the combined VM round after textfont-followup2,
 rather than rerunning v3 now. Previous sources/results are retained.
+
+
+Focused round-2 pair:
+[run 42724139459](https://github.com/Harvi654/winum/actions/runs/42724139459),
+test-run/batch4-3 at 2d2fc9d, based on main b75a5e1. The run is in
+progress; no runtime result is recorded yet. Both source variants contain
+identical v4 test bytes, while only series receives the implementation.
+The branch-only workflow runs attachment on both PE architectures. This
+focused diagnostic does not replace the wider neighboring-suite L2.
+
+The coverage gate requires 44 completed scenarios, zero scenario skips,
+592 component snapshots and 2180 positive-reference checks. An available
+absolute view must cover all 592 snapshots; the independent-control skip
+is accepted only with its explicit unavailable state and three preceding
+absolute snapshots. Series must have no ordinary failures; vanilla must
+retain a target signal. The artifact roots contain
+attachment-coverage-series.json / attachment-coverage-vanilla.json. Public
+job notices also expose the filtered per-architecture counters and up to
+three representative failures, so the scope can be assessed without API
+artifact access. None of these checks substitutes for native v4 L1.
+
+The series artifact also packages the revised native user32:attachment
+unit. Hold that VM rerun for the next combined round after the pending
+textfont-followup2 measurement results; do not rerun the obsolete v3
+bundle. The textfont BSTR fix has not been added to a new run.
