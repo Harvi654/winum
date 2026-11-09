@@ -9,7 +9,10 @@ then placed before the next repaint - ITextRange::Select, EM_SETSEL,
 EM_EXSETSEL, WM_SETFOCUS or ITextRange::ScrollIntoView - cursor_coords()
 finds the paragraph still marked MEPF_REWRAP and fails
 assert(~para->nFlags & MEPF_REWRAP). Inventor aborted that way when a
-dimension text was edited. Rewrap at that point instead.
+dimension text was edited. Rewrap at that point instead, and find the
+cursor again from its character offset: wrapping splits runs, and the
+run and paragraph taken from the cursor before wrapping gave the caret the
+position of the first line.
 
 Windows 10 (x86_64 and i686, riched20 and msftedit; winum
 docs/wine-repro/riched20-caret-rewrap, windows-2026-11-09): none of those
@@ -19,31 +22,53 @@ checks exactly that, relative to EM_POSFROMCHAR, so font metrics do not
 enter.
 
 Not changed: on Windows the text is already wrapped right after SetText
-(EM_GETLINECOUNT counts the wrapped lines); Wine still wraps later.
+(EM_GETLINECOUNT counts the wrapped lines), and SetText leaves the
+selection alone (Wine restores a stale copy of the cursor: 56,56 or 0,56
+instead of 0,0; todo_wine in the test, and with that selection the caret
+is checked only when it is empty).
 
-v2 (2026-11-09): adds the Wine test; the code change is the one of v1.
+v2 (2026-11-09): adds the Wine test. The test showed that v1 avoided the
+assertion but placed the caret on the first line (run and paragraph read
+before wrapping); v2 reads them after wrapping, from the character
+offset.
 
 --- a/dlls/riched20/caret.c
 +++ b/dlls/riched20/caret.c
-@@ -229,7 +229,14 @@
+@@ -222,15 +222,27 @@
+                     int *x, int *y, int *height )
+ {
+   ME_Row *row;
+-  ME_Run *run = cursor->run;
+-  ME_Paragraph *para = cursor->para;
+-  ME_Run *size_run = run, *prev;
++  ME_Run *run, *size_run, *prev;
++  ME_Paragraph *para;
+   ME_Context c;
    int run_x;
    HDC hdc = ITextHost_TxGetDC( editor->texthost );
  
 -  assert(~para->nFlags & MEPF_REWRAP);
 +  /* The caret can be placed before the next repaint has rewrapped the text
-+   * (e.g. a host that creates the caret right after changing the text);
-+   * rewrap now instead of failing an assertion. */
-+  if (para->nFlags & MEPF_REWRAP)
++   * (e.g. ITextRange::SetText followed by a selection change); rewrap now
++   * instead of failing an assertion. Wrapping splits runs, so the cursor is
++   * found again from its character offset. */
++  if (cursor->para->nFlags & MEPF_REWRAP)
 +  {
++    int ofs = ME_GetCursorOfs( cursor );
+ 
 +    WARN( "paragraph needs rewrap, wrapping now\n" );
 +    wrap_marked_paras_dc( editor, hdc, FALSE );
++    cursor_from_char_ofs( editor, ofs, cursor );
 +  }
- 
++
++  run = size_run = cursor->run;
++  para = cursor->para;
    row = row_from_cursor( cursor );
  
+   ME_InitContext( &c, editor, hdc );
 --- a/dlls/riched20/tests/richole.c
 +++ b/dlls/riched20/tests/richole.c
-@@ -5565,6 +5565,117 @@
+@@ -5565,6 +5565,120 @@
    release_interfaces(&hwnd, &reole, &doc, &selection);
  }
  
@@ -100,6 +125,9 @@ v2 (2026-11-09): adds the Wine test; the code change is the one of v1.
 +        ok(hr == S_OK, "got %#lx\n", hr);
 +        SysFreeString(str);
 +        ITextRange_Release(range);
++        /* SetText leaves the selection alone */
++        SendMessageA(edit, EM_EXGETSEL, 0, (LPARAM)&cr);
++        todo_wine ok(!cr.cpMin && !cr.cpMax, "got selection %ld,%ld\n", cr.cpMin, cr.cpMax);
 +
 +        /* the caret is placed before any repaint */
 +        switch (t)
@@ -142,7 +170,7 @@ v2 (2026-11-09): adds the Wine test; the code change is the one of v1.
 +            line = SendMessageA(edit, EM_EXLINEFROMCHAR, 0, 23);
 +            ok(line > 0, "got line %ld\n", line);
 +        }
-+        if (t <= 3)
++        if (t <= 2 || (t == 3 && cr.cpMin == cr.cpMax))
 +        {
 +            /* the caret is where the selection is */
 +            SendMessageA(edit, EM_POSFROMCHAR, (WPARAM)&pt, cr.cpMin);
@@ -161,7 +189,7 @@ v2 (2026-11-09): adds the Wine test; the code change is the one of v1.
  START_TEST(richole)
  {
    /* Must explicitly LoadLibrary(). The test has no references to functions in
-@@ -5609,4 +5720,5 @@
+@@ -5609,4 +5723,5 @@
    test_undo();
    test_undo_control();
    test_freeze();
