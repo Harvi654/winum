@@ -1,17 +1,55 @@
-Wine 11.20: preserve connected input components when detaching one edge.
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] server: Preserve input components and desktop reparent associations.
 
-Experimental, developed with AI assistance; not submitted to upstream Wine.
-License: LGPL-2.1-or-later, matching the modified Wine source.
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not
+submitted upstream.
 
-A WebView GUI thread can be attached to two host GUI threads. Unparenting
-one embedded window must not separate it from its remaining host. Keep
-cycles connected and keep the active window on the original input object
-so desktop foreground routing is retained. Restore the removed edge on
-allocation failure. The detach-all/desktop-change path is unchanged.
+Windows 10 x86_64/i686, measured through public APIs with our own windows
+(docs/wine-repro/server-input-attachment-components/windows-2026-11-09,
+bundle run 42659893206), preserves remaining explicit AttachThreadInput
+components when one reference is removed: chains, bridges, cycles and
+repeated/reversed edges. Focus, active and captured windows stay in the
+component of the active anchor. Nonedges fail without splitting input.
 
+Vanilla split only the from queue, breaking surviving links and moving
+active/focus away from the foreground input object. Keep the v1 component
+walk and retain the active component's input object. Allocation failure
+restores the removed reference; detach-all is unchanged.
+
+The measured implicit child sequences differ: SetParent(child, NULL)
+retains the shared input association, including after that child is later
+destroyed, whereas direct destruction detaches its old host on Windows.
+Do not split the old parent group when moving a child to the desktop.
+Otherwise v1 would newly clear the old host's active window, a field that
+vanilla preserves like Windows. Direct-destruction detachment and the
+self-detach error-code discrepancy remain separate Wine gaps, limited
+todo_wine assertions in the test. No claim covers unmeasured desktop,
+DPI, cross-process or allocator-failure Windows behavior.
+
+v3 (2026-11-09, foreground setup round 1): create hidden own windows,
+show them without incidental activation, seed independent queues to the
+measured initial pattern and drain their events. Check actual foreground,
+active and focus state before any edge or child is created. If that
+initial prerequisite cannot be reached, skip the scenario explicitly;
+never skip a failed assertion after attachments exist. Report completed
+and skipped coverage separately. The literal Windows oracle, existing
+todos and all implementation hunks are unchanged. V3 needs its own native
+L1 rerun and paired L2; v2's native pass is not transferred to this body.
+
+v2 (2026-11-09): add a Wine test with literal observed state checkpoints
+and invalid/duplicate reference results, plus the measured desktop-reparent
+limit that preserves the old host too. The x86_64 and i686 measurements
+are identical except bitness; expected values are never computed from
+Wine's attachment graph. Native assertion L1 passed on Windows 10
+x86_64/i386: 10195 checks each, zero failures/skips. Paired L2 run
+42695491325 completed the assertion unit but still reports 2377 i386 and
+2370 x86_64 ordinary active/focus failures under Xvfb. L2 is not cleared
+(see the candidate README); no native expected value or todo was changed.
+
+diff --git a/server/queue.c b/server/queue.c
 --- a/server/queue.c
 +++ b/server/queue.c
-@@ -1451,11 +1451,91 @@
+@@ -1495,11 +1495,91 @@
      release_object( old_input );
  }
  
@@ -104,7 +142,7 @@ allocation failure. The detach-all/desktop-change path is unchanged.
      int count = 0;
  
      LIST_FOR_EACH_ENTRY_SAFE( attach, next, &old_input->attachments, struct attachment, entry )
-@@ -1464,15 +1544,18 @@
+@@ -1508,15 +1588,18 @@
          if (attach->queue_to != queue_from && (!queue_to || attach->queue_to != queue_to)) continue;
          if (count++ && queue_to) break;
          list_remove( &attach->entry );
@@ -128,3 +166,17 @@ allocation failure. The detach-all/desktop-change path is unchanged.
      if (!(new_input = create_thread_input( desktop ))) return;
      assign_thread_input( queue_from, new_input );
      release_object( new_input );
+diff --git a/server/window.c b/server/window.c
+--- a/server/window.c
++++ b/server/window.c
+@@ -425,7 +425,9 @@
+ 
+     if (parent)
+     {
+-        attach_parent_thread( win, false );
++        /* Reparenting a child to the desktop retains its input association.
++         * In particular, another child can still share input with that host. */
++        if (!is_desktop_window( parent )) attach_parent_thread( win, false );
+         if (win->parent) release_object( win->parent );
+         win->parent = (struct window *)grab_object( parent );
+         attach_parent_thread( win, true );

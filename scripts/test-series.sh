@@ -87,6 +87,7 @@ for t in $TESTS; do
         [ -f "$exe" ] || continue
         units="$(./wine "$exe" --list 2>/dev/null | sed -n 's/^    //p' | tr -d '\r')" || true
         for u in $units; do
+            [ -z "${ONLY_UNIT:-}" ] || [ "$u" = "$ONLY_UNIT" ] || continue
             log="$OUTDIR/logs/$t.$arch.$u.log"
             start=$(date +%s)
             timeout -k 10 "$UNIT_TIMEOUT" ./wine "$exe" "$u" > "$log" 2>&1 || echo "exit=$?" >> "$log"

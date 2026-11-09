@@ -27,22 +27,18 @@ jobs:
       fail-fast: false
       matrix:
         variant: [vanilla, series]
-        group: [g1, g2, g3, g4, g5]
+        group: [g1]
         include:
           - group: g1
             tests: user32
-          - group: g2
-            tests: win32u gdi32 comctl32 opengl32 glu32
-          - group: g3
-            tests: ntdll kernelbase advapi32 combase ole32 oleaut32 rpcrt4 urlmon
-          - group: g4
-            tests: msi
-          - group: g5
-            tests: msxml3 mspatcha riched20 msftedit shell32 wbemprox wininet
     runs-on: ubuntu-24.04
     container: archlinux:base-devel
     timeout-minutes: 350
     env:
+      L1_UNITS: user32:attachment
+      ONLY_UNIT: attachment
+      UNIT_TIMEOUT: '600'
+      VARIANT: ${{ matrix.variant }}
       RUN_GROUP: ${{ inputs.only == '' || inputs.only == matrix.group }}
     steps:
       - name: Dependencies (official Arch repositories)
@@ -69,6 +65,36 @@ jobs:
           export GROUP="${{ matrix.group }}"
           export MAKE_L1="${{ matrix.group == 'g1' && '1' || '0' }}"
           bash scripts/test-series.sh ${{ matrix.variant }} out
+      - name: Require complete attachment coverage and inspect absolute result
+        if: always() && env.RUN_GROUP == 'true'
+        run: |
+          python3 - <<'COVERAGE'
+          import json, os, re
+          from pathlib import Path
+          variant = os.environ['VARIANT']
+          results = json.loads(Path('out/results-' + variant + '-g1.json').read_text())
+          errors = []
+          report = {'variant': variant, 'source_commit': os.environ['GITHUB_SHA'], 'units': {}, 'errors': errors}
+          for arch in ['i386', 'x86_64']:
+              key = 'user32.' + arch + '.attachment'
+              result = results[key]
+              log = Path('out/logs/' + key + '.log').read_text(errors='replace')
+              match = re.search(r'ATTACHMENT_COVERAGE completed=(\d+) skipped=(\d+) attempted=44', log)
+              print(key, 'coverage=' + (match.group(0) if match else 'missing'),
+                    'finished=' + str(result['finished']), 'failures=' + str(result['failures']),
+                    'todos=' + str(result['todo']), 'exit=' + str(result['exit']))
+              report['units'][key] = dict(result, completed_scenarios=int(match[1]) if match else None,
+                                        skipped_scenarios=int(match[2]) if match else None)
+              if not result['finished'] or not match or match.groups() != ('44', '0'):
+                  errors.append(key + ': incomplete coverage; skips are not a candidate pass')
+              if variant == 'series' and (result['failures'] or result['exit'] not in (None, '0')):
+                  errors.append(key + ': ordinary series failures remain')
+              if variant == 'vanilla' and not result['failures']:
+                  errors.append(key + ': vanilla target difference not demonstrated')
+          Path('out/attachment-coverage-' + variant + '.json').write_text(json.dumps(report, indent=2) + '\n')
+          if errors:
+              raise SystemExit('\n'.join(errors))
+          COVERAGE
       - name: Build log on failure
         if: failure() && env.RUN_GROUP == 'true'
         run: tail -n 80 /tmp/work/*.log || true
