@@ -1,4 +1,3 @@
-/* BEGIN winum actctx model test: original, AI-assisted (Codex), LGPL-2.1-or-later. */
 static void test_com_threading_model_case(void)
 {
     static const GUID clsid = {0x6e9bfe81, 0x6da1, 0x47a3,
@@ -33,8 +32,8 @@ static void test_com_threading_model_case(void)
             ACTCTXW request = {0};
             HANDLE file, context = INVALID_HANDLE_VALUE;
             ULONG_PTR cookie = 0;
-            SIZE_T got = 0;
-            DWORD written, error, prefix[3], model;
+            struct comclassredirect_data *record;
+            DWORD written, error, model;
             BOOL ret, active = FALSE, complete = TRUE;
             int count;
 
@@ -89,19 +88,15 @@ static void test_com_threading_model_case(void)
             ok(ret, "Kind %u %s query failed.\n", managed, tests[i].label);
             if (!ret) goto done;
             ok(data.ulDataFormatVersion == 1, "Kind %u %s format %lu.\n", managed, tests[i].label, data.ulDataFormatVersion);
-            ok(data.lpData && data.ulLength >= sizeof(prefix), "Kind %u %s record is too short.\n", managed, tests[i].label);
-            if (!data.lpData || data.ulLength < sizeof(prefix)) goto done;
-            /* Public query result: size/flags/model prefix as in open Wine's
-             * actctx tests. Copy no more than the returned record length. */
-            ret = ReadProcessMemory(GetCurrentProcess(), data.lpData, prefix, sizeof(prefix), &got);
-            ok(ret && got == sizeof(prefix), "Kind %u %s record unreadable.\n", managed, tests[i].label);
-            if (!ret || got != sizeof(prefix)) goto done;
-            ok(prefix[0] == 120, "Kind %u %s record size %lu.\n", managed, tests[i].label, prefix[0]);
-            ok(!prefix[1], "Kind %u %s record flags %#lx.\n", managed, tests[i].label, prefix[1]);
+            record = data.lpData;
+            ok(record && data.ulLength >= sizeof(*record), "Kind %u %s record is too short.\n", managed, tests[i].label);
+            if (!record || data.ulLength < sizeof(*record)) goto done;
+            ok(record->size == sizeof(*record), "Kind %u %s record size %lu.\n", managed, tests[i].label, record->size);
+            ok(!record->flags, "Kind %u %s record flags %#lx.\n", managed, tests[i].label, record->flags);
             model = !tests[i].value && managed ? 4 : tests[i].model;
             /* Missing-attribute defaults are separate Wine discrepancies. */
             todo_wine_if(!tests[i].value)
-                ok(prefix[2] == model, "Kind %u %s model %lu, expected %lu.\n", managed, tests[i].label, prefix[2], model);
+                ok(record->model == model, "Kind %u %s model %lu, expected %lu.\n", managed, tests[i].label, record->model, model);
         done:
             if (active)
             {
@@ -122,4 +117,3 @@ static void test_com_threading_model_case(void)
         }
     }
 }
-/* END winum actctx model test */

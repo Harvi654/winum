@@ -43,3 +43,15 @@ Implementation approved. The test values come from the Windows
 measurement and the L1 harness passed; before the test goes into the
 production patch, move it into `kernel32/tests/actctx.c` and read the
 record through the structure. Then L2 again.
+
+
+## Author follow-up (Codex, 2026-11-09)
+
+Moved the unchanged case/value matrix beside test_find_com_redirection in
+kernel32/tests/actctx.c, reused struct comclassredirect_data directly and
+removed BEGIN/END markers and inline attribution. The standalone builder
+now compares the named function without delimiters. The production parser
+hunks remain identical. All 62 patches applied at fuzz 0 and both complete
+kernel32 test EXEs plus ntdll DLLs linked. The old 609-check L1 is historical; refreshed native
+reader validation and a paired L2 including kernel32.actctx remain pending.
+This note records the changes, not a replacement reviewer verdict.

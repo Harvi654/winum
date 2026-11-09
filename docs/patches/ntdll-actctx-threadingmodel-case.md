@@ -20,8 +20,9 @@ The manifest parser compares `threadingModel` case-insensitively (`free` = Free)
 
 None in the production patch. The
 [v2 candidate](../../patches/candidates/ntdll-actctx-threadingmodel-case-v2/README.md)
-adds an isolated ntdll activation-context test from our 42-case Windows
-MEASURE. It checks both comClass and clrClass value spellings, with separate
+adds cases to kernel32/tests/actctx.c from our 42-case Windows MEASURE,
+as requested in cross review. It reads comclassredirect_data directly and
+checks both comClass and clrClass value spellings, with separate
 todo_wine controls for rejection and omitted-model defaults.
 
 ## Validation
@@ -29,7 +30,7 @@ todo_wine controls for rejection and omitted-model defaults.
 | Level | Result |
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
-| L1 | v2 candidate: Windows 10 x86_64/i686, 609 checks each, 0 failures, exit 0 (2026-11-09). Production has no integrated test yet |
+| L1 | v2 candidate: Windows 10 x86_64/i686, pre-review body: 609 checks each, 0 failures, exit 0 (2026-11-09); relocated direct-reader refresh pending. Production has no integrated test yet |
 | L2 | not recorded per patch |
 | L3 | not recorded |
 | L4 | Stress Analysis runs. (Inventor, maintainer) |
@@ -53,3 +54,9 @@ Autodesk-Inventor-for-Linux [`docs/arch-hyprland.md`](https://github.com/Harvi65
   The production case-folding implementation is unchanged. All 62 patches
   apply at fuzz 0 with the candidate and focused ntdll DLL/test builds passed
   for both architectures. No production patch or series change is made here.
+
+- 2026-11-09, review follow-up: Relocated the candidate matrix to kernel32's
+  existing activation-context test and removed the raw-prefix reader and
+  delimiter markers. Expected values and production parser code are
+  unchanged. Complete kernel32 test EXEs and ntdll DLLs linked for both
+  architectures; refreshed native reader L1 and kernel32.actctx L2 remain open.

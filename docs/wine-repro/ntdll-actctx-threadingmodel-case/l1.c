@@ -23,6 +23,27 @@ static void model_check(int condition, unsigned int line, const char *format, ..
 #define ok(condition, ...) model_check(!!(condition), __LINE__, __VA_ARGS__)
 #define todo_wine
 #define todo_wine_if(condition)
+struct comclassredirect_data {
+    ULONG size;
+    ULONG flags;
+    DWORD model;
+    GUID  clsid;
+    GUID  alias;
+    GUID  clsid2;
+    GUID  tlid;
+    ULONG name_len;
+    ULONG name_offset;
+    ULONG progid_len;
+    ULONG progid_offset;
+    ULONG clrdata_len;
+    ULONG clrdata_offset;
+    DWORD miscstatus;
+    DWORD miscstatuscontent;
+    DWORD miscstatusthumbnail;
+    DWORD miscstatusicon;
+    DWORD miscstatusdocprint;
+};
+_Static_assert(sizeof(struct comclassredirect_data) == 120, "Native record layout");
 #include "test-body.h"
 int main(void)
 {

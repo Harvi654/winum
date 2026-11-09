@@ -10,8 +10,8 @@ import sys
 root = Path(sys.argv[1])
 patch = (root / 'patches/candidates/ntdll-actctx-threadingmodel-case-v2/ntdll-actctx-threadingmodel-case.patch').read_text()
 added = '\n'.join(line[1:] for line in patch.splitlines() if line.startswith('+') and not line.startswith('+++'))
-start = added.index('/* BEGIN winum actctx model test:')
-end = added.index('/* END winum actctx model test */', start) + len('/* END winum actctx model test */')
+start = added.index('static void test_com_threading_model_case(void)\n')
+end = added.index('\n}', start) + len('\n}')
 body = (root / 'docs/wine-repro/ntdll-actctx-threadingmodel-case/test-body.h').read_text()
 if added[start:end] + '\n' != body:
     sys.exit('Candidate test and standalone test body differ')

@@ -17,6 +17,13 @@ Windows rejects those values with ERROR_SXS_CANT_GEN_ACTCTX; no additional
 parser behaviour is changed here. Native assertion L1, formal cross review,
 paired runtime checks and consumer validation remain pending.
 
+v3 (2026-11-09, test follow-up): Address cross review by moving the matrix
+beside test_find_com_redirection in kernel32/tests/actctx.c. Use its existing
+comclassredirect_data structure directly and remove test-block markers and
+inline attribution. Parser changes, measured values and todos are unchanged.
+The prior 609-check L1 is historical; the revised reader/build needs refreshed
+native assertion and kernel32 actctx L2 validation.
+
 --- a/dlls/ntdll/actctx.c
 +++ b/dlls/ntdll/actctx.c
 @@ -1485,14 +1485,17 @@
@@ -41,28 +48,12 @@ paired runtime checks and consumer validation remain pending.
          return ThreadingModel_Neutral;
      else
          return ThreadingModel_No;
---- a/dlls/ntdll/tests/Makefile.in
-+++ b/dlls/ntdll/tests/Makefile.in
-@@ -2,6 +2,7 @@
- IMPORTS   = user32 advapi32
+--- a/dlls/kernel32/tests/actctx.c
++++ b/dlls/kernel32/tests/actctx.c
+@@ -1689,6 +1689,126 @@
+     }
+ }
  
- SOURCES = \
-+	actctx.c \
- 	alpc.c \
- 	atom.c \
- 	change.c \
---- /dev/null
-+++ b/dlls/ntdll/tests/actctx.c
-@@ -0,0 +1,138 @@
-+/* Original, AI-assisted (Codex), LGPL-2.1-or-later.
-+ * Activation-context COM threading model compatibility. */
-+#include <stdio.h>
-+#include "windef.h"
-+#include "winbase.h"
-+#include "winerror.h"
-+#include "wine/test.h"
-+
-+/* BEGIN winum actctx model test: original, AI-assisted (Codex), LGPL-2.1-or-later. */
 +static void test_com_threading_model_case(void)
 +{
 +    static const GUID clsid = {0x6e9bfe81, 0x6da1, 0x47a3,
@@ -97,8 +88,8 @@ paired runtime checks and consumer validation remain pending.
 +            ACTCTXW request = {0};
 +            HANDLE file, context = INVALID_HANDLE_VALUE;
 +            ULONG_PTR cookie = 0;
-+            SIZE_T got = 0;
-+            DWORD written, error, prefix[3], model;
++            struct comclassredirect_data *record;
++            DWORD written, error, model;
 +            BOOL ret, active = FALSE, complete = TRUE;
 +            int count;
 +
@@ -153,19 +144,15 @@ paired runtime checks and consumer validation remain pending.
 +            ok(ret, "Kind %u %s query failed.\n", managed, tests[i].label);
 +            if (!ret) goto done;
 +            ok(data.ulDataFormatVersion == 1, "Kind %u %s format %lu.\n", managed, tests[i].label, data.ulDataFormatVersion);
-+            ok(data.lpData && data.ulLength >= sizeof(prefix), "Kind %u %s record is too short.\n", managed, tests[i].label);
-+            if (!data.lpData || data.ulLength < sizeof(prefix)) goto done;
-+            /* Public query result: size/flags/model prefix as in open Wine's
-+             * actctx tests. Copy no more than the returned record length. */
-+            ret = ReadProcessMemory(GetCurrentProcess(), data.lpData, prefix, sizeof(prefix), &got);
-+            ok(ret && got == sizeof(prefix), "Kind %u %s record unreadable.\n", managed, tests[i].label);
-+            if (!ret || got != sizeof(prefix)) goto done;
-+            ok(prefix[0] == 120, "Kind %u %s record size %lu.\n", managed, tests[i].label, prefix[0]);
-+            ok(!prefix[1], "Kind %u %s record flags %#lx.\n", managed, tests[i].label, prefix[1]);
++            record = data.lpData;
++            ok(record && data.ulLength >= sizeof(*record), "Kind %u %s record is too short.\n", managed, tests[i].label);
++            if (!record || data.ulLength < sizeof(*record)) goto done;
++            ok(record->size == sizeof(*record), "Kind %u %s record size %lu.\n", managed, tests[i].label, record->size);
++            ok(!record->flags, "Kind %u %s record flags %#lx.\n", managed, tests[i].label, record->flags);
 +            model = !tests[i].value && managed ? 4 : tests[i].model;
 +            /* Missing-attribute defaults are separate Wine discrepancies. */
 +            todo_wine_if(!tests[i].value)
-+                ok(prefix[2] == model, "Kind %u %s model %lu, expected %lu.\n", managed, tests[i].label, prefix[2], model);
++                ok(record->model == model, "Kind %u %s model %lu, expected %lu.\n", managed, tests[i].label, record->model, model);
 +        done:
 +            if (active)
 +            {
@@ -186,9 +173,15 @@ paired runtime checks and consumer validation remain pending.
 +        }
 +    }
 +}
-+/* END winum actctx model test */
 +
-+START_TEST(actctx)
-+{
+ static void test_find_com_redirection(HANDLE handle, const GUID *clsid, const GUID *tlid, const WCHAR *progid, ULONG exid, int line)
+ {
+     struct comclassredirect_data *comclass, *comclass2;
+@@ -4802,6 +4922,7 @@
+     test_CreateActCtx();
+     test_CreateActCtx_share_mode();
+     test_findsectionstring();
 +    test_com_threading_model_case();
-+}
+     test_ZombifyActCtx();
+     run_child_process();
+     test_compatibility();

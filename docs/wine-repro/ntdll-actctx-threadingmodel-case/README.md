@@ -70,8 +70,8 @@ has itself run on Windows.
 ## Test placement and remaining work
 
 The existing open Wine activation-context tests live in kernel32/tests/actctx.c;
-there is no ntdll/tests/actctx.c in Wine 11.20. The v2 candidate adds
-an isolated ntdll test for this parser, using the same public API path. It
+the revised v2 candidate now adds its matrix there beside the existing COM
+redirection checks, using the same public API path. It
 checks the changed case-folding behaviour and retains unaffected controls,
 with independent discrepancies marked todo_wine. Its standalone native L1
 EXEs are compiled for both architectures; the native assertion results are
@@ -113,9 +113,9 @@ logs are not committed.
 ## Windows-derived assertion test
 
 The [v2 candidate](../../../patches/candidates/ntdll-actctx-threadingmodel-case-v2/README.md)
-keeps the production parser change and adds the isolated ntdll Wine test.
+keeps the production parser change and extends kernel32/tests/actctx.c.
 The case-folding assertions use ordinary ok(); independent rejection/default
-differences use todo_wine. test-body.h is the exact integrated test block.
+differences use todo_wine. test-body.h is the exact integrated test function, without delimiter markers.
 l1.c supplies a native-only reporter which treats all assertions, including
 todos, as ordinary checks. It is not a substitute for Wine's runtime harness.
 
@@ -134,7 +134,21 @@ contains actctx-model-l1; l1.list can build just that entry.
 
 Both offline Windows 10 runs (x86_64/i686) report
 `SUMMARY checks=609 failures=0`, no FAIL lines, and exit 0. These are the
-shared Wine test assertions, including the rejection and omitted-model
-controls that are todos only under Wine. Raw logs are not committed. The
+pre-review shared Wine test assertions, including the rejection and
+omitted-model controls that are todos only under Wine. The revised direct
+structure reader has not yet been rerun natively; these 609-check results
+remain historical. Raw logs are not committed. The
 production series and test marker are unchanged pending candidate review
 and Wine runtime validation.
+
+
+## Review placement/reader follow-up (2026-11-09)
+
+The matrix now lives beside test_find_com_redirection in
+kernel32/tests/actctx.c. It uses the existing comclassredirect_data structure
+directly, with pointer/length checks, and removes the BEGIN/END delimiters.
+The standalone builder locates the named function instead of markers and
+checks its equality with test-body.h. The expected Windows values and cases
+are unchanged. Both standalone architectures compile with -Wextra -Werror;
+refreshed native assertion execution and kernel32.actctx L2 are pending.
+The main bundle's actctx-model-l1 entry builds this revised reader.
