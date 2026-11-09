@@ -43,6 +43,7 @@ jobs:
     container: archlinux:base-devel
     timeout-minutes: 350
     env:
+      L1_UNITS: user32:attachment
       RUN_GROUP: ${{ inputs.only == '' || inputs.only == matrix.group }}
     steps:
       - name: Dependencies (official Arch repositories)
