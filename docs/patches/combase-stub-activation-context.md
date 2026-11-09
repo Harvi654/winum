@@ -37,7 +37,7 @@ native L1 passed, but production conformance has not been established.
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
 | L1 | v2 candidate: Windows 10 x86_64/i686, 291 checks each, 0 failures, exit 0 (2026-11-09). Production has no integrated test yet |
-| L2 | [Paired Wine run 42567082861](https://github.com/Harvi654/winum/actions/runs/42567082861) failed on 2026-11-09: both build/run jobs exit 2, compare exit 1. Artifact contents unavailable to this review; no runtime conformance verdict or complete L2 coverage established ([details](../wine-repro/combase-stub-activation-context/README.md#paired-wine-run-finished-2026-11-09)) |
+| L2 | [Paired Wine run 42567082861](https://github.com/Harvi654/winum/actions/runs/42567082861) failed on 2026-11-09: both build/run jobs exit 2, compare exit 1. Returned report: stub_actctx completes 291 checks with 16 failures in each variant/architecture, but changes failure locations and still conflicts with Windows. ole32.marshal/rpcrt4.cstub are incomplete in both variants; complete L2 is not established ([details](../wine-repro/combase-stub-activation-context/README.md#paired-wine-run-finished-2026-11-09)) |
 | L3 | not recorded |
 | L4 | Stress Analysis mesh in Inventor 2026 (wine-11.20-2 onwards). (Inventor, maintainer) |
 | L5 | in Inventor's runtime since `wine-11.19-1` (2026-10-19); a week of use not formally recorded - maintainer to confirm |
@@ -46,8 +46,10 @@ native L1 passed, but production conformance has not been established.
 ## Open points
 
 Native observations and assertion L1 are complete for the IClassFactory
-fixture. Paired Wine comparison is needed to isolate the current patch's
-MTA capture behavior; the local STA shortcut is a distinct source path.
+fixture. The returned paired report isolates changed MTA callback masks, but neither
+variant conforms to Windows in this fixture. Neighbouring ole32/rpcrt4 units
+are unfinished; their cause and complete L2 remain open. The local STA
+shortcut is a distinct source path.
 Do not generalize the observations to every COM interface or remove a working
 CAD workaround without a reviewed correction and consumer validation. The
 production marker stays missing until an appropriate test/fix is promoted.
@@ -66,3 +68,7 @@ Autodesk-Inventor-for-Linux [`docs/arch-hyprland.md`](https://github.com/Harvi65
 - 2026-11-09: Recorded the paired workflow's failed jobs and the evidence
   limit: the report and per-variant JSON must be read before attributing the
   failure or rerunning. No L2 pass or patch regression is claimed.
+
+- 2026-11-09, returned report: Recorded completed focused units and changed
+  callback-mask failures despite equal totals. The capture conflicts with
+  the native fixture; neighbouring L2 units remain incomplete in both variants.

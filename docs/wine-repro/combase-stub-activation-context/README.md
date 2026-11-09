@@ -223,3 +223,44 @@ occurred. Read the small report and both variants' `inputs.json` and
 If a result file is absent, retain that fact rather than interpreting the
 missing run as a passed control. No rerun was requested here. The candidate,
 production implementation, series and validation marker remain unchanged.
+
+
+## Returned paired report (2026-11-09)
+
+The maintainer supplied `l2-report.md` from run 42567082861. This resolves
+the report-access limit above, but does not supply the individual JSON files
+or raw runner logs. The report identifies incomplete ole32.marshal and
+rpcrt4.cstub units on both architectures in both variants. It does not give
+the underlying timeout/crash/collection reason. These unfinished units keep
+the neighbouring L2 gate open; do not rerun the expensive pair blindly.
+
+The completed focused units are identical in count across the pair:
+
+| Unit, each architecture | Checks without -> with | Failures without -> with | Skips |
+| --- | --- | --- | --- |
+| combase.roapi | 735 -> 735 | 0 -> 0 | 0 -> 0 |
+| combase.string | 598 -> 598 | 0 -> 0 | 0 -> 0 |
+| combase.stub_actctx | 291 -> 291 | 16 -> 16 | 0 -> 0 |
+| oleaut32.tmarshal | 754 -> 754 | 0 -> 0 | 0 -> 0 |
+
+Equal failure totals do not mean equal behavior. In MTA scenarios 5 and 6,
+the detailed assertion changes show the following server callback masks:
+
+| Scenario | Client phase | Windows | Without capture | With capture |
+| --- | --- | ---: | ---: | ---: |
+| 5, first marshal A | none / A / B | 0 / 1 / 2 | 0 / 0 / 0 | 1 / 1 / 1 |
+| 6, first marshal B | none / A / B | 0 / 1 / 2 | 0 / 0 / 0 | 2 / 2 / 2 |
+
+Each phase calls both proxies. The same diagnostic changes occur on i386
+and x86_64: capture fixes some caller-A/B failures and introduces failures
+for other caller contexts, including calls with no test context. Thus the
+production implementation changes this fixture's behavior and still fails
+the Windows-tested contract. The baseline also fails that contract. A
+count-only no-regression claim would conceal the changed failure locations.
+
+This establishes a focused conformance conflict for our standard-marshaled
+IClassFactory fixture, not a rule for every COM interface or a replacement
+for the CAD workaround. No implementation correction, removal, production
+series change or candidate promotion is made. Read the per-variant JSON and
+filtered diagnostics of the unfinished units before completing L2. The
+returned report is summarized here; raw logs are not committed.
