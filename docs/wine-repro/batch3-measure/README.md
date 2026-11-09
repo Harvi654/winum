@@ -160,3 +160,10 @@ scripts/build-l1-timezone.sh. Require zero failures and zero skips in the
 measured setup before claiming its L1. Unknown seasonal/localized/custom
 cases are documented, not silently inferred. The production marker/series
 remain unchanged.
+
+The timezone candidate's exact-body assertion bundle at 34f65fe now passes
+on Windows 10 x86_64/i686: 104 checks, zero failures, zero skips and exit 0
+each. The documented standard-time value assertions all ran. Broader
+timezone modes, paired Wine runtime, cross review and promotion remain
+open. Continue with the HTTP same-position seek entry; production series
+and markers are unchanged.

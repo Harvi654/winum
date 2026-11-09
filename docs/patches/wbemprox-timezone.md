@@ -18,14 +18,20 @@ WMI class `Win32_TimeZone` added.
 
 ## Wine test
 
-None in the patch.
+None in the production patch. The separate
+[v2 candidate](../../patches/candidates/wbemprox-timezone-v2/README.md)
+adds a Windows-derived 21-property test in dlls/wbemprox/tests/timezone.c
+and corrects the measured Bias sign, StandardBias type and Display labels.
+Its exact-body standalone test passes native L1 in the measured stable
+standard-time setup. Unmeasured timezone modes and other validation gates
+are explicitly documented; the candidate is not in patches/series.
 
 ## Validation
 
 | Level | Result |
 | --- | --- |
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
-| L1 | **no Wine test** - needs one, measured on Windows first |
+| L1 | 2026-11-09: v2 candidate exact-body test passes on offline Windows 10 x86_64/i686, 104 checks / zero failures / zero skips / exit 0 each (34f65fe sources), in the documented standard-time setup. Production has no test until candidate promotion. |
 | L2 | not recorded per patch |
 | L3 | not recorded |
 | L4 | Inventor runs with unmodified Autodesk files (2026-10-15). (Inventor, maintainer) |
@@ -34,7 +40,12 @@ None in the patch.
 
 ## Open points
 
-Wine test missing.
+Candidate cross review, paired Wine runtime/L2 and consumer validation remain
+open. Active daylight time, nonzero standard adjustment, disabled automatic
+DST, successful MUI localization and custom-zone fallbacks remain unmeasured.
+The native sample does not distinguish negated base bias from negated
+standard/active totals outside the tested setup. No production marker
+upgrade or candidate promotion is claimed yet.
 
 ## Evidence
 

@@ -170,7 +170,7 @@ adds a Wine timezone.c unit and corrects the measured Bias sign, StandardBias
 metadata and raw Display labels. Its shared test block is verified by
 scripts/build-l1-timezone.sh before standalone compilation. Full execution
 in the measured stable standard-time setup should report 104 checks, zero
-failures and zero skips; native assertion L1 has not yet run.
+failures and zero skips; the returned native assertion results are below.
 
 The unit always requires the class and observed property types/presence.
 Unknown seasonal/disabled-DST/nonzero-standard-adjustment contexts omit the
@@ -180,3 +180,14 @@ skips is partial coverage and cannot close the candidate's full native gate.
 Unmeasured MUI/custom-zone fallbacks remain open, and the existing empty-
 label fallback is not presented as a Windows oracle. Production page/marker
 and patches/series remain unchanged pending native L1 and cross review.
+
+## Windows exact-body assertion L1 (2026-11-09)
+
+Both x86_64 and i686 native assertion results report 104 checks, zero
+failures, zero skips and exit 0, using the candidate/harness prepared at
+34f65fe in the offline Windows 10 VM. Thus all measured standard-time value
+and label comparisons actually executed. This passes the candidate's L1
+for the documented environment; it does not establish the unmeasured
+seasonal, custom-zone or localization modes. Paired Wine runtime, formal
+cross review and consumer validation remain pending, and the candidate
+is not promoted. Raw logs and Windows files are not committed.

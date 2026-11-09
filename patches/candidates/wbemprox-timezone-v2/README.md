@@ -74,8 +74,9 @@ Run run-measure.bat in a fresh offline Windows 10 folder with the same
 timezone settings as the measurements. Return result-timezone-l1-x86_64.txt,
 result-timezone-l1-i686.txt and exitcodes.txt, even on failure. Full successful
 execution in those conditions should report 104 checks, zero failures and
-zero skips, exit 0 each. Native assertion execution is pending. The main
-measure list also contains this entry; use the dedicated builder for parity.
+zero skips, exit 0 each. The returned native assertion results are recorded
+below. The main measure list also contains this entry; use the dedicated
+builder for parity.
 
 ## Application and checks
 
@@ -103,6 +104,21 @@ defect and no conspicuous copied nontrivial block. Suggested defensive key/
 path and registry-source bounds checks are included. This limited advisory
 is not an originality certificate, native L1 or formal cross review.
 
-Native exact-body assertion L1, paired wbemprox L2, observed vanilla/patched
-runtime, Claude's formal cross review, the unmeasured timezone modes and
-consumer validation remain open. No production marker upgrade is claimed.
+Paired wbemprox L2, observed vanilla/patched runtime, Claude's formal cross
+review, the unmeasured timezone modes and consumer validation remain open.
+No production marker upgrade is claimed.
+
+## Windows assertion L1 (2026-11-09)
+
+Both exact-body native executables prepared from 34f65fe pass on the
+maintainer's offline Windows 10 VM: x86_64 and i686 each report
+SUMMARY checks=104 failures=0 skipped=0, with exit 0. All measured-context
+value comparisons ran, including raw Display labels, signed Bias and
+unsigned StandardBias metadata. This is assertion L1 for the documented
+stable standard-time setup, not just MEASURE or a type-only skipped pass.
+Only summarized text results are recorded, never raw logs or Windows files.
+
+This run does not expand the native basis to daylight time, nonzero standard
+adjustment, disabled automatic DST, successful MUI resolution or custom
+zones. The remaining runtime/review/consumer gates above stay open. The
+candidate is not promoted; the production patch and series are unchanged.
