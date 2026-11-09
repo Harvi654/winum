@@ -77,15 +77,30 @@ done:
     MsiCloseHandle(db);
     return ok;
 }
-struct automation { DWORD main_thread; HWND dialog; BOOL selected; };
+struct automation {
+    DWORD main_thread, started;
+    volatile LONG stop;
+    HWND dialog;
+    BOOL selected;
+};
+static BOOL automation_active(struct automation *state)
+{
+    return !InterlockedCompareExchange(&state->stop,0,0)
+           && GetTickCount()-state->started < 15000;
+}
 static BOOL CALLBACK find_dialog(HWND window, LPARAM parameter)
 {
     struct automation *state = (struct automation *)parameter;
-    WCHAR title[80];
+    WCHAR title[80] = {0};
     DWORD pid;
+    DWORD_PTR result;
+    if(!automation_active(state)) return FALSE;
     GetWindowThreadProcessId(window,&pid);
     if(pid != GetCurrentProcessId()) return TRUE;
-    GetWindowTextW(window,title,80);
+    /* GetWindowText on another thread of this process sends an unbounded
+     * WM_GETTEXT. Even a hidden MSI window must not stall our actor. */
+    if(!SendMessageTimeoutW(window,WM_GETTEXT,80,(LPARAM)title,
+                           SMTO_ABORTIFHUNG|SMTO_BLOCK|SMTO_ERRORONEXIT,500,&result)) return TRUE;
     if(!lstrcmpW(title,L"Winum Selection Measure")) { state->dialog=window; return FALSE; }
     return TRUE;
 }
@@ -96,14 +111,14 @@ static BOOL tree_message(HWND window, UINT message, WPARAM wp, LPARAM lp, DWORD_
 static DWORD WINAPI automate(void *parameter)
 {
     struct automation *state = parameter;
-    DWORD start = GetTickCount();
     HWND tree = NULL, button = NULL;
     DWORD_PTR root = 0, child = 0, result;
-    while(GetTickCount()-start < 15000) {
+    while(automation_active(state)) {
         EnumThreadWindows(state->main_thread,find_dialog,(LPARAM)state);
         if(state->dialog) {
             tree = FindWindowExW(state->dialog,NULL,WC_TREEVIEWW,NULL);
-            button = FindWindowExW(state->dialog,NULL,L"Button",L"Done");
+            /* There is exactly one button in our own dialog. */
+            button = FindWindowExW(state->dialog,NULL,L"Button",NULL);
             if(tree && button && tree_message(tree,TVM_GETNEXTITEM,TVGN_ROOT,0,&root) && root
                && tree_message(tree,TVM_GETNEXTITEM,TVGN_CHILD,(LPARAM)root,&child) && child) break;
         }
@@ -121,6 +136,30 @@ static DWORD WINAPI automate(void *parameter)
     }
     return 0;
 }
+static void join_automation(HANDLE thread, struct automation *state)
+{
+    DWORD started = GetTickCount(), elapsed, result;
+    MSG message;
+    InterlockedExchange(&state->stop,1);
+    for(;;) {
+        elapsed = GetTickCount()-started;
+        if(elapsed >= 20000) break;
+        result = MsgWaitForMultipleObjects(1,&thread,FALSE,20000-elapsed,QS_ALLINPUT);
+        if(result == WAIT_OBJECT_0) return;
+        if(result != WAIT_OBJECT_0+1) break;
+        /* Service pending cross-thread messages even if MsiDoAction returned
+         * before the actor found a dialog. The state lives until it joins. */
+        while(GetTickCount()-started < 20000 && PeekMessageW(&message,NULL,0,0,PM_REMOVE)) {
+            if(message.message == WM_QUIT) { b3_error("UnexpectedQuit",ERROR_CANCELLED); continue; }
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+    }
+    b3_error("JoinAutomation",ERROR_TIMEOUT);
+    fflush(stdout);
+    TerminateProcess(GetCurrentProcess(),2);
+    ExitProcess(2);
+}
 static BOOL get_property(MSIHANDLE package, const WCHAR *name, WCHAR *value)
 {
     DWORD size = 1024;
@@ -137,10 +176,10 @@ static void observe(const char *phase, BOOL indirect, const WCHAR *install, cons
 static void run_case(const WCHAR *directory, BOOL indirect)
 {
     WCHAR database[MAX_PATH], install[1024], browse[1024], initial_install[1024], initial_browse[1024];
-    struct automation state = {GetCurrentThreadId(),NULL,FALSE};
+    struct automation state = {GetCurrentThreadId(),0,0,NULL,FALSE};
     HANDLE thread = NULL;
-    MSIHANDLE package = 0, message = 0;
-    int result;
+    MSIHANDLE package = 0;
+    UINT result;
     printf("CASE indirect=%u\n",indirect);
     if(!b3_path(database,directory,indirect?L"indirect.msi":L"direct.msi")) return;
     if(!create_database(database,indirect)) goto done;
@@ -150,26 +189,25 @@ static void run_case(const WCHAR *directory, BOOL indirect)
     if(!msi_api(MsiDoActionW(package,L"FileCost"), "FileCost")) goto done;
     if(!msi_api(MsiDoActionW(package,L"CostFinalize"), "CostFinalize")) goto done;
     if(!get_property(package,L"INSTALLDIR",initial_install) || !get_property(package,L"BROWSE",initial_browse)) goto done;
-    if(!initial_install[0] || lstrcmpW(initial_browse,L"INSTALLDIR")) {
+    if(!initial_install[0] || !lstrcmpW(initial_install,L"INSTALLDIR")
+       || !lstrcmpW(initial_install,L"ALTDIR") || lstrcmpW(initial_browse,L"INSTALLDIR")) {
         b3_error("InitialDirectoryBinding",ERROR_INVALID_DATA); goto done;
     }
     observe("before",indirect,initial_install,initial_browse,initial_install,initial_browse);
-    message = MsiCreateRecord(0);
-    if(!message) { b3_error("CreateDialogRecord",ERROR_OUTOFMEMORY); goto done; }
-    if(!msi_api(MsiRecordSetStringW(message,0,L"WinumSelect"), "SetDialogRecord")) goto done;
+    state.started = GetTickCount();
     thread = CreateThread(NULL,0,automate,&state,0,NULL);
     if(!thread) { b3_error("CreateAutomationThread",GetLastError()); goto done; }
-    result = MsiProcessMessage(package,INSTALLMESSAGE_SHOWDIALOG,message);
-    printf("DIALOG indirect=%u result=%d\n",indirect,result);
-    if(WaitForSingleObject(thread,20000) != WAIT_OBJECT_0) { TerminateProcess(GetCurrentProcess(),2); ExitProcess(2); }
+    /* Named UI action only: no INSTALL action or installation sequence. */
+    result = MsiDoActionW(package,L"WinumSelect");
+    printf("DIALOG indirect=%u entry=DoAction result=%u\n",indirect,result);
+    join_automation(thread,&state);
     if(!CloseHandle(thread)) b3_error("CloseAutomationThread",GetLastError());
     if(!state.selected) b3_error("SelectionAutomation",ERROR_INVALID_DATA);
-    if(result == -1) b3_error("OwnDialog",ERROR_FUNCTION_FAILED);
+    if(result) b3_error("OwnDialog",result);
     if(get_property(package,L"INSTALLDIR",install) && get_property(package,L"BROWSE",browse))
         observe("after",indirect,install,browse,initial_install,initial_browse);
     printf("CASE_END indirect=%u\n",indirect);
 done:
-    if(message) MsiCloseHandle(message);
     if(package) MsiCloseHandle(package);
     b3_delete_file(database);
 }
@@ -179,7 +217,7 @@ int main(void)
     INITCOMMONCONTROLSEX controls = {sizeof(controls),ICC_TREEVIEW_CLASSES};
     INSTALLUILEVEL previous;
     if(!b3_start("msi_selection_tree_property",60000)) return 1;
-    printf("FIXTURE revision=2 explicit_insert_columns=1\n");
+    printf("FIXTURE revision=3 explicit_insert_columns=1 dialog_entry=DoAction bounded_title=1 pumped_join=1\n");
     if(!b3_hr(OleInitialize(NULL), "OleInitialize")) return b3_finish();
     if(!InitCommonControlsEx(&controls)) { b3_error("InitCommonControlsEx",GetLastError()); OleUninitialize(); return b3_finish(); }
     previous = MsiSetInternalUI(INSTALLUILEVEL_FULL,NULL);

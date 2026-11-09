@@ -1,0 +1,2 @@
+# Final targeted MSI UI fixture attempt; existing entry in measure-bundle.list.
+msi-tree-property | docs/wine-repro/msi-selection-tree-directory-property/measure.c | -Wextra -lmsi -lcomctl32 -lole32 -static
