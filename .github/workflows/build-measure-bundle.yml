@@ -1,10 +1,19 @@
 # Builds the MEASURE / standalone L1 programs listed in
 # docs/wine-repro/measure-bundle.list for x86_64 and i686 (MinGW) into one
 # artifact for the maintainer's offline Windows 10 VM. Publishes nothing.
+# "Run workflow" can take another list (one batch, e.g.
+# docs/wine-repro/batch1-measure/measure.list), so the bundle holds only
+# the programs of that batch.
 name: Build MEASURE bundle
 
 on:
   workflow_dispatch:
+    inputs:
+      list:
+        description: 'List file under docs/wine-repro/ (empty: docs/wine-repro/measure-bundle.list)'
+        required: false
+        default: ''
+        type: string
   push:
     branches: [main]
     paths:
@@ -26,9 +35,23 @@ jobs:
         run: pacman -Syu --noconfirm --needed git mingw-w64-gcc
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Build
+        env:
+          LIST: ${{ inputs.list }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          bash scripts/build-measure-bundle.sh out/measure-bundle
+          if [ -z "$LIST" ]; then
+              bash scripts/build-measure-bundle.sh out/measure-bundle
+          else
+              # only a list file inside the repository's docs/wine-repro/
+              case "$LIST" in
+                  *..*) echo "list must not contain '..': $LIST" >&2; exit 1 ;;
+              esac
+              if ! printf '%s' "$LIST" | grep -Eq '^docs/wine-repro/[A-Za-z0-9._/-]+\.list$' || [ ! -f "$LIST" ]; then
+                  echo "not a list file under docs/wine-repro/: $LIST" >&2; exit 1
+              fi
+              echo "list: $LIST"
+              bash scripts/build-measure-bundle.sh out/measure-bundle "$LIST"
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: measure-bundle
