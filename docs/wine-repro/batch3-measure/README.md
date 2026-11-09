@@ -13,6 +13,9 @@ Current entries:
   row and populated binary control; [scope](../msi-transform-null-stream/README.md).
 - msi-tree-property: own MSI dialog with direct-directory/indirect browse
   bindings and own-process tree automation; [scope](../msi-selection-tree-directory-property/README.md).
+- mspatcha-signature: original raw/PE32 signature and normalization subset;
+  PA19 decoder coverage remains blocked without an original producer,
+  [limits and L3 proposal](../mspatcha-pa19/README.md).
 
 Build one final bundle after all batch entries are prepared:
 
