@@ -160,3 +160,108 @@ documented real COM transport before interpreting NdrStubCall3. If it works,
 investigate the wrapper/copied metadata difference first. This is the
 second fixture iteration, not a Wine fix or native L1; do not keep guessing
 metadata across repeated unsuccessful iterations.
+
+
+## Schema-2 Windows results (2026-11-09): generated control also faults
+
+Both unchanged generated-stub controls reached CALL_BEGIN and WIRE
+(method=3, bytes=4, representation=00000010), then exited -1073741819
+(0xc0000005) before SERVER, CALL, CLEANUP or SUMMARY. The mode-2 controls
+on both architectures and the x64 mode-3 probe again stopped after DISPATCH
+with the same exit. The i686 mode-3 export was absent and its availability
+SUMMARY completed with exit 0. Every preceding factory/proxy/stub/connection
+API reported S_OK.
+
+Removing the wrapper and copied server metadata did not restore a usable
+control. This rules out that wrapper being necessary for the fault; it
+does not identify the precise failing instruction or prove that generated
+format strings are accepted. The minimal channel remains a leading harness
+hypothesis, not an established native RPC defect. Do not repeat these
+minimal-channel programs unchanged or turn the access violation into an
+expected conformance result. The next fixture uses public COM marshaling
+to provide a real channel, without filling reserved message fields. This
+is the second unsuccessful fixture iteration; one further deliberate
+transport change is permitted before applying AGENTS.md's three-round stop.
+No production patch, marker, series entry or L1 claim changes here.
+
+
+## Schema-3 MEASURE: standard COM transport (third fixture iteration)
+
+`com-measure.c` replaces the fake IRpcChannelBuffer with public COM
+marshaling. The main STA owns the non-agile object. CoMarshalInterThreadInterfaceInStream
+and CoGetInterfaceAndReleaseStream pass its custom interface to an MTA
+thread; the STA pumps messages until the client has released its proxy and
+uninitialized COM. NdrDllGetClassObject supplies the SDK proxy factory.
+CoRegisterClassObject (CLSCTX_INPROC_SERVER) and CoRegisterPSClsid register
+only our own factory/IID inside the process in each apartment. These are
+public registration APIs, also exercised by open Wine's own tests; their
+success in this new fixture still needs native measurement. No registry
+keys, native DLLs, proxy DLL installation or reserved message fields are
+written. COM supplies the channel and message state.
+
+Three independent programs keep the control/probe distinction:
+
+| Program | Stub path | What must complete before interpretation |
+| --- | --- | --- |
+| ndrstub-com-generated | Original WIDL interpreted stub, NULL dispatch table | Real COM call reaches our server once, value=42, no explicit wrapper calls |
+| ndrstub-com-control | Ordinary metadata, explicit NdrStubCall2 wrapper | Same successful call plus one DISPATCH/DISPATCH_DONE |
+| ndrstub-com-call3 | One NDR32 syntax entry, explicit NdrStubCall3 wrapper | Observe native export, dispatch, server and reply before choosing expectations |
+
+All programs use the same original IDL and generated formats. Modes 0/2
+check the response chosen by our own method (input=35 -> output=42, S_OK),
+with one callback on its STA creator rather than the client thread. Mode 3
+prints unknown native HRESULT/phase/value observations; it is not an
+assertion test. `functional=1` requires completed S_OK/value=42 dispatch,
+one server callback on the creator, and the appropriate wrapper count.
+Missing export exits 0 with functional=0; that is not conformance coverage.
+Successful setup alone does not establish interpreter acceptance.
+
+The proxy/stub metadata remains alive until both apartments uninitialize.
+The client consumes its marshaled stream on unmarshal, including failed
+unmarshal. A stream not handed to that call is rewound and its marshal data
+released in the owning STA. Client proxies are released before revoking its
+factory; the server disconnects its own object, revokes its factory and
+uninitializes COM before reporting the remaining reference observation.
+No native reference count or stub phase is guessed as an expected value.
+A separate 30-second watchdog covers setup, pumping, calls and cleanup and
+terminates only this dedicated process on timeout. No live worker state is
+freed on a timeout. Raw paths, addresses and native binary internals are
+not inspected or printed.
+
+```sh
+export NDR_COM_MEASURE="$HOME/.cache/winum-ndr-com-$(date +%Y%m%d-%H%M%S)"
+bash scripts/build-measure-bundle.sh "$NDR_COM_MEASURE" docs/wine-repro/rpcrt4-ndrstubcall3/transport.list
+```
+
+Copy the full folder into a fresh directory in offline Windows 10, run
+run-measure.bat and return all six result-*.txt plus exitcodes.txt, including
+failures. Only this list is needed; mshtml and actctx native L1 are already
+complete. Do not repeat the historical minimal-channel lists. All six
+transport EXEs compile with -Wall -Wextra -Werror and hashes verify.
+Compilation does not establish native runtime success.
+
+This is the third deliberate fixture iteration. If its native controls fail
+to establish a working dispatch, stop under AGENTS.md's three-round rule,
+record the exact last phase and best hypothesis, and leave this patch's
+conformance gate blocked. Do not issue another guessed-metadata VM bundle
+or call an export-only probe L1. No production implementation or series
+change and no native L1 claim are made by preparing this measurement.
+
+
+A second-model read-only advisory read the complete schema-3 source,
+wrappers, original IDL and public Wine/MinGW marshaling and registration
+paths. It found no concrete ABI, metadata-lifetime or synchronization defect
+in the new transport. The public registration pattern also appears in Wine
+tests; the original method, control variants and STA/MTA measurement are
+our own fixture. No conspicuous nontrivial copied block was identified.
+This limited advisory is not formal cross review or proof of originality.
+
+One failure-path limit remains: if unmarshaling consumes the stream and
+then fails, that stream is no longer available for explicit marshal-data
+release. Server disconnection and apartment shutdown still run, and the
+remaining object reference observation is printed; an elevated count on
+that failed path is not a successful cleanup/conformance claim. Native
+acceptance and all resulting expected values remain unknown. Even if the
+controls work, a rejected mode-3 metadata shape alone must not be called a
+functional native NdrStubCall3 oracle. Do not keep modifying it beyond this
+third round without stopping and recording the evidence limit.

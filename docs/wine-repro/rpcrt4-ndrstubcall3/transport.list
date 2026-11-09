@@ -1,0 +1,4 @@
+# Real COM transport, independent generated and explicit NdrStubCall2 controls.
+ndrstub-com-generated | docs/wine-repro/rpcrt4-ndrstubcall3/com-generated-control.c | -Wextra -lrpcrt4 -lole32 -luuid -static
+ndrstub-com-control | docs/wine-repro/rpcrt4-ndrstubcall3/com-control.c | -Wextra -lrpcrt4 -lole32 -luuid -static
+ndrstub-com-call3 | docs/wine-repro/rpcrt4-ndrstubcall3/com-measure.c | -Wextra -lrpcrt4 -lole32 -luuid -static
