@@ -152,3 +152,31 @@ The actctx program is an assertion test. The NDR/MSHTML programs are MEASUREs:
 zero exit alone cannot establish their expected semantics or native L1.
 Unknown values must come from the returned native results before the Wine
 conformance tests are written. Partial/crashed processes must also be returned.
+
+## Runtime bundle returned and next native run (2026-11-09)
+
+The reviewed actctx reader passed native L1 on x86_64/i686 (575 checks,
+zero failures, exits 0). No repeat of that entry is needed. The mshtml
+MEASURE established S_OK for supplied/NULL output pointers in all three
+states on both architectures. Its new loaded-state Wine assertions need
+native L1. The NDR controls faulted before the server; those results are
+not an oracle for valid dispatch. The unchanged generated-stub diagnostic
+is the next limited fixture check. Topic pages record the results and limits.
+
+```sh
+export RUNTIME_FOLLOWUP="$HOME/.cache/winum-runtime-followup-$(date +%Y%m%d-%H%M%S)"
+bash scripts/build-l1-mshtml-open.sh "$RUNTIME_FOLLOWUP-mshtml-parity"
+bash scripts/build-measure-bundle.sh "$RUNTIME_FOLLOWUP" docs/wine-repro/batch2-measure/followup.list
+```
+
+The first command verifies that the standalone mshtml function is identical
+to the candidate patch; the second builds the single combined run directory.
+Copy the complete RUNTIME_FOLLOWUP directory to a fresh directory in offline
+Windows 10, run run-measure.bat, and return all result-*.txt and exitcodes.txt,
+including failures. This is eight EXEs (four entries, both architectures),
+not a repeat of all prior measurements. Do not copy any Windows DLL back.
+
+The successful mshtml assertion result should be 34 checks, zero failures,
+exit 0. The RPC entries remain diagnostic observations: a zero exit without
+server dispatch is not functional coverage. If the generated control faults
+too, do not infer native dispatch behavior from either wrapper result.

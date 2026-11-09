@@ -1,8 +1,9 @@
 # IHTMLDocument2::open optional result: Windows MEASURE
 
-Original, AI-assisted (Codex), LGPL-2.1-or-later. Native HRESULTs and returned
-interfaces are unknown until Windows output arrives. No conformance test or
-L1 pass is claimed; production patches, series and test marker are unchanged.
+Original, AI-assisted (Codex), LGPL-2.1-or-later. The completed Windows
+observations are recorded below. A conformance candidate is now available;
+native assertion L1 is pending. Production patches, series and test marker
+are unchanged.
 
 ## Controlled documents and result-pointer modes
 
@@ -85,3 +86,45 @@ Those observations are included; ownership review found no clear stream or
 COM leak. The API setup follows common public patterns, with an original
 three-state/process-isolated fixture. This limited resemblance check cannot
 prove originality or replace formal review or native execution.
+
+## Windows observations (2026-11-09)
+
+The maintainer returned all four native process outputs and exitcodes.txt.
+x86_64 and i686 match apart from the bitness field. Each process completed
+three cases, api_errors=0, exit 0; the loaded case reached readyState=complete.
+
+| State | Supplied-result open | Result present | NULL-result open | close, both modes | parentWindow before/after |
+| --- | --- | --- | --- | --- | --- |
+| created | S_OK | yes | S_OK | S_OK | S_OK, present |
+| initialized | S_OK | yes | S_OK | S_OK | S_OK, present |
+| loaded | S_OK | yes | S_OK | S_OK | S_OK, present |
+
+Every supplied result returned E_NOINTERFACE (0x80004002) with a NULL output
+when queried for IHTMLWindow2. Thus the positive control establishes a valid
+dispatch result, not that its type is a window. No guessed replacement
+interface or identity is asserted. Setup, marker-free public API calls and
+both optional-pointer paths completed; these are functional observations,
+not a native assertion-test pass. No raw logs are committed.
+
+## Windows-derived Wine candidate
+
+The [v2 candidate](../../../patches/candidates/mshtml-document-open-optional-result-v2/README.md)
+adds test_doc_open_optional_result to the existing dom.c unit, keeping the
+implementation guards unchanged. The loaded-state control and NULL case
+use separate fresh copies of the measured own HTML. Expected S_OK, non-NULL
+control output and usable pre/post parentWindow come from the table above;
+unrelated result-interface identity is outside this regression's scope.
+All assertions are ordinary ok().
+
+```sh
+bash scripts/build-l1-mshtml-open.sh /path/to/NEW-output
+```
+
+The script verifies exact candidate/body parity and builds both MinGW
+architectures with -Wextra -Werror. Its wrapper uses CoInitialize like the
+Wine dom unit, rather than the MEASURE's OleInitialize; refreshed native
+assertion execution must validate that complete fixture. A successful native
+run should reach SUMMARY checks=34 failures=0 and exit 0 on both architectures.
+Return both result-mshtml-open-l1-*.txt and exitcodes.txt. Formal cross review,
+native assertion L1 and Gecko-enabled paired Wine runtime remain open; the
+production patch page and test marker are not upgraded by the MEASURE alone.
