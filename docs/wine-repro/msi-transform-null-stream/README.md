@@ -52,3 +52,21 @@ in direct mode and rejecting a failed transform/populated control as usable
 coverage. Those changes are included. No conspicuous copied nontrivial
 block was found; prescribed stream encoding is not proof of originality.
 Native acceptance and expected NULL-field outcomes remain unmeasured.
+
+
+## Windows observations (2026-11-09)
+
+The x86_64/i686 results match apart from bitness; both exit 0 with complete
+setup and CASES completed=1. The own transform applies with result 0. The
+previously empty table contains two rows afterward:
+
+| Key / note | Payload NULL | ReadStream result | Bytes | Content |
+| --- | --- | --- | --- | --- |
+| 1 / null-row | true | 13 (ERROR_INVALID_DATA) | 0 | no payload |
+| 2 / blob-row | false | 0 | 4 | exact own W3M! blob |
+
+Thus Windows retains the NULL-object row and its non-binary fields while
+the populated binary control is valid. These are functional observations
+of our original transform, not an assertion L1 pass. They provide the
+regression oracle for a candidate test; production patch/series/marker
+remain unchanged. Raw logs are summarized rather than committed.
