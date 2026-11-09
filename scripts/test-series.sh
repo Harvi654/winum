@@ -96,6 +96,17 @@ for t in $TESTS; do
 done
 ./server/wineserver -k 2>/dev/null || true
 
+# tests-first: print every failure of their test files on this side, so the
+# job log shows what vanilla and the series each fail (the compare step only
+# lists differences)
+if [ -f "$HERE/patches/tests-first/series" ]; then
+    for f in $(sed -n 's#^+++ b/dlls/[^/]*/tests/\([^/[:space:]]*\.c\).*#\1#p' "$HERE"/patches/tests-first/*.patch | sort -u); do
+        say "tests-first failures in $f ($VARIANT)"
+        grep -H -E "$f:[0-9]+: (Test failed|Test succeeded inside todo)" "$OUTDIR"/logs/*.log 2>/dev/null \
+            | sed "s#^$OUTDIR/logs/##" | tr -d '\r' | head -200 || true
+    done
+fi
+
 # summaries and failure locations only (no raw logs in the artifact's index)
 python3 "$HERE/scripts/compare-tests.py" summarize "$OUTDIR/logs" > "$OUTDIR/results-$VARIANT-$GROUP.json"
 
