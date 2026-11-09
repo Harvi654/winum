@@ -110,3 +110,19 @@ cases on each architecture before native coverage can be accepted. Do not
 choose a compatibility-mode reinstall if the compatibility assistant appears.
 The installed-correctly response already chosen does not invalidate prior
 text observations or establish an API result for an empty file.
+
+## Follow-up outcome and MSI UI stop (2026-11-09)
+
+The NULL-stream candidate's exact-body assertion L1 passed on Windows 10
+x86_64/i686: 43 checks, zero failures and exit 0 each. Mspatcha's targeted
+repeat now has complete identical two-architecture observations for its
+signature/normalization subset; PA19 decoding remains uncovered.
+
+The MSI UI fixture reached costing in revision 2 but SHOWDIALOG returned -1
+and the process timed out. Revision 3's named-dialog action returns 0 for
+both cases on both architectures and the processes complete, but discovery
+and child selection both report false. The maintainer dismissed the visible
+dialogs. Both processes exit 1 with two automation errors; the unchanged
+properties are not a selection oracle. Stop that fixture after its third
+native iteration, retain the evidence and hypothesis in the topic README,
+and continue other batch entries. No fourth rerun or L1 upgrade is requested.

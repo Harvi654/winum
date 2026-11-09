@@ -115,3 +115,34 @@ bash scripts/build-measure-bundle.sh /path/to/NEW-output docs/wine-repro/batch3-
 Run run-measure.bat once in a fresh offline Windows 10 folder, without
 compatibility mode or administrator relaunch, and return the two
 result-msi-tree-property-*.txt files and exitcodes.txt even if incomplete.
+
+## Third Windows result: automation coverage blocked (2026-11-09)
+
+Revision 3 produces identical x86_64/i686 observations apart from bitness;
+both exit 1. SQL, package setup, costing and all property reads succeed.
+Both named-dialog actions return 0, and both CASE_END records and the final
+SUMMARY are present. The maintainer saw and dismissed the dialogs manually.
+However, every case reports UI found=0 selected_child=0, followed by
+SelectionAutomation error 13; each process ends with api_errors=2.
+
+The before/after properties are unchanged in both cases: INSTALLDIR remains
+its initial non-identifier value, and BROWSE still names INSTALLDIR. These
+are observations without a successful child-feature selection, not evidence
+for either selection property's Windows contract. Manual dismissal cannot
+replace the missing positive selection control. The screenshot confirms a
+visible dialog, so found=0 describes our discovery failure, not absence of
+native UI. It does not establish whether dismissal preceded discovery.
+
+The best remaining hypothesis is that restricting discovery to the caller's
+thread and process misses the windows used by native MSI UI. The returned
+text does not include window owner thread/process measurements, so this is
+not a confirmed cause. A future redesign would first measure only the
+fixture dialog's owner identity through public APIs and then establish a
+reliable selection/closure control; it must not infer values from this run.
+
+Stop this fixture after the three native iterations, as required by
+AGENTS.md. No fourth repair or same-fixture rerun is requested. Native
+selection assertions and L1 remain blocked; no candidate or test marker is
+promoted. The source and history are retained. Continue the other batch-3
+patches independently; manual dismissal of these own UI dialogs does not
+invalidate the earlier NULL-stream L1 or other successful measurements.

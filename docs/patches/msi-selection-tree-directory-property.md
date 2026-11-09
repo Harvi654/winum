@@ -34,7 +34,13 @@ None in the patch.
 
 ## Open points
 
-None recorded.
+The original native MEASURE reached both own dialogs in its third iteration
+(2026-11-09), but its actor found neither dialog and selected neither child.
+The maintainer dismissed the UI manually. Both architectures exit 1 with
+two automation errors. Unchanged properties without selection are not a
+native oracle. The fixture is stopped under AGENTS.md's three-round rule;
+no assertion L1, replacement candidate or release exception is claimed.
+See [measurement state](../wine-repro/msi-selection-tree-directory-property/README.md).
 
 ## Evidence
 
