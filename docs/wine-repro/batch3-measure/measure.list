@@ -1,0 +1,2 @@
+# Batch 3 native observations; programs are added one patch at a time.
+msi-null-stream | docs/wine-repro/msi-transform-null-stream/measure.c | -Wextra -lmsi -lole32 -static
