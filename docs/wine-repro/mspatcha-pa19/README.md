@@ -106,3 +106,17 @@ repeat of this entry; return both architectures so any manifest-dependent
 observation is visible. If i686 remains empty, preserve its exit code and
 last visible launch state rather than retrying with compatibility settings.
 Native assertion L1 and the full decoder gate remain open.
+
+## Completed two-architecture repeat (2026-11-09)
+
+The targeted follow-up returns complete x86_64 and i686 text, identical apart
+from bitness. Both exports are present, all five cases complete, api_errors=0
+and both processes exit 0. All signatures, changed-byte counts and last-error
+values match the x86_64 table above, including the six changed bytes in the
+default PE32 signature call and zero in its independent Normalize call.
+The manifest-bearing bundle therefore supplies the missing i686 observations.
+This successful repeat does not establish why the earlier stdout was empty.
+
+These are native MEASURE results, not an assertion L1 pass. PA19 apply/decode
+coverage remains explicitly zero, and the full-patch producer/fixture gap
+above remains open. No production marker, implementation or series change.
