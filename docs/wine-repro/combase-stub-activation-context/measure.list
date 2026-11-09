@@ -1,0 +1,2 @@
+# Same entry as the main bundle, for a single-topic offline VM run.
+com-stub-actctx | docs/wine-repro/combase-stub-activation-context/measure.c | -Wextra -lole32 -luuid -static
