@@ -34,6 +34,8 @@ None in the patch.
 
 ## Open points
 
+AutoCAD (decision 2026-11-09): AutoCAD is not installed and is not being worked on now. The patch stays in the series as it is; it gets its Wine test (L1, L2) like every other patch, and the AutoCAD smoke test (L4) is deferred until there is time for AutoCAD again.
+
 Windows values measured 2026-11-09 (`docs/wine-repro/urlmon-zones/`); test first in `patches/tests-first/urlmon-tests-res-zones.patch` (URLs `x`, `""`, `unknownscheme:` that reach the copy path in Wine).
 
 Wine test missing; added for AutoCAD, not Inventor.
