@@ -37,3 +37,4 @@ ownerdraw-capture | docs/wine-repro/comctl32-ownerdraw-existing-capture/measure.
 caret-rewrap | docs/wine-repro/riched20-caret-rewrap/measure.c | -Wextra -municode -lole32 -loleaut32 -luuid -static
 scf-word | docs/wine-repro/riched20-scf-word-insertion-point/measure.c | -Wextra -static
 textfont-applytmp | docs/wine-repro/riched20-textfont-applytmp/measure.c | -Wextra -lole32 -loleaut32 -luuid -static
+scf-word-boundary | docs/wine-repro/riched20-scf-word-insertion-point/measure-boundary.c | -Wextra -static

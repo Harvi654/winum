@@ -78,3 +78,19 @@ characters are taken, `_ . -` separate words while `'` joins `i'j` in one
 direction only. The patch gets Inventor's case right and the word starts,
 and differs elsewhere; at `ab|␣` vanilla Wine (9.0 local run) formatted
 `ab ` like Windows, the patch formats nothing. No single rule is derived from these 46 points yet.
+
+## Follow-up: boundary cases (`measure-boundary.c`)
+
+Original, AI-assisted (Claude), LGPL-2.1-or-later. Written for the v2
+candidate's three rules, to measure the cases the first run did not cover:
+two paragraphs (end of the first, start of the second, end of the text),
+an italic range ending inside a word, at a word end, covering the space and
+the next word, before a dot, a colour-only change at a word end and before a
+dot, word starts with an accented letter, a digit, a dot or `_` after a
+space, two spaces, a tab, the text starting with a space, a dot or an
+accented letter, the text ending in a space, single-letter words. Per case
+a `SETUP` line and a `POINT` line per insertion point: return value, bold
+per character, the marked range, the insertion point's bold state.
+riched20 and msftedit. In `docs/wine-repro/batch1-measure/followup.list`
+and the main list. Built with `-Wall -Wextra -Werror` for both
+architectures; runs to completion under a local Wine 11.20 build.

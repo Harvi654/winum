@@ -1,0 +1,2 @@
+# Batch 1 follow-up measurements (second VM visit); also in measure-bundle.list.
+scf-word-boundary | docs/wine-repro/riched20-scf-word-insertion-point/measure-boundary.c | -Wextra -static

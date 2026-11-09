@@ -1,0 +1,252 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] riched20: Leave the text alone for SCF_WORD at a word start, paragraph end or format change.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 (x86_64 and i686, riched20 and msftedit; winum
+docs/wine-repro/riched20-scf-word-insertion-point, windows-2026-11-09):
+EM_SETCHARFORMAT(SCF_SELECTION | SCF_WORD) with an empty selection changes
+no character when the insertion point is at the start of the text or right
+after a space or tab with an ASCII letter or digit after it, at the end of
+the paragraph, or where the character format changes; only the insertion
+point takes the format. Wine formatted the next or the previous word in
+those places. Inventor sets its normal font that way right after GD&T
+symbol letters set in another face, and the symbols turned into letters.
+
+The change is limited to those three cases. Of the 50 measured insertion
+points Wine differed from Windows at 42; the three cases cover 16 of them,
+and at no measured point where Wine matched Windows do they apply. Every
+other point keeps Wine's word range, also where it differs from Windows
+(inside words, next to punctuation, non-ASCII letters; todo_wine in the
+test). Style pointers are compared for the format change, since equal
+character formats share one style.
+
+v2 (2026-11-09): replaces v1 (format a word only with a word character on
+both sides of the point), which the measurement showed to be wrong at word
+ends before a space, where Wine already matched Windows; adds the Wine
+test.
+
+--- a/dlls/riched20/editor.c
++++ b/dlls/riched20/editor.c
+@@ -3250,6 +3250,31 @@
+   ME_EndToUnicode(codepage, wszText);
+ }
+ 
++/* SCF_WORD with an empty selection leaves the text alone when the insertion
++   point is at the end of a paragraph, where the character format changes,
++   or at the start of a word: at the start of the text or after a space or
++   tab, with an ASCII letter or digit after it. Elsewhere the word around
++   the point is formatted. */
++static BOOL scf_word_point_outside_word( ME_TextEditor *editor )
++{
++    ME_Cursor *cursor = &editor->pCursors[0], prev;
++    int ofs = ME_GetCursorOfs( cursor );
++    WCHAR before[2] = { 0 }, after[2] = { 0 };
++
++    if (cursor->run->nFlags & MERF_ENDPARA) return TRUE;
++    ME_GetTextW( editor, after, ARRAY_SIZE(after), cursor, 1, FALSE, FALSE );
++    if (ofs)
++    {
++        cursor_from_char_ofs( editor, ofs - 1, &prev );
++        if (prev.run != cursor->run && !(prev.run->nFlags & MERF_ENDPARA) &&
++            prev.run->style != cursor->run->style)
++            return TRUE;
++        ME_GetTextW( editor, before, ARRAY_SIZE(before), &prev, 1, FALSE, FALSE );
++        if (before[0] != ' ' && before[0] != '\t') return FALSE;
++    }
++    return after[0] < 0x80 && iswalnum( after[0] );
++}
++
+ static LRESULT handle_EM_SETCHARFORMAT( ME_TextEditor *editor, WPARAM flags, const CHARFORMAT2W *fmt_in )
+ {
+     CHARFORMAT2W fmt;
+@@ -3274,7 +3299,7 @@
+     else if (flags & SCF_SELECTION)
+     {
+         if (editor->mode & TM_PLAINTEXT) return 0;
+-        if (flags & SCF_WORD)
++        if ((flags & SCF_WORD) && (ME_IsSelection( editor ) || !scf_word_point_outside_word( editor )))
+         {
+             end = editor->pCursors[0];
+             ME_MoveCursorWords( editor, &end, +1 );
+--- a/dlls/riched20/tests/editor.c
++++ b/dlls/riched20/tests/editor.c
+@@ -9330,6 +9330,168 @@
+     }
+ }
+ 
++/* EM_SETCHARFORMAT(SCF_SELECTION | SCF_WORD) at an empty insertion point:
++ * which characters change, at every point of two texts and of the sequence
++ * an application uses after letters set in another face, as measured on
++ * Windows 10 (riched20 and msftedit, x86_64 and i686). B = bold. */
++struct scf_word_point
++{
++    int point;
++    const char *format;
++    BOOL todo;
++};
++
++static const struct scf_word_point word_text0[] =
++{
++    {  0, ".......................", 0 },
++    {  1, "BB.....................", 1 },
++    {  2, "BBB....................", 0 },
++    {  3, ".......................", 0 },
++    {  4, "...BB..................", 1 },
++    {  5, "...BBBB................", 0 },
++    {  6, "...BBBB................", 0 },
++    {  7, ".......................", 0 },
++    {  8, ".......................", 1 },
++    {  9, ".......................", 1 },
++    { 10, ".........BB............", 1 },
++    { 11, ".........BBB...........", 1 },
++    { 12, ".......................", 0 },
++    { 13, ".......................", 1 },
++    { 14, ".......................", 1 },
++    { 15, "..............BB.......", 1 },
++    { 16, ".......................", 0 },
++    { 17, "................BB.....", 1 },
++    { 18, ".......................", 1 },
++    { 19, "................BBBB...", 0 },
++    { 20, ".......................", 0 },
++    { 21, ".......................", 1 },
++    { 22, ".......................", 1 },
++    { 23, ".......................", 0 },
++};
++
++static const struct scf_word_point word_text1[] =
++{
++    {  0, "...................", 0 },
++    {  1, "BBBB...............", 1 },
++    {  2, "BBBBB..............", 1 },
++    {  3, "BBBBB..............", 1 },
++    {  4, "BBBBB..............", 1 },
++    {  5, "..BBBB.............", 0 },
++    {  6, "...................", 0 },
++    {  7, "......BB...........", 1 },
++    {  8, "...................", 1 },
++    {  9, "...................", 1 },
++    { 10, ".........BB........", 1 },
++    { 11, "...................", 0 },
++    { 12, "...................", 1 },
++    { 13, "...................", 0 },
++    { 14, ".............BB....", 0 },
++    { 15, "...................", 1 },
++    { 16, "...............BB..", 1 },
++    { 17, "...............BBB.", 0 },
++    { 18, "...................", 0 },
++    { 19, "...................", 0 },
++};
++
++static const struct scf_word_point word_face[] =
++{
++    {  2, "TTTCCCAAA", 0 },
++    {  3, "AAACCCAAA", 0 },
++    {  4, "AAATTTAAA", 1 },
++    {  5, "AAATTTAAA", 1 },
++    {  6, "AAACCCAAA", 0 },
++    {  7, "AAACCCAAA", 0 },
++};
++
++static void get_scf_word_format(HWND hwnd, char *out, int len, BOOL faces)
++{
++    CHARFORMAT2W cf;
++    int i;
++
++    for (i = 0; i < len; i++)
++    {
++        memset(&cf, 0, sizeof(cf));
++        cf.cbSize = sizeof(cf);
++        SendMessageW(hwnd, EM_SETSEL, i, i + 1);
++        SendMessageW(hwnd, EM_GETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++        if (faces)
++            out[i] = !lstrcmpW(cf.szFaceName, L"Arial") ? 'A' : !lstrcmpW(cf.szFaceName, L"Courier New") ? 'C' :
++                     !lstrcmpW(cf.szFaceName, L"Times New Roman") ? 'T' : '?';
++        else
++            out[i] = (cf.dwMask & CFM_BOLD) && (cf.dwEffects & CFE_BOLD) ? 'B' : '.';
++    }
++    out[len] = 0;
++}
++
++static void test_EM_SETCHARFORMAT_word_point(void)
++{
++    static const WCHAR *texts[] = { L"ab cd  e_f1 g.h i'j k-l", L"x \x00e9\x00e8z 12,5 m\tn ?! o" };
++    static const struct { const struct scf_word_point *points; unsigned int count; } tables[] =
++    {
++        { word_text0, ARRAY_SIZE(word_text0) },
++        { word_text1, ARRAY_SIZE(word_text1) },
++    };
++    CHARFORMAT2W cf;
++    unsigned int t, i;
++    char format[32];
++    HWND hwnd;
++    LRESULT ret;
++    int len;
++
++    hwnd = new_richeditW(NULL);
++    for (t = 0; t < ARRAY_SIZE(texts); t++)
++    {
++        len = lstrlenW(texts[t]);
++        for (i = 0; i < tables[t].count; i++)
++        {
++            const struct scf_word_point *p = &tables[t].points[i];
++
++            SendMessageW(hwnd, WM_SETTEXT, 0, (LPARAM)texts[t]);
++            memset(&cf, 0, sizeof(cf));
++            cf.cbSize = sizeof(cf);
++            cf.dwMask = CFM_BOLD;
++            SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
++            SendMessageW(hwnd, EM_SETSEL, p->point, p->point);
++            cf.dwEffects = CFE_BOLD;
++            ret = SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION | SCF_WORD, (LPARAM)&cf);
++            ok(ret == 1, "text %u, point %d: got %Id\n", t, p->point, ret);
++            /* the insertion point itself takes the format */
++            memset(&cf, 0, sizeof(cf));
++            cf.cbSize = sizeof(cf);
++            SendMessageW(hwnd, EM_GETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++            ok((cf.dwMask & CFM_BOLD) && (cf.dwEffects & CFE_BOLD), "text %u, point %d: insertion point not bold\n",
++               t, p->point);
++            get_scf_word_format(hwnd, format, len, FALSE);
++            todo_wine_if(p->todo)
++            ok(!strcmp(format, p->format), "text %u, point %d: got %s, expected %s\n", t, p->point, format, p->format);
++        }
++    }
++
++    /* "gaj" in Courier New in Arial text, then Times New Roman with SCF_WORD */
++    for (i = 0; i < ARRAY_SIZE(word_face); i++)
++    {
++        const struct scf_word_point *p = &word_face[i];
++
++        SendMessageW(hwnd, WM_SETTEXT, 0, (LPARAM)L"ab gaj cd");
++        memset(&cf, 0, sizeof(cf));
++        cf.cbSize = sizeof(cf);
++        cf.dwMask = CFM_FACE;
++        lstrcpyW(cf.szFaceName, L"Arial");
++        SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
++        SendMessageW(hwnd, EM_SETSEL, 3, 6);
++        lstrcpyW(cf.szFaceName, L"Courier New");
++        SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++        SendMessageW(hwnd, EM_SETSEL, p->point, p->point);
++        lstrcpyW(cf.szFaceName, L"Times New Roman");
++        ret = SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION | SCF_WORD, (LPARAM)&cf);
++        ok(ret == 1, "face, point %d: got %Id\n", p->point, ret);
++        get_scf_word_format(hwnd, format, 9, TRUE);
++        todo_wine_if(p->todo)
++        ok(!strcmp(format, p->format), "face, point %d: got %s, expected %s\n", p->point, format, p->format);
++    }
++    DestroyWindow(hwnd);
++}
++
+ START_TEST( editor )
+ {
+   BOOL ret;
+@@ -9409,6 +9571,8 @@
+   test_init_messages();
+   test_EM_SELECTIONTYPE();
+ 
++  test_EM_SETCHARFORMAT_word_point();
++
+   /* Set the environment variable WINETEST_RICHED20 to keep windows
+    * responsive and open for 30 seconds. This is useful for debugging.
+    */
