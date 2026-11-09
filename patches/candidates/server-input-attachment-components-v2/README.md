@@ -111,11 +111,22 @@ rule beyond the tested early/late and direct/unparent sequences.
 Run 42695491325 completed in 1h 24m 12s, source 36b639e. The public run
 page reports failure and the compare job's annotation reports exit 1;
 eleven artifacts were produced, including l2-report and both g1 results.
-Only run/job metadata was retrieved here: the GitHub API request was
-Forbidden and the anonymous web log endpoint did not provide the report.
-The failure locations and counts have therefore not been inspected.
-Do not describe this as a passed candidate test or as a proven attachment
-regression from the aggregate status alone.
+The maintainer subsequently returned l2-report.md; the complete filtered
+report and its analysis are recorded in
+docs/wine-repro/server-input-attachment-components/l2-2026-11-09/.
+It reports 420 units, six units with new failure locations, five with
+removed locations, two moved and 39 other changes. Both attachment
+architectures remove failures at :769/:772/:774 with no new locations
+listed. This delta is not an absolute zero-failure/completion assertion;
+the structured g1 summaries are still needed.
+
+The neighboring user32.i386.win has four new mouse-message failures
+(:4866/:4870/:4879/:4882) after hiding/reopening a popup. Their cause is
+not established and requires the paired data and a focused rerun before
+clearing the neighbor gate. Other new locations are in toolbar, exception
+and sec_mgr; no new gdi32/win32u locations are listed. Do not infer either
+a passed candidate or a proven input-components regression from this
+full-series comparison alone.
 
 Before promotion, inspect
 [l2-report](https://github.com/Harvi654/winum/actions/runs/42695491325/artifacts/13713784614)
