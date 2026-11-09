@@ -29,8 +29,12 @@ Claude approved v2 subject to paired L2 (d9119b4). Run 42695491325
 completed with compare exit 1. Returned g1 summaries confirm the candidate
 attachment test completes but fails 2377 checks on i386 and 2370 on x86_64,
 all active/focus assertions, with the original 12 todos. Initial-state
-mismatches also occur in vanilla; their cause and four new neighboring
-mouse-message failures still need investigation. L2 is not cleared. The production v1 still
+mismatches also occur in vanilla and are the current blocker. The
+maintainer attributes the neighboring mouse failures to the existing
+mousemove v1 patch; those are outside this task. A separate
+[v3 setup candidate](../../patches/candidates/server-input-attachment-components-v3/README.md)
+keeps the implementation unchanged and requires new native L1 and paired
+L2. L2 is not cleared. The production v1 still
 contains no test, so its marker remains missing until candidate promotion.
 
 ## Validation

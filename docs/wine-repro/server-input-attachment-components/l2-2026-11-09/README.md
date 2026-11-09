@@ -95,3 +95,21 @@ with unchanged messages and counts. No other g1 unit adds a failure
 location or stops finishing in the paired comparison. The i386 mouse
 sequence still needs a focused paired rerun/attribution. No extra CI run
 or maintainer-session execution was performed while recording these data.
+
+
+## Maintainer attribution and scope decision (2026-11-09)
+
+The maintainer identifies win.c:4866-4882 as the known intermittent
+production server-mousemove-on-show-hide v1 failure, removed by its v2
+candidate (clean in test-run/candidates-4). Toolbar :2134 and sec_mgr :2444
+come from old v1 patches; ntdll i386 exception is unrelated to server/window.c.
+This classification supersedes the earlier request to chase the mouse
+sequence in this task. No new investigation/rerun of those issues is part
+of the attachment harness revision.
+
+The blocker is the unreached initial foreground/active state in attachment,
+also on vanilla under Xvfb. Proceed in order: robust setup and prerequisite
+skip; then separate foreground-independent checks if needed; only then
+retain dependent coverage in native L1 alone if necessary. The three-round
+limit applies. V3 is setup round 1 and requires fresh native L1 and useful
+paired L2; zero completed scenarios is not validation.

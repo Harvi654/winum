@@ -1,5 +1,10 @@
 # Server input attachment components v2
 
+**Superseded for testing by [v3](../server-input-attachment-components-v3/README.md)**
+(foreground setup round 1). This directory retains the v2 patch and its
+L1/L2 record. The default L1 builder now targets v3; v2's original body
+and wrapper remain in the investigation directory.
+
 Candidate only. Production patches/series, the production patch and its
 missing-test marker are unchanged. At entry 37 substitute this directory's
 server-input-attachment-components.patch for the production file.

@@ -192,3 +192,21 @@ were strictly applied and checked against the full candidate before push.
 The tests-series-g1 artifact includes a native user32:attachment L1 bundle. Its server-neighbor
 coverage includes user32, win32u and gdi32. No maintainer desktop session
 was used by the cloud agent.
+
+
+## V3 foreground setup, round 1 (2026-11-09)
+
+The maintainer classifies the unrelated batch4-1 failures as existing
+production v1 issues; see the L2 directory's attribution note. The current
+blocker is attachment's unreached starting state. The separate
+[v3 candidate](../../../patches/candidates/server-input-attachment-components-v3/README.md)
+adds bounded setup and an explicit skip only before any edge/child exists.
+The server implementation, literal Windows tables and todos are unchanged.
+Post-attachment activation remains one-shot; failures remain hard.
+
+Original v2 sources and evidence are retained; revised sources are in v3/.
+The default native builder/list now target v3. Native v3 L1 and paired L2
+must be rerun. The coverage line separates completed and skipped scenarios;
+44 completed and zero skipped are required before claiming validation,
+including CI. The standalone wrapper fails on any skip. No v2 pass
+transfers to v3.
