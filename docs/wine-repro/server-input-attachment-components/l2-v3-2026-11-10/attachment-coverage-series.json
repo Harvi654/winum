@@ -1,0 +1,48 @@
+{
+  "variant": "series",
+  "source_commit": "83d702508d1c7d6cf340634a961405cf9cfb9ccd",
+  "units": {
+    "user32.i386.attachment": {
+      "exit": "255",
+      "fail_at": {
+        "attachment.c:772": 152,
+        "attachment.c:775": 149
+      },
+      "fail_msg": {
+        "attachment.c:772": "Test failed: isolated-nonedge-reverse0-anchorA joined-probe-B observer A: active 00000000, expected 0002007A",
+        "attachment.c:775": "Test failed: isolated-nonedge-reverse0-anchorA joined-probe-B observer A: focus 00000000, expected 0002007A"
+      },
+      "failures": 301,
+      "finished": true,
+      "flaky": 0,
+      "skipped": 0,
+      "tests": 10235,
+      "todo": 12,
+      "completed_scenarios": 44,
+      "skipped_scenarios": 0
+    },
+    "user32.x86_64.attachment": {
+      "exit": "255",
+      "fail_at": {
+        "attachment.c:772": 153,
+        "attachment.c:775": 152
+      },
+      "fail_msg": {
+        "attachment.c:772": "Test failed: isolated-nonedge-reverse0-anchorA joined-probe-B observer A: active 0000000000000000, expected 0000000000010052",
+        "attachment.c:775": "Test failed: isolated-nonedge-reverse0-anchorA joined-probe-B observer A: focus 0000000000000000, expected 0000000000010052"
+      },
+      "failures": 305,
+      "finished": true,
+      "flaky": 0,
+      "skipped": 0,
+      "tests": 10235,
+      "todo": 12,
+      "completed_scenarios": 44,
+      "skipped_scenarios": 0
+    }
+  },
+  "errors": [
+    "user32.i386.attachment: ordinary series failures remain",
+    "user32.x86_64.attachment: ordinary series failures remain"
+  ]
+}

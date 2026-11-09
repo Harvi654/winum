@@ -245,3 +245,15 @@ the next required input to distinguish an unreached prerequisite from
 post-setup failures before changing the test again. The native v3 L1
 bundle is in the same artifact. No second setup round or new unrelated
 patch investigation was started on the basis of the aggregate failure.
+
+
+### Round-1 coverage received (2026-11-10)
+
+The returned attachment-coverage-series.json is recorded in
+l2-v3-2026-11-10/. Both architectures completed all 44 scenarios with zero
+scenario skips: 10235 checks, 12 expected todos, ordinary failures 301
+(i386) / 305 (x86_64). The first failure is the isolated graph's local
+focus probe of B, with observer A becoming NULL rather than retaining its
+own active/focus window. Thus preparation now succeeds; the remaining
+independent-queue state difference calls for the maintainer's second
+option, separating component/API checks from absolute inactive-queue state.

@@ -45,3 +45,12 @@ richole 146 tests, 0 failures (vanilla 13 failures); riched20 richole
 - L0: 62/62 at `--fuzz=0` with the batch 1 candidates (2026-11-09).
 - L1, L2 (`test-run/batch1-5`), L4 (Inventor), cross review (Codex):
   pending.
+
+
+## Maintainer scheduling decision (2026-11-10)
+
+Codex's review found a P2 cached-name BSTR ownership leak in the refresh
+path. Fix it before promotion. Put that fix into the next combined run
+only after the offline VM returns textfont-followup2, so the new cycle
+assertions and ownership fix can share one native VM validation round.
+Do not start a separate textfont CI/VM round while those values are pending.

@@ -104,3 +104,17 @@ Reparenting again after SetParent(child,NULL), including a third thread's
 host, remains unmeasured. The server implementation is unchanged.
 Foreground dependence is now an explicit prerequisite/coverage gate, not
 assumed solved before revised native and paired results arrive.
+
+
+## Returned round-1 result (2026-11-10)
+
+Run 42713756358, series coverage returned: 44 completed, 0 skipped on both
+architectures, 10235 checks and the expected 12 todos. Ordinary failures
+fell to 301 (i386) / 305 (x86_64), at active/focus assertions. The first
+is already after joined-probe-B of the isolated nonedge graph, observer A;
+no explicit attachment exists there. This is not a failed initial-state
+skip. See the investigation's l2-v3-2026-11-10 directory for original data.
+Round 1 made progress but did not pass. Proceed to the requested separation
+of component checks and foreground-dependent absolute state; preserve the
+literal native observations and do not add broad todos. Native v3 L1 is
+not assumed passed.
