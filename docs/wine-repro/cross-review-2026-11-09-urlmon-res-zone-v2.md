@@ -91,3 +91,20 @@ assertions, paired URLMON L2 and AutoCAD's icon/startup smoke test remain
 open. The corrected zone is 3 rather than v1's 0, so the earlier v1 consumer
 success cannot stand in for that new smoke test. Keep the candidate outside
 production pending those gates.
+
+## Revision check: bf3c3b9 (2026-11-09)
+
+Read the complete revision diff and updated candidate header/test. The new
+ordinary assertion requires a returned security URL for every measured row,
+and the header now has its dated v2 paragraph. Both P2 findings are addressed;
+the bounded implementation is unchanged. The two P3 cleanups (bounded string
+prefix comparison and moving provenance out of the test body) remain minor
+review suggestions. All 62 entries, substituting the revised candidate,
+applied with --fuzz=0 in a fresh pinned Wine 11.20 tree. No build/runtime or
+native assertion result is claimed by this follow-up.
+
+The maintainer has explicitly deferred AutoCAD work because it is not
+installed. Record its L4 as deferred, without requesting an installation
+for this review. The Wine/native validation gates remain independent and
+open. The corrected zone's actual AutoCAD behavior remains unverified;
+deferral does not turn v1's old consumer result into evidence for v2.
