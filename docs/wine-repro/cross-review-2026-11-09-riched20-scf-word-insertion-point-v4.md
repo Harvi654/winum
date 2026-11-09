@@ -89,3 +89,41 @@ promotion or interpreting the paired class tests as reliable. The table
 oracles themselves match the supplied Windows output. Fix initialization,
 add the lifetime control and validate exact-body L1/L2; do not replace the
 measured RichEdit20W values with msftedit values to make the test pass.
+
+## Follow-up: v5 (2026-11-09)
+
+Reviewed revision 4d5db1e from main 99e45cd. Read the complete v5 patch
+and README, its diff from v4, and the complete common constructor and
+text-service/window creation paths in the pinned Wine 11.20 source above.
+The unchanged tables/word implementation retain the preceding review;
+unrelated RichEdit code was not reread in full.
+
+- **P1 resolved.** ME_MakeEditor now explicitly sets msftedit to FALSE
+  before returning the editor to create_text_services. This covers the
+  windowless path too; create_windowed_editor still sets TRUE only for a
+  RichEdit50W class. The allocation and initialization paths no longer
+  rely on zero-filled or previously used heap memory.
+- **P2 resolved in the test source.** test_scf_word_classes loads both
+  DLLs and creates/destroys RichEdit50W then RichEdit20W three times in
+  one process. Both format expectations and the return/insertion-format
+  checks are ordinary assertions. At text 0, selection 2,2, the all-dots
+  msftedit result and BBB-plus-dots riched20 result match all four native
+  rows (two classes, x86_64/i686). No new expected value was inferred from
+  Wine. Alternation exercises lifetimes but does not guarantee that the
+  allocator reuses an address; the source initialization is the actual fix.
+- **P3 remains open**, unchanged: repeated document-origin lookups have
+  not been profiled on longer text. This revision does not broaden word
+  classification or change any of the previously reviewed table/todo rows.
+
+All 62 production series entries apply with --fuzz=0 in a fresh pinned
+Wine tree with only SCF v5 substituted. Its patch is byte-identical to the
+production-position copy in test-run/batch1-4 at 3e089b2, the source for
+[L2 run 42698489281](https://github.com/Harvi654/winum/actions/runs/42698489281).
+That run was in progress at this review; exact revised native L1 output
+has not been returned. The author's forced-TRUE/local Wine runs were not
+independently executed here. No new build or runtime pass is claimed.
+
+Verdict: the former **P1/P2 are resolved**; no additional blocking issue
+was found in the v5 delta. Promotion still requires the actual revised
+L1/L2 and applicable consumer validation. Production patches/series is
+unchanged.
