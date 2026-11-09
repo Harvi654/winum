@@ -72,3 +72,11 @@ Verdict: the old P1/P2/P3 findings are addressed by the revision, but
 L1, paired L2 and the Inventor palette smoke test. No new measured
 regression was identified in the covered matrix. The P2 uncertainty must
 not be silently replaced with an assumed Windows value.
+
+## Follow-up: v4 (2026-11-10)
+
+The returned sentinel/changed-bitmap measurement answers P2; v4 now keeps
+unchanged axes and uses height padding on a changed bitmap without
+reintroducing same-size recalculation. The list-path P3 is corrected.
+See [the v4 review](cross-review-2026-11-10-comctl32-toolbar-padding-height-v4.md)
+for the native row checks, residual scope and pending exact L1/L2 gates.
