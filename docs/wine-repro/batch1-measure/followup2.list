@@ -1,0 +1,3 @@
+# Batch 1 follow-up measurements after cross review (third VM visit); also in measure-bundle.list.
+toolbar-padding-followup | docs/wine-repro/comctl32-toolbar-padding-height/measure-followup.c | -Wextra -lgdi32 -static
+textfont-followup | docs/wine-repro/riched20-textfont-applytmp/measure-followup.c | -Wextra -lole32 -loleaut32 -luuid -static

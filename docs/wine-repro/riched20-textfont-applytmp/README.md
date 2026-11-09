@@ -60,3 +60,15 @@ fresh font object) - the changes are neither visible nor written. This
 differs from what Wine does (it applies them) and is outside the patch;
 Wine's own `test_ITextFont` uses `tomApplyLater` after `tomCacheParms`,
 a different state.
+
+## Follow-up after cross review (`measure-followup.c`)
+
+Original, AI-assisted (Claude), LGPL-2.1-or-later. The review's P3: what
+one font object does after a temporary cycle (tomApplyTmp, set blue,
+tomApplyNow), then: a second tomApplyNow; a change without a new Reset;
+another tomApplyTmp cycle; tomCacheParms and tomTrackParms. Per step the
+HRESULTs, the font's colour and bold and the text's CHARFORMAT, for
+RichEdit20W and RICHEDIT50W. In `docs/wine-repro/batch1-measure/followup2.list`
+and the main list; completes under a local Wine 11.20 build. Until its
+results are in, the candidate does not claim anything for these
+sequences.

@@ -63,3 +63,17 @@ v2 candidates. Quick feedback only; L2 is the CI run.
 
 Round 2 of the fix passed. Open: `ITextRange::SetText` restores a stale
 cursor (a separate fix, measured already: Windows keeps the selection).
+
+## L2 (2026-11-09)
+
+`test-run/batch1-1`, run 42642179431 (both architectures, paired with
+vanilla): 5 regressions in the report, all old and known - toolbar setrows
+v1, server mousemove v1, urlmon v1 and its tests-first test - which the
+`candidates-4` candidates fix. None comes from the batch 1 candidates.
+
+## Cross review (2026-11-09)
+
+Codex: approved (`docs/wine-repro/cross-review-2026-11-09-riched20-caret-rewrap-v2.md`).
+Together with L1 and L2 above, ready for the series once the maintainer
+decides; `patches/series` is not edited by the author.
+Open from the review, not done (would change the reviewed revision): P3 (optional): repeat the assertions with a RICHEDIT50W window.

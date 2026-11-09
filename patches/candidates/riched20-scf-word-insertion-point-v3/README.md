@@ -1,5 +1,9 @@
 # riched20-scf-word-insertion-point v3: msftedit's word rule
 
+**Superseded by `../riched20-scf-word-insertion-point-v4/` (2026-11-09):**
+v3 applied msftedit's rule to RichEdit20W too (8 measured points vanilla
+had right); v4 uses it only for RichEdit50W windows. Kept as the record.
+
 Candidate only: `patches/series`, the production patch and its page marker
 are unchanged. Substitute `riched20-scf-word-insertion-point.patch` from
 this folder for the production file at its place in the series (entry 23).

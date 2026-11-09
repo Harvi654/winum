@@ -81,3 +81,10 @@ v2 10844 tests in `riched20:editor`, 0 failures.
   batch 1 v2 candidates substituted, 62/62 (2026-11-09).
 - L1 of the new test, the follow-up MEASURE, L2, L4 (Inventor: GD&T symbols
   survive repeated edits), cross review (Codex): pending.
+
+## L2 (2026-11-09)
+
+`test-run/batch1-1`, run 42642179431 (both architectures, paired with
+vanilla): 5 regressions in the report, all old and known - toolbar setrows
+v1, server mousemove v1, urlmon v1 and its tests-first test - which the
+`candidates-4` candidates fix. None comes from the batch 1 candidates.

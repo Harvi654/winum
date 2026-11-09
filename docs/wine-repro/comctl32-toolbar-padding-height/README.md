@@ -62,3 +62,15 @@ the same sizes in all 520 cases; `SM_CXEDGE` 2, 96 DPI.
   `TB_ADDBUTTONS` keeps it.
 - `TB_GETMETRICS` (v6 only) reports the padding as `cxPad`/`cyPad`; v5
   returns zeros.
+
+## Follow-up after cross review (`measure-followup.c`)
+
+Original, AI-assisted (Claude), LGPL-2.1-or-later. For the v3 candidate:
+`TB_SETPADDING` with -1 x -1 after paddings 3x4, 0x0 and 16x16, with -1 in
+one direction only and with -2 x -2 (`PAD` lines: old value returned, value
+read back), and `TB_SETBITMAPSIZE` with the same and four different sizes
+(20x20, 16x24, 24x16, 16x15) on toolbars with and without strings,
+padding default, 0x0, 0x10 and 10x0 set before or after the buttons
+(`BMP` lines: button size before and after). v5 and v6. In
+`docs/wine-repro/batch1-measure/followup2.list` and the main list;
+completes under a local Wine 11.20 build.

@@ -39,3 +39,5 @@ caret-rewrap | docs/wine-repro/riched20-caret-rewrap/measure.c | -Wextra -munico
 scf-word | docs/wine-repro/riched20-scf-word-insertion-point/measure.c | -Wextra -static
 textfont-applytmp | docs/wine-repro/riched20-textfont-applytmp/measure.c | -Wextra -lole32 -loleaut32 -luuid -static
 scf-word-boundary | docs/wine-repro/riched20-scf-word-insertion-point/measure-boundary.c | -Wextra -static
+toolbar-padding-followup | docs/wine-repro/comctl32-toolbar-padding-height/measure-followup.c | -Wextra -lgdi32 -static
+textfont-followup | docs/wine-repro/riched20-textfont-applytmp/measure-followup.c | -Wextra -lole32 -loleaut32 -luuid -static

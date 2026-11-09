@@ -1,5 +1,9 @@
 # comctl32-toolbar-padding-height v2: Windows-derived test
 
+**Superseded by `../comctl32-toolbar-padding-height-v3/` (2026-11-09)** after
+cross review (P1: a height regression without strings after
+`TB_SETBITMAPSIZE`). Kept as the record.
+
 Candidate only: `patches/series`, the production patch and its page marker
 are unchanged. Substitute `comctl32-toolbar-padding-height.patch` from this
 folder for the production file at its place in the series (entry 10).
@@ -74,3 +78,10 @@ v2 candidates. Quick feedback only; L2 is the CI run.
 | | vanilla | v2 |
 | --- | --- | --- |
 | comctl32:toolbar | 36 failures, all in `test_padding_height` (string rows, height 36 instead of 30-32) | 2655 tests, 0 failures |
+
+## L2 (2026-11-09)
+
+`test-run/batch1-1`, run 42642179431 (both architectures, paired with
+vanilla): 5 regressions in the report, all old and known - toolbar setrows
+v1, server mousemove v1, urlmon v1 and its tests-first test - which the
+`candidates-4` candidates fix. None comes from the batch 1 candidates.

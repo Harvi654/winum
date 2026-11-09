@@ -1,0 +1,809 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] riched20: Format the word around the insertion point for SCF_WORD in msftedit's class.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 (x86_64 and i686; winum
+docs/wine-repro/riched20-scf-word-insertion-point, windows-2026-11-09 and
+windows-2026-11-09-boundary) gives different results for msftedit's class
+RichEdit50W and riched20's RichEdit20W:
+- msftedit: EM_SETCHARFORMAT(SCF_SELECTION | SCF_WORD) at an empty
+  insertion point formats characters only when those on both sides of the
+  point are of the same class, and then the run of that class around the
+  point: the word (letters, digits, an apostrophe between them), the
+  punctuation, or between spaces the word before them with the spaces;
+  between a word and a paragraph mark, the mark. At a word start or end,
+  next to another class, or at the start of the text only the insertion
+  point changes, whatever the character formats.
+- riched20 formats words in another way (with the trailing space at a
+  word end), which this patch leaves as Wine has it.
+- Both: with a selection, SCF_WORD formats the selection only; Wine
+  extended it to whole words.
+
+Inventor's text editors are RichEdit50W windows (+win trace: 492 creations,
+no RichEdit20W). It sets its normal font with SCF_WORD right after GD&T
+symbol letters in another face, a word end; Wine formatted the word, and
+the symbols turned into letters.
+
+Wine registers both classes with one window procedure; a flag in the
+editor records that the window was created with msftedit's class (case
+insensitive, as class names are), and only then the msftedit rule is
+used. Windowless text services keep riched20's behaviour. Classes are
+decided with iswalnum; other scripts were not measured.
+
+v4 (2026-11-09, after cross review of the paired textfont candidate):
+the msftedit rule only for RichEdit50W windows, RichEdit20W unchanged
+except for selections; the paragraph-mark case added; tests for both
+classes (riched20's editor tests for RichEdit20W).
+v3 (2026-11-09): msftedit's rule for both classes.
+v2 (2026-11-09): three rules derived from riched20 only.
+
+--- a/dlls/msftedit/tests/Makefile.in
++++ b/dlls/msftedit/tests/Makefile.in
+@@ -2,4 +2,5 @@
+ IMPORTS   = ole32 oleaut32 user32
+ 
+ SOURCES = \
++	editor.c \
+ 	richole.c
+--- a/dlls/msftedit/tests/editor.c
++++ b/dlls/msftedit/tests/editor.c
+@@ -0,0 +1,323 @@
++/*
++ * Unit test suite for msftedit's EM_SETCHARFORMAT with SCF_WORD
++ *
++ * AI-assisted (Claude), original code; LGPL-2.1-or-later.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++
++#include <stdarg.h>
++
++#include <windef.h>
++#include <winbase.h>
++#include <wingdi.h>
++#include <winuser.h>
++#include <richedit.h>
++#include <wine/test.h>
++
++/* EM_SETCHARFORMAT(SCF_SELECTION | SCF_WORD) with bold, at every insertion
++ * point (and some selections) of own texts, as measured on Windows 10 with
++ * msftedit (x86_64 and i686): which characters become bold (B), or which
++ * face each character has (A Arial, C Courier New, T Times New Roman).
++ * riched20's RichEdit20W behaves differently; riched20's editor tests
++ * check that class. */
++struct scf_word_point
++{
++    int start, end;
++    const char *format;
++    BOOL todo;
++};
++
++struct scf_word_case
++{
++    const WCHAR *text;
++    int mark;   /* 1: italic, 2: red, over [mark_start, mark_end) */
++    int mark_start, mark_end;
++    int point;
++    const char *format;
++    BOOL todo;
++};
++
++static const struct scf_word_point word_text0[] =
++{
++    {  0,  0, ".......................", 0 },
++    {  1,  1, "BB.....................", 0 },
++    {  1,  2, ".B.....................", 0 },
++    {  1,  4, ".BBB...................", 0 },
++    {  2,  2, ".......................", 0 },
++    {  3,  3, ".......................", 0 },
++    {  3,  5, "...BB..................", 0 },
++    {  4,  4, "...BB..................", 0 },
++    {  5,  5, ".......................", 0 },
++    {  6,  6, "...BBBB................", 0 },
++    {  7,  7, ".......................", 0 },
++    {  8,  8, ".......................", 0 },
++    {  9,  9, ".......................", 0 },
++    { 10, 10, ".........BB............", 0 },
++    { 11, 11, ".......................", 0 },
++    { 12, 12, ".......................", 0 },
++    { 13, 13, ".......................", 0 },
++    { 14, 14, ".......................", 0 },
++    { 15, 15, ".......................", 0 },
++    { 16, 16, ".......................", 0 },
++    { 17, 17, "................BBB....", 0 },
++    { 18, 18, "................BBB....", 0 },
++    { 19, 19, ".......................", 0 },
++    { 20, 20, ".......................", 0 },
++    { 21, 21, ".......................", 0 },
++    { 22, 22, ".......................", 0 },
++    { 23, 23, ".......................", 0 },
++};
++
++static const struct scf_word_point word_text1[] =
++{
++    {  0,  0, "...................", 0 },
++    {  1,  1, "...................", 0 },
++    {  1,  2, ".B.................", 0 },
++    {  1,  4, ".BBB...............", 0 },
++    {  2,  2, "...................", 0 },
++    {  3,  3, "..BBB..............", 0 },
++    {  3,  5, "...BB..............", 0 },
++    {  4,  4, "..BBB..............", 0 },
++    {  5,  5, "...................", 0 },
++    {  6,  6, "...................", 0 },
++    {  7,  7, "......BB...........", 0 },
++    {  8,  8, "...................", 0 },
++    {  9,  9, "...................", 0 },
++    { 10, 10, "...................", 0 },
++    { 11, 11, "...................", 0 },
++    { 12, 12, "...................", 0 },
++    { 13, 13, "...................", 0 },
++    { 14, 14, "...................", 0 },
++    { 15, 15, "...................", 0 },
++    { 16, 16, "...............BB..", 0 },
++    { 17, 17, "...................", 0 },
++    { 18, 18, "...................", 0 },
++    { 19, 19, "...................", 0 },
++};
++
++static const struct scf_word_point word_face[] =
++{
++    {  2,  2, "AAACCCAAA", 0 },
++    {  3,  3, "AAACCCAAA", 0 },
++    {  4,  4, "AAATTTAAA", 0 },
++    {  5,  5, "AAATTTAAA", 0 },
++    {  6,  6, "AAACCCAAA", 0 },
++    {  7,  7, "AAACCCAAA", 0 },
++};
++
++static const struct scf_word_case word_cases[] =
++{
++    { L"ab\rcd ef", 0, 0, 0, 2, "..B......", 0 },
++    { L"ab\rcd ef", 0, 0, 0, 3, ".........", 0 },
++    { L"ab\rcd ef", 0, 0, 0, 4, "...BB....", 0 },
++    { L"ab\rcd ef", 0, 0, 0, 5, ".........", 0 },
++    { L"ab\rcd ef", 0, 0, 0, 8, "........B", 0 },
++    { L"abcd ef", 1, 0, 2, 1, "BBBB...", 0 },
++    { L"abcd ef", 1, 0, 2, 2, "BBBB...", 0 },
++    { L"abcd ef", 1, 0, 2, 3, "BBBB...", 0 },
++    { L"abcd ef", 1, 0, 2, 4, ".......", 0 },
++    { L"abc def", 1, 0, 3, 2, "BBB....", 0 },
++    { L"abc def", 1, 0, 3, 3, ".......", 0 },
++    { L"abc def", 1, 0, 3, 4, ".......", 0 },
++    { L"abc def", 2, 0, 3, 2, "BBB....", 0 },
++    { L"abc def", 2, 0, 3, 3, ".......", 0 },
++    { L"abc def", 2, 0, 3, 4, ".......", 0 },
++    { L"abc def", 1, 3, 7, 3, ".......", 0 },
++    { L"abc def", 1, 3, 7, 4, ".......", 0 },
++    { L"abc def", 1, 3, 7, 5, "....BBB", 0 },
++    { L"abc.def", 1, 0, 3, 2, "BBB....", 0 },
++    { L"abc.def", 1, 0, 3, 3, ".......", 0 },
++    { L"abc.def", 1, 0, 3, 4, ".......", 0 },
++    { L"abc.def", 2, 0, 3, 3, ".......", 0 },
++    { L"a \x00e9z b", 0, 0, 0, 2, "......", 0 },
++    { L"a \x00e9z b", 0, 0, 0, 3, "..BB..", 0 },
++    { L"a z\x00e9 b", 0, 0, 0, 2, "......", 0 },
++    { L"a z\x00e9 b", 0, 0, 0, 3, "..BB..", 0 },
++    { L"a 9z b", 0, 0, 0, 2, "......", 0 },
++    { L"a 9z b", 0, 0, 0, 3, "..BB..", 0 },
++    { L"a .z b", 0, 0, 0, 2, "......", 0 },
++    { L"a .z b", 0, 0, 0, 3, "......", 0 },
++    { L"a _z b", 0, 0, 0, 2, "......", 0 },
++    { L"a _z b", 0, 0, 0, 3, "......", 0 },
++    { L"a  bc d", 0, 0, 0, 2, "BBB....", 0 },
++    { L"a  bc d", 0, 0, 0, 3, ".......", 0 },
++    { L"a  bc d", 0, 0, 0, 4, "...BB..", 0 },
++    { L"a\tbc d", 0, 0, 0, 1, "......", 0 },
++    { L"a\tbc d", 0, 0, 0, 2, "......", 0 },
++    { L"a\tbc d", 0, 0, 0, 3, "..BB..", 0 },
++    { L" ab c", 0, 0, 0, 0, ".....", 0 },
++    { L" ab c", 0, 0, 0, 1, ".....", 0 },
++    { L".ab c", 0, 0, 0, 0, ".....", 0 },
++    { L".ab c", 0, 0, 0, 1, ".....", 0 },
++    { L"\x00e9" L"ab c", 0, 0, 0, 0, ".....", 0 },
++    { L"\x00e9" L"ab c", 0, 0, 0, 1, "BBB..", 0 },
++    { L"ab ", 0, 0, 0, 2, "...", 0 },
++    { L"ab ", 0, 0, 0, 3, "...", 0 },
++    { L"a b c", 0, 0, 0, 1, ".....", 0 },
++    { L"a b c", 0, 0, 0, 2, ".....", 0 },
++    { L"a b c", 0, 0, 0, 3, ".....", 0 },
++    { L"a b c", 0, 0, 0, 5, ".....", 0 },
++};
++
++static HWND new_richedit(void)
++{
++    HWND hwnd = CreateWindowW(MSFTEDIT_CLASS, NULL, ES_MULTILINE | WS_POPUP | WS_VISIBLE,
++                              0, 0, 480, 150, NULL, NULL, NULL, NULL);
++    ok(hwnd != NULL, "error %lu\n", GetLastError());
++    return hwnd;
++}
++
++static void get_format(HWND hwnd, char *out, int len, BOOL faces)
++{
++    CHARFORMAT2W cf;
++    int i;
++
++    for (i = 0; i < len; i++)
++    {
++        memset(&cf, 0, sizeof(cf));
++        cf.cbSize = sizeof(cf);
++        SendMessageW(hwnd, EM_SETSEL, i, i + 1);
++        SendMessageW(hwnd, EM_GETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++        if (faces)
++            out[i] = !lstrcmpW(cf.szFaceName, L"Arial") ? 'A' : !lstrcmpW(cf.szFaceName, L"Courier New") ? 'C' :
++                     !lstrcmpW(cf.szFaceName, L"Times New Roman") ? 'T' : '?';
++        else
++            out[i] = (cf.dwMask & CFM_BOLD) && (cf.dwEffects & CFE_BOLD) ? 'B' : '.';
++    }
++    out[len] = 0;
++}
++
++static void set_bold_word(HWND hwnd, int start, int end, BOOL check_point)
++{
++    CHARFORMAT2W cf;
++    LRESULT ret;
++
++    SendMessageW(hwnd, EM_SETSEL, start, end);
++    memset(&cf, 0, sizeof(cf));
++    cf.cbSize = sizeof(cf);
++    cf.dwMask = CFM_BOLD;
++    cf.dwEffects = CFE_BOLD;
++    ret = SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION | SCF_WORD, (LPARAM)&cf);
++    ok(ret == 1, "got %Id\n", ret);
++    if (!check_point) return;
++    /* the insertion point itself takes the format */
++    memset(&cf, 0, sizeof(cf));
++    cf.cbSize = sizeof(cf);
++    SendMessageW(hwnd, EM_GETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++    ok((cf.dwMask & CFM_BOLD) && (cf.dwEffects & CFE_BOLD), "insertion point not bold\n");
++}
++
++static void reset_text(HWND hwnd, const WCHAR *text)
++{
++    CHARFORMAT2W cf;
++
++    SendMessageW(hwnd, WM_SETTEXT, 0, (LPARAM)text);
++    memset(&cf, 0, sizeof(cf));
++    cf.cbSize = sizeof(cf);
++    cf.dwMask = CFM_BOLD | CFM_ITALIC | CFM_COLOR;
++    SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
++}
++
++static void test_scf_word(void)
++{
++    static const WCHAR *texts[] = { L"ab cd  e_f1 g.h i'j k-l", L"x \x00e9\x00e8z 12,5 m\tn ?! o" };
++    static const struct { const struct scf_word_point *points; unsigned int count; } tables[] =
++    {
++        { word_text0, ARRAY_SIZE(word_text0) },
++        { word_text1, ARRAY_SIZE(word_text1) },
++    };
++    CHARFORMAT2W cf;
++    unsigned int t, i;
++    char format[32];
++    HWND hwnd;
++    int len;
++
++    hwnd = new_richedit();
++    for (t = 0; t < ARRAY_SIZE(texts); t++)
++    {
++        len = lstrlenW(texts[t]);
++        for (i = 0; i < tables[t].count; i++)
++        {
++            const struct scf_word_point *p = &tables[t].points[i];
++
++            winetest_push_context("text %u, %d-%d", t, p->start, p->end);
++            reset_text(hwnd, texts[t]);
++            set_bold_word(hwnd, p->start, p->end, TRUE);
++            get_format(hwnd, format, len, FALSE);
++            todo_wine_if(p->todo)
++            ok(!strcmp(format, p->format), "got %s, expected %s\n", format, p->format);
++            winetest_pop_context();
++        }
++    }
++
++    /* letters set in another face, then the normal face with SCF_WORD */
++    for (i = 0; i < ARRAY_SIZE(word_face); i++)
++    {
++        const struct scf_word_point *p = &word_face[i];
++
++        winetest_push_context("face, point %d", p->start);
++        SendMessageW(hwnd, WM_SETTEXT, 0, (LPARAM)L"ab gaj cd");
++        memset(&cf, 0, sizeof(cf));
++        cf.cbSize = sizeof(cf);
++        cf.dwMask = CFM_FACE;
++        lstrcpyW(cf.szFaceName, L"Arial");
++        SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
++        SendMessageW(hwnd, EM_SETSEL, 3, 6);
++        lstrcpyW(cf.szFaceName, L"Courier New");
++        SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++        SendMessageW(hwnd, EM_SETSEL, p->start, p->end);
++        lstrcpyW(cf.szFaceName, L"Times New Roman");
++        SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION | SCF_WORD, (LPARAM)&cf);
++        get_format(hwnd, format, 9, TRUE);
++        todo_wine_if(p->todo)
++        ok(!strcmp(format, p->format), "got %s, expected %s\n", format, p->format);
++        winetest_pop_context();
++    }
++
++    /* paragraphs, format changes, word starts */
++    for (i = 0; i < ARRAY_SIZE(word_cases); i++)
++    {
++        const struct scf_word_case *c = &word_cases[i];
++
++        winetest_push_context("%s, point %d", wine_dbgstr_w(c->text), c->point);
++        reset_text(hwnd, c->text);
++        if (c->mark)
++        {
++            SendMessageW(hwnd, EM_SETSEL, c->mark_start, c->mark_end);
++            memset(&cf, 0, sizeof(cf));
++            cf.cbSize = sizeof(cf);
++            if (c->mark == 1) { cf.dwMask = CFM_ITALIC; cf.dwEffects = CFE_ITALIC; }
++            else { cf.dwMask = CFM_COLOR; cf.crTextColor = RGB(255, 0, 0); }
++            SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++        }
++        len = SendMessageW(hwnd, WM_GETTEXTLENGTH, 0, 0);
++        ok(len == strlen(c->format), "got length %d\n", len);
++        set_bold_word(hwnd, c->point, c->point, TRUE);
++        get_format(hwnd, format, min(len, ARRAY_SIZE(format) - 1), FALSE);
++        todo_wine_if(c->todo)
++        ok(!strcmp(format, c->format), "got %s, expected %s\n", format, c->format);
++        winetest_pop_context();
++    }
++    DestroyWindow(hwnd);
++}
++
++START_TEST(editor)
++{
++    HMODULE module = LoadLibraryA("msftedit.dll");
++    ok(module != NULL, "error %lu\n", GetLastError());
++
++    test_scf_word();
++}
+--- a/dlls/riched20/editor.c
++++ b/dlls/riched20/editor.c
+@@ -3250,6 +3250,68 @@
+   ME_EndToUnicode(codepage, wszText);
+ }
+ 
++enum word_class { WORD_CLASS_BREAK, WORD_CLASS_SPACE, WORD_CLASS_WORD, WORD_CLASS_PUNCT };
++
++static WCHAR char_at_ofs( ME_TextEditor *editor, int ofs )
++{
++    WCHAR buf[2] = { 0 };
++    ME_Cursor cursor;
++
++    cursor_from_char_ofs( editor, ofs, &cursor );
++    ME_GetTextW( editor, buf, ARRAY_SIZE(buf), &cursor, 1, FALSE, FALSE );
++    return buf[0];
++}
++
++/* an apostrophe between two word characters belongs to the word */
++static enum word_class word_class_at( ME_TextEditor *editor, int ofs, int len )
++{
++    WCHAR c = char_at_ofs( editor, ofs );
++
++    if (c == '\'' && ofs > 0 && ofs + 1 < len && iswalnum( char_at_ofs( editor, ofs - 1 ) ) &&
++        iswalnum( char_at_ofs( editor, ofs + 1 ) ))
++        return WORD_CLASS_WORD;
++    if (iswalnum( c )) return WORD_CLASS_WORD;
++    if (c == ' ' || c == '\t') return WORD_CLASS_SPACE;
++    if (!c || c == '\r' || c == '\n' || c == '\v' || c == WCH_EMBEDDING) return WORD_CLASS_BREAK;
++    return WORD_CLASS_PUNCT;
++}
++
++/* The range SCF_WORD formats at an empty insertion point in msftedit's class:
++   only when the characters on both sides are of the same class - the word
++   (letters, digits, inner apostrophes) or the run of punctuation around the
++   point, or between spaces the word before them with the spaces; between a
++   word and a paragraph mark, the mark. */
++static BOOL scf_word_range( ME_TextEditor *editor, ME_Cursor *start, ME_Cursor *end )
++{
++    int len = ME_GetTextLength( editor ), ofs = ME_GetCursorOfs( &editor->pCursors[0] );
++    enum word_class class;
++    int from, to;
++
++    if (ofs <= 0 || ofs > len) return FALSE;
++    class = word_class_at( editor, ofs - 1, len );
++    /* right after a word and before a paragraph mark, the mark is formatted */
++    if (class == WORD_CLASS_WORD && (ofs == len || word_class_at( editor, ofs, len ) == WORD_CLASS_BREAK))
++    {
++        cursor_from_char_ofs( editor, ofs, start );
++        if (!(start->run->nFlags & MERF_ENDPARA)) return FALSE;
++        *end = *start;
++        end->nOffset = end->run->len;
++        return TRUE;
++    }
++    if (ofs == len || class == WORD_CLASS_BREAK || class != word_class_at( editor, ofs, len )) return FALSE;
++
++    from = ofs - 1;
++    while (from > 0 && word_class_at( editor, from - 1, len ) == class) from--;
++    to = ofs + 1;
++    while (to < len && word_class_at( editor, to, len ) == class) to++;
++    if (class == WORD_CLASS_SPACE)
++        while (from > 0 && word_class_at( editor, from - 1, len ) == WORD_CLASS_WORD) from--;
++
++    cursor_from_char_ofs( editor, from, start );
++    cursor_from_char_ofs( editor, to, end );
++    return TRUE;
++}
++
+ static LRESULT handle_EM_SETCHARFORMAT( ME_TextEditor *editor, WPARAM flags, const CHARFORMAT2W *fmt_in )
+ {
+     CHARFORMAT2W fmt;
+@@ -3274,13 +3336,22 @@
+     else if (flags & SCF_SELECTION)
+     {
+         if (editor->mode & TM_PLAINTEXT) return 0;
+-        if (flags & SCF_WORD)
++        /* with a selection, SCF_WORD formats the selection only */
++        if ((flags & SCF_WORD) && !ME_IsSelection( editor ))
+         {
+-            end = editor->pCursors[0];
+-            ME_MoveCursorWords( editor, &end, +1 );
+-            start = end;
+-            ME_MoveCursorWords( editor, &start, -1 );
+-            ME_SetCharFormat( editor, &start, &end, &fmt );
++            if (editor->msftedit)
++            {
++                if (scf_word_range( editor, &start, &end ))
++                    ME_SetCharFormat( editor, &start, &end, &fmt );
++            }
++            else
++            {
++                end = editor->pCursors[0];
++                ME_MoveCursorWords( editor, &end, +1 );
++                start = end;
++                ME_MoveCursorWords( editor, &start, -1 );
++                ME_SetCharFormat( editor, &start, &end, &fmt );
++            }
+         }
+         changed = ME_IsSelection( editor );
+         ME_SetSelectionCharFormat( editor, &fmt );
+--- a/dlls/riched20/editstr.h
++++ b/dlls/riched20/editstr.h
+@@ -387,6 +387,7 @@
+ {
+   ITextHost2 *texthost;
+   unsigned int bEmulateVersion10 : 1;
++  unsigned int msftedit : 1; /* a window of msftedit's class RichEdit50W */
+   unsigned int in_place_active : 1;
+   unsigned int have_texthost2 : 1;
+   ME_TextBuffer *pBuffer;
+--- a/dlls/riched20/tests/editor.c
++++ b/dlls/riched20/tests/editor.c
+@@ -9330,6 +9330,293 @@
+     }
+ }
+ 
++/* EM_SETCHARFORMAT(SCF_SELECTION | SCF_WORD) with bold, at every insertion
++ * point (and some selections) of own texts, as measured on Windows 10 with
++ * riched20's RichEdit20W (x86_64 and i686): which characters become bold
++ * (B), or which face each character has (A Arial, C Courier New, T Times
++ * New Roman). msftedit behaves differently; msftedit's editor tests check
++ * that class. todo_wine: where Wine's word movement differs. */
++struct scf_word_point
++{
++    int start, end;
++    const char *format;
++    BOOL todo;
++};
++
++struct scf_word_case
++{
++    const WCHAR *text;
++    int mark;   /* 1: italic, 2: red, over [mark_start, mark_end) */
++    int mark_start, mark_end;
++    int point;
++    const char *format;
++    BOOL todo;
++};
++
++static const struct scf_word_point word_text0[] =
++{
++    {  0,  0, ".......................", 1 },
++    {  1,  1, "BB.....................", 1 },
++    {  1,  2, ".B.....................", 0 },
++    {  1,  4, ".BBB...................", 0 },
++    {  2,  2, "BBB....................", 0 },
++    {  3,  3, ".......................", 1 },
++    {  3,  5, "...BB..................", 0 },
++    {  4,  4, "...BB..................", 1 },
++    {  5,  5, "...BBBB................", 0 },
++    {  6,  6, "...BBBB................", 0 },
++    {  7,  7, ".......................", 1 },
++    {  8,  8, ".......................", 1 },
++    {  9,  9, ".......................", 1 },
++    { 10, 10, ".........BB............", 1 },
++    { 11, 11, ".........BBB...........", 1 },
++    { 12, 12, ".......................", 1 },
++    { 13, 13, ".......................", 1 },
++    { 14, 14, ".......................", 1 },
++    { 15, 15, "..............BB.......", 1 },
++    { 16, 16, ".......................", 1 },
++    { 17, 17, "................BB.....", 1 },
++    { 18, 18, ".......................", 1 },
++    { 19, 19, "................BBBB...", 0 },
++    { 20, 20, ".......................", 1 },
++    { 21, 21, ".......................", 1 },
++    { 22, 22, ".......................", 1 },
++    { 23, 23, ".......................", 1 },
++};
++
++static const struct scf_word_point word_text1[] =
++{
++    {  0,  0, "...................", 1 },
++    {  1,  1, "BBBB...............", 1 },
++    {  1,  2, ".B.................", 0 },
++    {  1,  4, ".BBB...............", 0 },
++    {  2,  2, "BBBBB..............", 1 },
++    {  3,  3, "BBBBB..............", 1 },
++    {  3,  5, "...BB..............", 0 },
++    {  4,  4, "BBBBB..............", 1 },
++    {  5,  5, "..BBBB.............", 0 },
++    {  6,  6, "...................", 1 },
++    {  7,  7, "......BB...........", 1 },
++    {  8,  8, "...................", 1 },
++    {  9,  9, "...................", 1 },
++    { 10, 10, ".........BB........", 1 },
++    { 11, 11, "...................", 1 },
++    { 12, 12, "...................", 1 },
++    { 13, 13, "...................", 1 },
++    { 14, 14, ".............BB....", 0 },
++    { 15, 15, "...................", 1 },
++    { 16, 16, "...............BB..", 1 },
++    { 17, 17, "...............BBB.", 0 },
++    { 18, 18, "...................", 1 },
++    { 19, 19, "...................", 1 },
++};
++
++static const struct scf_word_point word_face[] =
++{
++    {  2,  2, "TTTCCCAAA", 0 },
++    {  3,  3, "AAACCCAAA", 1 },
++    {  4,  4, "AAATTTAAA", 1 },
++    {  5,  5, "AAATTTAAA", 1 },
++    {  6,  6, "AAACCCAAA", 1 },
++    {  7,  7, "AAACCCAAA", 1 },
++};
++
++static const struct scf_word_case word_cases[] =
++{
++    { L"ab\rcd ef", 0, 0, 0, 2, "..B......", 0 },
++    { L"ab\rcd ef", 0, 0, 0, 3, ".........", 1 },
++    { L"ab\rcd ef", 0, 0, 0, 4, "...BB....", 1 },
++    { L"ab\rcd ef", 0, 0, 0, 5, "...BBB...", 0 },
++    { L"ab\rcd ef", 0, 0, 0, 8, "........B", 1 },
++    { L"abcd ef", 1, 0, 2, 1, "BBBB...", 1 },
++    { L"abcd ef", 1, 0, 2, 2, "BBBB...", 1 },
++    { L"abcd ef", 1, 0, 2, 3, "BBBB...", 1 },
++    { L"abcd ef", 1, 0, 2, 4, "BBBBB..", 0 },
++    { L"abc def", 1, 0, 3, 2, "BBB....", 1 },
++    { L"abc def", 1, 0, 3, 3, "BBBB...", 0 },
++    { L"abc def", 1, 0, 3, 4, ".......", 1 },
++    { L"abc def", 2, 0, 3, 2, "BBB....", 1 },
++    { L"abc def", 2, 0, 3, 3, "BBBB...", 0 },
++    { L"abc def", 2, 0, 3, 4, ".......", 1 },
++    { L"abc def", 1, 3, 7, 3, "BBBB...", 0 },
++    { L"abc def", 1, 3, 7, 4, ".......", 1 },
++    { L"abc def", 1, 3, 7, 5, "....BBB", 0 },
++    { L"abc.def", 1, 0, 3, 2, "BBB....", 1 },
++    { L"abc.def", 1, 0, 3, 3, ".......", 1 },
++    { L"abc.def", 1, 0, 3, 4, ".......", 1 },
++    { L"abc.def", 2, 0, 3, 3, ".......", 1 },
++    { L"a \x00e9z b", 0, 0, 0, 2, "BBBB..", 1 },
++    { L"a \x00e9z b", 0, 0, 0, 3, "BBBB..", 1 },
++    { L"a z\x00e9 b", 0, 0, 0, 2, "......", 1 },
++    { L"a z\x00e9 b", 0, 0, 0, 3, "..BB..", 1 },
++    { L"a 9z b", 0, 0, 0, 2, "......", 1 },
++    { L"a 9z b", 0, 0, 0, 3, "..BB..", 1 },
++    { L"a .z b", 0, 0, 0, 2, "......", 1 },
++    { L"a .z b", 0, 0, 0, 3, "......", 1 },
++    { L"a _z b", 0, 0, 0, 2, "......", 1 },
++    { L"a _z b", 0, 0, 0, 3, "......", 1 },
++    { L"a  bc d", 0, 0, 0, 2, "BBB....", 0 },
++    { L"a  bc d", 0, 0, 0, 3, ".......", 1 },
++    { L"a  bc d", 0, 0, 0, 4, "...BB..", 1 },
++    { L"a\tbc d", 0, 0, 0, 1, "......", 1 },
++    { L"a\tbc d", 0, 0, 0, 2, "......", 1 },
++    { L"a\tbc d", 0, 0, 0, 3, "..BB..", 1 },
++    { L" ab c", 0, 0, 0, 0, ".....", 1 },
++    { L" ab c", 0, 0, 0, 1, ".....", 1 },
++    { L".ab c", 0, 0, 0, 0, ".....", 1 },
++    { L".ab c", 0, 0, 0, 1, ".....", 1 },
++    { L"\x00e9" L"ab c", 0, 0, 0, 0, ".....", 1 },
++    { L"\x00e9" L"ab c", 0, 0, 0, 1, "BBB..", 1 },
++    { L"ab ", 0, 0, 0, 2, "BBB", 0 },
++    { L"ab ", 0, 0, 0, 3, "...", 1 },
++    { L"a b c", 0, 0, 0, 1, "BB...", 0 },
++    { L"a b c", 0, 0, 0, 2, ".....", 1 },
++    { L"a b c", 0, 0, 0, 3, "..BB.", 0 },
++    { L"a b c", 0, 0, 0, 5, ".....", 1 },
++};
++
++static HWND new_scf_word_richedit(void)
++{
++    HWND hwnd = CreateWindowW(RICHEDIT_CLASS20W, NULL, ES_MULTILINE | WS_POPUP | WS_VISIBLE,
++                              0, 0, 480, 150, NULL, NULL, NULL, NULL);
++    ok(hwnd != NULL, "error %lu\n", GetLastError());
++    return hwnd;
++}
++
++static void get_scf_word_format(HWND hwnd, char *out, int len, BOOL faces)
++{
++    CHARFORMAT2W cf;
++    int i;
++
++    for (i = 0; i < len; i++)
++    {
++        memset(&cf, 0, sizeof(cf));
++        cf.cbSize = sizeof(cf);
++        SendMessageW(hwnd, EM_SETSEL, i, i + 1);
++        SendMessageW(hwnd, EM_GETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++        if (faces)
++            out[i] = !lstrcmpW(cf.szFaceName, L"Arial") ? 'A' : !lstrcmpW(cf.szFaceName, L"Courier New") ? 'C' :
++                     !lstrcmpW(cf.szFaceName, L"Times New Roman") ? 'T' : '?';
++        else
++            out[i] = (cf.dwMask & CFM_BOLD) && (cf.dwEffects & CFE_BOLD) ? 'B' : '.';
++    }
++    out[len] = 0;
++}
++
++static void set_scf_word_bold(HWND hwnd, int start, int end, BOOL check_point)
++{
++    CHARFORMAT2W cf;
++    LRESULT ret;
++
++    SendMessageW(hwnd, EM_SETSEL, start, end);
++    memset(&cf, 0, sizeof(cf));
++    cf.cbSize = sizeof(cf);
++    cf.dwMask = CFM_BOLD;
++    cf.dwEffects = CFE_BOLD;
++    ret = SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION | SCF_WORD, (LPARAM)&cf);
++    ok(ret == 1, "got %Id\n", ret);
++    if (!check_point) return;
++    /* the insertion point itself takes the format */
++    memset(&cf, 0, sizeof(cf));
++    cf.cbSize = sizeof(cf);
++    SendMessageW(hwnd, EM_GETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++    ok((cf.dwMask & CFM_BOLD) && (cf.dwEffects & CFE_BOLD), "insertion point not bold\n");
++}
++
++static void reset_scf_word_text(HWND hwnd, const WCHAR *text)
++{
++    CHARFORMAT2W cf;
++
++    SendMessageW(hwnd, WM_SETTEXT, 0, (LPARAM)text);
++    memset(&cf, 0, sizeof(cf));
++    cf.cbSize = sizeof(cf);
++    cf.dwMask = CFM_BOLD | CFM_ITALIC | CFM_COLOR;
++    SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
++}
++
++static void test_EM_SETCHARFORMAT_word_point(void)
++{
++    static const WCHAR *texts[] = { L"ab cd  e_f1 g.h i'j k-l", L"x \x00e9\x00e8z 12,5 m\tn ?! o" };
++    static const struct { const struct scf_word_point *points; unsigned int count; } tables[] =
++    {
++        { word_text0, ARRAY_SIZE(word_text0) },
++        { word_text1, ARRAY_SIZE(word_text1) },
++    };
++    CHARFORMAT2W cf;
++    unsigned int t, i;
++    char format[32];
++    HWND hwnd;
++    int len;
++
++    hwnd = new_scf_word_richedit();
++    for (t = 0; t < ARRAY_SIZE(texts); t++)
++    {
++        len = lstrlenW(texts[t]);
++        for (i = 0; i < tables[t].count; i++)
++        {
++            const struct scf_word_point *p = &tables[t].points[i];
++
++            winetest_push_context("text %u, %d-%d", t, p->start, p->end);
++            reset_scf_word_text(hwnd, texts[t]);
++            set_scf_word_bold(hwnd, p->start, p->end, TRUE);
++            get_scf_word_format(hwnd, format, len, FALSE);
++            todo_wine_if(p->todo)
++            ok(!strcmp(format, p->format), "got %s, expected %s\n", format, p->format);
++            winetest_pop_context();
++        }
++    }
++
++    /* letters set in another face, then the normal face with SCF_WORD */
++    for (i = 0; i < ARRAY_SIZE(word_face); i++)
++    {
++        const struct scf_word_point *p = &word_face[i];
++
++        winetest_push_context("face, point %d", p->start);
++        SendMessageW(hwnd, WM_SETTEXT, 0, (LPARAM)L"ab gaj cd");
++        memset(&cf, 0, sizeof(cf));
++        cf.cbSize = sizeof(cf);
++        cf.dwMask = CFM_FACE;
++        lstrcpyW(cf.szFaceName, L"Arial");
++        SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
++        SendMessageW(hwnd, EM_SETSEL, 3, 6);
++        lstrcpyW(cf.szFaceName, L"Courier New");
++        SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++        SendMessageW(hwnd, EM_SETSEL, p->start, p->end);
++        lstrcpyW(cf.szFaceName, L"Times New Roman");
++        SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION | SCF_WORD, (LPARAM)&cf);
++        get_scf_word_format(hwnd, format, 9, TRUE);
++        todo_wine_if(p->todo)
++        ok(!strcmp(format, p->format), "got %s, expected %s\n", format, p->format);
++        winetest_pop_context();
++    }
++
++    /* paragraphs, format changes, word starts */
++    for (i = 0; i < ARRAY_SIZE(word_cases); i++)
++    {
++        const struct scf_word_case *c = &word_cases[i];
++
++        winetest_push_context("%s, point %d", wine_dbgstr_w(c->text), c->point);
++        reset_scf_word_text(hwnd, c->text);
++        if (c->mark)
++        {
++            SendMessageW(hwnd, EM_SETSEL, c->mark_start, c->mark_end);
++            memset(&cf, 0, sizeof(cf));
++            cf.cbSize = sizeof(cf);
++            if (c->mark == 1) { cf.dwMask = CFM_ITALIC; cf.dwEffects = CFE_ITALIC; }
++            else { cf.dwMask = CFM_COLOR; cf.crTextColor = RGB(255, 0, 0); }
++            SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++        }
++        len = SendMessageW(hwnd, WM_GETTEXTLENGTH, 0, 0);
++        ok(len == strlen(c->format), "got length %d\n", len);
++        set_scf_word_bold(hwnd, c->point, c->point, TRUE);
++        get_scf_word_format(hwnd, format, min(len, ARRAY_SIZE(format) - 1), FALSE);
++        todo_wine_if(c->todo)
++        ok(!strcmp(format, c->format), "got %s, expected %s\n", format, c->format);
++        winetest_pop_context();
++    }
++    DestroyWindow(hwnd);
++}
++
+ START_TEST( editor )
+ {
+   BOOL ret;
+@@ -9409,6 +9696,8 @@
+   test_init_messages();
+   test_EM_SELECTIONTYPE();
+ 
++  test_EM_SETCHARFORMAT_word_point();
++
+   /* Set the environment variable WINETEST_RICHED20 to keep windows
+    * responsive and open for 30 seconds. This is useful for debugging.
+    */
+--- a/dlls/riched20/txthost.c
++++ b/dlls/riched20/txthost.c
+@@ -868,6 +868,7 @@
+ static BOOL create_windowed_editor( HWND hwnd, CREATESTRUCTW *create, BOOL emulate_10 )
+ {
+     struct host *host = host_create( hwnd, create, emulate_10 );
++    WCHAR class[16];
+     IUnknown *unk;
+     HRESULT hr;
+ 
+@@ -880,6 +881,8 @@
+         return FALSE;
+     }
+     IUnknown_QueryInterface( unk, &IID_ITextServices, (void **)&host->text_srv );
++    if (GetClassNameW( hwnd, class, ARRAY_SIZE(class) ) && !wcsicmp( class, MSFTEDIT_CLASS ))
++        CONTAINING_RECORD( unk, struct text_services, IUnknown_inner )->editor->msftedit = TRUE;
+     IUnknown_Release( unk );
+ 
+     SetWindowLongPtrW( hwnd, 0, (LONG_PTR)host );
