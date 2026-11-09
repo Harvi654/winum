@@ -17,3 +17,13 @@ before msxml3-schema-cache-namespace), checked 2026-11-08.
 Open: cross review (Codex); L1 of the new test (the series L1 bundle
 contains msxml3 domdoc); L2; L4 in SOLIDWORKS when that work resumes (the
 change only affects the no-error case, which SOLIDWORKS does not hit).
+
+## 2026-11-09: empty string
+
+L2 run 42552802374 (`test-run/candidates-2`) failed the new check after
+`loadXML("")` (`domdoc.c:12987`, S_FALSE instead of S_OK): Wine's
+`domdoc_loadXML` takes a separate branch for an empty string and never
+set `doc->error`, so v2 would have answered S_FALSE in exactly the call
+SOLIDWORKS makes. The candidate now records `E_SAX_MISSINGROOT`
+(0xc00ce558, the code Windows returned) there. The tests were also
+revised after cross review (both measured classes, all measured states).

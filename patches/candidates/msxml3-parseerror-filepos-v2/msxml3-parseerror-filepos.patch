@@ -30,6 +30,25 @@ document for every load as in the measurement, and cover all measured
 states: new document, loadXML(""), "<a><b></a>" (8), an error on the
 third line (12) and a successful load; NULL is checked in each state.
 
+v2 revised (2026-11-09, after L2 run 42552802374): Wine's loadXML("")
+returned S_FALSE without recording a parse error, so get_filepos (and
+get_errorCode) reported no error there, where Windows reports
+0xc00ce558 (XML_E_MISSINGROOT) and get_filepos returns S_OK - the
+SOLIDWORKS case. loadXML of an empty string now records that code; a
+NULL string is left as it was (not measured).
+
+--- a/dlls/msxml3/domdoc.c
++++ b/dlls/msxml3/domdoc.c
+@@ -1486,6 +1486,9 @@
+         node->properties = domdoc_create_properties(doc->node->properties->version);
+         attach_doc_node(doc, node);
+ 
++        /* An empty string is a parse error with a code on Windows. */
++        if (data) doc->error = E_SAX_MISSINGROOT;
++
+         hr = S_FALSE;
+     }
+ 
 --- a/dlls/msxml3/parseerror.c
 +++ b/dlls/msxml3/parseerror.c
 @@ -242,8 +242,11 @@
