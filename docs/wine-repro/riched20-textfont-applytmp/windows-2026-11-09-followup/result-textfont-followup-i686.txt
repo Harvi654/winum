@@ -1,0 +1,84 @@
+MEASURE topic=riched20-textfont-followup schema=1 bits=32
+DLL riched20
+SEQUENCE seq=now_now
+RESET seq=now_now mode=applytmp hr=80070057
+SET seq=now_now color_hr=00000000
+RESET seq=now_now mode=applynow hr=00000000
+FONT seq=now_now when=now1 color=00000000:00ff0000 bold=00000000:-1
+TEXT seq=now_now when=now1 mask_color=1 color=ff0000 mask_bold=1 bold=1
+RESET seq=now_now mode=applynow hr=00000000
+FONT seq=now_now when=end color=00000000:00ff0000 bold=00000000:-1
+TEXT seq=now_now when=end mask_color=1 color=ff0000 mask_bold=1 bold=1
+SEQUENCE seq=set_after
+RESET seq=set_after mode=applytmp hr=80070057
+SET seq=set_after color_hr=00000000
+RESET seq=set_after mode=applynow hr=00000000
+FONT seq=set_after when=now1 color=00000000:00ff0000 bold=00000000:-1
+TEXT seq=set_after when=now1 mask_color=1 color=ff0000 mask_bold=1 bold=1
+SET seq=set_after bold_hr=00000000
+FONT seq=set_after when=end color=00000000:00ff0000 bold=00000000:0
+TEXT seq=set_after when=end mask_color=1 color=ff0000 mask_bold=1 bold=0
+SEQUENCE seq=tmp_again
+RESET seq=tmp_again mode=applytmp hr=80070057
+SET seq=tmp_again color_hr=00000000
+RESET seq=tmp_again mode=applynow hr=00000000
+FONT seq=tmp_again when=now1 color=00000000:00ff0000 bold=00000000:-1
+TEXT seq=tmp_again when=now1 mask_color=1 color=ff0000 mask_bold=1 bold=1
+RESET seq=tmp_again mode=applytmp hr=80070057
+SET seq=tmp_again bold_hr=00000000
+RESET seq=tmp_again mode=applynow hr=00000000
+FONT seq=tmp_again when=end color=00000000:00ff0000 bold=00000000:0
+TEXT seq=tmp_again when=end mask_color=1 color=ff0000 mask_bold=1 bold=0
+SEQUENCE seq=cache_after
+RESET seq=cache_after mode=applytmp hr=80070057
+SET seq=cache_after color_hr=00000000
+RESET seq=cache_after mode=applynow hr=00000000
+FONT seq=cache_after when=now1 color=00000000:00ff0000 bold=00000000:-1
+TEXT seq=cache_after when=now1 mask_color=1 color=ff0000 mask_bold=1 bold=1
+RESET seq=cache_after mode=cacheparms hr=00000000
+FONT seq=cache_after when=cached color=00000000:00ff0000 bold=00000000:-1
+RESET seq=cache_after mode=trackparms hr=00000000
+FONT seq=cache_after when=end color=00000000:00ff0000 bold=00000000:-1
+TEXT seq=cache_after when=end mask_color=1 color=ff0000 mask_bold=1 bold=1
+DLL msftedit
+SEQUENCE seq=now_now
+RESET seq=now_now mode=applytmp hr=00000000
+SET seq=now_now color_hr=00000000
+RESET seq=now_now mode=applynow hr=00000000
+FONT seq=now_now when=now1 color=00000000:000000ff bold=00000000:-1
+TEXT seq=now_now when=now1 mask_color=1 color=0000ff mask_bold=1 bold=1
+RESET seq=now_now mode=applynow hr=00000000
+FONT seq=now_now when=end color=00000000:000000ff bold=00000000:-1
+TEXT seq=now_now when=end mask_color=1 color=0000ff mask_bold=1 bold=1
+SEQUENCE seq=set_after
+RESET seq=set_after mode=applytmp hr=00000000
+SET seq=set_after color_hr=00000000
+RESET seq=set_after mode=applynow hr=00000000
+FONT seq=set_after when=now1 color=00000000:000000ff bold=00000000:-1
+TEXT seq=set_after when=now1 mask_color=1 color=0000ff mask_bold=1 bold=1
+SET seq=set_after bold_hr=00000000
+FONT seq=set_after when=end color=00000000:000000ff bold=00000000:0
+TEXT seq=set_after when=end mask_color=1 color=0000ff mask_bold=1 bold=0
+SEQUENCE seq=tmp_again
+RESET seq=tmp_again mode=applytmp hr=00000000
+SET seq=tmp_again color_hr=00000000
+RESET seq=tmp_again mode=applynow hr=00000000
+FONT seq=tmp_again when=now1 color=00000000:000000ff bold=00000000:-1
+TEXT seq=tmp_again when=now1 mask_color=1 color=0000ff mask_bold=1 bold=1
+RESET seq=tmp_again mode=applytmp hr=00000000
+SET seq=tmp_again bold_hr=00000000
+RESET seq=tmp_again mode=applynow hr=00000000
+FONT seq=tmp_again when=end color=00000000:000000ff bold=00000000:0
+TEXT seq=tmp_again when=end mask_color=1 color=0000ff mask_bold=1 bold=0
+SEQUENCE seq=cache_after
+RESET seq=cache_after mode=applytmp hr=00000000
+SET seq=cache_after color_hr=00000000
+RESET seq=cache_after mode=applynow hr=00000000
+FONT seq=cache_after when=now1 color=00000000:000000ff bold=00000000:-1
+TEXT seq=cache_after when=now1 mask_color=1 color=0000ff mask_bold=1 bold=1
+RESET seq=cache_after mode=cacheparms hr=00000000
+FONT seq=cache_after when=cached color=00000000:000000ff bold=00000000:-1
+RESET seq=cache_after mode=trackparms hr=00000000
+FONT seq=cache_after when=end color=00000000:000000ff bold=00000000:-1
+TEXT seq=cache_after when=end mask_color=1 color=0000ff mask_bold=1 bold=1
+SUMMARY topic=riched20-textfont-followup api_errors=0 complete=1 expectations=none

@@ -1,5 +1,11 @@
 # comctl32-toolbar-padding-height v3: after cross review
 
+**Superseded by `../comctl32-toolbar-padding-height-v4/` (2026-11-09)** after
+the follow-up measurement (-1 leaves a direction unchanged; the padding
+height applies without text too). Kept as the record. L1 of v3
+(run 42698489281): x86_64 passed; i386 failed for an environment reason
+(see `docs/wine-repro/batch1-measure/l1-2026-11-09-batch1-4/`).
+
 Candidate only: `patches/series`, the production patch and its page marker
 are unchanged. Substitute `comctl32-toolbar-padding-height.patch` from this
 folder for the production file at its place in the series (entry 10).

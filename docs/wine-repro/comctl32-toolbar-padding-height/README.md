@@ -74,3 +74,27 @@ padding default, 0x0, 0x10 and 10x0 set before or after the buttons
 (`BMP` lines: button size before and after). v5 and v6. In
 `docs/wine-repro/batch1-measure/followup2.list` and the main list;
 completes under a local Wine 11.20 build.
+
+### Windows observations of the follow-up (2026-11-09)
+
+`windows-2026-11-09-followup/`, both architectures identical, exit 0,
+`api_errors=0`; v5 and v6 identical.
+
+- `PAD`: -1 in a direction leaves that direction unchanged: after 3x4,
+  (-1,-1) keeps 3x4, (-1,5) gives 3x5, (5,-1) gives 5x4; the same after
+  0x0 and 16x16. -2 (0xfffe) is stored as given. The returned old value is
+  the padding before the call. (v3 reset both directions to 7x6: wrong.)
+- `BMP`, without strings: the same bitmap size keeps the button (23x22);
+  another size recalculates to bitmap + padding in both directions, with
+  the padding current at that moment (padding 0: 20x20 bitmap gives
+  20x20; 0x10 gives 20x30; default gives 27x26), whether the padding was
+  set before or after the buttons.
+- `BMP`, with strings: the height is bitmap + padding height + 1 + text
+  (relative to the size before: the new bitmap height and the current
+  padding height); the width is bitmap + padding, but with the padding
+  set after the buttons a narrower result keeps the earlier width
+  (23 stays 23 for a 20x20 bitmap with padding 0).
+
+So the padding height applies to buttons without text as well when a
+changed bitmap size recalculates them (v3 had limited it to text), and
+only the same-size call recalculates nothing.

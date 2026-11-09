@@ -72,3 +72,26 @@ RichEdit20W and RICHEDIT50W. In `docs/wine-repro/batch1-measure/followup2.list`
 and the main list; completes under a local Wine 11.20 build. Until its
 results are in, the candidate does not claim anything for these
 sequences.
+
+### Windows observations of the follow-up (2026-11-09)
+
+`windows-2026-11-09-followup/`, both architectures identical, exit 0,
+`api_errors=0`.
+
+msftedit (RICHEDIT50W):
+- `now_now`: a second tomApplyNow after the cycle writes nothing (red,
+  bold stay). The v4 candidate wrote the temporary blue there - fixed in
+  v5 by reloading the cache when the temporary state ends.
+- `set_after`: a change without a Reset after the cycle applies at once.
+- `tmp_again`: tomApplyTmp again, SetBold(tomFalse), tomApplyNow: the text
+  ends not bold - the second cycle's change reaches the text. Not
+  explained by these rows (nothing was read between the change and
+  tomApplyNow); `measure-followup2.c` reads every step, on the same and on
+  a new font object (`docs/wine-repro/batch1-measure/followup3.list`).
+- `cache_after`: tomCacheParms / tomTrackParms afterwards report the text
+  (red, bold).
+
+riched20 (RichEdit20W): tomApplyTmp E_INVALIDARG, the setters apply at
+once, later tomApplyNow writes nothing; Wine's (vanilla and candidate)
+tomApplyNow writes the font's cached values - the known RichEdit20W
+difference, todo_wine.

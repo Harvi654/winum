@@ -1,5 +1,10 @@
 # riched20-textfont-applytmp v4: exact class in the RichEdit20W test
 
+**Superseded by `../riched20-textfont-applytmp-v5/` (2026-11-09)** after
+the follow-up measurement (a second tomApplyNow wrote temporary values).
+Kept as the record. L1 of v4 (run 42698489281) passed on both
+architectures.
+
 Candidate only: `patches/series`, the production patch and its page marker
 are unchanged. Substitute `riched20-textfont-applytmp.patch` from this
 folder for the production file at its place in the series (entry 24).

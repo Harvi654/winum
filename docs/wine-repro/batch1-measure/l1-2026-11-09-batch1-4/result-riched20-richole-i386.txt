@@ -1,0 +1,3 @@
+richole.c:5139: Test failed: Copy failed: 0x800401d0
+richole.c:5139: Test failed: unexpected contents: "b\r\n c"
+1620:richole: 183279 tests executed (0 marked as todo, 0 as flaky, 2 failures), 0 skipped.

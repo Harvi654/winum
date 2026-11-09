@@ -67,3 +67,8 @@ Codex: approved (`docs/wine-repro/cross-review-2026-11-09-comctl32-header-null-l
 Together with L1 and L2 above, ready for the series once the maintainer
 decides; `patches/series` is not edited by the author.
 Open from the review, not done (would change the reviewed revision): P3 (optional): also assert `hwndInsertAfter`, `y`, `cx` unchanged and send the NULL-member cases through `SendMessageW`.
+
+## L1 of test-run/batch1-4 (2026-11-09)
+
+Run 42698489281, Windows 10, x86_64 and i386: the new test passed
+(`docs/wine-repro/batch1-measure/l1-2026-11-09-batch1-4/`).

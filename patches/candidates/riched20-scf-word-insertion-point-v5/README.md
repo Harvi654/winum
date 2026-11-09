@@ -33,3 +33,8 @@ riched20 richole (181587), editor (11056), txtsrv (215), msftedit editor
   substituted, 62/62 (2026-11-09).
 - L1 (`msftedit:editor`, `riched20:editor`), L2 (`test-run/batch1-4`),
   L4 (Inventor GD&T), cross review (Codex): pending.
+
+## L1 of test-run/batch1-4 (2026-11-09)
+
+Run 42698489281, Windows 10, x86_64 and i386: the new test passed
+(`docs/wine-repro/batch1-measure/l1-2026-11-09-batch1-4/`).

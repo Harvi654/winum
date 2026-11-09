@@ -1,0 +1,2 @@
+# Batch 1 follow-up after the second follow-up results; also in measure-bundle.list.
+textfont-followup2 | docs/wine-repro/riched20-textfont-applytmp/measure-followup2.c | -Wextra -lole32 -loleaut32 -luuid -static

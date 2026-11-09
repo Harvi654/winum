@@ -1,0 +1,2 @@
+textfont-followup x86_64=0
+textfont-followup i686=0

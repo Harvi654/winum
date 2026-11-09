@@ -1,0 +1,189 @@
+MEASURE topic=comctl32-toolbar-padding-followup schema=1 bits=32
+SYSTEM cxedge=2 dpi_y=96
+COMCTL32 requested=5 dll=5.82
+PAD v=5 first=3,4 second=65535,65535 old=3,4 now=3,4
+PAD v=5 first=3,4 second=65535,5 old=3,4 now=3,5
+PAD v=5 first=3,4 second=5,65535 old=3,4 now=5,4
+PAD v=5 first=3,4 second=65534,65534 old=3,4 now=65534,65534
+PAD v=5 first=0,0 second=65535,65535 old=0,0 now=0,0
+PAD v=5 first=0,0 second=65535,5 old=0,0 now=0,5
+PAD v=5 first=0,0 second=5,65535 old=0,0 now=5,0
+PAD v=5 first=0,0 second=65534,65534 old=0,0 now=65534,65534
+PAD v=5 first=16,16 second=65535,65535 old=16,16 now=16,16
+PAD v=5 first=16,16 second=65535,5 old=16,16 now=16,5
+PAD v=5 first=16,16 second=5,65535 old=16,16 now=5,16
+PAD v=5 first=16,16 second=65534,65534 old=16,16 now=65534,65534
+BMP v=5 strings=0 order=before pad=default:0,0 bitmap=16,16 before=23,22 after=23,22
+BMP v=5 strings=0 order=before pad=default:0,0 bitmap=20,20 before=23,22 after=27,26
+BMP v=5 strings=0 order=before pad=default:0,0 bitmap=16,24 before=23,22 after=23,30
+BMP v=5 strings=0 order=before pad=default:0,0 bitmap=24,16 before=23,22 after=31,22
+BMP v=5 strings=0 order=before pad=default:0,0 bitmap=16,15 before=23,22 after=23,21
+BMP v=5 strings=0 order=before pad=0,0 bitmap=16,16 before=23,22 after=23,22
+BMP v=5 strings=0 order=before pad=0,0 bitmap=20,20 before=23,22 after=20,20
+BMP v=5 strings=0 order=before pad=0,0 bitmap=16,24 before=23,22 after=16,24
+BMP v=5 strings=0 order=before pad=0,0 bitmap=24,16 before=23,22 after=24,16
+BMP v=5 strings=0 order=before pad=0,0 bitmap=16,15 before=23,22 after=16,15
+BMP v=5 strings=0 order=before pad=0,10 bitmap=16,16 before=23,22 after=23,22
+BMP v=5 strings=0 order=before pad=0,10 bitmap=20,20 before=23,22 after=20,30
+BMP v=5 strings=0 order=before pad=0,10 bitmap=16,24 before=23,22 after=16,34
+BMP v=5 strings=0 order=before pad=0,10 bitmap=24,16 before=23,22 after=24,26
+BMP v=5 strings=0 order=before pad=0,10 bitmap=16,15 before=23,22 after=16,25
+BMP v=5 strings=0 order=before pad=10,0 bitmap=16,16 before=23,22 after=23,22
+BMP v=5 strings=0 order=before pad=10,0 bitmap=20,20 before=23,22 after=30,20
+BMP v=5 strings=0 order=before pad=10,0 bitmap=16,24 before=23,22 after=26,24
+BMP v=5 strings=0 order=before pad=10,0 bitmap=24,16 before=23,22 after=34,16
+BMP v=5 strings=0 order=before pad=10,0 bitmap=16,15 before=23,22 after=26,15
+BMP v=5 strings=0 order=after pad=default:0,0 bitmap=16,16 before=23,22 after=23,22
+BMP v=5 strings=0 order=after pad=default:0,0 bitmap=20,20 before=23,22 after=27,26
+BMP v=5 strings=0 order=after pad=default:0,0 bitmap=16,24 before=23,22 after=23,30
+BMP v=5 strings=0 order=after pad=default:0,0 bitmap=24,16 before=23,22 after=31,22
+BMP v=5 strings=0 order=after pad=default:0,0 bitmap=16,15 before=23,22 after=23,21
+BMP v=5 strings=0 order=after pad=0,0 bitmap=16,16 before=23,22 after=23,22
+BMP v=5 strings=0 order=after pad=0,0 bitmap=20,20 before=23,22 after=20,20
+BMP v=5 strings=0 order=after pad=0,0 bitmap=16,24 before=23,22 after=16,24
+BMP v=5 strings=0 order=after pad=0,0 bitmap=24,16 before=23,22 after=24,16
+BMP v=5 strings=0 order=after pad=0,0 bitmap=16,15 before=23,22 after=16,15
+BMP v=5 strings=0 order=after pad=0,10 bitmap=16,16 before=23,22 after=23,22
+BMP v=5 strings=0 order=after pad=0,10 bitmap=20,20 before=23,22 after=20,30
+BMP v=5 strings=0 order=after pad=0,10 bitmap=16,24 before=23,22 after=16,34
+BMP v=5 strings=0 order=after pad=0,10 bitmap=24,16 before=23,22 after=24,26
+BMP v=5 strings=0 order=after pad=0,10 bitmap=16,15 before=23,22 after=16,25
+BMP v=5 strings=0 order=after pad=10,0 bitmap=16,16 before=23,22 after=23,22
+BMP v=5 strings=0 order=after pad=10,0 bitmap=20,20 before=23,22 after=30,20
+BMP v=5 strings=0 order=after pad=10,0 bitmap=16,24 before=23,22 after=26,24
+BMP v=5 strings=0 order=after pad=10,0 bitmap=24,16 before=23,22 after=34,16
+BMP v=5 strings=0 order=after pad=10,0 bitmap=16,15 before=23,22 after=26,15
+BMP v=5 strings=1 order=before pad=default:0,0 bitmap=16,16 before=23,38 after=23,38
+BMP v=5 strings=1 order=before pad=default:0,0 bitmap=20,20 before=23,38 after=27,42
+BMP v=5 strings=1 order=before pad=default:0,0 bitmap=16,24 before=23,38 after=23,46
+BMP v=5 strings=1 order=before pad=default:0,0 bitmap=24,16 before=23,38 after=31,38
+BMP v=5 strings=1 order=before pad=default:0,0 bitmap=16,15 before=23,38 after=23,37
+BMP v=5 strings=1 order=before pad=0,0 bitmap=16,16 before=16,32 after=16,32
+BMP v=5 strings=1 order=before pad=0,0 bitmap=20,20 before=16,32 after=20,36
+BMP v=5 strings=1 order=before pad=0,0 bitmap=16,24 before=16,32 after=16,40
+BMP v=5 strings=1 order=before pad=0,0 bitmap=24,16 before=16,32 after=24,32
+BMP v=5 strings=1 order=before pad=0,0 bitmap=16,15 before=16,32 after=16,31
+BMP v=5 strings=1 order=before pad=0,10 bitmap=16,16 before=16,42 after=16,42
+BMP v=5 strings=1 order=before pad=0,10 bitmap=20,20 before=16,42 after=20,46
+BMP v=5 strings=1 order=before pad=0,10 bitmap=16,24 before=16,42 after=16,50
+BMP v=5 strings=1 order=before pad=0,10 bitmap=24,16 before=16,42 after=24,42
+BMP v=5 strings=1 order=before pad=0,10 bitmap=16,15 before=16,42 after=16,41
+BMP v=5 strings=1 order=before pad=10,0 bitmap=16,16 before=26,32 after=26,32
+BMP v=5 strings=1 order=before pad=10,0 bitmap=20,20 before=26,32 after=30,36
+BMP v=5 strings=1 order=before pad=10,0 bitmap=16,24 before=26,32 after=26,40
+BMP v=5 strings=1 order=before pad=10,0 bitmap=24,16 before=26,32 after=34,32
+BMP v=5 strings=1 order=before pad=10,0 bitmap=16,15 before=26,32 after=26,31
+BMP v=5 strings=1 order=after pad=default:0,0 bitmap=16,16 before=23,38 after=23,38
+BMP v=5 strings=1 order=after pad=default:0,0 bitmap=20,20 before=23,38 after=27,42
+BMP v=5 strings=1 order=after pad=default:0,0 bitmap=16,24 before=23,38 after=23,46
+BMP v=5 strings=1 order=after pad=default:0,0 bitmap=24,16 before=23,38 after=31,38
+BMP v=5 strings=1 order=after pad=default:0,0 bitmap=16,15 before=23,38 after=23,37
+BMP v=5 strings=1 order=after pad=0,0 bitmap=16,16 before=23,38 after=23,38
+BMP v=5 strings=1 order=after pad=0,0 bitmap=20,20 before=23,38 after=23,36
+BMP v=5 strings=1 order=after pad=0,0 bitmap=16,24 before=23,38 after=23,40
+BMP v=5 strings=1 order=after pad=0,0 bitmap=24,16 before=23,38 after=24,32
+BMP v=5 strings=1 order=after pad=0,0 bitmap=16,15 before=23,38 after=23,31
+BMP v=5 strings=1 order=after pad=0,10 bitmap=16,16 before=23,38 after=23,38
+BMP v=5 strings=1 order=after pad=0,10 bitmap=20,20 before=23,38 after=23,46
+BMP v=5 strings=1 order=after pad=0,10 bitmap=16,24 before=23,38 after=23,50
+BMP v=5 strings=1 order=after pad=0,10 bitmap=24,16 before=23,38 after=24,42
+BMP v=5 strings=1 order=after pad=0,10 bitmap=16,15 before=23,38 after=23,41
+BMP v=5 strings=1 order=after pad=10,0 bitmap=16,16 before=23,38 after=23,38
+BMP v=5 strings=1 order=after pad=10,0 bitmap=20,20 before=23,38 after=30,36
+BMP v=5 strings=1 order=after pad=10,0 bitmap=16,24 before=23,38 after=26,40
+BMP v=5 strings=1 order=after pad=10,0 bitmap=24,16 before=23,38 after=34,32
+BMP v=5 strings=1 order=after pad=10,0 bitmap=16,15 before=23,38 after=26,31
+COMCTL32 requested=6 dll=6.16
+PAD v=6 first=3,4 second=65535,65535 old=3,4 now=3,4
+PAD v=6 first=3,4 second=65535,5 old=3,4 now=3,5
+PAD v=6 first=3,4 second=5,65535 old=3,4 now=5,4
+PAD v=6 first=3,4 second=65534,65534 old=3,4 now=65534,65534
+PAD v=6 first=0,0 second=65535,65535 old=0,0 now=0,0
+PAD v=6 first=0,0 second=65535,5 old=0,0 now=0,5
+PAD v=6 first=0,0 second=5,65535 old=0,0 now=5,0
+PAD v=6 first=0,0 second=65534,65534 old=0,0 now=65534,65534
+PAD v=6 first=16,16 second=65535,65535 old=16,16 now=16,16
+PAD v=6 first=16,16 second=65535,5 old=16,16 now=16,5
+PAD v=6 first=16,16 second=5,65535 old=16,16 now=5,16
+PAD v=6 first=16,16 second=65534,65534 old=16,16 now=65534,65534
+BMP v=6 strings=0 order=before pad=default:0,0 bitmap=16,16 before=23,22 after=23,22
+BMP v=6 strings=0 order=before pad=default:0,0 bitmap=20,20 before=23,22 after=27,26
+BMP v=6 strings=0 order=before pad=default:0,0 bitmap=16,24 before=23,22 after=23,30
+BMP v=6 strings=0 order=before pad=default:0,0 bitmap=24,16 before=23,22 after=31,22
+BMP v=6 strings=0 order=before pad=default:0,0 bitmap=16,15 before=23,22 after=23,21
+BMP v=6 strings=0 order=before pad=0,0 bitmap=16,16 before=23,22 after=23,22
+BMP v=6 strings=0 order=before pad=0,0 bitmap=20,20 before=23,22 after=20,20
+BMP v=6 strings=0 order=before pad=0,0 bitmap=16,24 before=23,22 after=16,24
+BMP v=6 strings=0 order=before pad=0,0 bitmap=24,16 before=23,22 after=24,16
+BMP v=6 strings=0 order=before pad=0,0 bitmap=16,15 before=23,22 after=16,15
+BMP v=6 strings=0 order=before pad=0,10 bitmap=16,16 before=23,22 after=23,22
+BMP v=6 strings=0 order=before pad=0,10 bitmap=20,20 before=23,22 after=20,30
+BMP v=6 strings=0 order=before pad=0,10 bitmap=16,24 before=23,22 after=16,34
+BMP v=6 strings=0 order=before pad=0,10 bitmap=24,16 before=23,22 after=24,26
+BMP v=6 strings=0 order=before pad=0,10 bitmap=16,15 before=23,22 after=16,25
+BMP v=6 strings=0 order=before pad=10,0 bitmap=16,16 before=23,22 after=23,22
+BMP v=6 strings=0 order=before pad=10,0 bitmap=20,20 before=23,22 after=30,20
+BMP v=6 strings=0 order=before pad=10,0 bitmap=16,24 before=23,22 after=26,24
+BMP v=6 strings=0 order=before pad=10,0 bitmap=24,16 before=23,22 after=34,16
+BMP v=6 strings=0 order=before pad=10,0 bitmap=16,15 before=23,22 after=26,15
+BMP v=6 strings=0 order=after pad=default:0,0 bitmap=16,16 before=23,22 after=23,22
+BMP v=6 strings=0 order=after pad=default:0,0 bitmap=20,20 before=23,22 after=27,26
+BMP v=6 strings=0 order=after pad=default:0,0 bitmap=16,24 before=23,22 after=23,30
+BMP v=6 strings=0 order=after pad=default:0,0 bitmap=24,16 before=23,22 after=31,22
+BMP v=6 strings=0 order=after pad=default:0,0 bitmap=16,15 before=23,22 after=23,21
+BMP v=6 strings=0 order=after pad=0,0 bitmap=16,16 before=23,22 after=23,22
+BMP v=6 strings=0 order=after pad=0,0 bitmap=20,20 before=23,22 after=20,20
+BMP v=6 strings=0 order=after pad=0,0 bitmap=16,24 before=23,22 after=16,24
+BMP v=6 strings=0 order=after pad=0,0 bitmap=24,16 before=23,22 after=24,16
+BMP v=6 strings=0 order=after pad=0,0 bitmap=16,15 before=23,22 after=16,15
+BMP v=6 strings=0 order=after pad=0,10 bitmap=16,16 before=23,22 after=23,22
+BMP v=6 strings=0 order=after pad=0,10 bitmap=20,20 before=23,22 after=20,30
+BMP v=6 strings=0 order=after pad=0,10 bitmap=16,24 before=23,22 after=16,34
+BMP v=6 strings=0 order=after pad=0,10 bitmap=24,16 before=23,22 after=24,26
+BMP v=6 strings=0 order=after pad=0,10 bitmap=16,15 before=23,22 after=16,25
+BMP v=6 strings=0 order=after pad=10,0 bitmap=16,16 before=23,22 after=23,22
+BMP v=6 strings=0 order=after pad=10,0 bitmap=20,20 before=23,22 after=30,20
+BMP v=6 strings=0 order=after pad=10,0 bitmap=16,24 before=23,22 after=26,24
+BMP v=6 strings=0 order=after pad=10,0 bitmap=24,16 before=23,22 after=34,16
+BMP v=6 strings=0 order=after pad=10,0 bitmap=16,15 before=23,22 after=26,15
+BMP v=6 strings=1 order=before pad=default:0,0 bitmap=16,16 before=23,38 after=23,38
+BMP v=6 strings=1 order=before pad=default:0,0 bitmap=20,20 before=23,38 after=27,42
+BMP v=6 strings=1 order=before pad=default:0,0 bitmap=16,24 before=23,38 after=23,46
+BMP v=6 strings=1 order=before pad=default:0,0 bitmap=24,16 before=23,38 after=31,38
+BMP v=6 strings=1 order=before pad=default:0,0 bitmap=16,15 before=23,38 after=23,37
+BMP v=6 strings=1 order=before pad=0,0 bitmap=16,16 before=16,32 after=16,32
+BMP v=6 strings=1 order=before pad=0,0 bitmap=20,20 before=16,32 after=20,36
+BMP v=6 strings=1 order=before pad=0,0 bitmap=16,24 before=16,32 after=16,40
+BMP v=6 strings=1 order=before pad=0,0 bitmap=24,16 before=16,32 after=24,32
+BMP v=6 strings=1 order=before pad=0,0 bitmap=16,15 before=16,32 after=16,31
+BMP v=6 strings=1 order=before pad=0,10 bitmap=16,16 before=16,42 after=16,42
+BMP v=6 strings=1 order=before pad=0,10 bitmap=20,20 before=16,42 after=20,46
+BMP v=6 strings=1 order=before pad=0,10 bitmap=16,24 before=16,42 after=16,50
+BMP v=6 strings=1 order=before pad=0,10 bitmap=24,16 before=16,42 after=24,42
+BMP v=6 strings=1 order=before pad=0,10 bitmap=16,15 before=16,42 after=16,41
+BMP v=6 strings=1 order=before pad=10,0 bitmap=16,16 before=26,32 after=26,32
+BMP v=6 strings=1 order=before pad=10,0 bitmap=20,20 before=26,32 after=30,36
+BMP v=6 strings=1 order=before pad=10,0 bitmap=16,24 before=26,32 after=26,40
+BMP v=6 strings=1 order=before pad=10,0 bitmap=24,16 before=26,32 after=34,32
+BMP v=6 strings=1 order=before pad=10,0 bitmap=16,15 before=26,32 after=26,31
+BMP v=6 strings=1 order=after pad=default:0,0 bitmap=16,16 before=23,38 after=23,38
+BMP v=6 strings=1 order=after pad=default:0,0 bitmap=20,20 before=23,38 after=27,42
+BMP v=6 strings=1 order=after pad=default:0,0 bitmap=16,24 before=23,38 after=23,46
+BMP v=6 strings=1 order=after pad=default:0,0 bitmap=24,16 before=23,38 after=31,38
+BMP v=6 strings=1 order=after pad=default:0,0 bitmap=16,15 before=23,38 after=23,37
+BMP v=6 strings=1 order=after pad=0,0 bitmap=16,16 before=23,38 after=23,38
+BMP v=6 strings=1 order=after pad=0,0 bitmap=20,20 before=23,38 after=23,36
+BMP v=6 strings=1 order=after pad=0,0 bitmap=16,24 before=23,38 after=23,40
+BMP v=6 strings=1 order=after pad=0,0 bitmap=24,16 before=23,38 after=24,32
+BMP v=6 strings=1 order=after pad=0,0 bitmap=16,15 before=23,38 after=23,31
+BMP v=6 strings=1 order=after pad=0,10 bitmap=16,16 before=23,38 after=23,38
+BMP v=6 strings=1 order=after pad=0,10 bitmap=20,20 before=23,38 after=23,46
+BMP v=6 strings=1 order=after pad=0,10 bitmap=16,24 before=23,38 after=23,50
+BMP v=6 strings=1 order=after pad=0,10 bitmap=24,16 before=23,38 after=24,42
+BMP v=6 strings=1 order=after pad=0,10 bitmap=16,15 before=23,38 after=23,41
+BMP v=6 strings=1 order=after pad=10,0 bitmap=16,16 before=23,38 after=23,38
+BMP v=6 strings=1 order=after pad=10,0 bitmap=20,20 before=23,38 after=30,36
+BMP v=6 strings=1 order=after pad=10,0 bitmap=16,24 before=23,38 after=26,40
+BMP v=6 strings=1 order=after pad=10,0 bitmap=24,16 before=23,38 after=34,32
+BMP v=6 strings=1 order=after pad=10,0 bitmap=16,15 before=23,38 after=26,31
+SUMMARY topic=comctl32-toolbar-padding-followup api_errors=0 complete=1 expectations=none
