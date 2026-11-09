@@ -1,5 +1,9 @@
 # riched20-textfont-applytmp v3: temporary formatting only in msftedit's class
 
+**Superseded by `../riched20-textfont-applytmp-v4/` (2026-11-09)** after
+cross review (P1: dependency on the uninitialised flag; P2: the test used
+RichEdit20A). Kept as the record.
+
 Candidate only: `patches/series`, the production patch and its page marker
 are unchanged. Substitute `riched20-textfont-applytmp.patch` from this
 folder for the production file at its place in the series (entry 24).

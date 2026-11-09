@@ -63,7 +63,8 @@ tests, 0 failures.
   editor (`grep -E "SetPadding|SetButtonSize|SetBitmapSize|cx %ld"`) shows
   the sequence.
 - Not measured, measured by the follow-up program
-  `measure-followup.c` (in `docs/wine-repro/batch1-measure/followup.list`):
+  `docs/wine-repro/comctl32-toolbar-padding-height/measure-followup.c` (in
+  `docs/wine-repro/batch1-measure/followup2.list`):
   -1 x -1 after another padding and -1 in one direction, and
   `TB_SETBITMAPSIZE` with a different size, with and without strings.
 - `TBSTYLE_LIST` padding height (above).
@@ -77,3 +78,14 @@ tests, 0 failures.
 - Local run (2026-11-09): toolbar, header, button units pass, 0 failures.
 - L1 of the revised test, L2 (`test-run/batch1-3`), L4 (Inventor palette),
   cross review (Codex): pending.
+
+## Cross review of v3 (2026-11-09)
+
+`docs/wine-repro/cross-review-2026-11-09-comctl32-toolbar-padding-height-v3.md`:
+the v2 findings are resolved; promotion is conditional on the sentinel
+follow-up (P2: `-1 x -1` after a non-default padding has no Windows
+result yet - `TOOLBAR_SetPadding`'s reset branch is not established for
+that state until `measure-followup.c` returns), exact-body L1, paired L2
+and the Inventor palette. P3 (this README named the wrong list) is
+corrected. The code is unchanged; the follow-up MEASURE is the bundle of
+run 42662108608 (`followup2.list`).

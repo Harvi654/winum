@@ -1,5 +1,8 @@
 # riched20-scf-word-insertion-point v4: msftedit's rule for RichEdit50W only
 
+**Superseded by `../riched20-scf-word-insertion-point-v5/` (2026-11-09)** after
+cross review (P1: the class flag was not initialised). Kept as the record.
+
 Candidate only: `patches/series`, the production patch and its page marker
 are unchanged. Substitute `riched20-scf-word-insertion-point.patch` from
 this folder for the production file at its place in the series (entry 23).
