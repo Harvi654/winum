@@ -120,3 +120,19 @@ This successful repeat does not establish why the earlier stdout was empty.
 These are native MEASURE results, not an assertion L1 pass. PA19 apply/decode
 coverage remains explicitly zero, and the full-patch producer/fixture gap
 above remains open. No production marker, implementation or series change.
+
+## Signature-subset assertion candidate
+
+The [v2 candidate](../../../patches/candidates/mspatcha-signature-v2/README.md)
+adds an original Wine signature.c test with all five native-derived cases.
+The production implementation diff is retained unchanged. Its entire test
+helper/function block is checked against the standalone source by
+scripts/build-l1-mspatcha-signature.sh. Expected successful native execution
+is 50 checks, zero failures and exit 0 on each architecture; that assertion
+run is still pending. The summary explicitly prints pa19_decode_covered=0.
+
+This makes the independently measured API subset reviewable without
+pretending it covers the decoder or solves the original large-reference
+fixture gap. No full-patch L1, l3-only exception or production marker upgrade
+is claimed. The native test requires only our generated buffers, not PA19
+data, Microsoft tools, vendor files or an application.

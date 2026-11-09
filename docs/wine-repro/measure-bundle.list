@@ -27,3 +27,4 @@ ndrstub-com-generated | docs/wine-repro/rpcrt4-ndrstubcall3/com-generated-contro
 ndrstub-com-control | docs/wine-repro/rpcrt4-ndrstubcall3/com-control.c | -Wextra -lrpcrt4 -lole32 -luuid -static
 ndrstub-com-call3 | docs/wine-repro/rpcrt4-ndrstubcall3/com-measure.c | -Wextra -lrpcrt4 -lole32 -luuid -static
 msi-null-stream-l1 | docs/wine-repro/msi-transform-null-stream/l1.c | -Wextra -lmsi -lole32 -static
+mspatcha-signature-l1 | docs/wine-repro/mspatcha-pa19/l1.c | -Wextra -static

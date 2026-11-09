@@ -126,3 +126,11 @@ dialogs. Both processes exit 1 with two automation errors; the unchanged
 properties are not a selection oracle. Stop that fixture after its third
 native iteration, retain the evidence and hypothesis in the topic README,
 and continue other batch entries. No fourth rerun or L1 upgrade is requested.
+
+The next independently measurable candidate is the mspatcha signature API
+subset. Its original Wine signature.c test and exact-body standalone wrapper
+cover the five native cases, with 50 checks on complete success. Build it
+through scripts/build-l1-mspatcha-signature.sh before native assertion L1.
+Both strict standalone architectures and the full-series substituted DLL/test
+PE targets build, but runtime is pending. This does not close the original
+PA19 producer/decoder gap or grant full-patch L1; see the candidate's scope.
