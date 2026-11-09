@@ -59,7 +59,9 @@ Wine a fixed 6 with an image list), and padding set after the buttons
   substituted (62/62), also together with
   `candidates/comctl32-toolbar-setrows-v2` (2026-11-09).
 - Local run (2026-11-09): below.
-- L1 of the new test: pending (series L1 bundle of a test run).
+- L1 (2026-11-09): **passed** - `comctl32:toolbar` from the L1 bundle of `test-run/batch1-1`
+  (run 42642179431) on Windows 10, x86_64 and i386: 2655 tests, 0 failures, exit 0
+  (`docs/wine-repro/batch1-measure/l1-2026-11-09/`).
 - L2: pending (`test-run/<name>` with this candidate).
 - Cross review: pending (Codex).
 

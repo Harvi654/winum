@@ -1,5 +1,12 @@
 # riched20-scf-word-insertion-point v2: only where Wine differs from Windows
 
+**Superseded by `../riched20-scf-word-insertion-point-v3/` (2026-11-09):**
+v2 was derived from the riched20 class only; the boundary measurement
+contradicted its format-change rule there, and msftedit follows a
+different, simpler rule. Kept as the record of round 2. Its L1 run
+(`riched20:editor`, 2026-11-09) passed on Windows 10 for the measured
+riched20 values.
+
 Candidate only: `patches/series`, the production patch and its page marker
 are unchanged. Substitute `riched20-scf-word-insertion-point.patch` from
 this folder for the production file at its place in the series (entry 23).

@@ -1,0 +1,12 @@
+comctl32 toolbar x86_64=0
+comctl32 toolbar i386=0
+comctl32 header x86_64=0
+comctl32 header i386=0
+comctl32 button x86_64=0
+comctl32 button i386=0
+riched20 richole x86_64=0
+riched20 richole i386=0
+riched20 editor x86_64=2
+riched20 editor i386=0
+msftedit richole x86_64=0
+msftedit richole i386=0

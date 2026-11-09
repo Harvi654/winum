@@ -1,0 +1,141 @@
+MEASURE topic=riched20-scf-word-boundary schema=1 bits=64
+LEGEND bold: B/. per character; mark: I = the italic or red range, - none; text length counts a paragraph break as one character
+SETUP dll=riched20 case=two_paragraphs len=9 bold=......... mark=---------
+POINT dll=riched20 case=two_paragraphs point=2 ret=1 bold=..B...... mark=--------- insert_bold=1
+POINT dll=riched20 case=two_paragraphs point=3 ret=1 bold=......... mark=--------- insert_bold=1
+POINT dll=riched20 case=two_paragraphs point=4 ret=1 bold=...BB.... mark=--------- insert_bold=1
+POINT dll=riched20 case=two_paragraphs point=5 ret=1 bold=...BBB... mark=--------- insert_bold=1
+POINT dll=riched20 case=two_paragraphs point=8 ret=1 bold=........B mark=--------- insert_bold=1
+SETUP dll=riched20 case=italic_inside_word len=7 bold=....... mark=II.....
+POINT dll=riched20 case=italic_inside_word point=1 ret=1 bold=BBBB... mark=II..... insert_bold=1
+POINT dll=riched20 case=italic_inside_word point=2 ret=1 bold=BBBB... mark=II..... insert_bold=1
+POINT dll=riched20 case=italic_inside_word point=3 ret=1 bold=BBBB... mark=II..... insert_bold=1
+POINT dll=riched20 case=italic_inside_word point=4 ret=1 bold=BBBBB.. mark=II..... insert_bold=1
+SETUP dll=riched20 case=italic_word_end len=7 bold=....... mark=III....
+POINT dll=riched20 case=italic_word_end point=2 ret=1 bold=BBB.... mark=III.... insert_bold=1
+POINT dll=riched20 case=italic_word_end point=3 ret=1 bold=BBBB... mark=III.... insert_bold=1
+POINT dll=riched20 case=italic_word_end point=4 ret=1 bold=....... mark=III.... insert_bold=1
+SETUP dll=riched20 case=red_word_end len=7 bold=....... mark=III....
+POINT dll=riched20 case=red_word_end point=2 ret=1 bold=BBB.... mark=III.... insert_bold=1
+POINT dll=riched20 case=red_word_end point=3 ret=1 bold=BBBB... mark=III.... insert_bold=1
+POINT dll=riched20 case=red_word_end point=4 ret=1 bold=....... mark=III.... insert_bold=1
+SETUP dll=riched20 case=italic_space_and_word len=7 bold=....... mark=...IIII
+POINT dll=riched20 case=italic_space_and_word point=3 ret=1 bold=BBBB... mark=...IIII insert_bold=1
+POINT dll=riched20 case=italic_space_and_word point=4 ret=1 bold=....... mark=...IIII insert_bold=1
+POINT dll=riched20 case=italic_space_and_word point=5 ret=1 bold=....BBB mark=...IIII insert_bold=1
+SETUP dll=riched20 case=italic_before_dot len=7 bold=....... mark=III....
+POINT dll=riched20 case=italic_before_dot point=2 ret=1 bold=BBB.... mark=III.... insert_bold=1
+POINT dll=riched20 case=italic_before_dot point=3 ret=1 bold=....... mark=III.... insert_bold=1
+POINT dll=riched20 case=italic_before_dot point=4 ret=1 bold=....... mark=III.... insert_bold=1
+SETUP dll=riched20 case=red_before_dot len=7 bold=....... mark=III....
+POINT dll=riched20 case=red_before_dot point=3 ret=1 bold=....... mark=III.... insert_bold=1
+SETUP dll=riched20 case=start_accent len=6 bold=...... mark=------
+POINT dll=riched20 case=start_accent point=2 ret=1 bold=BBBB.. mark=------ insert_bold=1
+POINT dll=riched20 case=start_accent point=3 ret=1 bold=BBBB.. mark=------ insert_bold=1
+SETUP dll=riched20 case=start_accent_ascii_after len=6 bold=...... mark=------
+POINT dll=riched20 case=start_accent_ascii_after point=2 ret=1 bold=...... mark=------ insert_bold=1
+POINT dll=riched20 case=start_accent_ascii_after point=3 ret=1 bold=..BB.. mark=------ insert_bold=1
+SETUP dll=riched20 case=start_digit len=6 bold=...... mark=------
+POINT dll=riched20 case=start_digit point=2 ret=1 bold=...... mark=------ insert_bold=1
+POINT dll=riched20 case=start_digit point=3 ret=1 bold=..BB.. mark=------ insert_bold=1
+SETUP dll=riched20 case=start_dot len=6 bold=...... mark=------
+POINT dll=riched20 case=start_dot point=2 ret=1 bold=...... mark=------ insert_bold=1
+POINT dll=riched20 case=start_dot point=3 ret=1 bold=...... mark=------ insert_bold=1
+SETUP dll=riched20 case=start_underscore len=6 bold=...... mark=------
+POINT dll=riched20 case=start_underscore point=2 ret=1 bold=...... mark=------ insert_bold=1
+POINT dll=riched20 case=start_underscore point=3 ret=1 bold=...... mark=------ insert_bold=1
+SETUP dll=riched20 case=two_spaces len=7 bold=....... mark=-------
+POINT dll=riched20 case=two_spaces point=2 ret=1 bold=BBB.... mark=------- insert_bold=1
+POINT dll=riched20 case=two_spaces point=3 ret=1 bold=....... mark=------- insert_bold=1
+POINT dll=riched20 case=two_spaces point=4 ret=1 bold=...BB.. mark=------- insert_bold=1
+SETUP dll=riched20 case=tab len=6 bold=...... mark=------
+POINT dll=riched20 case=tab point=1 ret=1 bold=...... mark=------ insert_bold=1
+POINT dll=riched20 case=tab point=2 ret=1 bold=...... mark=------ insert_bold=1
+POINT dll=riched20 case=tab point=3 ret=1 bold=..BB.. mark=------ insert_bold=1
+SETUP dll=riched20 case=text_start_space len=5 bold=..... mark=-----
+POINT dll=riched20 case=text_start_space point=0 ret=1 bold=..... mark=----- insert_bold=1
+POINT dll=riched20 case=text_start_space point=1 ret=1 bold=..... mark=----- insert_bold=1
+SETUP dll=riched20 case=text_start_dot len=5 bold=..... mark=-----
+POINT dll=riched20 case=text_start_dot point=0 ret=1 bold=..... mark=----- insert_bold=1
+POINT dll=riched20 case=text_start_dot point=1 ret=1 bold=..... mark=----- insert_bold=1
+SETUP dll=riched20 case=text_start_accent len=5 bold=..... mark=-----
+POINT dll=riched20 case=text_start_accent point=0 ret=1 bold=..... mark=----- insert_bold=1
+POINT dll=riched20 case=text_start_accent point=1 ret=1 bold=BBB.. mark=----- insert_bold=1
+SETUP dll=riched20 case=text_end_space len=3 bold=... mark=---
+POINT dll=riched20 case=text_end_space point=2 ret=1 bold=BBB mark=--- insert_bold=1
+POINT dll=riched20 case=text_end_space point=3 ret=1 bold=... mark=--- insert_bold=1
+SETUP dll=riched20 case=single_letters len=5 bold=..... mark=-----
+POINT dll=riched20 case=single_letters point=1 ret=1 bold=BB... mark=----- insert_bold=1
+POINT dll=riched20 case=single_letters point=2 ret=1 bold=..... mark=----- insert_bold=1
+POINT dll=riched20 case=single_letters point=3 ret=1 bold=..BB. mark=----- insert_bold=1
+POINT dll=riched20 case=single_letters point=5 ret=1 bold=..... mark=----- insert_bold=1
+SETUP dll=msftedit case=two_paragraphs len=9 bold=......... mark=---------
+POINT dll=msftedit case=two_paragraphs point=2 ret=1 bold=..B...... mark=--------- insert_bold=1
+POINT dll=msftedit case=two_paragraphs point=3 ret=1 bold=......... mark=--------- insert_bold=1
+POINT dll=msftedit case=two_paragraphs point=4 ret=1 bold=...BB.... mark=--------- insert_bold=1
+POINT dll=msftedit case=two_paragraphs point=5 ret=1 bold=......... mark=--------- insert_bold=1
+POINT dll=msftedit case=two_paragraphs point=8 ret=1 bold=........B mark=--------- insert_bold=1
+SETUP dll=msftedit case=italic_inside_word len=7 bold=....... mark=II.....
+POINT dll=msftedit case=italic_inside_word point=1 ret=1 bold=BBBB... mark=II..... insert_bold=1
+POINT dll=msftedit case=italic_inside_word point=2 ret=1 bold=BBBB... mark=II..... insert_bold=1
+POINT dll=msftedit case=italic_inside_word point=3 ret=1 bold=BBBB... mark=II..... insert_bold=1
+POINT dll=msftedit case=italic_inside_word point=4 ret=1 bold=....... mark=II..... insert_bold=1
+SETUP dll=msftedit case=italic_word_end len=7 bold=....... mark=III....
+POINT dll=msftedit case=italic_word_end point=2 ret=1 bold=BBB.... mark=III.... insert_bold=1
+POINT dll=msftedit case=italic_word_end point=3 ret=1 bold=....... mark=III.... insert_bold=1
+POINT dll=msftedit case=italic_word_end point=4 ret=1 bold=....... mark=III.... insert_bold=1
+SETUP dll=msftedit case=red_word_end len=7 bold=....... mark=III....
+POINT dll=msftedit case=red_word_end point=2 ret=1 bold=BBB.... mark=III.... insert_bold=1
+POINT dll=msftedit case=red_word_end point=3 ret=1 bold=....... mark=III.... insert_bold=1
+POINT dll=msftedit case=red_word_end point=4 ret=1 bold=....... mark=III.... insert_bold=1
+SETUP dll=msftedit case=italic_space_and_word len=7 bold=....... mark=...IIII
+POINT dll=msftedit case=italic_space_and_word point=3 ret=1 bold=....... mark=...IIII insert_bold=1
+POINT dll=msftedit case=italic_space_and_word point=4 ret=1 bold=....... mark=...IIII insert_bold=1
+POINT dll=msftedit case=italic_space_and_word point=5 ret=1 bold=....BBB mark=...IIII insert_bold=1
+SETUP dll=msftedit case=italic_before_dot len=7 bold=....... mark=III....
+POINT dll=msftedit case=italic_before_dot point=2 ret=1 bold=BBB.... mark=III.... insert_bold=1
+POINT dll=msftedit case=italic_before_dot point=3 ret=1 bold=....... mark=III.... insert_bold=1
+POINT dll=msftedit case=italic_before_dot point=4 ret=1 bold=....... mark=III.... insert_bold=1
+SETUP dll=msftedit case=red_before_dot len=7 bold=....... mark=III....
+POINT dll=msftedit case=red_before_dot point=3 ret=1 bold=....... mark=III.... insert_bold=1
+SETUP dll=msftedit case=start_accent len=6 bold=...... mark=------
+POINT dll=msftedit case=start_accent point=2 ret=1 bold=...... mark=------ insert_bold=1
+POINT dll=msftedit case=start_accent point=3 ret=1 bold=..BB.. mark=------ insert_bold=1
+SETUP dll=msftedit case=start_accent_ascii_after len=6 bold=...... mark=------
+POINT dll=msftedit case=start_accent_ascii_after point=2 ret=1 bold=...... mark=------ insert_bold=1
+POINT dll=msftedit case=start_accent_ascii_after point=3 ret=1 bold=..BB.. mark=------ insert_bold=1
+SETUP dll=msftedit case=start_digit len=6 bold=...... mark=------
+POINT dll=msftedit case=start_digit point=2 ret=1 bold=...... mark=------ insert_bold=1
+POINT dll=msftedit case=start_digit point=3 ret=1 bold=..BB.. mark=------ insert_bold=1
+SETUP dll=msftedit case=start_dot len=6 bold=...... mark=------
+POINT dll=msftedit case=start_dot point=2 ret=1 bold=...... mark=------ insert_bold=1
+POINT dll=msftedit case=start_dot point=3 ret=1 bold=...... mark=------ insert_bold=1
+SETUP dll=msftedit case=start_underscore len=6 bold=...... mark=------
+POINT dll=msftedit case=start_underscore point=2 ret=1 bold=...... mark=------ insert_bold=1
+POINT dll=msftedit case=start_underscore point=3 ret=1 bold=...... mark=------ insert_bold=1
+SETUP dll=msftedit case=two_spaces len=7 bold=....... mark=-------
+POINT dll=msftedit case=two_spaces point=2 ret=1 bold=BBB.... mark=------- insert_bold=1
+POINT dll=msftedit case=two_spaces point=3 ret=1 bold=....... mark=------- insert_bold=1
+POINT dll=msftedit case=two_spaces point=4 ret=1 bold=...BB.. mark=------- insert_bold=1
+SETUP dll=msftedit case=tab len=6 bold=...... mark=------
+POINT dll=msftedit case=tab point=1 ret=1 bold=...... mark=------ insert_bold=1
+POINT dll=msftedit case=tab point=2 ret=1 bold=...... mark=------ insert_bold=1
+POINT dll=msftedit case=tab point=3 ret=1 bold=..BB.. mark=------ insert_bold=1
+SETUP dll=msftedit case=text_start_space len=5 bold=..... mark=-----
+POINT dll=msftedit case=text_start_space point=0 ret=1 bold=..... mark=----- insert_bold=1
+POINT dll=msftedit case=text_start_space point=1 ret=1 bold=..... mark=----- insert_bold=1
+SETUP dll=msftedit case=text_start_dot len=5 bold=..... mark=-----
+POINT dll=msftedit case=text_start_dot point=0 ret=1 bold=..... mark=----- insert_bold=1
+POINT dll=msftedit case=text_start_dot point=1 ret=1 bold=..... mark=----- insert_bold=1
+SETUP dll=msftedit case=text_start_accent len=5 bold=..... mark=-----
+POINT dll=msftedit case=text_start_accent point=0 ret=1 bold=..... mark=----- insert_bold=1
+POINT dll=msftedit case=text_start_accent point=1 ret=1 bold=BBB.. mark=----- insert_bold=1
+SETUP dll=msftedit case=text_end_space len=3 bold=... mark=---
+POINT dll=msftedit case=text_end_space point=2 ret=1 bold=... mark=--- insert_bold=1
+POINT dll=msftedit case=text_end_space point=3 ret=1 bold=... mark=--- insert_bold=1
+SETUP dll=msftedit case=single_letters len=5 bold=..... mark=-----
+POINT dll=msftedit case=single_letters point=1 ret=1 bold=..... mark=----- insert_bold=1
+POINT dll=msftedit case=single_letters point=2 ret=1 bold=..... mark=----- insert_bold=1
+POINT dll=msftedit case=single_letters point=3 ret=1 bold=..... mark=----- insert_bold=1
+POINT dll=msftedit case=single_letters point=5 ret=1 bold=..... mark=----- insert_bold=1
+SUMMARY topic=riched20-scf-word-boundary api_errors=0 complete=1 expectations=none

@@ -62,8 +62,11 @@ be made the foreground window.
 - L0: the full series applies at `--fuzz=0` on Wine 11.20 with this file
   substituted (with the toolbar and header v2 candidates), 62/62
   (2026-11-09); the later themed-checkbox patch still applies.
-- L1 of the new test, L2, L4 (SOLIDWORKS, Inventor), cross review (Codex):
-  pending.
+- L1 (2026-11-09): **passed** - `comctl32:button` from the L1 bundle of `test-run/batch1-1`
+  (run 42642179431) on Windows 10, x86_64 and i386: 14224 tests, 0 failures, exit 0
+  (`docs/wine-repro/batch1-measure/l1-2026-11-09/`).
+- L2, cross review (Codex): pending. L4: SOLIDWORKS deferred (AGENTS.md);
+  Inventor's smoke test covers owner-drawn buttons there.
 
 ## Local run (2026-11-09)
 

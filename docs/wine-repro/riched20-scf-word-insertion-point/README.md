@@ -94,3 +94,25 @@ per character, the marked range, the insertion point's bold state.
 riched20 and msftedit. In `docs/wine-repro/batch1-measure/followup.list`
 and the main list. Built with `-Wall -Wextra -Werror` for both
 architectures; runs to completion under a local Wine 11.20 build.
+
+### Windows observations of the follow-up (2026-11-09)
+
+`windows-2026-11-09-boundary/`, both architectures identical, exit 0,
+`api_errors=0`. The classes differ (they also did in the first run, at
+`ab|␣`, `cd|␣␣`, `f1|␣`, `x|␣`, `i'|j` and more - the earlier summary
+"riched20 and msftedit agree" was wrong):
+
+- msftedit: nothing at word starts and ends, also across a format change
+  inside a word (`ab|cd` with `ab` italic formats `abcd`) and at a word end
+  where the format changes (`abc|␣`, italic or red: nothing); a digit
+  joins a word (`9|z` gives `9z`), `.` and `_` do not; between two spaces
+  the word before and the spaces; a point right before a paragraph mark
+  makes the mark bold, also at the end of the text.
+- riched20: at word ends before a space the word and the space
+  (`abc|␣` gives `abc␣`, with or without a format change), `a|␣b` gives
+  `a␣`, and after a space before an accented letter the word before, the
+  space and the next word (`a␣|éz` gives `a␣éz`); otherwise as msftedit in
+  these cases.
+
+The msftedit rule is written out in
+`patches/candidates/riched20-scf-word-insertion-point-v3/README.md`.

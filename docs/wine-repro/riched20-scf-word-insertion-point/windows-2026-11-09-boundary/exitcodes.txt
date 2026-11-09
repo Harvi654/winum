@@ -1,0 +1,2 @@
+scf-word-boundary x86_64=0
+scf-word-boundary i686=0

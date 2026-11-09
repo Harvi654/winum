@@ -46,7 +46,10 @@ E_NOTIMPL (Windows S_OK).
 
 - L0: the full series applies at `--fuzz=0` on Wine 11.20 with this file
   (and the caret-rewrap v2 candidate) substituted, 62/62 (2026-11-09).
-- L1 of the new test, L2, L4 (Inventor: inserting a symbol, text colours,
+- L1 (2026-11-09): **passed** - `msftedit:richole` from the L1 bundle of `test-run/batch1-1`
+  (run 42642179431) on Windows 10, x86_64 and i386: 121 tests, 0 failures, exit 0
+  (`docs/wine-repro/batch1-measure/l1-2026-11-09/`).
+- L2, L4 (Inventor: inserting a symbol, text colours,
   spell check), cross review (Codex): pending.
 
 ## Local run (2026-11-09)

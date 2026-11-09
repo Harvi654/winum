@@ -1,0 +1,25 @@
+editor.c:565: Tests skipped: Skip multibyte character tests on non-Japanese platform
+editor.c:1897: Tests skipped: Skip multibyte character tests on non-Japanese platform
+editor.c:1957: Tests skipped: Skip multibyte character tests on non-Japanese platform
+editor.c:4386: EM_STREAMOUT produced:
+{\rtf1\ansi\ansicpg1252\deff0\deflang1033{\fonttbl{\f0\fswiss\fprq2\fcharset0 System;}}
+\viewkind4\uc1\pard\b\f0\fs20 TestSomeText\par
+}
+
+editor.c:4428: EM_STREAMOUT produced:
+{\rtf1\ansi\ansicpg1252\deff0\deflang1033{\fonttbl{\f0\fswiss\fprq2\fcharset0 System;}}
+\viewkind4\uc1\pard\b\f0\fs20 TestSomeText\par
+}
+
+editor.c:4519: Tests skipped: Skip multibyte character tests on non-Japanese platform
+editor.c:5201: Tests skipped: Skip multibyte character tests on non-Japanese platform
+editor.c:5124: Tests skipped: Skip multibyte character tests on non-Japanese platform
+editor.c:6402: EM_SETTEXTEX is supported on this platform
+editor.c:8892: Tests skipped: Skip multibyte character tests on non-Japanese platform
+editor.c:5251: Testing EM_REPLACESEL behavior with redraw=1
+editor.c:5507: Tests skipped: Skip multibyte character tests on non-Japanese platform
+editor.c:5251: Testing EM_REPLACESEL behavior with redraw=0
+editor.c:5507: Tests skipped: Skip multibyte character tests on non-Japanese platform
+editor.c:7518: testing with WM_SETREDRAW=0
+editor.c:7518: testing with WM_SETREDRAW=1
+2f78:editor: 10847 tests executed (0 marked as todo, 0 as flaky, 0 failures), 9 skipped.

@@ -36,7 +36,10 @@ dependent: 20 in v5, 24 in v6 here) nor the `WINDOWPOS` flags (Windows
 
 - L0: the full series applies at `--fuzz=0` on Wine 11.20 with this file
   (and the toolbar-padding v2 candidate) substituted, 62/62 (2026-11-09).
-- L1 of the new test, L2, cross review (Codex): pending.
+- L1 (2026-11-09): **passed** - `comctl32:header` from the L1 bundle of `test-run/batch1-1`
+  (run 42642179431) on Windows 10, x86_64 and i386: 1208 tests, 0 failures, exit 0
+  (`docs/wine-repro/batch1-measure/l1-2026-11-09/`).
+- L2, cross review (Codex): pending.
 
 ## Local run (2026-11-09)
 
