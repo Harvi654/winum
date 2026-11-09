@@ -76,3 +76,26 @@ data. Revise the class alignment and state coverage before calling the new
 test fully derived from that matrix. Native L1, paired msxml3 L2 and the
 consumer's L4 remain prerequisites for promotion. Keep the candidate outside
 production during that validation.
+
+## Revision check: 54894ed (2026-11-09)
+
+Read the complete revision diff and applied the revised candidate to clean
+Wine 11.20 parseerror.c/domdoc.c with `--fuzz=0`. The measured 30/60 classes,
+fresh document per load, five states, per-state NULL checks and getter wording
+address the original class/matrix points. The implementation is unchanged.
+However, two new **P1 test blockers** prevent approval:
+
+- The calls were inserted into test_put_dataType, around line 6656, but
+  test_parseerror_filepos is first declared/defined around line 12966. There
+  is no forward declaration: the implicit external declaration conflicts
+  with the later static definition. Move the calls into test_parseerror
+  after the helper definition (or provide a proper declaration).
+- Three unrelated `<a/>` inputs changed in test_save, test_get_xml and
+  test_prohibitdtd. In test_get_xml the existing assertions still require
+  `<a/>`, so its newly loaded `<a><b/></a>` necessarily contradicts them.
+  Restore those unrelated inputs; keep the new XML in the new case table.
+
+The explicit successful-load case now matches the supplied fresh-document
+measurement. Same-object error-to-success reset coverage is still separate.
+No build/runtime pass is claimed. Verdict: original points addressed in
+intent, but the revised test needs the two corrections above before L1/L2.
