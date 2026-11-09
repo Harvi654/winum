@@ -1,15 +1,38 @@
-diff --git a/server/queue.c b/server/queue.c
-index 2449f0c8..7c44b93b 100644
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] server: Send a mouse move to the window under the cursor after show/hide.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 (x86_64 and i686, measured with
+docs/wine-repro/server-mousemove-show-hide/measure.c, 2026-11-08): after a
+window is shown, hidden, created, destroyed or moved, the window under the
+cursor receives one WM_MOUSEMOVE, a burst of changes giving one, within
+15-32 ms; a repaint alone gives none.
+
+Wine sent none after show/hide, so Inventor's sketch showed an edited
+dimension only after the mouse moved. Wine already sends one when a visible
+window moves; this adds the show/hide case, delayed and coalesced.
+
+The change is limited to visibility changes (moves are handled by Wine
+already). WINE_SHOWHIDE_MOUSEMOVE_MS overrides the delay (0 disables it).
+
+v2 (2026-11-08): the delay is 16 ms instead of 100 ms. With 100 ms the
+move landed inside the next message sequence of Wine's own tests, which
+pass on Windows (comctl32 button "expected WM_PAINT, got WM_MOUSEMOVE",
+user32 test_mouse_input), in about half of the L2 runs.
+
 --- a/server/queue.c
 +++ b/server/queue.c
-@@ -589,6 +589,50 @@ void update_cursor_pos( struct desktop *desktop )
+@@ -589,6 +589,51 @@
      set_cursor_pos( desktop, desktop_shm->cursor.x, desktop_shm->cursor.y );
  }
  
-+/* Windows sends the window under the cursor a mouse move when a window is
-+ * shown or hidden; it arrives after the messages the change itself causes
-+ * (Inventor redraws its view after a sketch dimension edit only then).
-+ * Delay ours a little and send one for a burst of changes. */
++/* Windows sends the window under the cursor one mouse move after a window
++ * is shown or hidden, a burst of changes giving one move, within one or two
++ * timer ticks (15-32 ms measured); it arrives after the messages the change
++ * itself causes (Inventor redraws its view after a sketch dimension edit
++ * only then). */
 +static struct timeout_user *cursor_pos_timeout;
 +static struct desktop *cursor_pos_desktop;
 +
@@ -38,7 +61,7 @@ index 2449f0c8..7c44b93b 100644
 +    if (delay_ms < 0)
 +    {
 +        const char *env = getenv( "WINE_SHOWHIDE_MOUSEMOVE_MS" );
-+        delay_ms = env ? atoi( env ) : 100;
++        delay_ms = env ? atoi( env ) : 16;
 +    }
 +    if (!delay_ms) return;
 +    if (cursor_pos_timeout)
@@ -53,11 +76,9 @@ index 2449f0c8..7c44b93b 100644
  /* retrieve default position and time for synthesized messages */
  static void get_message_defaults( struct msg_queue *queue, int *x, int *y, unsigned int *time )
  {
-diff --git a/server/user.h b/server/user.h
-index f1a1f07d..5f043be7 100644
 --- a/server/user.h
 +++ b/server/user.h
-@@ -124,6 +124,7 @@ extern void detach_thread_input( struct msg_queue *queue_from, struct msg_queue
+@@ -124,6 +124,7 @@
  extern void set_clip_rectangle( struct desktop *desktop, const struct rectangle *rect,
                                  unsigned int flags, int reset );
  extern void update_cursor_pos( struct desktop *desktop );
@@ -65,11 +86,9 @@ index f1a1f07d..5f043be7 100644
  extern void post_message( user_handle_t win, unsigned int message,
                            lparam_t wparam, lparam_t lparam );
  extern void send_notify_message( user_handle_t win, unsigned int message,
-diff --git a/server/window.c b/server/window.c
-index 3cd82b0c..76bcf667 100644
 --- a/server/window.c
 +++ b/server/window.c
-@@ -2770,6 +2770,8 @@ DECL_HANDLER(set_window_pos)
+@@ -2770,6 +2770,8 @@
      if ((win->style & old_style & WS_VISIBLE) && (memcmp( &old_client, &win->client_rect, sizeof(old_client) )
          || memcmp( &old_window, &win->window_rect, sizeof(old_window) )))
          update_cursor_pos( win->desktop );
