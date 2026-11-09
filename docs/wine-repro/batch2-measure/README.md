@@ -180,3 +180,16 @@ The successful mshtml assertion result should be 34 checks, zero failures,
 exit 0. The RPC entries remain diagnostic observations: a zero exit without
 server dispatch is not functional coverage. If the generated control faults
 too, do not infer native dispatch behavior from either wrapper result.
+
+
+## Follow-up bundle returned (2026-11-09)
+
+Both architectures passed the mshtml assertion L1 (34 checks, zero failures,
+exit 0), also confirmed by the separately returned dedicated L1 outputs.
+That entry does not need another native run. The unchanged generated NDR
+control faulted on both architectures just like the dispatch-wrapper
+controls; the x64 NdrStubCall3 probe also faulted. i686 NdrStubCall3 was absent.
+The minimal-channel fixture has no working native control and is blocked.
+Do not repeat followup.list unchanged or derive a conformance oracle from
+those faults. The next RPC fixture must use a real COM marshaling path;
+these completed mshtml results remain valid independently of the RPC failures.

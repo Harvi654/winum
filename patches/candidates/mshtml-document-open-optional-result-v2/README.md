@@ -91,3 +91,17 @@ The build used --enable-archs=x86_64,i386 --without-x --without-wayland
 Wine build, native assertion L1 or runtime execution. The standalone L1
 builder's function-parity check and both -Wextra -Werror builds also passed;
 all bundle hashes verified. Implementation hunks match production exactly.
+
+
+## Windows assertion L1 passed (2026-11-09)
+
+The maintainer returned the combined follow-up bundle results and a separate
+dedicated L1 result set. Both sets are identical: x86_64 and i686 each report
+`SUMMARY checks=34 failures=0`, no FAIL lines, exit 0. These are executions
+of the candidate's exact named function under CoInitialize, including both
+the supplied-output control and NULL-output case on loaded documents.
+Native assertion L1 is complete, not inferred from the earlier MEASURE.
+Formal cross review, Gecko-enabled paired Wine runtime validation and
+consumer gates remain open. Production patches and series are unchanged;
+the production marker remains missing until a reviewed candidate is promoted.
+Raw logs are summarized rather than committed.
