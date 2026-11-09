@@ -1,0 +1,342 @@
+MEASURE topic=comctl32-ownerdraw-existing-capture schema=1 bits=64
+COMCTL32 requested=5 dll=5.82
+PLAIN first prev=none capture=other
+MSG stage=plain to=other msg=WM_CAPTURECHANGED new=other
+PLAIN repeat prev=other capture=other
+MSG stage=plain to=other msg=WM_CAPTURECHANGED new=parent
+PLAIN switch prev=other capture=parent
+MSG stage=plain to=parent msg=WM_CAPTURECHANGED new=none
+PLAIN released capture=none
+MSG stage=plain to=parent msg=WM_DRAWITEM action=0001 selected=0
+CASE v=5 type=ownerdraw pre=none foreground=1
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=none
+MSG stage=down to=parent msg=WM_DRAWITEM action=0004 selected=0
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+MSG stage=down to=parent msg=WM_DRAWITEM action=0002 selected=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=5 type=ownerdraw pre=none capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=parent msg=WM_DRAWITEM action=0002 selected=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=5 type=ownerdraw pre=none capture=none state=0008 clicked=1 drawitems=3
+MSG stage=cleanup to=parent msg=WM_DRAWITEM action=0001 selected=0
+CASE v=5 type=ownerdraw pre=self_down foreground=1
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=none
+SUBCLASS_SETCAPTURE prev=none capture=button
+MSG stage=down to=button msg=WM_CAPTURECHANGED new=button capture=button
+MSG stage=down to=parent msg=WM_DRAWITEM action=0004 selected=0
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+MSG stage=down to=parent msg=WM_DRAWITEM action=0002 selected=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=5 type=ownerdraw pre=self_down capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=parent msg=WM_DRAWITEM action=0002 selected=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=5 type=ownerdraw pre=self_down capture=none state=0008 clicked=1 drawitems=3
+MSG stage=cleanup to=parent msg=WM_DRAWITEM action=0001 selected=0
+CASE v=5 type=ownerdraw pre=self_before foreground=1
+PRE_SETCAPTURE target=button prev=none capture=button
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=button
+MSG stage=down to=button msg=WM_CAPTURECHANGED new=button capture=button
+MSG stage=down to=parent msg=WM_DRAWITEM action=0004 selected=0
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+MSG stage=down to=parent msg=WM_DRAWITEM action=0002 selected=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=5 type=ownerdraw pre=self_before capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=parent msg=WM_DRAWITEM action=0002 selected=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=5 type=ownerdraw pre=self_before capture=none state=0008 clicked=1 drawitems=3
+MSG stage=cleanup to=parent msg=WM_DRAWITEM action=0001 selected=0
+CASE v=5 type=ownerdraw pre=other foreground=1
+PRE_SETCAPTURE target=other prev=none capture=other
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=other
+MSG stage=down to=other msg=WM_CAPTURECHANGED new=button
+MSG stage=down to=parent msg=WM_DRAWITEM action=0004 selected=0
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+MSG stage=down to=parent msg=WM_DRAWITEM action=0002 selected=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=5 type=ownerdraw pre=other capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=parent msg=WM_DRAWITEM action=0002 selected=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=5 type=ownerdraw pre=other capture=none state=0008 clicked=1 drawitems=3
+CASE v=5 type=pushbutton pre=none foreground=1
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=none
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=5 type=pushbutton pre=none capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=5 type=pushbutton pre=none capture=none state=0008 clicked=1 drawitems=0
+CASE v=5 type=pushbutton pre=self_down foreground=1
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=none
+SUBCLASS_SETCAPTURE prev=none capture=button
+MSG stage=down to=button msg=WM_CAPTURECHANGED new=button capture=button
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=5 type=pushbutton pre=self_down capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=5 type=pushbutton pre=self_down capture=none state=0008 clicked=1 drawitems=0
+CASE v=5 type=pushbutton pre=self_before foreground=1
+PRE_SETCAPTURE target=button prev=none capture=button
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=button
+MSG stage=down to=button msg=WM_CAPTURECHANGED new=button capture=button
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=5 type=pushbutton pre=self_before capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=5 type=pushbutton pre=self_before capture=none state=0008 clicked=1 drawitems=0
+CASE v=5 type=pushbutton pre=other foreground=1
+PRE_SETCAPTURE target=other prev=none capture=other
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=other
+MSG stage=down to=other msg=WM_CAPTURECHANGED new=button
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=5 type=pushbutton pre=other capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=5 type=pushbutton pre=other capture=none state=0008 clicked=1 drawitems=0
+CASE v=5 type=autocheckbox pre=none foreground=1
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=none
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=5 type=autocheckbox pre=none capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0009
+AFTER_UP v=5 type=autocheckbox pre=none capture=none state=0009 clicked=1 drawitems=0
+CASE v=5 type=autocheckbox pre=self_down foreground=1
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=none
+SUBCLASS_SETCAPTURE prev=none capture=button
+MSG stage=down to=button msg=WM_CAPTURECHANGED new=button capture=button
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=5 type=autocheckbox pre=self_down capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0009
+AFTER_UP v=5 type=autocheckbox pre=self_down capture=none state=0009 clicked=1 drawitems=0
+CASE v=5 type=autocheckbox pre=self_before foreground=1
+PRE_SETCAPTURE target=button prev=none capture=button
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=button
+MSG stage=down to=button msg=WM_CAPTURECHANGED new=button capture=button
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=5 type=autocheckbox pre=self_before capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0009
+AFTER_UP v=5 type=autocheckbox pre=self_before capture=none state=0009 clicked=1 drawitems=0
+CASE v=5 type=autocheckbox pre=other foreground=1
+PRE_SETCAPTURE target=other prev=none capture=other
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=other
+MSG stage=down to=other msg=WM_CAPTURECHANGED new=button
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=5 type=autocheckbox pre=other capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0009
+AFTER_UP v=5 type=autocheckbox pre=other capture=none state=0009 clicked=1 drawitems=0
+COMCTL32 requested=6 dll=6.16
+PLAIN first prev=none capture=other
+MSG stage=plain to=other msg=WM_CAPTURECHANGED new=other
+PLAIN repeat prev=other capture=other
+MSG stage=plain to=other msg=WM_CAPTURECHANGED new=parent
+PLAIN switch prev=other capture=parent
+MSG stage=plain to=parent msg=WM_CAPTURECHANGED new=none
+PLAIN released capture=none
+MSG stage=plain to=parent msg=WM_DRAWITEM action=0001 selected=0
+CASE v=6 type=ownerdraw pre=none foreground=1
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=none
+MSG stage=down to=parent msg=WM_DRAWITEM action=0004 selected=0
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=6 type=ownerdraw pre=none capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=6 type=ownerdraw pre=none capture=none state=0008 clicked=1 drawitems=1
+MSG stage=cleanup to=parent msg=WM_DRAWITEM action=0001 selected=0
+CASE v=6 type=ownerdraw pre=self_down foreground=1
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=none
+SUBCLASS_SETCAPTURE prev=none capture=button
+MSG stage=down to=button msg=WM_CAPTURECHANGED new=button capture=button
+MSG stage=down to=parent msg=WM_DRAWITEM action=0004 selected=0
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=6 type=ownerdraw pre=self_down capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=6 type=ownerdraw pre=self_down capture=none state=0008 clicked=1 drawitems=1
+MSG stage=cleanup to=parent msg=WM_DRAWITEM action=0001 selected=0
+CASE v=6 type=ownerdraw pre=self_before foreground=1
+PRE_SETCAPTURE target=button prev=none capture=button
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=button
+MSG stage=down to=button msg=WM_CAPTURECHANGED new=button capture=button
+MSG stage=down to=parent msg=WM_DRAWITEM action=0004 selected=0
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=6 type=ownerdraw pre=self_before capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=6 type=ownerdraw pre=self_before capture=none state=0008 clicked=1 drawitems=1
+MSG stage=cleanup to=parent msg=WM_DRAWITEM action=0001 selected=0
+CASE v=6 type=ownerdraw pre=other foreground=1
+PRE_SETCAPTURE target=other prev=none capture=other
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=other
+MSG stage=down to=other msg=WM_CAPTURECHANGED new=button
+MSG stage=down to=parent msg=WM_DRAWITEM action=0004 selected=0
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=6 type=ownerdraw pre=other capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=6 type=ownerdraw pre=other capture=none state=0008 clicked=1 drawitems=1
+CASE v=6 type=pushbutton pre=none foreground=1
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=none
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=6 type=pushbutton pre=none capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=6 type=pushbutton pre=none capture=none state=0008 clicked=1 drawitems=0
+CASE v=6 type=pushbutton pre=self_down foreground=1
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=none
+SUBCLASS_SETCAPTURE prev=none capture=button
+MSG stage=down to=button msg=WM_CAPTURECHANGED new=button capture=button
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=6 type=pushbutton pre=self_down capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=6 type=pushbutton pre=self_down capture=none state=0008 clicked=1 drawitems=0
+CASE v=6 type=pushbutton pre=self_before foreground=1
+PRE_SETCAPTURE target=button prev=none capture=button
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=button
+MSG stage=down to=button msg=WM_CAPTURECHANGED new=button capture=button
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=6 type=pushbutton pre=self_before capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=6 type=pushbutton pre=self_before capture=none state=0008 clicked=1 drawitems=0
+CASE v=6 type=pushbutton pre=other foreground=1
+PRE_SETCAPTURE target=other prev=none capture=other
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=other
+MSG stage=down to=other msg=WM_CAPTURECHANGED new=button
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=6 type=pushbutton pre=other capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0008
+AFTER_UP v=6 type=pushbutton pre=other capture=none state=0008 clicked=1 drawitems=0
+CASE v=6 type=autocheckbox pre=none foreground=1
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=none
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=6 type=autocheckbox pre=none capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0009
+AFTER_UP v=6 type=autocheckbox pre=none capture=none state=0009 clicked=1 drawitems=0
+CASE v=6 type=autocheckbox pre=self_down foreground=1
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=none
+SUBCLASS_SETCAPTURE prev=none capture=button
+MSG stage=down to=button msg=WM_CAPTURECHANGED new=button capture=button
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=6 type=autocheckbox pre=self_down capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0009
+AFTER_UP v=6 type=autocheckbox pre=self_down capture=none state=0009 clicked=1 drawitems=0
+CASE v=6 type=autocheckbox pre=self_before foreground=1
+PRE_SETCAPTURE target=button prev=none capture=button
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=button
+MSG stage=down to=button msg=WM_CAPTURECHANGED new=button capture=button
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=6 type=autocheckbox pre=self_before capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0009
+AFTER_UP v=6 type=autocheckbox pre=self_before capture=none state=0009 clicked=1 drawitems=0
+CASE v=6 type=autocheckbox pre=other foreground=1
+PRE_SETCAPTURE target=other prev=none capture=other
+MSG stage=down to=button msg=WM_LBUTTONDOWN capture=other
+MSG stage=down to=other msg=WM_CAPTURECHANGED new=button
+MSG stage=down to=button msg=BM_SETSTATE wparam=1
+RETURNED stage=down msg=WM_LBUTTONDOWN capture=button state=006c
+AFTER_DOWN v=6 type=autocheckbox pre=other capture=button state=006c
+MSG stage=up to=button msg=WM_LBUTTONUP capture=button
+MSG stage=up to=button msg=BM_SETSTATE wparam=0
+MSG stage=up to=button msg=WM_CAPTURECHANGED new=none capture=none
+MSG stage=up to=parent msg=WM_COMMAND code=0
+RETURNED stage=up msg=WM_LBUTTONUP capture=none state=0009
+AFTER_UP v=6 type=autocheckbox pre=other capture=none state=0009 clicked=1 drawitems=0
+SUMMARY topic=comctl32-ownerdraw-existing-capture api_errors=0 complete=1 expectations=none

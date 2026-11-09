@@ -1,0 +1,187 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] comctl32/button: Take the capture before the focus in WM_LBUTTONDOWN.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 (x86_64 and i686, comctl32 5.82 and 6.16; winum
+docs/wine-repro/comctl32-ownerdraw-existing-capture, windows-2026-11-09):
+on WM_LBUTTONDOWN an owner-drawn button takes the mouse capture before the
+focus. The window that held the capture gets WM_CAPTURECHANGED before the
+parent's WM_DRAWITEM for the focus, and when the button already held the
+capture (a superclass that captured the mouse in its own WM_LBUTTONDOWN),
+Windows sends the button WM_CAPTURECHANGED naming itself, also before the
+focus is drawn. user32's buttons in Wine already use that order; the v6
+button took the focus first, so the capture change came after the focus.
+
+SOLIDWORKS' PropertyManager buttons (checkmark, red X) are such
+superclasses; they did not react to clicks. v1 of this patch skipped the
+repeated SetCapture for owner-drawn buttons, so the superclass got no
+WM_CAPTURECHANGED at all - which Windows does send. v2 keeps the message
+and gives it the Windows order.
+
+The change is limited to non-split buttons; split buttons keep their
+dropdown check between focus and capture (not measured).
+
+v2 (2026-11-09): replaces v1 (skip SetCapture for BS_OWNERDRAW when the
+button already holds the capture), which the Windows measurement
+contradicts; adds the Wine test. Needs the SOLIDWORKS smoke test again.
+
+--- a/dlls/comctl32/tests/button.c
++++ b/dlls/comctl32/tests/button.c
+@@ -2562,6 +2562,113 @@
+     DestroyWindow(hwnd);
+ }
+ 
++/* Order of capture and focus in WM_LBUTTONDOWN of an owner-drawn button, as
++ * measured on Windows 10 (comctl32 5.82 and 6.16): the button takes the
++ * capture before the focus, so the previous capture window - also the
++ * button itself, when a superclass captured the mouse first - gets
++ * WM_CAPTURECHANGED before the focus is drawn. */
++static HWND capture_button, capture_other;
++static WNDPROC capture_button_proc;
++static char capture_events[16];
++static BOOL capture_in_down;
++static int capture_clicks;
++
++static void capture_event(char c)
++{
++    size_t len = strlen(capture_events);
++    if (len < sizeof(capture_events) - 1) capture_events[len] = c;
++}
++
++static LRESULT CALLBACK capture_subclass_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++    if (msg == WM_CAPTURECHANGED && (HWND)lparam == hwnd) capture_event('C');
++    if (msg == BM_SETSTATE && wparam) capture_event('S');
++    if (msg == WM_LBUTTONDOWN && capture_in_down) SetCapture(hwnd);
++    return CallWindowProcA(capture_button_proc, hwnd, msg, wparam, lparam);
++}
++
++static LRESULT CALLBACK capture_parent_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++    if (msg == WM_DRAWITEM)
++    {
++        const DRAWITEMSTRUCT *dis = (const DRAWITEMSTRUCT *)lparam;
++        if (dis->itemAction == ODA_FOCUS) capture_event('F');
++        return TRUE;
++    }
++    if (msg == WM_CAPTURECHANGED && hwnd == capture_other && (HWND)lparam == capture_button) capture_event('O');
++    if (msg == WM_COMMAND && (HWND)lparam == capture_button && HIWORD(wparam) == BN_CLICKED) capture_clicks++;
++    return DefWindowProcA(hwnd, msg, wparam, lparam);
++}
++
++static void test_ownerdraw_capture(void)
++{
++    static const struct { const char *name; const char *events; } tests[] =
++    {
++        { "no capture", "FS" },
++        { "captured in the superclass", "CFS" },
++        { "captured before", "CFS" },
++        { "another window captured", "OFS" },
++    };
++    WNDCLASSA cls = { 0 };
++    unsigned int i;
++    HWND parent;
++
++    cls.lpfnWndProc = capture_parent_proc;
++    cls.hInstance = GetModuleHandleA(NULL);
++    cls.hCursor = LoadCursorA(NULL, (LPCSTR)IDC_ARROW);
++    cls.lpszClassName = "capture_parent";
++    RegisterClassA(&cls);
++    parent = CreateWindowA("capture_parent", "parent", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
++                           50, 50, 300, 200, NULL, NULL, NULL, NULL);
++    capture_other = CreateWindowA("capture_parent", "other", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
++                                  400, 50, 200, 150, NULL, NULL, NULL, NULL);
++    ok(parent && capture_other, "failed to create windows\n");
++    SetForegroundWindow(parent);
++    flush_events();
++    if (GetForegroundWindow() != parent)
++    {
++        skip("parent is not the foreground window\n");
++        DestroyWindow(capture_other);
++        DestroyWindow(parent);
++        return;
++    }
++
++    for (i = 0; i < ARRAY_SIZE(tests); i++)
++    {
++        winetest_push_context("%s", tests[i].name);
++        capture_button = CreateWindowA(WC_BUTTONA, "Ab", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
++                                       10, 10, 60, 24, parent, (HMENU)7, NULL, NULL);
++        ok(capture_button != NULL, "failed to create button\n");
++        capture_button_proc = (WNDPROC)SetWindowLongPtrA(capture_button, GWLP_WNDPROC,
++                                                         (LONG_PTR)capture_subclass_proc);
++        SetFocus(parent);
++        ReleaseCapture();
++        flush_events();
++        memset(capture_events, 0, sizeof(capture_events));
++        capture_clicks = 0;
++        capture_in_down = (i == 1);
++        if (i == 2) SetCapture(capture_button);
++        if (i == 3) SetCapture(capture_other);
++        memset(capture_events, 0, sizeof(capture_events));
++
++        SendMessageA(capture_button, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM(5, 5));
++        ok(!strcmp(capture_events, tests[i].events), "got events \"%s\", expected \"%s\"\n",
++           capture_events, tests[i].events);
++        ok(GetCapture() == capture_button, "got capture %p\n", GetCapture());
++        ok(GetFocus() == capture_button, "got focus %p\n", GetFocus());
++
++        SendMessageA(capture_button, WM_LBUTTONUP, 0, MAKELPARAM(5, 5));
++        ok(capture_clicks == 1, "got %d BN_CLICKED\n", capture_clicks);
++        ok(!GetCapture(), "got capture %p\n", GetCapture());
++
++        DestroyWindow(capture_button);
++        winetest_pop_context();
++    }
++    DestroyWindow(capture_other);
++    DestroyWindow(parent);
++    UnregisterClassA("capture_parent", GetModuleHandleA(NULL));
++}
++
+ START_TEST(button)
+ {
+     ULONG_PTR ctx_cookie;
+@@ -2586,6 +2693,7 @@
+     test_get_set_textmargin();
+     test_state();
+     test_bcm_get_ideal_size();
++    test_ownerdraw_capture();
+     test_style();
+     test_visual();
+     test_radiobutton_focus();
+--- a/dlls/comctl32_v6/button.c
++++ b/dlls/comctl32_v6/button.c
+@@ -600,20 +600,27 @@
+         }
+         /* fall through */
+     case WM_LBUTTONDOWN:
++    {
++        BOOL split = (btn_type == BS_SPLITBUTTON || btn_type == BS_DEFSPLITBUTTON) &&
++                     !(infoPtr->split_style & BCSS_NOSPLIT);
++
+         infoPtr->state |= BUTTON_BTNPRESSED;
++        /* The capture is taken before the focus, as in user32's buttons; a
++         * window that loses the capture is told so before the button draws
++         * its focus. */
++        if (!split) SetCapture( hWnd );
+         SetFocus( hWnd );
+ 
+-        if ((btn_type == BS_SPLITBUTTON || btn_type == BS_DEFSPLITBUTTON) &&
+-            !(infoPtr->split_style & BCSS_NOSPLIT) &&
+-            notify_split_button_dropdown(infoPtr, &pt, hWnd))
++        if (split && notify_split_button_dropdown(infoPtr, &pt, hWnd))
+         {
+             infoPtr->state &= ~BUTTON_BTNPRESSED;
+             break;
+         }
+ 
+-        SetCapture( hWnd );
++        if (split) SetCapture( hWnd );
+         SendMessageW( hWnd, BM_SETSTATE, TRUE, 0 );
+         break;
++    }
+ 
+     case WM_KEYUP:
+ 	if (wParam != VK_SPACE)
