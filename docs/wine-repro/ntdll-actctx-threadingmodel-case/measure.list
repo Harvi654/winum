@@ -1,0 +1,2 @@
+# Same entry as the main bundle, for a single-topic offline VM run.
+actctx-model | docs/wine-repro/ntdll-actctx-threadingmodel-case/measure.c | -static
