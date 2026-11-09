@@ -1,0 +1,45 @@
+# Cross review: ntdll activation-context threading model v2 (2026-11-09)
+
+Reviewer: Claude; candidate author: Codex. Reviewed at winum `a952e33`.
+No vendor or Microsoft binaries were inspected.
+
+## Scope
+
+Read in full: `patches/candidates/ntdll-actctx-threadingmodel-case-v2/`
+(patch and README), the production patch, and in Wine 11.20
+`dlls/ntdll/actctx.c` the threading-model enum, `parse_com_class_threadingmodel`,
+the comClass and clrClass element parsers and where the model is written
+into the section data. Skimmed: the MEASURE README (aggregate results).
+
+## Implementation
+
+Identical to the production patch (compared hunk by hunk): the four
+comparisons become `xmlstr_cmpi`. Matches the Windows result (all
+spellings accepted, models 1/2/4/5). Approved.
+
+## Test
+
+- **P2: placement.** Wine's activation-context tests, including the
+  comClass redirection checks, live in `dlls/kernel32/tests/actctx.c`; a
+  new ntdll test file with its own Makefile entry is not where Wine
+  would look. Move the cases there, next to `test_find_com_redirection`.
+- **P2: reading the record.** `ReadProcessMemory` on the own process is
+  not needed and not Wine style; the kernel32 test reads the returned
+  `struct comclassredirect_data` directly (size, flags, model). Use the
+  same structure, which also documents the fields.
+- **P3:** the `BEGIN/END winum` markers and the attribution comment
+  inside the test are not Wine style; the attribution belongs in the
+  patch header, which already has it.
+- **Check in L2:** the `todo_wine` on the rejected values and on the
+  missing-attribute defaults assumes Wine accepts those manifests and
+  stores model 0 when the attribute is missing (the comClass and
+  clrClass parsers start from a zeroed entity, so this looks right). The
+  run `test-run/candidates-3` (42562380900) shows whether any of them is
+  a "Test succeeded inside todo block".
+
+## Verdict
+
+Implementation approved. The test values come from the Windows
+measurement and the L1 harness passed; before the test goes into the
+production patch, move it into `kernel32/tests/actctx.c` and read the
+record through the structure. Then L2 again.
