@@ -37,3 +37,16 @@ dependent: 20 in v5, 24 in v6 here) nor the `WINDOWPOS` flags (Windows
 - L0: the full series applies at `--fuzz=0` on Wine 11.20 with this file
   (and the toolbar-padding v2 candidate) substituted, 62/62 (2026-11-09).
 - L1 of the new test, L2, cross review (Codex): pending.
+
+## Local run (2026-11-09)
+
+Wine 11.20 built locally for x86_64 (Ubuntu, X11 under Xvfb), test units run
+with the new tests applied, first on vanilla DLLs, then with all six batch 1
+v2 candidates. Quick feedback only; L2 is the CI run.
+
+| | vanilla | v2 |
+| --- | --- | --- |
+| comctl32:header | crash at the first NULL `HDM_LAYOUT` (exit 5) | 1129 tests, 0 failures (v5 and v6) |
+
+SOLIDWORKS' L4 is deferred (AGENTS.md); v2 changes only the NULL cases,
+which crash in vanilla Wine.

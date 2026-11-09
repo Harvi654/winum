@@ -48,3 +48,16 @@ E_NOTIMPL (Windows S_OK).
   (and the caret-rewrap v2 candidate) substituted, 62/62 (2026-11-09).
 - L1 of the new test, L2, L4 (Inventor: inserting a symbol, text colours,
   spell check), cross review (Codex): pending.
+
+## Local run (2026-11-09)
+
+Wine 11.20 built locally for x86_64 (Ubuntu, X11 under Xvfb), test units run
+with the new tests applied, first on vanilla DLLs, then with all six batch 1
+v2 candidates. Quick feedback only; L2 is the CI run.
+
+| | vanilla | v2 |
+| --- | --- | --- |
+| msftedit:richole | 13 failures, all in `test_textfont_applytmp` (changes applied, stale red written back) | 117 tests, 0 failures |
+| riched20:richole | (with the caret v2 test) | 0 failures |
+
+`msftedit` was in no L2 test group; it is added to group g5.

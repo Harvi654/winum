@@ -35,11 +35,9 @@ font metrics do not enter. `TB_GETPADDING` returns the set value.
 ## Expected results
 
 - vanilla Wine 11.20: the string rows fail for padding 0x0, 1x1 and 2x2
-  (height stays default + 0, Wine adds 6), 2 styles x ... in v5 and v6;
-  the image-list-only row is `todo_wine` (Wine recalculates when the image
-  list is set and takes the width from the padding: 16x22 for 0x0);
-- with v2: the string rows pass; the image-list-only row stays
-  `todo_wine` (now 16x16 for 0x0, still not 23x22).
+  (Wine adds 6 to the height whatever the padding);
+- with v2: all pass; toolbars without strings keep 23x22 in both, as on
+  Windows.
 
 Not tested, because Wine differs from Windows outside this patch:
 `TB_SETPADDING` above 2 (Wine clamps to `SM_CXEDGE`/`SM_CYEDGE`; Windows
@@ -51,22 +49,26 @@ Wine a fixed 6 with an image list), and padding set after the buttons
 
 ## Open points
 
-- The image-list-only case: Windows does not recalculate the button size
-  when an image list is set (23x22 for every padding); Wine does, and with
-  this patch the height follows the padding as well (16x16 for 0x0
-  instead of 16x22 before). Inventor's palette looked right with v1 (L4),
-  which is consistent with Windows' TB_SETBUTTONSIZE result (16x16 for
-  padding 0); whether Inventor reaches that size through TB_SETBUTTONSIZE
-  or through Wine's extra recalculation is not known. A fix that stops
-  the extra recalculation would be a separate patch, measured first.
-- The three differences listed under "Not tested".
+- The differences listed under "Not tested". (An earlier reading of the
+  source suggested that Wine recalculates when the image list is set; the
+  local run shows 23x22 there, as on Windows.)
 
 ## Validation of v2
 
 - L0: the full series applies at `--fuzz=0` on Wine 11.20 with this file
   substituted (62/62), also together with
   `candidates/comctl32-toolbar-setrows-v2` (2026-11-09).
-- Local run: see the dated note below, when done.
+- Local run (2026-11-09): below.
 - L1 of the new test: pending (series L1 bundle of a test run).
 - L2: pending (`test-run/<name>` with this candidate).
 - Cross review: pending (Codex).
+
+## Local run (2026-11-09)
+
+Wine 11.20 built locally for x86_64 (Ubuntu, X11 under Xvfb), test units run
+with the new tests applied, first on vanilla DLLs, then with all six batch 1
+v2 candidates. Quick feedback only; L2 is the CI run.
+
+| | vanilla | v2 |
+| --- | --- | --- |
+| comctl32:toolbar | 36 failures, all in `test_padding_height` (string rows, height 36 instead of 30-32) | 2655 tests, 0 failures |
