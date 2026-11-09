@@ -79,3 +79,14 @@ and test both measured contracts, then rerun native L1 and paired
 riched20/msftedit L2 for the revision. Inventor's symbol/color/spell-check
 smoke result remains separate; success with the old msftedit-style
 workaround cannot justify changing RichEdit20W's measured direct setters.
+
+## Follow-up: v3 in 687afe6 (2026-11-09)
+
+P1 is addressed in design by rejecting tomApplyTmp outside RichEdit50W,
+but not fully resolved in the pair: SCF v4's new class bit is uninitialized
+for nonmatching/windowless editors. P2 now has ordinary direct-setter
+controls, but their factory creates RichEdit20A despite the W-class
+provenance; align that control with the measured class. P3's overbroad
+lifetime wording is resolved; repeated-cycle behavior remains pending the
+new MEASURE output. The separate v3 and SCF v4 reviews contain the details.
+No approval or revised native L1/L2 pass is implied by this follow-up.
