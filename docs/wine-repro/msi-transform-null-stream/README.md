@@ -70,3 +70,18 @@ the populated binary control is valid. These are functional observations
 of our original transform, not an assertion L1 pass. They provide the
 regression oracle for a candidate test; production patch/series/marker
 remain unchanged. Raw logs are summarized rather than committed.
+
+## Windows-derived assertion candidate
+
+The [v2 candidate](../../../patches/candidates/msi-transform-null-stream-v2/README.md)
+keeps the production fix and adds the exact observed two-row contract to
+the existing MSI db.c unit. Its shared helper/function block is compiled
+unchanged by scripts/build-l1-msi-null-stream.sh for native assertion L1;
+the builder verifies its equality to the patch. Assertions are ordinary
+ok(), including the valid binary control and NULL stream's result 13.
+
+The assertion fixture uses unique owned temporary files rather than the
+MEASURE's directory and is therefore itself still subject to native L1.
+Successful MEASURE is not promoted to an assertion pass. Cross review,
+paired runtime and consumer gates also remain open; production page and
+test marker stay unchanged until a native-tested candidate is promoted.
