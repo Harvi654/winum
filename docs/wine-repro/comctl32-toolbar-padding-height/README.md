@@ -36,3 +36,29 @@ Local check (Wine 9.0, not an oracle): complete, about 1 MB of output per
 architecture; with padding 0,0 and the 16x16 image list the height stays 22
 (bitmap + 6) through `TB_SETBITMAPSIZE` and drops to 16 only with
 `TB_SETBUTTONSIZE` (1,1).
+
+## Windows observations (2026-11-09)
+
+Offline Windows 10 VM, `windows-2026-11-09/` (both architectures complete,
+`api_errors=0`, identical apart from `bits=`). comctl32 5.82 and 6.16 give
+the same sizes in all 520 cases; `SM_CXEDGE` 2, 96 DPI.
+
+- `TB_SETPADDING` is not clamped: (16,16) reads back as 16,16, (0,10) as
+  0,10. (0xffff,0xffff) reads back as the default 7,6.
+- The size is recalculated only where strings are involved:
+  `TB_ADDSTRING` / `TB_ADDBUTTONS` with strings. Then width = the wider of
+  bitmap and text + padding.cx, height = 16 + padding.cy + 1 + text
+  (default 23x38, 0x0 16x32, (0,10) 16x42, (10,0) 26x32) for the non-list
+  styles, and height = 16 + padding.cy for `TBSTYLE_LIST` (43x22 default,
+  36x16 for 0x0).
+- Without strings (image list only, or nothing) the size stays 23x22 for
+  every padding, also after `TB_SETIMAGELIST`, `TB_AUTOSIZE` and
+  `TB_SETBITMAPSIZE(16,16)`; the list styles stay 27x22.
+- Padding set after the buttons changes nothing until the next
+  recalculation; `TB_AUTOSIZE` and `TB_SETBITMAPSIZE` with an unchanged
+  size do not recalculate.
+- `TB_SETBUTTONSIZE(1,1)` gives 16 + padding in both directions in every
+  style and content (16x16 for 0x0, 32x32 for 16x16), and a following
+  `TB_ADDBUTTONS` keeps it.
+- `TB_GETMETRICS` (v6 only) reports the padding as `cxPad`/`cyPad`; v5
+  returns zeros.

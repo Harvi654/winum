@@ -40,3 +40,23 @@ x86_64 and i686 (Ubuntu MinGW 13) and run once under the distribution's
 Wine 9.0 with Xvfb, only to see that it completes (`SUMMARY ... complete=1`,
 exit 0). Those outputs are not expectations and are not committed; where
 they show the bug the patch fixes, the topic README says so.
+
+## Run of 2026-11-09
+
+All twelve programs completed in the offline Windows 10 VM (`SUMMARY ...
+complete=1 api_errors=0`, which `b3_finish` turns into exit 0); x86_64 and
+i686 identical apart from `bits=` and pointer width; comctl32 5.82 and
+6.16. `exitcodes-2026-11-09.txt` holds `!errorlevel!` instead of the
+codes: the batch file that ran used delayed-expansion syntax without
+enabling it (the bundle script writes `%ERRORLEVEL%`), so the exit codes
+come from the SUMMARY lines. Results and observations are in each topic's
+`windows-2026-11-09/` and README:
+
+| Patch | Result | Candidate |
+| --- | --- | --- |
+| toolbar-padding-height | Windows uses the padding height when it recalculates; recalculates less often than Wine | v2: test, code as v1 |
+| header-null-layout | NULL layout and NULL members: FALSE, nothing written | v2: checks the members too |
+| ownerdraw-existing-capture | Windows sends the `WM_CAPTURECHANGED` v1 suppresses; it takes the capture before the focus | v2: Windows order instead of the skip (SOLIDWORKS L4 needed) |
+| caret-rewrap | no failure; caret at `EM_POSFROMCHAR` | v2: test, code as v1 |
+| scf-word-insertion-point | Windows' word rule differs from v1 outside Inventor's case | none yet (open) |
+| textfont-applytmp | msftedit: temporary and dropped; riched20: E_INVALIDARG | v2: tomApplyLater keeps it temporary; test in msftedit |

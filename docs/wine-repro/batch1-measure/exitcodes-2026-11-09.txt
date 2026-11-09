@@ -1,0 +1,12 @@
+toolbar-padding x86_64=!errorlevel! 
+toolbar-padding i686=!errorlevel! 
+header-null-layout x86_64=!errorlevel! 
+header-null-layout i686=!errorlevel! 
+ownerdraw-capture x86_64=!errorlevel! 
+ownerdraw-capture i686=!errorlevel! 
+caret-rewrap x86_64=!errorlevel! 
+caret-rewrap i686=!errorlevel! 
+scf-word x86_64=!errorlevel! 
+scf-word i686=!errorlevel! 
+textfont-applytmp x86_64=!errorlevel! 
+textfont-applytmp i686=!errorlevel! 
