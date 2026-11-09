@@ -18,14 +18,20 @@ SOLIDWORKS media download (about 16 GB) failed while reading the media list.
 
 ## Wine test
 
-None in the patch.
+None in the production patch. The separate
+[v2 candidate](../../patches/candidates/wininet-same-position-seek-v2/README.md)
+adds a Windows-derived 12-case loopback regression to dlls/wininet/tests/http.c,
+keeping the one-line fix unchanged. Its exact-body native assertion bundle
+passes on both architectures. Only the independent cached chunked/close
+seek-rejection gap has Wine-only todos; body and request checks are ordinary.
+The candidate is not yet in patches/series.
 
 ## Validation
 
 | Level | Result |
 | --- | --- |
 | L0 | full builds full-1/full-2 |
-| L1 | no Wine test; Windows reference missing |
+| L1 | 2026-11-09: v2 exact-body test passes on offline Windows 10 x86_64/i686, 200 checks / zero failures / 12 cases / 12 requests / exit 0 each (96d3ca3 sources). Production has no test until candidate promotion. |
 | L2 | not recorded |
 | L3 | x64 probe 42/48 -> 48/48 fixtures |
 | L4 | media list retrieved, download reached 97% (completion not confirmed); combined smoke |
@@ -35,6 +41,9 @@ None in the patch.
 ## Open points
 
 Cache/seek behaviour outside the fixtures unproven.
+Observed vanilla/patched comparison, paired wininet L2, formal cross review
+and consumer validation remain open. Native assertion L1 does not promote
+the candidate or change the production test marker.
 
 ## Evidence
 

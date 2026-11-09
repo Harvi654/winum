@@ -90,3 +90,16 @@ or broader HTTP modes. The shared 45-second cooperative budget and native
 60-second watchdog bound fixture execution. Exact-body native L1 and paired
 Wine runtime still need observation; production page/marker/series are
 unchanged pending validation and cross review.
+
+## Windows exact-body assertion L1 (2026-11-09)
+
+Both x86_64 and i686 assertion outputs report 200 checks, zero failures,
+12 completed cases, 12 server-observed requests and exit 0 (96d3ca3 sources,
+offline Windows 10). All native controls run as ordinary assertions,
+including checks that have Wine-only todos in the integrated test. The
+candidate's native L1 passes for this complete measured matrix.
+
+The native pass does not establish Wine's before/after runtime results or
+broader HTTP support. Paired wininet L2, formal cross review and consumer
+validation remain open. The candidate is not promoted and production series
+and marker stay unchanged. Raw output and Windows binaries are not committed.

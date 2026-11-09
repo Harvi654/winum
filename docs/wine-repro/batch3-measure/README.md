@@ -176,3 +176,9 @@ server-observed requests. Target/body/count assertions are ordinary; only
 the independent Wine cached chunked/close seek-rejection gap has Wine todos.
 Native assertion L1, runtime pairing and review are pending; no production
 series or marker change is made.
+
+The HTTP exact-body native assertion bundle prepared at 96d3ca3 now passes
+on Windows 10 x86_64/i686: 200 checks, zero failures, 12 cases, 12 observed
+requests and exit 0 each. Wine-only todos are ordinary in the native wrapper,
+so all controls ran. Runtime pairing, review and promotion remain pending.
+Continue with folder-view selection, the final entry of this batch.

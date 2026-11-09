@@ -81,8 +81,8 @@ run-measure.bat. Return result-http-same-seek-l1-x86_64.txt,
 result-http-same-seek-l1-i686.txt and exitcodes.txt, including failed or
 partial results. Successful execution should report 200 checks, zero
 failures, completed_cases=12 and requests=12, exit 0 on each architecture.
-No dialogs or application setup are needed. This assertion run is pending;
-the previous MEASURE alone is not native L1.
+No dialogs or application setup are needed. The returned assertion results
+are recorded below; the previous MEASURE alone was not counted as native L1.
 
 ## Application and validation
 
@@ -109,6 +109,20 @@ is included as the cooperative budget. No blocking defect or conspicuous
 copied nontrivial block was found. This limited advisory is not proof of
 originality, native execution or formal candidate cross review.
 
-Native exact-body L1, observed vanilla/patched comparison, paired wininet L2,
-Claude's formal cross review and consumer validation remain open. The
-candidate is not promoted and no production test marker is upgraded.
+Observed vanilla/patched comparison, paired wininet L2, Claude's formal
+cross review and consumer validation remain open. The candidate is not
+promoted and no production test marker is upgraded.
+
+## Windows assertion L1 (2026-11-09)
+
+The exact-body x86_64 and i686 executables prepared from 96d3ca3 both pass
+on the maintainer's offline Windows 10 VM: 200 checks, zero failures,
+completed_cases=12, requests=12 and exit 0 each. The native wrapper treats
+all Wine-only todos as ordinary assertions, so the unsupported-seek controls
+were checked too. Body continuity, EOF and one request per case all pass.
+These are assertion L1 results, not just the earlier observations.
+
+Only summarized text results are recorded; no raw logs or Windows files.
+No runtime claim is made for vanilla or patched Wine by this native pass.
+Broader HTTP modes and the review/runtime/consumer gates above stay open;
+the production patch, marker and patches/series remain unchanged.
