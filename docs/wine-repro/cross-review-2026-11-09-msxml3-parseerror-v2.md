@@ -99,3 +99,121 @@ The explicit successful-load case now matches the supplied fresh-document
 measurement. Same-object error-to-success reset coverage is still separate.
 No build/runtime pass is claimed. Verdict: original points addressed in
 intent, but the revised test needs the two corrections above before L1/L2.
+
+## Current revision review: 9bb1703 / 54cfb6a / 0955db1 (2026-11-09)
+
+Reviewer: Codex; candidate author: Claude. Reviewed the candidate on main at
+6c87a74. The requested a1c2d0e object is not in the fetched repository after
+git pull, so this review does not claim that exact revision. The available
+history contains the empty-string implementation fix in 9bb1703, call
+placement in 54cfb6a and removal of unrelated test edits in 0955db1. The
+actual reviewed patch SHA-256 is
+9d011211c31a96e8124bccc0ea5dc5958d8c9967c873b33ec580a24322a189d4.
+
+Read in full for this pass: the current candidate patch/README, production
+v1 patch, own MEASURE source, investigation README, both complete Windows
+result files, this earlier review and the complete 9bb1703/54cfb6a/0955db1
+candidate diffs. In pinned Wine 11.20, read all of parseerror.c and the
+complete domdoc_loadXML, domdoc_get_parseError, attach_doc_node,
+test_parseerror, _create_object, is_clsid_supported and BSTR-pool helpers;
+also the support table and the adjacent existing NULL-load tests. Other
+large domdoc.c/test functions were sampled only for changed-call context,
+not audited in full. No native implementation, symbols or vendor binary
+contents were inspected.
+
+### Native comparison and scope
+
+The current table uses a fresh DOMDocument30/60 for every input, matching
+the actual measurement. For both classes and both architectures:
+
+| State | Measured filepos HRESULT / value | Current candidate |
+| --- | --- | --- |
+| New document | S_FALSE / 0 | ordinary checks; source agrees |
+| loadXML("") | S_OK / 0 | ordinary checks; empty-string fix supplies nonzero code |
+| `<a><b></a>` | S_OK / 8 | ordinary HRESULT; value 8 is todo_wine, stored value remains 0 |
+| `<a>\n  <b>\n</a>` | S_OK / 12 | ordinary HRESULT; value 12 is todo_wine, stored value remains 0 |
+| Fresh document, valid XML | S_FALSE / 0 | ordinary checks; source agrees |
+| NULL filepos output in every state | E_INVALIDARG | ordinary checks; source agrees |
+
+loadXML's HRESULT and VARIANT_BOOL are checked too. Their initial boolean
+is deliberately opposite to the expected result, detecting an unwritten
+output. The four nonzero-position todos across the two classes represent
+real missing position tracking. No todo masks the new empty-input HRESULT,
+NULL contract or no-error result. The pre-existing legacy ParseError2
+interface todo is unrelated and unchanged.
+
+The implementation fix is necessary: the old empty-input load branch never
+assigned doc->error, so a fresh document still appeared error-free. The new
+if(data) assignment records E_SAX_MISSINGROOT, whose open-source enum value
+is exactly the measured 0xc00ce558. A NULL string still takes its unchanged
+path. The existing nonempty path already assigns the parse result to
+doc->error, including S_OK for valid XML. create_parse_error copies the
+code into a zero-initialized object, so the getter's S_OK/S_FALSE decision
+and stored position follow as described. No resource API or ownership
+transfer is added; the existing generic reason allocation now also runs
+for empty input. Documents, obtained error objects and pooled argument
+BSTRs are released on normal test paths.
+
+This remains a partial filepos implementation. It does not populate the
+nonzero malformed positions or establish parity for other getters' values.
+get_line/get_linepos still return S_OK without an error, and the reason is
+the existing generic "error" rather than the measured 45/47-character
+native reasons. Same-object error-to-success reset, NULL-string error-state
+semantics, embedded-NUL input and other class versions are outside the new
+native matrix; none should acquire guessed expectations from this review.
+
+### Current findings
+
+- **P1: none found in the current bounded change.** Both earlier test
+  blockers are closed. The helper is defined before test_parseerror, and
+  its two class calls are inside that function. The candidate leaves
+  test_put_dataType, test_save, test_get_xml and test_prohibitdtd unchanged;
+  no unrelated `<a/>` replacement remains.
+- **P2: directly protect the new empty-input error code.** The candidate
+  now changes the observable get_errorCode result to S_OK/0xc00ce558, but
+  its regression only checks filepos. Any nonzero replacement code, such
+  as generic E_FAIL, would satisfy every new empty-filepos check despite
+  disagreeing with the supplied Windows output. Add an ordinary
+  get_errorCode HRESULT/value assertion for the empty-string case on both
+  measured classes before promotion. The current implementation constant
+  is correct; this finding is a missing regression guard for its new
+  public behavior, not a demonstrated runtime failure. No new MEASURE is
+  needed for those already recorded values. Do not blanket-todo that
+  exact empty-input contract or import unmeasured invalid-input cases.
+- **P3: remaining scope wording is stale.** The candidate README still says
+  the change affects only the no-error case that SOLIDWORKS does not hit;
+  9bb1703 specifically repairs its empty-string call. The header's earlier
+  "limited to get_filepos" wording also predates the doc->error change.
+  The investigation README still groups all getters as returning S_OK
+  without an error, although get_errorCode/get_reason already return
+  S_FALSE there. Update those descriptions without broadening this patch
+  to the other getters or implying complete position/reason support.
+
+### Checks and verdict for the current file
+
+Replaced v1 at its existing series position and applied all 62 production
+entries with --fuzz=0 to a fresh pinned Wine 11.20 tree: importnode precedes
+the candidate and schema-cache-namespace follows it. Compared the named
+unrelated test bodies before/after the candidate and checked helper/call
+placement. Built the touched domdoc.c and parseerror.c DLL objects and the
+domdoc.c test object for x86_64/i386. All six PE compilation targets pass
+without compiler warnings in this focused build. Configuration used
+--enable-archs=x86_64,i386 --without-x --without-wayland --without-freetype.
+Source archive SHA-256:
+9f516d63e9f814f4dad70ce0a1943211b8a6236008ac3025cf58004091c661db.
+This is object compilation, not full DLL/test linking, graphical L0, native
+L1 or Wine runtime execution. No candidate/production code or series entry
+was changed by this review.
+
+The commit message for 0955db1 reports that the new checks passed in
+candidates-4 while unrelated XML edits caused other failures. That is
+author-reported context; this review did not fetch or rerun its Actions
+logs and does not turn it into a verified current paired L2 result.
+
+Verdict: the measured bounded implementation is supported, and the old P1
+placement/unrelated-edit issues are resolved. Add the P2 empty-error-code
+guard and correct the P3 descriptions before promotion. Native L1 of the
+final assertions and paired msxml3 L2 remain open. SOLIDWORKS L4 is deferred
+under the current AGENTS.md policy for that inactive consumer; it is not
+claimed performed. Keep the candidate outside production during these
+remaining test/review gates, and retain the acknowledged position todos.
