@@ -27,3 +27,6 @@ at start, `wineserver -k` before each try): 16 and 24 ms fail, 32 and
 100 ms work. The default is now 32 ms, the upper end of what Windows
 showed (15-32 ms). L4 of the 32 ms default itself is still to be done
 with the next build; the Wine test must accept a move within that delay.
+
+**Superseded by `../server-mousemove-on-show-hide-v3/` (2026-11-10)**: the
+same server change with a Wine test.
