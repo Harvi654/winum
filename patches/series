@@ -78,3 +78,6 @@ msi-source-directory-component-state.patch
 # description needed for GPU ray tracing.
 oleaut32-typelib-keep-released.patch
 opengl32-window-format-color-bits.patch
+# test-run/all-1 only: the statusbar v2 candidate is incremental, after the full series
+comctl32-statusbar-erase-background-v2-tests.patch
+comctl32-statusbar-erase-background-v2.patch

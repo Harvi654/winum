@@ -68,7 +68,7 @@
      btnPtr = infoPtr->buttons;
      x  = infoPtr->nIndent;
      width = infoPtr->client_rect.right - infoPtr->client_rect.left;
-@@ -1854,6 +1901,16 @@
+@@ -1857,6 +1904,16 @@
      /* infoPtr->nRows is the number of rows on the toolbar */
      infoPtr->nRows = nRows + nSepRows + 1;
  
@@ -85,7 +85,7 @@
      TRACE("toolbar button width %d\n", infoPtr->nButtonWidth);
  }
  
-@@ -4924,89 +4981,36 @@
+@@ -4927,89 +4984,40 @@
  
      TRACE("Setting rows to %d (%d)\n", rows, bLarger);
  
@@ -115,19 +115,12 @@
 -           FIXME: Take width of window into account?
 +           Use the fewest buttons per row that fit into the requested number
 +           of rows; every group of buttons (between separators) starts on a
-+           new row and separators are not counted (Windows does this; bLarger
-+           is not needed for it).
++           new row and separators are not counted. When the requested number
++           cannot be met exactly, bLarger chooses the next larger number of
++           rows instead of the next smaller one (tbrows_results in
++           tests/toolbar.c, which pass on Windows).
           */
-+        for (i = 0; i < infoPtr->nNumButtons; i++)
-+            if (!(btnPtr[i].fsState & TBSTATE_HIDDEN) && !(btnPtr[i].fsStyle & BTNS_SEP))
-+                buttons++;
-+
-+        if (rows < 1) rows = 1;
-+        for (columns = 1; columns < buttons; columns++)
-+            if (TOOLBAR_WrapColumns(infoPtr, columns) <= rows)
-+                break;
-+        if (columns < 1) columns = 1;
- 
+-
 -        /* Loop through the buttons one by one counting key items  */
 -        for (i = 0; i < infoPtr->nNumButtons; i++ )
 -        {
@@ -184,6 +177,18 @@
 -        }
 -
 -        TRACE("Result - %d rows\n", curRow + 1);
++        for (i = 0; i < infoPtr->nNumButtons; i++)
++            if (!(btnPtr[i].fsState & TBSTATE_HIDDEN) && !(btnPtr[i].fsStyle & BTNS_SEP))
++                buttons++;
++
++        if (rows < 1) rows = 1;
++        for (columns = 1; columns < buttons; columns++)
++            if (TOOLBAR_WrapColumns(infoPtr, columns) <= rows)
++                break;
++        if (bLarger && columns > 1 && TOOLBAR_WrapColumns(infoPtr, columns) < rows)
++            columns--;
++        if (columns < 1) columns = 1;
++
 +        TRACE("Trying to wrap at %d (%d buttons, %d rows)\n", columns, buttons, rows);
 +        TOOLBAR_WrapColumns(infoPtr, columns);
 +        infoPtr->nRowsColumns = columns;

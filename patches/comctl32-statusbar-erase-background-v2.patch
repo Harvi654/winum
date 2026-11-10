@@ -1,0 +1,181 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH 2/2] comctl32: Limit status erase-only painting to themed v6.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Windows 10 (windows-2026-11-07 MEASURE, both architectures) always paints
+unthemed v5/v6 status backgrounds in WM_PAINT, even without an erase.
+Themed v6 paints its background only through WM_ERASEBKGND and preserves
+an application's erase fill. SB_SETTEXT erases in v6 regardless of theme,
+but does not erase in v5.
+
+The current v1 patch applies erase-only painting and erasing invalidations
+to all controls. This leaves old pixels after a non-erasing v5/classic
+paint and changes v5 SB_SETTEXT erasure. Restrict v1's general invalidation
+and erase-handler changes to v6 with an active theme. Keep the measured
+v6 SB_SETTEXT exception, and always paint an unthemed control's background
+in WM_PAINT. Leave direct-HDC painting and v1's owner-drawn themed-pane
+handling unchanged. Other setter invalidations were not measured: outside
+themed v6 they return to vanilla rather than claiming new Windows values.
+
+v2 (2026-11-07): Supersede v1's global ps.fErase gate with a theme/version
+check; restore classic painting and v5 invalidations, retain v6 SB_SETTEXT
+erasure without a theme, and remove the corresponding test todos. This is
+an incremental candidate AFTER the full winum series (which contains v1),
+not a replacement applied in place of v1. No claim is made to fix the
+separate maximized-window GPU composition fault. Claude cross review and
+Windows L1 remain required before promotion.
+
+--- a/dlls/comctl32/status.c
++++ b/dlls/comctl32/status.c
+@@ -90,6 +90,15 @@
+ static LRESULT
+ STATUSBAR_NotifyFormat (STATUS_INFO *infoPtr, HWND from, INT cmd);
+ 
++static BOOL STATUSBAR_HasTheme(const STATUS_INFO *infoPtr)
++{
++#if __WINE_COMCTL32_VERSION == 6
++    return GetWindowTheme(infoPtr->Self) != NULL;
++#else
++    return FALSE;
++#endif
++}
++
+ static inline LPCSTR debugstr_t(LPCWSTR text, BOOL isW)
+ {
+   return isW ? debugstr_w(text) : debugstr_a((LPCSTR)text);
+@@ -377,7 +386,7 @@
+     infoPtr->horizontalBorder = in[0];
+     infoPtr->verticalBorder = in[1];
+     infoPtr->horizontalGap = in[2];
+-    InvalidateRect(infoPtr->Self, NULL, TRUE);
++    InvalidateRect(infoPtr->Self, NULL, STATUSBAR_HasTheme(infoPtr));
+ 
+     return TRUE;
+ }
+@@ -561,7 +570,7 @@
+ 
+     oldBkColor = infoPtr->clrBk;
+     infoPtr->clrBk = color;
+-    InvalidateRect(infoPtr->Self, NULL, TRUE);
++    InvalidateRect(infoPtr->Self, NULL, STATUSBAR_HasTheme(infoPtr));
+ 
+     TRACE("CREF: %#lx -> %#lx\n", oldBkColor, infoPtr->clrBk);
+     return oldBkColor;
+@@ -582,14 +591,14 @@
+ 	    return TRUE;
+ 	infoPtr->part0.hIcon = hIcon;
+ 	if (infoPtr->simple)
+-            InvalidateRect(infoPtr->Self, &infoPtr->part0.bound, TRUE);
++            InvalidateRect(infoPtr->Self, &infoPtr->part0.bound, STATUSBAR_HasTheme(infoPtr));
+     } else {
+ 	if (infoPtr->parts[nPart].hIcon == hIcon) /* same as - no redraw */
+ 	    return TRUE;
+ 
+ 	infoPtr->parts[nPart].hIcon = hIcon;
+ 	if (!(infoPtr->simple))
+-            InvalidateRect(infoPtr->Self, &infoPtr->parts[nPart].bound, TRUE);
++            InvalidateRect(infoPtr->Self, &infoPtr->parts[nPart].bound, STATUSBAR_HasTheme(infoPtr));
+     }
+     return TRUE;
+ }
+@@ -675,7 +684,7 @@
+ 	}
+     }
+     STATUSBAR_SetPartBounds (infoPtr);
+-    InvalidateRect(infoPtr->Self, NULL, TRUE);
++    InvalidateRect(infoPtr->Self, NULL, STATUSBAR_HasTheme(infoPtr));
+     return TRUE;
+ }
+ 
+@@ -755,7 +764,8 @@
+ 	    Free (part->text);
+ 	part->text = ntext;
+     }
+-    InvalidateRect(infoPtr->Self, &part->bound, TRUE);
++    /* Windows v6 erases for SB_SETTEXT even when its theme is disabled. */
++    InvalidateRect(infoPtr->Self, &part->bound, __WINE_COMCTL32_VERSION == 6);
+     UpdateWindow(infoPtr->Self);
+ 
+     return TRUE;
+@@ -826,7 +836,7 @@
+     nmhdr.idFrom = GetWindowLongPtrW (infoPtr->Self, GWLP_ID);
+     nmhdr.code = SBN_SIMPLEMODECHANGE;
+     SendMessageW (infoPtr->Notify, WM_NOTIFY, 0, (LPARAM)&nmhdr);
+-    InvalidateRect(infoPtr->Self, NULL, TRUE);
++    InvalidateRect(infoPtr->Self, NULL, STATUSBAR_HasTheme(infoPtr));
+     return TRUE;
+ }
+ 
+@@ -1017,11 +1027,9 @@
+     TRACE("\n");
+     if (hdc) return STATUSBAR_Refresh (infoPtr, hdc, TRUE);
+     hdc = BeginPaint (infoPtr->Self, &ps);
+-    /* The background belongs to WM_ERASEBKGND (the invalidations above ask
+-       for it): an application that paints it itself there (Inventor's dark
+-       status bar) must not be painted over. ps.fErase is still set if nobody
+-       erased it. */
+-    STATUSBAR_Refresh (infoPtr, hdc, ps.fErase);
++    /* Themed v6 leaves background painting to WM_ERASEBKGND. Classic
++       controls repaint it even after a non-erasing invalidation. */
++    STATUSBAR_Refresh (infoPtr, hdc, !STATUSBAR_HasTheme(infoPtr));
+     EndPaint (infoPtr->Self, &ps);
+ 
+     return 0;
+@@ -1037,7 +1045,7 @@
+     infoPtr->height = STATUSBAR_ComputeHeight(infoPtr);
+     SendMessageW(infoPtr->Self, WM_SIZE, 0, 0);  /* update size */
+     if (redraw)
+-        InvalidateRect(infoPtr->Self, NULL, TRUE);
++        InvalidateRect(infoPtr->Self, NULL, STATUSBAR_HasTheme(infoPtr));
+ 
+     return 0;
+ }
+@@ -1064,7 +1072,7 @@
+         lstrcpyW (part->text, (LPCWSTR)text);
+     }
+ 
+-    InvalidateRect(infoPtr->Self, &part->bound, TRUE);
++    InvalidateRect(infoPtr->Self, &part->bound, STATUSBAR_HasTheme(infoPtr));
+ 
+     return TRUE;
+ }
+@@ -1095,7 +1103,7 @@
+     y = parent_rect.bottom - infoPtr->height;
+     MoveWindow(infoPtr->Self, x, y, width, infoPtr->height, FALSE);
+     STATUSBAR_SetPartBounds (infoPtr);
+-    InvalidateRect(infoPtr->Self, NULL, TRUE);
++    InvalidateRect(infoPtr->Self, NULL, STATUSBAR_HasTheme(infoPtr));
+     return TRUE;
+ }
+ 
+@@ -1263,6 +1271,7 @@
+ 	{
+ 	    RECT rect;
+ 
++            if (!STATUSBAR_HasTheme(infoPtr)) return DefWindowProcW(hwnd, msg, wParam, lParam);
+ 	    GetClientRect (hwnd, &rect);
+ 	    STATUSBAR_DrawBackground (infoPtr, (HDC)wParam, &rect);
+ 	    return 1;
+--- a/dlls/comctl32/tests/status.c
++++ b/dlls/comctl32/tests/status.c
+@@ -908,14 +908,12 @@
+                 break;
+             case 5: SendMessageW(bar, WM_PAINT, 0, 0); break;
+             }
+-            todo_wine_if(is_v6 && !op)
+-                ok(!!data.erase == erases, "%s v%u themed=%u: erase %u, expected %u\n",
+-                   operations[op], is_v6 ? 6 : 5, themed, data.erase, erases);
++            ok(!!data.erase == erases, "%s v%u themed=%u: erase %u, expected %u\n",
++               operations[op], is_v6 ? 6 : 5, themed, data.erase, erases);
+             color = status_background_pixel(bar, x, y);
+-            todo_wine_if(themed && op != 5)
+-                ok(color == (retains ? marker : themed ? dark : GetSysColor(COLOR_3DFACE)),
+-                   "%s v%u themed=%u: pixel %#lx, expected %#lx\n", operations[op], is_v6 ? 6 : 5,
+-                   themed, color, retains ? marker : themed ? dark : GetSysColor(COLOR_3DFACE));
++            ok(color == (retains ? marker : themed ? dark : GetSysColor(COLOR_3DFACE)),
++               "%s v%u themed=%u: pixel %#lx, expected %#lx\n", operations[op], is_v6 ? 6 : 5,
++               themed, color, retains ? marker : themed ? dark : GetSysColor(COLOR_3DFACE));
+             ok(!GetUpdateRect(bar, NULL, FALSE), "Pending update after %s\n", operations[op]);
+         }
+         DestroyWindow(host);
