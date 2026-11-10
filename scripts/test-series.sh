@@ -31,7 +31,7 @@ WORK="${WORK:-${XDG_CACHE_HOME:-$HOME/.cache}/winum/test-$VARIANT}"
 JOBS="${JOBS:-$(nproc)}"
 # test directories of the DLLs patches/series changes (the server, win32u and
 # winex11.drv changes are exercised by the user32/gdi32/win32u tests)
-TESTS="${TESTS:-advapi32 combase comctl32 gdi32 glu32 kernel32 kernelbase msi mspatcha msxml3 ntdll ole32 oleaut32 opengl32 riched20 msftedit rpcrt4 shell32 urlmon user32 wbemprox win32u wininet}"
+TESTS="${TESTS:-advapi32 combase comctl32 gdi32 glu32 kernel32 kernelbase msi mspatcha mshtml msxml3 ntdll ole32 oleaut32 opengl32 riched20 msftedit rpcrt4 shell32 urlmon user32 wbemprox win32u wininet}"
 UNIT_TIMEOUT="${UNIT_TIMEOUT:-300}"
 GROUP="${GROUP:-all}"
 MAKE_L1="${MAKE_L1:-1}"
@@ -58,6 +58,16 @@ if [ -f "$HERE/patches/tests-first/series" ]; then
     done < <(sed -e 's/#.*//' -e 's/[[:space:]]//g' -e '/^$/d' "$HERE/patches/tests-first/series")
 fi
 
+want_mshtml=0
+case " $TESTS " in
+    *' mshtml '*)
+        want_mshtml=1
+        # Pins must match the selected Wine source, on both variants.
+        source "$HERE/scripts/lib/wine-gecko.sh"
+        wine_fetch_gecko "$SRC" "$WORK/gecko" "$HERE/wine/gecko.env"
+        ;;
+esac
+
 say "Configuring with tests"
 mkdir -p "$SRC/build" && cd "$SRC/build"
 ../configure --enable-archs=x86_64,i386 --enable-tests \
@@ -73,28 +83,90 @@ rm -rf "$WINEPREFIX"
 # one X server for the whole run (xvfb-run per unit cost a server start each time)
 Xvfb -displayfd 3 -screen 0 1280x1024x24 -nolisten tcp 3>"$WORK/display" &
 XVFB_PID=$!
-trap 'kill "$XVFB_PID" 2>/dev/null || true' EXIT
+cleanup_test_processes()
+{
+    # Cover setup/coverage failures as well as the normal end of the loop.
+    timeout -k 5 10 ./server/wineserver -k 2>/dev/null || true
+    if [ -n "${mshtml_prefix:-}" ]; then
+        WINEPREFIX="$mshtml_prefix" timeout -k 5 10 ./server/wineserver -k 2>/dev/null || true
+    fi
+    kill "$XVFB_PID" 2>/dev/null || true
+}
+trap cleanup_test_processes EXIT
 for _ in $(seq 50); do [ -s "$WORK/display" ] && break; sleep 0.2; done
 [ -s "$WORK/display" ] || { echo "Xvfb did not start" >&2; exit 1; }
 export DISPLAY=":$(tr -d '\n' < "$WORK/display")"
 ./wine wineboot -i >/dev/null 2>&1 || true
 ./server/wineserver -w 2>/dev/null || true
 mkdir -p "$OUTDIR/logs"
+if [ "$want_mshtml" = 1 ]; then
+    say "Installing verified Gecko and probing both mshtml backends"
+    mshtml_prefix="$WORK/mshtml-prefix"
+    rm -rf "$mshtml_prefix"
+    (
+    trap - EXIT
+    # MSI/COM registration belongs only to this dedicated HTML test prefix;
+    # the prefix of all other suites keeps its previous boot state.
+    export WINEPREFIX="$mshtml_prefix"
+    timeout -k 10 120 ./wine wineboot -i > "$OUTDIR/mshtml-boot.log" 2>&1
+    timeout -k 10 60 ./server/wineserver -w
+    wine_install_gecko "$WORK/gecko" "$OUTDIR"
+    for arch in x86_64 i386; do
+        compiler_arch="$arch"
+        [ "$arch" != i386 ] || compiler_arch=i686
+        "$compiler_arch-w64-mingw32-gcc" -O2 -Wall -Wextra -Werror \
+            "$HERE/scripts/mshtml-backend-probe.c" -o "$OUTDIR/mshtml-backend-$arch.exe" \
+            -lole32 -loleaut32 -luuid
+        if ! WINEDLLOVERRIDES='mscoree=;mshtml=b' timeout -k 10 30 \
+                ./wine "$OUTDIR/mshtml-backend-$arch.exe" > "$OUTDIR/mshtml-backend-$arch.txt" 2>&1; then
+            echo "MSHTML_SETUP incomplete: backend probe failed or timed out ($arch)" >&2
+            exit 1
+        fi
+        grep '^MSHTML_BACKEND ' "$OUTDIR/mshtml-backend-$arch.txt"
+    done
+    )
+fi
 : > "$OUTDIR/durations-$VARIANT-$GROUP.tsv"
 for t in $TESTS; do
     for arch in x86_64 i386; do
         exe="dlls/$t/tests/$arch-windows/${t}_test.exe"
-        [ -f "$exe" ] || continue
-        units="$(./wine "$exe" --list 2>/dev/null | sed -n 's/^    //p' | tr -d '\r')" || true
+        if [ ! -f "$exe" ]; then
+            [ "$t" != mshtml ] || { echo "MSHTML_SETUP incomplete: missing $arch test EXE" >&2; exit 1; }
+            continue
+        fi
+        # Keep mshtml disabled during boot, installation and other suites.
+        # Builtin is enabled only in these enumeration/test child processes.
+        test_overrides="$WINEDLLOVERRIDES"
+        test_prefix="$WINEPREFIX"
+        if [ "$t" = mshtml ]; then
+            test_overrides='mscoree=;mshtml=b'
+            test_prefix="$mshtml_prefix"
+        fi
+        if [ "$t" = mshtml ]; then
+            if ! units="$(WINEPREFIX="$test_prefix" WINEDLLOVERRIDES="$test_overrides" timeout -k 10 "$UNIT_TIMEOUT" \
+                    ./wine "$exe" --list 2>/dev/null | sed -n 's/^    //p' | tr -d '\r')"; then
+                echo "MSHTML_SETUP incomplete: unit enumeration failed ($arch)" >&2
+                exit 1
+            fi
+            [ -n "$units" ] && printf '%s\n' "$units" | grep -qx dom || \
+                { echo "MSHTML_SETUP incomplete: no dom unit ($arch)" >&2; exit 1; }
+            printf '%s\n' "$units" > "$OUTDIR/mshtml-units-$VARIANT-$arch.txt"
+        else
+            units="$(./wine "$exe" --list 2>/dev/null | sed -n 's/^    //p' | tr -d '\r')" || true
+        fi
         for u in $units; do
             log="$OUTDIR/logs/$t.$arch.$u.log"
             start=$(date +%s)
-            timeout -k 10 "$UNIT_TIMEOUT" ./wine "$exe" "$u" > "$log" 2>&1 || echo "exit=$?" >> "$log"
+            WINEPREFIX="$test_prefix" WINEDLLOVERRIDES="$test_overrides" timeout -k 10 "$UNIT_TIMEOUT" \
+                ./wine "$exe" "$u" > "$log" 2>&1 || echo "exit=$?" >> "$log"
             printf '%s\t%s\t%s\t%s\n' "$t" "$arch" "$u" "$(( $(date +%s) - start ))" >> "$OUTDIR/durations-$VARIANT-$GROUP.tsv"
         done
     done
 done
 ./server/wineserver -k 2>/dev/null || true
+if [ "$want_mshtml" = 1 ]; then
+    WINEPREFIX="$mshtml_prefix" ./server/wineserver -k 2>/dev/null || true
+fi
 
 # tests-first: print every failure of their test files on this side, so the
 # job log shows what vanilla and the series each fail (the compare step only
@@ -109,6 +181,9 @@ fi
 
 # summaries and failure locations only (no raw logs in the artifact's index)
 python3 "$HERE/scripts/compare-tests.py" summarize "$OUTDIR/logs" > "$OUTDIR/results-$VARIANT-$GROUP.json"
+if [ "$want_mshtml" = 1 ]; then
+    python3 "$HERE/scripts/check-mshtml-l2.py" "$OUTDIR/results-$VARIANT-$GROUP.json" "$OUTDIR"
+fi
 
 if [ "$VARIANT" = series ] && [ "$MAKE_L1" = 1 ]; then
     say "L1 bundle (Wine test executables for Windows 10)"

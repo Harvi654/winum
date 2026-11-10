@@ -40,8 +40,9 @@ The production marker stays missing because that test is not promoted.
 
 ## Open points
 
-Formal cross review, Gecko-enabled paired mshtml.dom L2 and consumer validation
-remain open before candidate promotion. Do not count a disabled mshtml backend
+The bounded candidate implementation/test has Claude's cross review.
+Gecko-enabled paired mshtml.dom L2 and consumer validation remain open
+before candidate promotion. Do not count a disabled mshtml backend
 or native MEASURE alone as runtime validation.
 
 ## Evidence
@@ -101,3 +102,57 @@ That would be an explicit infrastructure exception for the L2 venue,
 not a replacement of the existing Windows L1 or a fabricated l3-only
 reason. Until one route runs, keep the L2 gate open and do not add a group
 that only records disabled-backend skips as success.
+
+
+## Maintainer decision and CI setup (2026-11-10)
+
+**No exception accepted.** The maintainer chose Gecko-enabled paired CI;
+the old draft above is historical, and the active marker remains missing
+until the native-tested candidate is promoted through the normal gates.
+
+Mshtml is now in workflow group g5 and in the script's default test list.
+Both vanilla and series provision Wine Gecko 2.47.4 x86/x86_64 from the
+fixed official MSI URLs. wine/gecko.env contains the two SHA-256 values
+listed above; scripts/lib/wine-gecko.sh first verifies that version and
+both architecture hashes match the selected, verified Wine source's
+addons.c. It verifies every download/cache file, and rechecks each MSI
+before its bounded silent installation. A changed source pin or corrupt
+MSI stops setup; neither can become a disabled-backend success.
+
+Only jobs requesting mshtml prepare Gecko. It has a separate disposable
+mshtml-prefix, preserving the previous prefix of other suites. Wineboot
+and MSI setup keep the default mshtml-disabled override. Each architecture's
+own backend-probe process enables builtin mshtml, loads/registers that
+builtin in its prefix's registry view (wineboot skipped it), loads an
+original in-memory HTML stream, waits at most five seconds for complete,
+and requires its controlled title and parent window. External timeouts
+also bound boot, installation, the probe and enumeration. COM registration
+is prefix-wide, not process-local; it is isolated from other suites by the
+dedicated prefix. No persistent DLL override is written.
+
+Unit enumeration and every mshtml test process alone receive the dedicated
+prefix and WINEDLLOVERRIDES='mscoree=;mshtml=b'. Other suite processes retain
+their original prefix and disabled mshtml override. All enumerated mshtml
+units run on both PE architectures with the existing UNIT_TIMEOUT (300 s
+by default, followed by the existing ten-second kill bound). An EXIT trap
+also kills both test wineservers and Xvfb after setup/coverage failures.
+
+scripts/check-mshtml-l2.py rejects absent/mismatched backend probes, missing
+or invalid enumeration, missing/unfinished/timed-out units, an all-zero-
+assertion backend-wide skip, missing dom coverage or dom's required-
+interface skip. Optional per-feature skips remain reported; individual
+zero-check units are not automatically backend-wide skips. Ordinary test
+failures stay in the paired comparison rather than being misclassified
+as a missing backend. mshtml-coverage-<variant>.json records the scope;
+MSHTML_COVERAGE/MSHTML_INCOMPLETE are the filtered summary lines.
+
+Checks performed here: both probe PE builds pass -Wall -Wextra -Werror;
+12 coverage/download/cleanup tests pass using only own temporary fixtures
+and a mock transport, without executing Wine or downloading Gecko. YAML,
+shell syntax and source pin parity pass. A second-model read-only advisory
+found no concrete backend/prefix/override fail-open issue and no identifiable
+borrowed implementation in the bounded original delta (not an originality
+proof); its failure-cleanup suggestion is included. Runtime installation,
+full dom completion and paired L2 remain to be observed in Claude's
+upcoming test-run/all-2. No runtime pass, Gecko download or local Wine
+execution is claimed by these build/static checks.

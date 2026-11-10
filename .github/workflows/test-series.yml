@@ -38,7 +38,7 @@ jobs:
           - group: g4
             tests: msi
           - group: g5
-            tests: msxml3 mspatcha riched20 msftedit shell32 wbemprox wininet
+            tests: msxml3 mspatcha riched20 msftedit shell32 wbemprox wininet mshtml
     runs-on: ubuntu-24.04
     container: archlinux:base-devel
     timeout-minutes: 350
