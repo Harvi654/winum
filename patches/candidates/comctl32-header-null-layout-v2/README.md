@@ -72,3 +72,10 @@ Open from the review, not done (would change the reviewed revision): P3 (optiona
 
 Run 42698489281, Windows 10, x86_64 and i386: the new test passed
 (`docs/wine-repro/batch1-measure/l1-2026-11-09-batch1-4/`).
+
+## L1 and L2 of test-run/batch1-6 (2026-11-10)
+
+Run 42772681118 (`docs/wine-repro/batch1-measure/l1-2026-11-10-batch1-6/`).
+L1: unchanged since batch1-4, where its L1 passed; in this run as part of the series. L2 (paired, both architectures): 6 regressions, all known and
+none from batch 1 (production setrows v1, mousemove v1, urlmon v1 and its
+tests-first test; ntdll threadpool timing).

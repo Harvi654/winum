@@ -36,3 +36,10 @@ msftedit:richole 178 tests, riched20:richole 181587 tests: 0 failures.
 - L1 (v5's test body passed on both architectures, 150 tests, run
   42718217301; v6 pending), L2 (`test-run/batch1-6`), L4 (Inventor:
   repeated spell-check cycles), cross review (Codex): pending.
+
+## L1 and L2 of test-run/batch1-6 (2026-11-10)
+
+Run 42772681118 (`docs/wine-repro/batch1-measure/l1-2026-11-10-batch1-6/`).
+L1: `msftedit:richole` 182 tests and `riched20:richole` 183279 tests, 0 failures, x86_64 and i386. L2 (paired, both architectures): 6 regressions, all known and
+none from batch 1 (production setrows v1, mousemove v1, urlmon v1 and its
+tests-first test; ntdll threadpool timing).

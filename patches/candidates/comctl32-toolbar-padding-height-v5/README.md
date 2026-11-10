@@ -26,3 +26,10 @@ The DLL change is byte-identical to v4.
   failure; i386 pending.
 - L4 (Inventor palette): pending. Cross review of the one-line test fix:
   pending (Codex).
+
+## L1 and L2 of test-run/batch1-6 (2026-11-10)
+
+Run 42772681118 (`docs/wine-repro/batch1-measure/l1-2026-11-10-batch1-6/`).
+L1: `comctl32:toolbar` 5309 tests, 0 failures, x86_64 and i386. L2 (paired, both architectures): 6 regressions, all known and
+none from batch 1 (production setrows v1, mousemove v1, urlmon v1 and its
+tests-first test; ntdll threadpool timing).
