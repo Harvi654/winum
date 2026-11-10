@@ -1,0 +1,354 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] comctl32/toolbar: Use the TB_SETPADDING height for buttons and keep the size on an unchanged bitmap size.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 (x86_64 and i686, comctl32 5.82 and 6.16 give the same values;
+winum docs/wine-repro/comctl32-toolbar-padding-height, windows-2026-11-09
+and windows-2026-11-09-followup):
+- TB_SETPADDING stores the padding as given (16x16 reads back as 16x16,
+  0xfffe as 0xfffe); -1 in a direction leaves that direction unchanged
+  (3x4, then -1 x 5, gives 3x5). Wine clamped to SM_CXEDGE x SM_CYEDGE.
+- When a non-list toolbar recalculates its buttons (strings added, or
+  TB_SETBITMAPSIZE with another size), the button is bitmap + padding
+  wide (the wider of bitmap and text) and bitmap + the padding height
+  high, + 1 + the text height with strings; Wine added a fixed 6 to the
+  height.
+- TB_SETBITMAPSIZE with the current bitmap size changes nothing; Wine
+  recalculated, which reset sizes Windows keeps.
+
+Inventor's symbol palette sets padding 0; with Wine's fixed 6 its rows
+were taller than on Windows and needed a scroll bar.
+
+The change is limited to TOOLBAR_SetPadding, the non-list height in
+TOOLBAR_MeasureButton and the same-size case of TOOLBAR_SetBitmapSize.
+Not changed: TBSTYLE_LIST keeps Wine's fixed height padding (Windows uses
+the padding height there too), and with strings Windows keeps a wider
+button when the bitmap shrinks after a padding change, Wine does not
+(as before).
+
+v5 (2026-11-10): the test initialises its toolbar handle; rebuild_toolbar()
+destroyed whatever the uninitialised variable held, on i386 the test
+parent window, and every later toolbar of the unit failed. Code as v4.
+v4 (2026-11-09, after the follow-up measurement): -1 leaves a direction
+unchanged (v3 reset both to the default); the padding height is used
+without text too (Windows does so when another bitmap size makes it
+recalculate; v3 had limited it to text); tests for both.
+v3 (2026-11-09, after cross review): no recalculation for an unchanged
+bitmap size, padding stored unclamped, padding height only with text.
+v2 (2026-11-09): added the Wine test.
+
+--- a/dlls/comctl32/tests/toolbar.c
++++ b/dlls/comctl32/tests/toolbar.c
+@@ -3150,6 +3150,245 @@
+     DestroyWindow(hToolbar);
+ }
+ 
++/* Button sizes after TB_SETPADDING, as measured on Windows 10 (v5 and v6
++ * give the same values): the padding is stored as given, -1 leaves that
++ * direction unchanged; when strings make the toolbar recalculate the button
++ * size, the height padding is the TB_SETPADDING height, like the width; a
++ * TB_SETBITMAPSIZE with the current size changes nothing, and a toolbar
++ * without strings keeps its default size. */
++static void test_padding_height(void)
++{
++    static const DWORD styles[] =
++    {
++        0, TBSTYLE_FLAT, TBSTYLE_FLAT | TBSTYLE_WRAPABLE | CCS_VERT,
++    };
++    static const struct { int set; WORD cx, cy; } paddings[] =
++    {
++        { 0 }, { 1, 0, 0 }, { 1, 1, 1 }, { 1, 2, 2 }, { 1, 8, 8 }, { 1, 0, 10 }, { 1, 10, 0 }, { 1, 16, 16 },
++    };
++    HIMAGELIST (WINAPI *pImageList_Create)(int, int, UINT, int, int);
++    int (WINAPI *pImageList_Add)(HIMAGELIST, HBITMAP, HBITMAP);
++    BOOL (WINAPI *pImageList_Destroy_)(HIMAGELIST);
++    DWORD size, pad, def_size[4] = { 0 };
++    unsigned int s, c, p, after;
++    TBBUTTON buttons[4];
++    HIMAGELIST himl;
++    HBITMAP bitmap;
++    HMODULE module;
++    HWND toolbar = NULL;
++    LRESULT first;
++    int i, cx, cy;
++    HDC hdc;
++
++    /* the image list functions of the comctl32 version in use */
++    module = GetModuleHandleA("comctl32.dll");
++    pImageList_Create = (void *)GetProcAddress(module, "ImageList_Create");
++    pImageList_Add = (void *)GetProcAddress(module, "ImageList_Add");
++    pImageList_Destroy_ = (void *)GetProcAddress(module, "ImageList_Destroy");
++
++    hdc = GetDC(NULL);
++    bitmap = CreateCompatibleBitmap(hdc, 64, 16);
++    ReleaseDC(NULL, hdc);
++
++    /* -1 leaves that direction unchanged */
++    rebuild_toolbar(&toolbar);
++    pad = SendMessageA(toolbar, TB_SETPADDING, 0, MAKELPARAM(0xffff, 0xffff));
++    ok(pad == MAKELONG(7, 6), "got old padding %#lx\n", pad);
++    pad = SendMessageA(toolbar, TB_GETPADDING, 0, 0);
++    ok(pad == MAKELONG(7, 6), "got padding %#lx\n", pad);
++    SendMessageA(toolbar, TB_SETPADDING, 0, MAKELPARAM(3, 4));
++    pad = SendMessageA(toolbar, TB_SETPADDING, 0, MAKELPARAM(0xffff, 0xffff));
++    ok(pad == MAKELONG(3, 4), "got old padding %#lx\n", pad);
++    pad = SendMessageA(toolbar, TB_GETPADDING, 0, 0);
++    ok(pad == MAKELONG(3, 4), "got padding %#lx\n", pad);
++    SendMessageA(toolbar, TB_SETPADDING, 0, MAKELPARAM(0xffff, 5));
++    pad = SendMessageA(toolbar, TB_GETPADDING, 0, 0);
++    ok(pad == MAKELONG(3, 5), "got padding %#lx\n", pad);
++    SendMessageA(toolbar, TB_SETPADDING, 0, MAKELPARAM(16, 0xffff));
++    pad = SendMessageA(toolbar, TB_GETPADDING, 0, 0);
++    ok(pad == MAKELONG(16, 5), "got padding %#lx\n", pad);
++    SendMessageA(toolbar, TB_SETPADDING, 0, MAKELPARAM(0xfffe, 0xfffe));
++    pad = SendMessageA(toolbar, TB_GETPADDING, 0, 0);
++    ok(pad == MAKELONG(0xfffe, 0xfffe), "got padding %#lx\n", pad);
++    DestroyWindow(toolbar);
++
++    for (s = 0; s < ARRAY_SIZE(styles); s++)
++    for (after = 0; after < 2; after++)
++    {
++        /* content 0: 16x16 image list and strings; 1: strings, no image list
++         * (I_IMAGENONE); 2: image list, no strings; 3: neither */
++        for (c = 0; c < 4; c++)
++        {
++            for (p = 0; p < ARRAY_SIZE(paddings); p++)
++            {
++                winetest_push_context("style %#lx, padding %s, content %u, padding %u", styles[s],
++                                      after ? "after" : "before", c, p);
++                toolbar = CreateWindowExA(0, TOOLBARCLASSNAMEA, NULL, WS_CHILD | WS_VISIBLE | styles[s],
++                                          0, 0, 0, 0, hMainWnd, (HMENU)5, GetModuleHandleA(NULL), NULL);
++                ok(toolbar != NULL, "failed to create toolbar\n");
++                SendMessageA(toolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
++                if (paddings[p].set && !after)
++                    SendMessageA(toolbar, TB_SETPADDING, 0, MAKELPARAM(paddings[p].cx, paddings[p].cy));
++                himl = NULL;
++                if (c == 0 || c == 2)
++                {
++                    himl = pImageList_Create(16, 16, ILC_COLOR24, 4, 0);
++                    ok(pImageList_Add(himl, bitmap, NULL) == 0, "ImageList_Add failed\n");
++                    SendMessageA(toolbar, TB_SETIMAGELIST, 0, (LPARAM)himl);
++                }
++                first = -1;
++                if (c <= 1)
++                    first = SendMessageA(toolbar, TB_ADDSTRINGA, 0, (LPARAM)"Ab\0Cd\0Ef\0Gh\0");
++                memset(buttons, 0, sizeof(buttons));
++                for (i = 0; i < 4; i++)
++                {
++                    buttons[i].iBitmap = c == 1 ? I_IMAGENONE : i;
++                    buttons[i].idCommand = 100 + i;
++                    buttons[i].fsState = TBSTATE_ENABLED;
++                    buttons[i].fsStyle = BTNS_BUTTON;
++                    buttons[i].iString = first >= 0 ? first + i : -1;
++                }
++                ok(SendMessageA(toolbar, TB_ADDBUTTONSA, 4, (LPARAM)buttons), "TB_ADDBUTTONS failed\n");
++                SendMessageA(toolbar, TB_AUTOSIZE, 0, 0);
++                if (paddings[p].set && after)
++                {
++                    SendMessageA(toolbar, TB_SETPADDING, 0, MAKELPARAM(paddings[p].cx, paddings[p].cy));
++                    SendMessageA(toolbar, TB_AUTOSIZE, 0, 0);
++                }
++                if (paddings[p].set)
++                {
++                    pad = SendMessageA(toolbar, TB_GETPADDING, 0, 0);
++                    ok(pad == MAKELONG(paddings[p].cx, paddings[p].cy), "got padding %#lx\n", pad);
++                }
++                size = SendMessageA(toolbar, TB_GETBUTTONSIZE, 0, 0);
++
++                if (!paddings[p].set)
++                {
++                    /* the default padding is 7 x 6 */
++                    def_size[c] = size;
++                    if (c >= 2)
++                        ok(size == MAKELONG(23, 22), "got size %#lx\n", size);
++                    else
++                        ok(HIWORD(size) > 16 + 6 + 1, "got size %#lx\n", size);
++                    cx = LOWORD(size);
++                    cy = HIWORD(size);
++                }
++                else if (c <= 1 && !after)
++                {
++                    /* recalculated with the strings: both paddings count */
++                    cx = LOWORD(def_size[c]) - 7 + paddings[p].cx;
++                    cy = HIWORD(def_size[c]) - 6 + paddings[p].cy;
++                    ok(size == MAKELONG(cx, cy), "got size %#lx, expected %dx%d\n", size, cx, cy);
++                }
++                else
++                {
++                    /* not recalculated: still the default size */
++                    cx = LOWORD(def_size[c]);
++                    cy = HIWORD(def_size[c]);
++                    ok(size == def_size[c], "got size %#lx, expected %#lx\n", size, def_size[c]);
++                }
++
++                /* the same bitmap size changes nothing */
++                ok(SendMessageA(toolbar, TB_SETBITMAPSIZE, 0, MAKELPARAM(16, 16)), "TB_SETBITMAPSIZE failed\n");
++                size = SendMessageA(toolbar, TB_GETBUTTONSIZE, 0, 0);
++                ok(size == MAKELONG(cx, cy), "got size %#lx after TB_SETBITMAPSIZE, expected %dx%d\n", size, cx, cy);
++
++                /* TB_SETBUTTONSIZE does not go below the 16x16 images + padding */
++                SendMessageA(toolbar, TB_SETBUTTONSIZE, 0, MAKELPARAM(1, 1));
++                size = SendMessageA(toolbar, TB_GETBUTTONSIZE, 0, 0);
++                cx = 16 + (paddings[p].set ? paddings[p].cx : 7);
++                cy = 16 + (paddings[p].set ? paddings[p].cy : 6);
++                ok(size == MAKELONG(cx, cy), "got size %#lx after TB_SETBUTTONSIZE, expected %dx%d\n", size, cx, cy);
++
++                DestroyWindow(toolbar);
++                if (himl) pImageList_Destroy_(himl);
++                winetest_pop_context();
++            }
++        }
++    }
++    DeleteObject(bitmap);
++}
++
++/* TB_SETBITMAPSIZE with another size recalculates with the current padding
++ * (Windows 10, v5 and v6): without strings the button is bitmap + padding;
++ * with strings the height follows bitmap and padding height. */
++static void test_padding_bitmap_size(void)
++{
++    static const struct { int set; WORD cx, cy; } paddings[] = { { 0 }, { 1, 0, 0 }, { 1, 0, 10 }, { 1, 10, 0 } };
++    static const struct { WORD cx, cy; } sizes[] = { { 20, 20 }, { 16, 24 }, { 24, 16 }, { 16, 15 } };
++    HIMAGELIST (WINAPI *pImageList_Create)(int, int, UINT, int, int);
++    int (WINAPI *pImageList_Add)(HIMAGELIST, HBITMAP, HBITMAP);
++    BOOL (WINAPI *pImageList_Destroy_)(HIMAGELIST);
++    unsigned int p, z, strings, after;
++    DWORD before, size;
++    TBBUTTON buttons[2];
++    HIMAGELIST himl;
++    HBITMAP bitmap;
++    HMODULE module;
++    HWND toolbar;
++    LRESULT str;
++    int i, padx, pady, used_pady;
++    HDC hdc;
++
++    module = GetModuleHandleA("comctl32.dll");
++    pImageList_Create = (void *)GetProcAddress(module, "ImageList_Create");
++    pImageList_Add = (void *)GetProcAddress(module, "ImageList_Add");
++    pImageList_Destroy_ = (void *)GetProcAddress(module, "ImageList_Destroy");
++    hdc = GetDC(NULL);
++    bitmap = CreateCompatibleBitmap(hdc, 32, 16);
++    ReleaseDC(NULL, hdc);
++
++    for (strings = 0; strings < 2; strings++)
++    for (after = 0; after < 2; after++)
++    for (p = 0; p < ARRAY_SIZE(paddings); p++)
++    for (z = 0; z < ARRAY_SIZE(sizes); z++)
++    {
++        winetest_push_context("strings %u, padding %s %u, bitmap %ux%u", strings, after ? "after" : "before",
++                              p, sizes[z].cx, sizes[z].cy);
++        toolbar = CreateWindowExA(0, TOOLBARCLASSNAMEA, NULL, WS_CHILD | WS_VISIBLE, 0, 0, 0, 0,
++                                  hMainWnd, (HMENU)5, GetModuleHandleA(NULL), NULL);
++        ok(toolbar != NULL, "failed to create toolbar\n");
++        SendMessageA(toolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
++        if (paddings[p].set && !after)
++            SendMessageA(toolbar, TB_SETPADDING, 0, MAKELPARAM(paddings[p].cx, paddings[p].cy));
++        himl = pImageList_Create(16, 16, ILC_COLOR24, 2, 0);
++        pImageList_Add(himl, bitmap, NULL);
++        SendMessageA(toolbar, TB_SETIMAGELIST, 0, (LPARAM)himl);
++        str = strings ? SendMessageA(toolbar, TB_ADDSTRINGA, 0, (LPARAM)"Ab\0Cd\0") : -1;
++        memset(buttons, 0, sizeof(buttons));
++        for (i = 0; i < 2; i++)
++        {
++            buttons[i].iBitmap = i;
++            buttons[i].idCommand = 100 + i;
++            buttons[i].fsState = TBSTATE_ENABLED;
++            buttons[i].iString = str >= 0 ? str + i : -1;
++        }
++        SendMessageA(toolbar, TB_ADDBUTTONSA, 2, (LPARAM)buttons);
++        if (paddings[p].set && after)
++            SendMessageA(toolbar, TB_SETPADDING, 0, MAKELPARAM(paddings[p].cx, paddings[p].cy));
++        before = SendMessageA(toolbar, TB_GETBUTTONSIZE, 0, 0);
++        SendMessageA(toolbar, TB_SETBITMAPSIZE, 0, MAKELPARAM(sizes[z].cx, sizes[z].cy));
++        size = SendMessageA(toolbar, TB_GETBUTTONSIZE, 0, 0);
++
++        padx = paddings[p].set ? paddings[p].cx : 7;
++        pady = paddings[p].set ? paddings[p].cy : 6;
++        if (!strings)
++            ok(size == MAKELONG(sizes[z].cx + padx, sizes[z].cy + pady), "got size %#lx\n", size);
++        else
++        {
++            /* the size before was calculated with the padding set before
++             * the strings, or with the default one */
++            used_pady = after ? 6 : pady;
++            ok(HIWORD(size) - HIWORD(before) == sizes[z].cy - 16 + pady - used_pady,
++               "got size %#lx, before %#lx\n", size, before);
++        }
++        DestroyWindow(toolbar);
++        pImageList_Destroy_(himl);
++        winetest_pop_context();
++    }
++    DeleteObject(bitmap);
++}
++
+ START_TEST(toolbar)
+ {
+     ULONG_PTR ctx_cookie;
+@@ -3206,6 +3445,8 @@
+     test_WM_ERASEBKGND(FALSE);
+     test_WM_PAINT(FALSE);
+     test_wrap();
++    test_padding_height();
++    test_padding_bitmap_size();
+ 
+     if (!load_v6_module(&ctx_cookie, &ctx))
+         return;
+@@ -3217,6 +3458,8 @@
+     test_WM_ERASEBKGND(TRUE);
+     test_WM_PAINT(TRUE);
+     test_wrap();
++    test_padding_height();
++    test_padding_bitmap_size();
+ 
+     PostQuitMessage(0);
+     while(GetMessageA(&msg,0,0,0)) {
+--- a/dlls/comctl32/toolbar.c
++++ b/dlls/comctl32/toolbar.c
+@@ -1669,7 +1669,9 @@
+     {
+         if (bHasBitmap)
+         {
+-            sizeButton.cy = infoPtr->nBitmapHeight + DEFPAD_CY;
++            /* the height padding is the one set with TB_SETPADDING, like the
++               width (DEFPAD_CY by default) */
++            sizeButton.cy = infoPtr->nBitmapHeight + infoPtr->szPadding.cy;
+             if (sizeString.cy > 0)
+                 sizeButton.cy += 1 + sizeString.cy;
+             sizeButton.cx = infoPtr->szPadding.cx +
+@@ -4444,10 +4446,15 @@
+     }
+ 
+     /* width or height of -1 means no change */
+-    if (width != -1)
+-        infoPtr->nBitmapWidth = width;
+-    if (height != -1)
+-        infoPtr->nBitmapHeight = height;
++    if (width == -1)
++        width = infoPtr->nBitmapWidth;
++    if (height == -1)
++        height = infoPtr->nBitmapHeight;
++    /* the same size changes nothing, the buttons keep their size */
++    if (width == infoPtr->nBitmapWidth && height == infoPtr->nBitmapHeight)
++        return TRUE;
++    infoPtr->nBitmapWidth = width;
++    infoPtr->nBitmapHeight = height;
+ 
+     if ((himlDef == infoPtr->himlInt) &&
+         (ImageList_GetImageCount(infoPtr->himlInt) == 0))
+@@ -4893,8 +4900,11 @@
+     DWORD  oldPad;
+ 
+     oldPad = MAKELONG(infoPtr->szPadding.cx, infoPtr->szPadding.cy);
+-    infoPtr->szPadding.cx = min(LOWORD((DWORD)lParam), GetSystemMetrics(SM_CXEDGE));
+-    infoPtr->szPadding.cy = min(HIWORD((DWORD)lParam), GetSystemMetrics(SM_CYEDGE));
++    /* -1 leaves that direction unchanged */
++    if (LOWORD((DWORD)lParam) != 0xffff)
++        infoPtr->szPadding.cx = LOWORD((DWORD)lParam);
++    if (HIWORD((DWORD)lParam) != 0xffff)
++        infoPtr->szPadding.cy = HIWORD((DWORD)lParam);
+     TRACE("cx %ld, cy %ld\n", infoPtr->szPadding.cx, infoPtr->szPadding.cy);
+     return (LRESULT) oldPad;
+ }

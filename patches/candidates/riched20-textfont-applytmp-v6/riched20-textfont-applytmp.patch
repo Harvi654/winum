@@ -1,0 +1,531 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] riched20: Drop temporary formatting after ITextFont::Reset(tomApplyTmp) in msftedit's class.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 (x86_64 and i686; winum
+docs/wine-repro/riched20-textfont-applytmp, windows-2026-11-09):
+- msftedit (RichEdit50W): ITextFont::Reset(tomApplyTmp) on a font of a
+  range returns S_OK, and the changes made after it are temporary - the
+  font object's getters and EM_GETCHARFORMAT keep the old values, and a
+  following Reset(tomApplyNow), also after Reset(tomApplyLater), writes
+  nothing. When the text changed after the font object was taken, the
+  newer formatting stays.
+- riched20 (RichEdit20W): Reset(tomApplyTmp) returns E_INVALIDARG and
+  the setters that follow change the text at once, as without a Reset.
+
+Wine ignored tomApplyTmp (FIXME, S_OK) for both, so the changes went into
+the text, and in msftedit's class the next tomApplyNow wrote the font's
+cached properties back over newer formatting. Inventor's spell checker
+(its text editors are RichEdit50W windows) uses temporary formatting for
+its wavy underline; inserting a symbol turned the text black. Temporary
+formatting is not displayed here; the changes are collected and dropped.
+RichEdit20W gets the measured E_INVALIDARG; its setters stay direct.
+
+Depends on riched20-scf-word-insertion-point (v5), which records the
+window class in the editor.
+
+When the temporary state ends at tomApplyNow, the font caches the text's
+current properties, so a later tomApplyNow writes nothing temporary
+either (measured: a second tomApplyNow leaves the text as it is).
+
+Not changed: after the rejected tomApplyTmp, RichEdit20W's tomApplyNow
+still writes the font's cached values (Windows writes nothing;
+todo_wine); a duplicated (detached) font returns E_NOTIMPL in Wine (S_OK
+in msftedit, E_INVALIDARG in riched20); SetUnderline(tomWave) fails in
+Wine. A second tomApplyTmp cycle on the same font: when nothing is read
+between the steps, Windows' change ends up in the text, here it is dropped
+(todo_wine); when the font and the text are read after every step, it
+stays temporary on Windows too, as here (measured with
+docs/wine-repro/riched20-textfont-applytmp/measure-followup2.c).
+
+v6 (2026-11-10, after cross review): the cache refreshes at tomApplyTmp and
+at its end free the cached font name before replacing it (it leaked one
+BSTR per refresh); a test for the measured second cycle with the state
+read after every step (the change stays temporary there).
+v5 (2026-11-09, after the follow-up measurement): the cache is reloaded
+when the temporary state ends (a second tomApplyNow wrote the temporary
+values); tests for the measured follow-up sequences.
+v4 (2026-11-09, after cross review): the RichEdit20W test creates the
+RichEdit20W class that was measured (not RichEdit20A), and a test checks
+both classes in turn in one process; needs SCF_WORD v5 (flag
+initialised).
+v3 (2026-11-09, after cross review): temporary formatting only for
+msftedit's class; RichEdit20W returns E_INVALIDARG and keeps its direct
+setters; a test for RichEdit20W in riched20's richole tests.
+v2 (2026-11-09): tomApplyLater no longer ends the temporary state; the
+Wine test in dlls/msftedit/tests.
+
+--- a/dlls/msftedit/tests/richole.c
++++ b/dlls/msftedit/tests/richole.c
+@@ -181,10 +181,255 @@
+     ITextSelection_Release(txtsel);
+ }
+ 
++/* ITextFont::Reset(tomApplyTmp): changes made after it are temporary - the
++ * font object and the text's CHARFORMAT keep the old values, and a
++ * following tomApplyNow (also after tomApplyLater) writes nothing, not even
++ * values cached before the text changed. Measured on Windows 10 with
++ * msftedit (x86_64 and i686). */
++#define check_range_format(a,b,c,d) check_range_format_(__LINE__,a,b,c,d)
++static void check_range_format_(unsigned int line, HWND hwnd, LONG start, COLORREF color, BOOL bold)
++{
++    CHARFORMAT2W cf;
++
++    memset(&cf, 0, sizeof(cf));
++    cf.cbSize = sizeof(cf);
++    SendMessageW(hwnd, EM_SETSEL, start, start + 3);
++    SendMessageW(hwnd, EM_GETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++    ok_(__FILE__, line)((cf.dwMask & CFM_COLOR) && !(cf.dwEffects & CFE_AUTOCOLOR) && cf.crTextColor == color,
++                        "got mask %#lx effects %#lx color %#lx, expected %#lx\n",
++                        cf.dwMask, cf.dwEffects, cf.crTextColor, color);
++    ok_(__FILE__, line)((cf.dwMask & CFM_BOLD) && !!(cf.dwEffects & CFE_BOLD) == bold,
++                        "got mask %#lx effects %#lx, expected bold %d\n", cf.dwMask, cf.dwEffects, bold);
++}
++
++static void test_textfont_applytmp(void)
++{
++    static const char *sequences[] = { "now", "stale", "later", "empty" };
++    COLORREF expected;
++    ITextDocument *doc;
++    IRichEditOle *ole;
++    ITextRange *range;
++    ITextFont *font, *dup;
++    CHARFORMAT2W cf;
++    unsigned int s;
++    HRESULT hr;
++    LONG value;
++    HWND hwnd;
++
++    for (s = 0; s < ARRAY_SIZE(sequences); s++)
++    {
++        winetest_push_context("%s", sequences[s]);
++        hwnd = new_window(MSFTEDIT_CLASS, ES_MULTILINE, NULL);
++        ole = NULL;
++        SendMessageW(hwnd, EM_GETOLEINTERFACE, 0, (LPARAM)&ole);
++        ok(ole != NULL, "no IRichEditOle\n");
++        hr = IRichEditOle_QueryInterface(ole, &IID_ITextDocument, (void **)&doc);
++        ok(hr == S_OK, "got %#lx\n", hr);
++
++        /* "abc def ghi" in green, "def" red and bold */
++        SendMessageW(hwnd, WM_SETTEXT, 0, (LPARAM)L"abc def ghi");
++        memset(&cf, 0, sizeof(cf));
++        cf.cbSize = sizeof(cf);
++        cf.dwMask = CFM_COLOR | CFM_BOLD;
++        cf.crTextColor = RGB(0, 128, 0);
++        SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
++        SendMessageW(hwnd, EM_SETSEL, 4, 7);
++        cf.crTextColor = RGB(255, 0, 0);
++        cf.dwEffects = CFE_BOLD;
++        SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++        expected = RGB(255, 0, 0);
++
++        hr = ITextDocument_Range(doc, 4, 7, &range);
++        ok(hr == S_OK, "got %#lx\n", hr);
++        hr = ITextRange_GetFont(range, &font);
++        ok(hr == S_OK, "got %#lx\n", hr);
++
++        if (s == 1)
++        {
++            /* the text changes after the font object was taken */
++            cf.dwMask = CFM_COLOR;
++            cf.crTextColor = RGB(128, 0, 128);
++            SendMessageW(hwnd, EM_SETSEL, 4, 7);
++            SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++            expected = RGB(128, 0, 128);
++            hr = ITextFont_GetForeColor(font, &value);
++            ok(hr == S_OK && (COLORREF)value == expected, "got %#lx, color %#lx\n", hr, value);
++        }
++
++        hr = ITextFont_Reset(font, tomApplyTmp);
++        ok(hr == S_OK, "got %#lx\n", hr);
++        if (s != 3)
++        {
++            hr = ITextFont_SetUnderline(font, tomWave);
++            todo_wine ok(hr == S_OK, "got %#lx\n", hr);
++            hr = ITextFont_SetForeColor(font, RGB(0, 0, 255));
++            ok(hr == S_OK, "got %#lx\n", hr);
++            hr = ITextFont_SetBold(font, tomFalse);
++            ok(hr == S_OK, "got %#lx\n", hr);
++
++            /* neither the font object nor the text show the changes */
++            hr = ITextFont_GetForeColor(font, &value);
++            ok(hr == S_OK && (COLORREF)value == expected, "got %#lx, color %#lx\n", hr, value);
++            hr = ITextFont_GetBold(font, &value);
++            ok(hr == S_OK && value == tomTrue, "got %#lx, bold %ld\n", hr, value);
++            hr = ITextFont_GetUnderline(font, &value);
++            ok(hr == S_OK && value == tomNone, "got %#lx, underline %ld\n", hr, value);
++            check_range_format(hwnd, 4, expected, TRUE);
++        }
++        if (s == 2)
++        {
++            hr = ITextFont_Reset(font, tomApplyLater);
++            ok(hr == S_OK, "got %#lx\n", hr);
++        }
++        hr = ITextFont_Reset(font, tomApplyNow);
++        ok(hr == S_OK, "got %#lx\n", hr);
++        check_range_format(hwnd, 4, expected, TRUE);
++        check_range_format(hwnd, 0, RGB(0, 128, 0), FALSE);
++        check_range_format(hwnd, 8, RGB(0, 128, 0), FALSE);
++
++        if (s == 0)
++        {
++            /* a second tomApplyNow writes no temporary values either */
++            hr = ITextFont_Reset(font, tomApplyNow);
++            ok(hr == S_OK, "got %#lx\n", hr);
++            check_range_format(hwnd, 4, expected, TRUE);
++        }
++        if (s == 0)
++        {
++            /* a font that is not attached to a range */
++            hr = ITextFont_GetDuplicate(font, &dup);
++            ok(hr == S_OK, "got %#lx\n", hr);
++            hr = ITextFont_Reset(dup, tomApplyTmp);
++            todo_wine ok(hr == S_OK, "got %#lx\n", hr);
++            hr = ITextFont_Reset(dup, tomApplyNow);
++            ok(hr == S_OK, "got %#lx\n", hr);
++            ITextFont_Release(dup);
++        }
++
++        ITextFont_Release(font);
++        ITextRange_Release(range);
++        ITextDocument_Release(doc);
++        IRichEditOle_Release(ole);
++        DestroyWindow(hwnd);
++        winetest_pop_context();
++    }
++}
++
++/* the font's and the text's colour (red) and bold state, read through
++ * the font object and EM_GETCHARFORMAT */
++#define check_font_and_text(a,b,c) check_font_and_text_(__LINE__,a,b,c)
++static void check_font_and_text_(unsigned int line, ITextFont *font, HWND hwnd, BOOL bold)
++{
++    LONG value;
++    HRESULT hr;
++
++    hr = ITextFont_GetForeColor(font, &value);
++    ok_(__FILE__, line)(hr == S_OK && (COLORREF)value == RGB(255, 0, 0), "got %#lx, color %#lx\n", hr, value);
++    hr = ITextFont_GetBold(font, &value);
++    ok_(__FILE__, line)(hr == S_OK && value == (bold ? tomTrue : tomFalse), "got %#lx, bold %ld\n", hr, value);
++    check_range_format_(line, hwnd, 4, RGB(255, 0, 0), bold);
++}
++
++/* The same font object after one temporary cycle (tomApplyTmp, a change,
++ * tomApplyNow), as measured on Windows 10 with msftedit: a change without
++ * a Reset applies at once; after a second cycle the change is in the text
++ * too, unless the font and the text were read after every step. */
++static void test_textfont_after_applytmp(void)
++{
++    ITextDocument *doc;
++    IRichEditOle *ole;
++    ITextRange *range;
++    ITextFont *font;
++    CHARFORMAT2W cf;
++    unsigned int s;
++    HRESULT hr;
++    HWND hwnd;
++
++    for (s = 0; s < 3; s++)
++    {
++        winetest_push_context("%s", s == 2 ? "second cycle, read after every step" :
++                              s ? "second cycle" : "change after the cycle");
++        hwnd = new_window(MSFTEDIT_CLASS, ES_MULTILINE, NULL);
++        ole = NULL;
++        SendMessageW(hwnd, EM_GETOLEINTERFACE, 0, (LPARAM)&ole);
++        hr = IRichEditOle_QueryInterface(ole, &IID_ITextDocument, (void **)&doc);
++        ok(hr == S_OK, "got %#lx\n", hr);
++        SendMessageW(hwnd, WM_SETTEXT, 0, (LPARAM)L"abc def ghi");
++        memset(&cf, 0, sizeof(cf));
++        cf.cbSize = sizeof(cf);
++        cf.dwMask = CFM_COLOR | CFM_BOLD;
++        cf.crTextColor = RGB(0, 128, 0);
++        SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
++        SendMessageW(hwnd, EM_SETSEL, 4, 7);
++        cf.crTextColor = RGB(255, 0, 0);
++        cf.dwEffects = CFE_BOLD;
++        SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++        hr = ITextDocument_Range(doc, 4, 7, &range);
++        ok(hr == S_OK, "got %#lx\n", hr);
++        hr = ITextRange_GetFont(range, &font);
++        ok(hr == S_OK, "got %#lx\n", hr);
++
++        hr = ITextFont_Reset(font, tomApplyTmp);
++        ok(hr == S_OK, "got %#lx\n", hr);
++        hr = ITextFont_SetForeColor(font, RGB(0, 0, 255));
++        ok(hr == S_OK, "got %#lx\n", hr);
++        if (s == 2) check_font_and_text(font, hwnd, TRUE);
++        hr = ITextFont_Reset(font, tomApplyNow);
++        ok(hr == S_OK, "got %#lx\n", hr);
++        check_range_format(hwnd, 4, RGB(255, 0, 0), TRUE);
++        if (s == 2) check_font_and_text(font, hwnd, TRUE);
++
++        if (s)
++        {
++            hr = ITextFont_Reset(font, tomApplyTmp);
++            ok(hr == S_OK, "got %#lx\n", hr);
++            if (s == 2) check_font_and_text(font, hwnd, TRUE);
++        }
++        hr = ITextFont_SetBold(font, tomFalse);
++        ok(hr == S_OK, "got %#lx\n", hr);
++        if (s == 2) check_font_and_text(font, hwnd, TRUE);
++        if (s)
++        {
++            hr = ITextFont_Reset(font, tomApplyNow);
++            ok(hr == S_OK, "got %#lx\n", hr);
++        }
++        if (s == 2)
++        {
++            /* with the state read after every step, the second cycle's
++             * change stays temporary */
++            check_font_and_text(font, hwnd, TRUE);
++            ITextFont_Release(font);
++            ITextRange_Release(range);
++            ITextDocument_Release(doc);
++            IRichEditOle_Release(ole);
++            DestroyWindow(hwnd);
++            winetest_pop_context();
++            continue;
++        }
++        memset(&cf, 0, sizeof(cf));
++        cf.cbSize = sizeof(cf);
++        SendMessageW(hwnd, EM_SETSEL, 4, 7);
++        SendMessageW(hwnd, EM_GETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++        ok((cf.dwMask & CFM_COLOR) && cf.crTextColor == RGB(255, 0, 0), "got color %#lx\n", cf.crTextColor);
++        /* why the second cycle's change reaches the text is not known yet */
++        todo_wine_if(s)
++        ok((cf.dwMask & CFM_BOLD) && !(cf.dwEffects & CFE_BOLD), "got effects %#lx\n", cf.dwEffects);
++
++        ITextFont_Release(font);
++        ITextRange_Release(range);
++        ITextDocument_Release(doc);
++        IRichEditOle_Release(ole);
++        DestroyWindow(hwnd);
++        winetest_pop_context();
++    }
++}
++
+ START_TEST(richole)
+ {
+     msftedit_hmodule = LoadLibraryA("msftedit.dll");
+     ok(msftedit_hmodule != NULL, "error: %d\n", (int) GetLastError());
+ 
+     test_Interfaces();
++    test_textfont_applytmp();
++    test_textfont_after_applytmp();
+ }
+--- a/dlls/riched20/richole.c
++++ b/dlls/riched20/richole.c
+@@ -224,6 +224,7 @@
+     textfont_prop_val props[FONT_PROPID_LAST];
+     BOOL get_cache_enabled;
+     BOOL set_cache_enabled;
++    BOOL apply_tmp;
+ } ITextFontImpl;
+ 
+ typedef struct ITextParaImpl {
+@@ -727,6 +728,9 @@
+     CHARFORMAT2W fmt;
+     LONG start, end;
+ 
++    if (font->apply_tmp)
++        TRACE("temporary formatting, property %d not applied\n", propid);
++
+     /* when font is not attached to any range use cache */
+     if (!font->range || font->set_cache_enabled) {
+         if (propid == FONT_NAME) {
+@@ -883,6 +887,14 @@
+     }
+ }
+ 
++/* the cache of a font that has one: the name is replaced, not leaked */
++static void textfont_refresh_range_props(ITextFontImpl *font)
++{
++    SysFreeString(font->props[FONT_NAME].str);
++    font->props[FONT_NAME].str = NULL;
++    textfont_cache_range_props(font);
++}
++
+ static HRESULT textrange_expand(ITextRange *range, LONG unit, LONG *delta)
+ {
+     LONG expand_start, expand_end;
+@@ -3004,11 +3016,37 @@
+             This->get_cache_enabled = FALSE;
+             break;
+         case tomApplyLater:
++            /* temporary changes stay temporary: a following tomApplyNow
++               drops them as well */
+             This->set_cache_enabled = TRUE;
+             break;
+         case tomApplyNow:
+             This->set_cache_enabled = FALSE;
+-            textfont_apply_range_props(This);
++            /* temporary (display-only) formatting is not supported: drop it
++               instead of writing it into the text, and cache the text's
++               current properties, so that a later tomApplyNow writes no
++               temporary values either */
++            if (This->apply_tmp)
++            {
++                This->apply_tmp = FALSE;
++                textfont_refresh_range_props(This);
++            }
++            else
++                textfont_apply_range_props(This);
++            break;
++        case tomApplyTmp:
++            /* riched20's RichEdit20W rejects temporary formatting */
++            if (!get_range_reole( This->range )->editor->msftedit)
++                return E_INVALIDARG;
++            /* Temporary formatting is shown on screen only and never becomes
++               part of the text (spell checkers use it for the wavy underline
++               under misspelled words). It is not implemented; collect the
++               following changes in the cache and drop them, rather than
++               applying them as real formatting. */
++            WARN("temporary formatting (tomApplyTmp) not supported, ignored\n");
++            textfont_refresh_range_props(This);
++            This->set_cache_enabled = TRUE;
++            This->apply_tmp = TRUE;
+             break;
+         case tomUsePoints:
+         case tomUseTwips:
+@@ -3495,6 +3533,7 @@
+ 
+     font->ITextFont_iface.lpVtbl = &textfontvtbl;
+     font->ref = 1;
++    font->apply_tmp = FALSE;
+ 
+     if (src) {
+         font->range = NULL;
+--- a/dlls/riched20/tests/richole.c
++++ b/dlls/riched20/tests/richole.c
+@@ -3215,6 +3215,121 @@
+   release_interfaces(&hwnd, &reOle, &doc, NULL);
+ }
+ 
++/* ITextFont::Reset(tomApplyTmp) in riched20's RichEdit20W (the W class that
++ * was measured), as measured on
++ * Windows 10 (x86_64 and i686): it fails with E_INVALIDARG and the setters
++ * that follow change the text at once. (msftedit's class accepts it; see
++ * msftedit's richole tests.) */
++static HWND create_class_document(const WCHAR *cls, IRichEditOle **ole, ITextDocument **doc)
++{
++    HWND hwnd = CreateWindowW(cls, NULL, ES_MULTILINE | WS_POPUP | WS_VISIBLE,
++                              0, 0, 200, 60, NULL, NULL, NULL, NULL);
++    ok(hwnd != NULL, "class %s: error %lu\n", wine_dbgstr_w(cls), GetLastError());
++    *ole = NULL;
++    SendMessageW(hwnd, EM_GETOLEINTERFACE, 0, (LPARAM)ole);
++    ok(*ole != NULL, "no IRichEditOle\n");
++    IRichEditOle_QueryInterface(*ole, &IID_ITextDocument, (void **)doc);
++    return hwnd;
++}
++
++static void test_textfont_applytmp_riched20(void)
++{
++    ITextDocument *doc;
++    IRichEditOle *ole;
++    ITextRange *range;
++    ITextFont *font, *dup;
++    CHARFORMAT2W cf;
++    unsigned int i, c;
++    HRESULT hr;
++    LONG value;
++    HWND hwnd;
++
++    hwnd = create_class_document(L"RichEdit20W", &ole, &doc);
++    /* "abc def ghi" in green, "def" red and bold */
++    SendMessageW(hwnd, WM_SETTEXT, 0, (LPARAM)L"abc def ghi");
++    memset(&cf, 0, sizeof(cf));
++    cf.cbSize = sizeof(cf);
++    cf.dwMask = CFM_COLOR | CFM_BOLD;
++    cf.crTextColor = RGB(0, 128, 0);
++    SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_ALL, (LPARAM)&cf);
++    SendMessageW(hwnd, EM_SETSEL, 4, 7);
++    cf.crTextColor = RGB(255, 0, 0);
++    cf.dwEffects = CFE_BOLD;
++    SendMessageW(hwnd, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++
++    hr = ITextDocument_Range(doc, 4, 7, &range);
++    ok(hr == S_OK, "got %#lx\n", hr);
++    hr = ITextRange_GetFont(range, &font);
++    ok(hr == S_OK, "got %#lx\n", hr);
++
++    hr = ITextFont_Reset(font, tomApplyTmp);
++    ok(hr == E_INVALIDARG, "got %#lx\n", hr);
++    hr = ITextFont_SetUnderline(font, tomWave);
++    todo_wine ok(hr == S_OK, "got %#lx\n", hr);
++    hr = ITextFont_SetForeColor(font, RGB(0, 0, 255));
++    ok(hr == S_OK, "got %#lx\n", hr);
++    hr = ITextFont_SetBold(font, tomFalse);
++    ok(hr == S_OK, "got %#lx\n", hr);
++
++    /* the changes are in the text at once */
++    hr = ITextFont_GetForeColor(font, &value);
++    ok(hr == S_OK && (COLORREF)value == RGB(0, 0, 255), "got %#lx, color %#lx\n", hr, value);
++    hr = ITextFont_GetBold(font, &value);
++    ok(hr == S_OK && value == tomFalse, "got %#lx, bold %ld\n", hr, value);
++    memset(&cf, 0, sizeof(cf));
++    cf.cbSize = sizeof(cf);
++    SendMessageW(hwnd, EM_SETSEL, 4, 7);
++    SendMessageW(hwnd, EM_GETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++    ok((cf.dwMask & CFM_COLOR) && cf.crTextColor == RGB(0, 0, 255), "got mask %#lx color %#lx\n", cf.dwMask, cf.crTextColor);
++    ok((cf.dwMask & CFM_BOLD) && !(cf.dwEffects & CFE_BOLD), "got mask %#lx effects %#lx\n", cf.dwMask, cf.dwEffects);
++
++    /* tomApplyNow writes no older values back */
++    hr = ITextFont_Reset(font, tomApplyNow);
++    ok(hr == S_OK, "got %#lx\n", hr);
++    memset(&cf, 0, sizeof(cf));
++    cf.cbSize = sizeof(cf);
++    SendMessageW(hwnd, EM_SETSEL, 4, 7);
++    SendMessageW(hwnd, EM_GETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
++    todo_wine ok((cf.dwMask & CFM_COLOR) && cf.crTextColor == RGB(0, 0, 255), "got mask %#lx color %#lx\n", cf.dwMask, cf.crTextColor);
++    todo_wine ok((cf.dwMask & CFM_BOLD) && !(cf.dwEffects & CFE_BOLD), "got mask %#lx effects %#lx\n", cf.dwMask, cf.dwEffects);
++
++    /* a font that is not attached to a range */
++    hr = ITextFont_GetDuplicate(font, &dup);
++    ok(hr == S_OK, "got %#lx\n", hr);
++    hr = ITextFont_Reset(dup, tomApplyTmp);
++    todo_wine ok(hr == E_INVALIDARG, "got %#lx\n", hr);
++    ITextFont_Release(dup);
++
++    ITextFont_Release(font);
++    ITextRange_Release(range);
++    release_interfaces(&hwnd, &ole, &doc, NULL);
++
++    /* both classes in turn in one process: msftedit's RichEdit50W accepts
++     * tomApplyTmp (S_OK), RichEdit20W does not (measured) */
++    if (!LoadLibraryA("msftedit.dll"))
++    {
++        win_skip("msftedit.dll not available\n");
++        return;
++    }
++    for (i = 0; i < 3; i++)
++        for (c = 0; c < 2; c++)
++        {
++            winetest_push_context("round %u, %s", i, c ? "RichEdit20W" : "RichEdit50W");
++            hwnd = create_class_document(c ? L"RichEdit20W" : L"RichEdit50W", &ole, &doc);
++            SendMessageW(hwnd, WM_SETTEXT, 0, (LPARAM)L"abc def ghi");
++            hr = ITextDocument_Range(doc, 4, 7, &range);
++            ok(hr == S_OK, "got %#lx\n", hr);
++            hr = ITextRange_GetFont(range, &font);
++            ok(hr == S_OK, "got %#lx\n", hr);
++            hr = ITextFont_Reset(font, tomApplyTmp);
++            ok(hr == (c ? E_INVALIDARG : S_OK), "got %#lx\n", hr);
++            ITextFont_Release(font);
++            ITextRange_Release(range);
++            release_interfaces(&hwnd, &ole, &doc, NULL);
++            winetest_pop_context();
++        }
++}
++
+ static void test_Delete(void)
+ {
+   static const CHAR test_text1[] = "TestSomeText";
+@@ -5706,6 +5821,7 @@
+   test_GetPara();
+   test_dispatch();
+   test_ITextFont();
++  test_textfont_applytmp_riched20();
+   test_Delete();
+   test_SetText();
+   test_InRange();

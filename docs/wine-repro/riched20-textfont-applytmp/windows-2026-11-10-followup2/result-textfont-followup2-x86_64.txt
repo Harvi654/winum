@@ -1,0 +1,106 @@
+MEASURE topic=riched20-textfont-followup2 schema=1 bits=64
+DLL riched20
+SEQUENCE seq=same
+RESET seq=same mode=applytmp hr=80070057
+SET seq=same color_hr=00000000
+FONT seq=same when=set1 color=00000000:00ff0000 bold=00000000:-1
+TEXT seq=same when=set1 mask_color=1 color=ff0000 mask_bold=1 bold=1
+RESET seq=same mode=applynow hr=00000000
+FONT seq=same when=now1 color=00000000:00ff0000 bold=00000000:-1
+TEXT seq=same when=now1 mask_color=1 color=ff0000 mask_bold=1 bold=1
+RESET seq=same mode=applytmp2 hr=80070057
+FONT seq=same when=tmp2 color=00000000:00ff0000 bold=00000000:-1
+TEXT seq=same when=tmp2 mask_color=1 color=ff0000 mask_bold=1 bold=1
+SET seq=same bold_hr=00000000
+FONT seq=same when=set2 color=00000000:00ff0000 bold=00000000:0
+TEXT seq=same when=set2 mask_color=1 color=ff0000 mask_bold=1 bold=0
+RESET seq=same mode=applynow2 hr=00000000
+FONT seq=same when=now2 color=00000000:00ff0000 bold=00000000:0
+TEXT seq=same when=now2 mask_color=1 color=ff0000 mask_bold=1 bold=0
+SEQUENCE seq=new_font
+RESET seq=new_font mode=applytmp hr=80070057
+SET seq=new_font color_hr=00000000
+FONT seq=new_font when=set1 color=00000000:00ff0000 bold=00000000:-1
+TEXT seq=new_font when=set1 mask_color=1 color=ff0000 mask_bold=1 bold=1
+RESET seq=new_font mode=applynow hr=00000000
+FONT seq=new_font when=now1 color=00000000:00ff0000 bold=00000000:-1
+TEXT seq=new_font when=now1 mask_color=1 color=ff0000 mask_bold=1 bold=1
+RESET seq=new_font mode=applytmp2 hr=80070057
+FONT seq=new_font when=tmp2 color=00000000:00ff0000 bold=00000000:-1
+TEXT seq=new_font when=tmp2 mask_color=1 color=ff0000 mask_bold=1 bold=1
+SET seq=new_font bold_hr=00000000
+FONT seq=new_font when=set2 color=00000000:00ff0000 bold=00000000:0
+TEXT seq=new_font when=set2 mask_color=1 color=ff0000 mask_bold=1 bold=0
+RESET seq=new_font mode=applynow2 hr=00000000
+FONT seq=new_font when=now2 color=00000000:00ff0000 bold=00000000:0
+TEXT seq=new_font when=now2 mask_color=1 color=ff0000 mask_bold=1 bold=0
+SEQUENCE seq=bold_first
+RESET seq=bold_first mode=applytmp hr=80070057
+SET seq=bold_first bold_hr=00000000
+FONT seq=bold_first when=set color=00000000:000000ff bold=00000000:0
+TEXT seq=bold_first when=set mask_color=1 color=0000ff mask_bold=1 bold=0
+RESET seq=bold_first mode=applynow hr=00000000
+FONT seq=bold_first when=now color=00000000:000000ff bold=00000000:0
+TEXT seq=bold_first when=now mask_color=1 color=0000ff mask_bold=1 bold=0
+SEQUENCE seq=twice_tmp
+RESET seq=twice_tmp mode=applytmp hr=80070057
+RESET seq=twice_tmp mode=applytmp hr=80070057
+SET seq=twice_tmp color_hr=00000000
+FONT seq=twice_tmp when=set1 color=00000000:00ff0000 bold=00000000:-1
+TEXT seq=twice_tmp when=set1 mask_color=1 color=ff0000 mask_bold=1 bold=1
+RESET seq=twice_tmp mode=applynow hr=00000000
+FONT seq=twice_tmp when=now1 color=00000000:00ff0000 bold=00000000:-1
+TEXT seq=twice_tmp when=now1 mask_color=1 color=ff0000 mask_bold=1 bold=1
+DLL msftedit
+SEQUENCE seq=same
+RESET seq=same mode=applytmp hr=00000000
+SET seq=same color_hr=00000000
+FONT seq=same when=set1 color=00000000:000000ff bold=00000000:-1
+TEXT seq=same when=set1 mask_color=1 color=0000ff mask_bold=1 bold=1
+RESET seq=same mode=applynow hr=00000000
+FONT seq=same when=now1 color=00000000:000000ff bold=00000000:-1
+TEXT seq=same when=now1 mask_color=1 color=0000ff mask_bold=1 bold=1
+RESET seq=same mode=applytmp2 hr=00000000
+FONT seq=same when=tmp2 color=00000000:000000ff bold=00000000:-1
+TEXT seq=same when=tmp2 mask_color=1 color=0000ff mask_bold=1 bold=1
+SET seq=same bold_hr=00000000
+FONT seq=same when=set2 color=00000000:000000ff bold=00000000:-1
+TEXT seq=same when=set2 mask_color=1 color=0000ff mask_bold=1 bold=1
+RESET seq=same mode=applynow2 hr=00000000
+FONT seq=same when=now2 color=00000000:000000ff bold=00000000:-1
+TEXT seq=same when=now2 mask_color=1 color=0000ff mask_bold=1 bold=1
+SEQUENCE seq=new_font
+RESET seq=new_font mode=applytmp hr=00000000
+SET seq=new_font color_hr=00000000
+FONT seq=new_font when=set1 color=00000000:000000ff bold=00000000:-1
+TEXT seq=new_font when=set1 mask_color=1 color=0000ff mask_bold=1 bold=1
+RESET seq=new_font mode=applynow hr=00000000
+FONT seq=new_font when=now1 color=00000000:000000ff bold=00000000:-1
+TEXT seq=new_font when=now1 mask_color=1 color=0000ff mask_bold=1 bold=1
+RESET seq=new_font mode=applytmp2 hr=00000000
+FONT seq=new_font when=tmp2 color=00000000:000000ff bold=00000000:-1
+TEXT seq=new_font when=tmp2 mask_color=1 color=0000ff mask_bold=1 bold=1
+SET seq=new_font bold_hr=00000000
+FONT seq=new_font when=set2 color=00000000:000000ff bold=00000000:-1
+TEXT seq=new_font when=set2 mask_color=1 color=0000ff mask_bold=1 bold=1
+RESET seq=new_font mode=applynow2 hr=00000000
+FONT seq=new_font when=now2 color=00000000:000000ff bold=00000000:-1
+TEXT seq=new_font when=now2 mask_color=1 color=0000ff mask_bold=1 bold=1
+SEQUENCE seq=bold_first
+RESET seq=bold_first mode=applytmp hr=00000000
+SET seq=bold_first bold_hr=00000000
+FONT seq=bold_first when=set color=00000000:000000ff bold=00000000:-1
+TEXT seq=bold_first when=set mask_color=1 color=0000ff mask_bold=1 bold=1
+RESET seq=bold_first mode=applynow hr=00000000
+FONT seq=bold_first when=now color=00000000:000000ff bold=00000000:-1
+TEXT seq=bold_first when=now mask_color=1 color=0000ff mask_bold=1 bold=1
+SEQUENCE seq=twice_tmp
+RESET seq=twice_tmp mode=applytmp hr=00000000
+RESET seq=twice_tmp mode=applytmp hr=00000000
+SET seq=twice_tmp color_hr=00000000
+FONT seq=twice_tmp when=set1 color=00000000:000000ff bold=00000000:-1
+TEXT seq=twice_tmp when=set1 mask_color=1 color=0000ff mask_bold=1 bold=1
+RESET seq=twice_tmp mode=applynow hr=00000000
+FONT seq=twice_tmp when=now1 color=00000000:000000ff bold=00000000:-1
+TEXT seq=twice_tmp when=now1 mask_color=1 color=0000ff mask_bold=1 bold=1
+SUMMARY topic=riched20-textfont-followup2 api_errors=0 complete=1 expectations=none

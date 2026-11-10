@@ -1,5 +1,10 @@
 # comctl32-toolbar-padding-height v4: after the follow-up measurement
 
+**Superseded by `../comctl32-toolbar-padding-height-v5/` (2026-11-10):** the
+test left its toolbar handle uninitialised (i386 failure in L1 and L2);
+the code is unchanged. v4 was approved by Codex
+(`docs/wine-repro/cross-review-2026-11-10-comctl32-toolbar-padding-height-v4.md`).
+
 Candidate only: `patches/series`, the production patch and its page marker
 are unchanged. Substitute `comctl32-toolbar-padding-height.patch` from this
 folder for the production file at its place in the series (entry 10).

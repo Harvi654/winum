@@ -95,3 +95,22 @@ riched20 (RichEdit20W): tomApplyTmp E_INVALIDARG, the setters apply at
 once, later tomApplyNow writes nothing; Wine's (vanilla and candidate)
 tomApplyNow writes the font's cached values - the known RichEdit20W
 difference, todo_wine.
+
+### Second follow-up (`measure-followup2.c`, 2026-11-10)
+
+`windows-2026-11-10-followup2/`, both architectures identical, exit 0,
+`api_errors=0`. msftedit, the font and the text read after every step:
+
+- `same` (two cycles on one font): the second cycle's not-bold change
+  stays temporary - not in the getters, not in the text, also after its
+  tomApplyNow (bold stays). In the first follow-up's `tmp_again`, where
+  nothing was read between the steps, it ended up in the text.
+- `new_font` (second cycle on a new font object): the same as `same`.
+- `bold_first` (one cycle with a not-bold change): stays temporary.
+- `twice_tmp` (tomApplyTmp twice, then the change): stays temporary.
+
+The textfont v5 candidate gives exactly these results locally. What makes
+the unread `tmp_again` different on Windows is not known; the hypothesis
+is that reading the font (or EM_SETSEL / EM_GETCHARFORMAT) between the
+steps matters. Not measured further (third round on this point); the case
+stays `todo_wine`, the read-after-every-step case is an ordinary test.

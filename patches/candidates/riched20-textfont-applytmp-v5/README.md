@@ -1,5 +1,9 @@
 # riched20-textfont-applytmp v5: no temporary values after the cycle
 
+**Superseded by `../riched20-textfont-applytmp-v6/` (2026-11-10)** after
+cross review (P2: a cached font-name BSTR leaked at each refresh). Kept as
+the record.
+
 Candidate only: `patches/series`, the production patch and its page marker
 are unchanged. Substitute `riched20-textfont-applytmp.patch` from this
 folder for the production file at its place in the series (entry 24).
