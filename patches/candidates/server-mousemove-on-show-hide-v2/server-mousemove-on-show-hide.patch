@@ -27,9 +27,15 @@ the move arrives after the messages the change itself causes; the
 measurement shows the delay and the coalescing, not the order of the
 other messages.
 
+v2 revised (2026-11-10, after the maintainer's L4 in Inventor 2027 with
+the test-run/all-1 build): with 16 ms the sketch did not redraw after a
+dimension edit until the mouse moved; WINE_SHOWHIDE_MOUSEMOVE_MS=16 and
+24 failed, 32 and 100 worked. The default is now 32 ms, the upper end of
+the delay Windows showed (15-32 ms, two timer ticks).
+
 --- a/server/queue.c
 +++ b/server/queue.c
-@@ -589,6 +589,51 @@
+@@ -589,6 +589,52 @@
      set_cursor_pos( desktop, desktop_shm->cursor.x, desktop_shm->cursor.y );
  }
  
@@ -37,7 +43,8 @@ other messages.
 + * is shown, hidden, moved, created or destroyed, a burst of changes giving
 + * one move, within one or two timer ticks (15-32 ms measured). Inventor
 + * redraws its view after a sketch dimension edit only when that move
-+ * arrives. */
++ * arrives; under Wine it needs the upper end of that range (16 and 24 ms
++ * were too early, 32 ms works). */
 +static struct timeout_user *cursor_pos_timeout;
 +static struct desktop *cursor_pos_desktop;
 +
@@ -66,7 +73,7 @@ other messages.
 +    if (delay_ms < 0)
 +    {
 +        const char *env = getenv( "WINE_SHOWHIDE_MOUSEMOVE_MS" );
-+        delay_ms = env ? atoi( env ) : 16;
++        delay_ms = env ? atoi( env ) : 32;
 +    }
 +    if (!delay_ms) return;
 +    if (cursor_pos_timeout)

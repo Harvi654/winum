@@ -17,3 +17,13 @@ the mouse; a Wine test (batch 4) from the measured scenarios.
 ## L2: test-run/all-1 (2026-11-10)
 
 [docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: no new failure in the touched DLLs, both architectures.
+
+## L4, 2026-11-10 (Inventor 2027, build of test-run/all-1)
+
+With the 16 ms default the sketch did not redraw after a dimension edit
+until the mouse moved, so the 16 ms version did not fix the user's
+problem. Same build with `WINE_SHOWHIDE_MOUSEMOVE_MS` (read by wineserver
+at start, `wineserver -k` before each try): 16 and 24 ms fail, 32 and
+100 ms work. The default is now 32 ms, the upper end of what Windows
+showed (15-32 ms). L4 of the 32 ms default itself is still to be done
+with the next build; the Wine test must accept a move within that delay.

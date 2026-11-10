@@ -34,6 +34,8 @@ None in the patch.
 
 ## Open points
 
+L4 2026-11-10: 16 ms (v2 as first written) does not fix the sketch redraw in Inventor 2027; 16/24 ms fail, 32/100 ms work. v2 now defaults to 32 ms (`patches/candidates/server-mousemove-on-show-hide-v2/README.md`).
+
 Wine test missing; the 100 ms delay is empirical.
 
 ## Evidence
