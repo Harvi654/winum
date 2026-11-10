@@ -37,8 +37,11 @@ there as ordinary assertions; no child destruction, detach, reparent,
 capture, API or other actor check is newly excused. The original Windows
 tables and server hunks are unchanged. The returned JSON contains first
 messages per line, not all contexts; later failures' attribution remains
-a hypothesis to be checked by the last paired round. Native v5 L1 and
-paired L2 are pending; previous passes do not transfer.
+a hypothesis to be checked by the last paired round. Native v5 L1 passed Windows 10 x86_64/i386: 16719 checks each, zero
+failures/skips and both complete observation scopes. Focused paired L2
+42772336963 is green: zero ordinary series failures, full component
+coverage, 16 todos and one explicitly unavailable absolute-state scope.
+Changed-test cross review and neighboring-suite L2 remain pending.
 
 v4 (2026-11-10, separation round 2): round 1 reached every initial state
 but still found 301/305 ordinary failures, beginning in a no-edge local

@@ -1,0 +1,3 @@
+attachment.c:1329: ATTACHMENT_COVERAGE completed=44 skipped=0 attempted=44
+attachment.c:1331: ATTACHMENT_SCOPE component_snapshots=592 absolute_snapshots=592 absolute_state=1 positive_checks=2180
+2b8c:attachment: 16719 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.

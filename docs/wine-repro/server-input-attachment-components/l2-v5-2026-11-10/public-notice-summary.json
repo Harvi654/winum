@@ -1,0 +1,60 @@
+{
+  "source": "Transcribed public run-summary notices; not original artifact JSON.",
+  "run_url": "https://github.com/Harvi654/winum/actions/runs/42772336963",
+  "commit": "ee0773582e02308f8368a444b4f909de2c2eab15",
+  "overall_status": "success",
+  "units": [
+    {
+      "variant": "vanilla",
+      "architecture": "i386",
+      "absolute_snapshots": 3,
+      "absolute_state": 0,
+      "completed_scenarios": 44,
+      "component_snapshots": 592,
+      "exit": "255",
+      "failures": 290,
+      "finished": true,
+      "positive_checks": 2180,
+      "skipped": 1,
+      "skipped_scenarios": 0,
+      "tests": 12039,
+      "todo": 16
+    },
+    {
+      "variant": "series",
+      "architecture": "x86_64",
+      "absolute_snapshots": 3,
+      "absolute_state": 0,
+      "completed_scenarios": 44,
+      "component_snapshots": 592,
+      "exit": null,
+      "failures": 0,
+      "finished": true,
+      "positive_checks": 2180,
+      "skipped": 1,
+      "skipped_scenarios": 0,
+      "tests": 12039,
+      "todo": 16
+    },
+    {
+      "variant": "series",
+      "architecture": "i386",
+      "absolute_snapshots": 3,
+      "absolute_state": 0,
+      "completed_scenarios": 44,
+      "component_snapshots": 592,
+      "exit": null,
+      "failures": 0,
+      "finished": true,
+      "positive_checks": 2180,
+      "skipped": 1,
+      "skipped_scenarios": 0,
+      "tests": 12039,
+      "todo": 16
+    }
+  ],
+  "limits": [
+    "The public summary exposed three scope notices; the vanilla x86_64 absolute failure count was not independently retrieved.",
+    "A green coverage gate establishes the vanilla target signal on both architectures; this record does not invent the missing count."
+  ]
+}

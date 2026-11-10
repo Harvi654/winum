@@ -368,3 +368,17 @@ absolute Windows-state scope. If this final pair fails, record its full
 remaining evidence and stop before a further test adjustment. Both main
 and the run-record branch were pushed successfully; the earlier pull
 authentication failure did not block delivery.
+
+
+## V5 results recorded (2026-11-10)
+
+The corrected [native L1 files](l1-v5-2026-11-10/README.md) pass on both
+architectures: 16719 checks, all 44 scenarios, both complete scopes,
+zero failures/skips, exit 0. Privacy checked, original bytes SHA-256
+recorded. The earlier batch1 attachments are not this candidate's L1.
+[The focused pair](l2-v5-2026-11-10/README.md), run 42772336963, is green:
+each series unit has zero ordinary failures, 16 todos, all scenarios and
+component checks. Wine's unavailable absolute view remains disclosed;
+native L1 covers it in full. The final body needs no further VM rerun.
+Changed-test cross review, neighboring-suite v5 L2 and applicable L4
+are still gates; production series and the missing marker are unchanged.

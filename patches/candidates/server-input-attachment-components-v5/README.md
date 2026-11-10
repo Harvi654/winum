@@ -90,3 +90,27 @@ If it fails, stop and record the remaining evidence before any further
 adjustment; do not add broad todos or guess a server fix. No third paired
 run has started yet. The unmeasured third-thread reparent history remains
 an open point, outside this change.
+
+
+## Recorded native and paired results (2026-11-10)
+
+These results supersede the pre-run pending/scheduling notes above.
+[Native v5 L1](../../../docs/wine-repro/server-input-attachment-components/l1-v5-2026-11-10/README.md)
+passed on Windows 10 x86_64/i386: 16719 checks each, zero failures, todos,
+flaky checks or skips, exit 0. All 44 scenarios and both complete scopes
+(592 component and 592 absolute snapshots, state 1, 2180 positives) ran.
+The corrected three returned files were read in full and privacy checked;
+the previous batch1 attachments were not used as this candidate's L1.
+
+[Focused paired L2](../../../docs/wine-repro/server-input-attachment-components/l2-v5-2026-11-10/README.md),
+run 42772336963 at ee07735, finished green. Each series unit has 12039
+checks, zero ordinary failures, 16 todos and full component coverage.
+The single unavailable absolute-view scope is reported, not a scenario
+skip or a native-state pass. Vanilla retains the target signal (290
+ordinary i386 failures; the other count was not retrieved). Public
+source notices, not downloaded original JSON, support these counters.
+
+No further attachment VM rerun is needed for this body. Final changed-test
+cross review, neighboring-suite L2 for v5, and applicable Inventor L4
+remain pending; SOLIDWORKS L4 stays deferred. Candidate only: production
+patches/series and its marker remain unchanged.
