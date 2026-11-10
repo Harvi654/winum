@@ -307,3 +307,13 @@ The series artifact also packages the revised native user32:attachment
 unit. Hold that VM rerun for the next combined round after the pending
 textfont-followup2 measurement results; do not rerun the obsolete v3
 bundle. The textfont BSTR fix has not been added to a new run.
+
+
+Round 2 has finished: [recorded counters and limits](l2-v4-2026-11-10/README.md).
+Both architectures complete all 44 scenarios, with 12 ordinary series
+failures versus 302 vanilla. The absolute-state scope is unavailable on
+both variants. L2 is not cleared. The complete series coverage JSON is
+needed to classify the remaining twelve failures before the final round;
+three public examples point to the child reparent scenario, not proof
+that all failures have that cause. No new VM or third runtime round is
+requested yet.

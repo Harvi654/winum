@@ -111,3 +111,17 @@ The unmeasured third-thread reparent history remains outside this change.
 If component checks still require unreliable foreground behavior, inspect
 the actual round-2 results before choosing the maintainer's third option.
 Do not claim the problem solved or consume the last round on a guess.
+
+
+## Focused round-2 outcome (2026-11-10)
+
+[Run 42724139459](https://github.com/Harvi654/winum/actions/runs/42724139459)
+finished with 12 ordinary series failures on each architecture, compared
+with 302 on vanilla. All 44 scenarios and 592 component snapshots ran;
+there were zero scenario skips. Each variant reports one unavailable
+absolute-state scope, as designed. L2 remains blocked. Representative
+series failures concern children-late1-unparent0 / one-child; obtain the
+full failure list before deciding the final adjustment. Counters and
+limits are recorded in
+[the result note](../../../docs/wine-repro/server-input-attachment-components/l2-v4-2026-11-10/README.md).
+Native v4 L1 remains pending; no third round has been started.

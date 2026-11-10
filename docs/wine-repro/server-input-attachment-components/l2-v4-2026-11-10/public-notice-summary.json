@@ -1,0 +1,71 @@
+{
+  "source": "Public GitHub Actions summary notices, transcribed counters; not the original artifact JSON.",
+  "run_url": "https://github.com/Harvi654/winum/actions/runs/42724139459",
+  "commit": "2d2fc9d7360382b08e5f206f03112af66e6cb256",
+  "units": [
+    {
+      "variant": "vanilla",
+      "arch": "x86_64",
+      "absolute_snapshots": 3,
+      "absolute_state": 0,
+      "completed_scenarios": 44,
+      "component_snapshots": 592,
+      "exit": "255",
+      "failures": 302,
+      "finished": true,
+      "positive_checks": 2180,
+      "skipped": 1,
+      "skipped_scenarios": 0,
+      "tests": 12035,
+      "todo": 12
+    },
+    {
+      "variant": "vanilla",
+      "arch": "i386",
+      "absolute_snapshots": 3,
+      "absolute_state": 0,
+      "completed_scenarios": 44,
+      "component_snapshots": 592,
+      "exit": "255",
+      "failures": 302,
+      "finished": true,
+      "positive_checks": 2180,
+      "skipped": 1,
+      "skipped_scenarios": 0,
+      "tests": 12035,
+      "todo": 12
+    },
+    {
+      "variant": "series",
+      "arch": "x86_64",
+      "absolute_snapshots": 3,
+      "absolute_state": 0,
+      "completed_scenarios": 44,
+      "component_snapshots": 592,
+      "exit": "12",
+      "failures": 12,
+      "finished": true,
+      "positive_checks": 2180,
+      "skipped": 1,
+      "skipped_scenarios": 0,
+      "tests": 12035,
+      "todo": 12
+    },
+    {
+      "variant": "series",
+      "arch": "i386",
+      "absolute_snapshots": 3,
+      "absolute_state": 0,
+      "completed_scenarios": 44,
+      "component_snapshots": 592,
+      "exit": "12",
+      "failures": 12,
+      "finished": true,
+      "positive_checks": 2180,
+      "skipped": 1,
+      "skipped_scenarios": 0,
+      "tests": 12035,
+      "todo": 12
+    }
+  ]
+}
