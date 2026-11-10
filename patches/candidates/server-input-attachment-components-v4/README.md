@@ -1,5 +1,7 @@
 # Server input attachment components v4: separate observations, round 2
 
+**Further testing uses the [v5 candidate](../server-input-attachment-components-v5/README.md); this v4 record is retained.**
+
 Candidate only. Supersedes v3 for further testing; production patches/series,
 the production patch and its marker are unchanged. Both server implementation
 hunks are byte-identical to v2/v3. This revision changes the test only and

@@ -1,0 +1,64 @@
+{
+  "variant": "series",
+  "source_commit": "2d2fc9d7360382b08e5f206f03112af66e6cb256",
+  "units": {
+    "user32.i386.attachment": {
+      "exit": "12",
+      "fail_at": {
+        "attachment.c:804": 2,
+        "attachment.c:806": 2,
+        "attachment.c:825": 4,
+        "attachment.c:829": 4
+      },
+      "fail_msg": {
+        "attachment.c:804": "Test failed: children-late1-unparent0 one-child reference A: active 002C007A, expected actor 00570062",
+        "attachment.c:806": "Test failed: children-late1-unparent0 one-child reference A: focus 002C007A, expected actor 00570062",
+        "attachment.c:825": "Test failed: children-late1-unparent0 one-child observer A: shares active with A: got 002C007A, actor 00570062, expected 1",
+        "attachment.c:829": "Test failed: children-late1-unparent0 one-child observer A: shares focus with A: got 002C007A, actor 00570062, expected 1"
+      },
+      "failures": 12,
+      "finished": true,
+      "flaky": 0,
+      "skipped": 1,
+      "tests": 12035,
+      "todo": 12,
+      "completed_scenarios": 44,
+      "skipped_scenarios": 0,
+      "component_snapshots": 592,
+      "absolute_snapshots": 3,
+      "absolute_state": 0,
+      "positive_checks": 2180
+    },
+    "user32.x86_64.attachment": {
+      "exit": "12",
+      "fail_at": {
+        "attachment.c:804": 2,
+        "attachment.c:806": 2,
+        "attachment.c:825": 4,
+        "attachment.c:829": 4
+      },
+      "fail_msg": {
+        "attachment.c:804": "Test failed: children-late1-unparent0 one-child reference A: active 00000000002B0052, expected actor 00000000002B006A",
+        "attachment.c:806": "Test failed: children-late1-unparent0 one-child reference A: focus 00000000002B0052, expected actor 00000000002B006A",
+        "attachment.c:825": "Test failed: children-late1-unparent0 one-child observer A: shares active with A: got 00000000002B0052, actor 00000000002B006A, expected 1",
+        "attachment.c:829": "Test failed: children-late1-unparent0 one-child observer A: shares focus with A: got 00000000002B0052, actor 00000000002B006A, expected 1"
+      },
+      "failures": 12,
+      "finished": true,
+      "flaky": 0,
+      "skipped": 1,
+      "tests": 12035,
+      "todo": 12,
+      "completed_scenarios": 44,
+      "skipped_scenarios": 0,
+      "component_snapshots": 592,
+      "absolute_snapshots": 3,
+      "absolute_state": 0,
+      "positive_checks": 2180
+    }
+  },
+  "errors": [
+    "user32.i386.attachment: ordinary series failures remain",
+    "user32.x86_64.attachment: ordinary series failures remain"
+  ]
+}

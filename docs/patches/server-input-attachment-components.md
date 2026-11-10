@@ -68,3 +68,14 @@ keeps the implementation unchanged and separates actor-relative component
 checks from exact inactive-queue state. Both scopes must pass new native
 L1; Wine must report which scope ran. New native/paired validation and
 review of the revised test are pending; the production marker stays missing.
+
+
+V4's focused pair completes every component scenario but still reports
+12 ordinary errors per architecture (vanilla 302). The separate
+[v5 candidate](../../patches/candidates/server-input-attachment-components-v5/README.md)
+is the final test adjustment: distinguish the unchanged unfocused-child
+active/focus window-choice gap from ordinary positive component sharing.
+Expected native rows and implementation are unchanged. Revised native L1,
+paired L2 and cross review remain pending; the production marker is not
+promoted. The round-2 original JSON has first messages per source line,
+so later contexts' attribution needs verification in the final run.

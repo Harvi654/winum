@@ -33,3 +33,31 @@ server implementation have not changed.
 
 No further runtime round was started. Revised native L1 remains held for
 the combined VM round after textfont-followup2 returns.
+
+
+## Original series coverage returned
+
+The maintainer returned attachment-coverage-series.json (SHA256SUMS
+preserves the exact uploaded bytes), checked for personal paths, machine
+and user names, credentials and URLs; none were found. Both architectures
+have the same histogram: two reference-active, two reference-focus, four
+positive-active and four positive-focus failures. All first messages are
+children-late1-unparent0 / one-child. Contrary to the earlier request's
+wording, this JSON stores the first message per source line, not all twelve
+contextual messages. The later occurrences' scenario names are unavailable.
+
+The two late-child one-child rows have the same measured native state,
+CBCD for active and focus. The four-line histogram is consistent with
+both such rows choosing the host A instead of creator C. This is a
+source-supported hypothesis for the later occurrences, not a recovered
+full log. The first case demonstrably occurs immediately after creating
+child 0, before child 1 exists and before SetParent or destruction.
+
+The candidate changes detach_thread_input and desktop reparent handling;
+its attach_parent_thread/create/attach_thread_input/assign_thread_input
+paths are byte-identical to vanilla. Wine attaches creator C's input to
+parent A's input, retaining A's nonzero fields. This explains the first
+reported active/focus pair without implicating the component split. A
+narrow native-window-choice todo may describe that unchanged Wine gap,
+while positive non-NULL component sharing remains an ordinary assertion.
+No additional server behavior should be changed to obtain a green test.

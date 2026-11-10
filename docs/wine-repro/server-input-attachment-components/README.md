@@ -317,3 +317,25 @@ needed to classify the remaining twelve failures before the final round;
 three public examples point to the child reparent scenario, not proof
 that all failures have that cause. No new VM or third runtime round is
 requested yet.
+
+
+## V5 first-child window choice, final adjustment (2026-11-10)
+
+The original round-2 series JSON is preserved with SHA-256 in
+l2-v4-2026-11-10/. Its histogram is identical on both architectures; its
+first messages locate the gap at unfocused first-child creation, before
+reparent or detach. It contains first messages per line, not all contexts.
+Do not mistake this source-supported classification for a recovered full
+failure log. Wine's unchanged attach path selects host A's active/focus
+window, while the native two late-child rows select creator C's.
+
+[V5](../../../patches/candidates/server-input-attachment-components-v5/README.md)
+keeps exact Windows window choice as a narrow todo at those two rows.
+Positive live component witnesses and all A/C-versus-B/D membership checks
+remain ordinary; NULL and unrelated witnesses fail. All other actor,
+capture/API/error assertions, native tables and server hunks are unchanged.
+Native v5 builds and focused Wine test links pass, but revised native L1
+and paired runtime L2 are pending. The final pair must include contextual
+failure messages, not just a first-per-line summary. No third run has
+started. Keep native v5 L1 for the combined VM round after the pending
+textfont-followup2 results. No textfont changes or VM runs were started.
