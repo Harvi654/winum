@@ -136,3 +136,46 @@ after `TB_SETROWS`; "no-size-change" gives 20x16 (Wine recalculates on
 `TB_SETROWS` whatever happened before).
 
 Run in the VM: own list `sequence.list`; about 20 s, no input.
+
+## Sequence MEASURE on Windows 10 (2026-11-10), `windows-2026-11-10-sequence/`
+
+x86_64 and i686 identical, exit 0, `api_errors=0`, no child failed;
+comctl32 5.82 and 6.16 identical. **The hypothesis from the screenshot
+is wrong.** What Windows does (button size `TB_GETBUTTONSIZE`):
+
+| Sequence | after bitmap/image list | after `TB_SETPADDING(4,0)` | after `TB_SETROWS` | after resize, autosize |
+| --- | --- | --- | --- | --- |
+| inventor (`12Iaprwz`) | 39x22 | 39x22 | **39x22** | 39x22 |
+| inventor-buttons-late | 39x22 | 39x22 | 39x22 | 39x22 |
+| padding-first (`p12Iarwz`) | 36x16 | (before) | 36x16 | 36x16 |
+| padding-between (`1p2Iarwz`) | 36x16 | (between) | 36x16 | 36x16 |
+| no-size-change (`1iaprwz`) | 23x22 | 23x22 | **23x22** | 23x22 |
+| imagelist-only-32 | 39x22 | 39x22 | 39x22 | 39x22 |
+| imagelist-only-16 | 23x22 | 23x22 | 23x22 | 23x22 |
+| changed-and-back | 23x22 | 23x22 | 23x22 | 23x22 |
+| inventor-no-setrows | 39x22 | 39x22 | - | 39x22 |
+
+Windows computes the button size when the bitmap size is set
+(`TB_SETBITMAPSIZE`, also 16x15 -> 23x21, and `TB_SETIMAGELIST` with
+another size), as bitmap + the padding current at that moment. A later
+`TB_SETPADDING` changes nothing, and neither do the buttons,
+`TB_SETROWS`, a resize or `TB_AUTOSIZE`. So in Inventor's order the
+padding (4,0) comes too late and Windows' buttons stay 39x22.
+
+Wine 11.20 with padding v5 (`wine-2026-11-10/`): identical up to
+`TB_SETROWS`; there `TOOLBAR_CalcToolbar` recalculates with the current
+padding (Inventor's order 36x16, no-size-change 20x16), which Windows
+does not do. Vanilla Wine recalculates there as well (width from the
+padding, height + 6).
+
+Consequences:
+
+- The 16-pixel rows of Inventor's palette on Windows do not come from
+  this sequence (it gives 39x22 there). The trace grep (`SETBUTTONSIZE`
+  in capitals) could not match Wine's `TOOLBAR_SetButtonSize` trace
+  lines, so a `TB_SETBUTTONSIZE` or other size call by Inventor may
+  simply be missing from it.
+- The difference to fix is not "padding in the height", but that Wine
+  recalculates the button size from the padding where Windows does not
+  (at least `TB_SETROWS`). Padding v6 should be written once Inventor's
+  complete size calls are known, so that the L4 palette stays right.
