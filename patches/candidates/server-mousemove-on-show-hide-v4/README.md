@@ -38,3 +38,10 @@ with the patch 33 checks, 0 failures, 1 todo, three runs.
 
 The 32 ms default works: after a dimension edit the sketch shows the new
 value without moving the mouse (maintainer).
+
+## L1 (all-3, 2026-11-10) - superseded by v5
+
+`docs/wine-repro/l1-all-3-2026-11-10/`: i386 34 checks, 0 failures, two
+runs; x86_64 run 2 0 failures, run 1 "five show/hide pairs: got 2,
+expected 1". **Superseded by `../server-mousemove-on-show-hide-v5/`**
+(counts bounded).
