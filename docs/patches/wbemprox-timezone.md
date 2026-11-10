@@ -51,3 +51,13 @@ upgrade or candidate promotion is claimed yet.
 
 Autodesk-Inventor-for-Linux [`docs/arch-hyprland.md`](https://github.com/Harvi654/Autodesk-Inventor-for-Linux/blob/main/docs/arch-hyprland.md) (search for the patch name).
 
+
+## Candidate v3 environment-skip correction (2026-11-10)
+
+[V3](../../patches/candidates/wbemprox-timezone-v3/README.md) changes only
+the two fixture-limit win_skip calls to skip. All-1's UTC failure is a
+test classification error; the measured standard-time value checks do not
+apply there. Class/type/presence checks stay ordinary. The maintainer
+accepts the existing native L1 for identical Windows semantics, without a
+rerun. UTC value coverage (review P2) and unmeasured timezone modes remain
+open; paired v3 runtime validation is pending. Production marker unchanged.

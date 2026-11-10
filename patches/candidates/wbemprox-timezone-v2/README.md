@@ -126,3 +126,10 @@ candidate is not promoted; the production patch and series are unchanged.
 ## L2: test-run/all-1 (2026-11-10)
 
 [docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: **one failure per architecture in the new test**, `timezone.c:186`: the `win_skip` outside the measured standard-time setup (the CI container runs in UTC). The implementation shows no failure elsewhere. Needs a v3 test with `skip()` (cross review P1).
+
+## Superseded for the CI environment skip (2026-11-10)
+
+[V3](../wbemprox-timezone-v3/README.md) replaces only the two unmeasured-
+setup win_skip calls with skip. The implementation and native expectations
+are unchanged. Per maintainer decision, no new L1 run is required for
+identical Windows semantics. UTC value coverage remains partial (review P2).

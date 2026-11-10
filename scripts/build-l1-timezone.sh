@@ -8,7 +8,7 @@ python3 - "$here" <<'PY'
 from pathlib import Path
 import sys
 root = Path(sys.argv[1])
-patch = (root / 'patches/candidates/wbemprox-timezone-v2/wbemprox-timezone.patch').read_text()
+patch = (root / 'patches/candidates/wbemprox-timezone-v3/wbemprox-timezone.patch').read_text()
 unit_diff = patch.split('diff --git a/dlls/wbemprox/tests/timezone.c b/dlls/wbemprox/tests/timezone.c\n', 1)[1]
 unit = '\n'.join(line[1:] for line in unit_diff.splitlines() if line.startswith('+') and not line.startswith('+++')) + '\n'
 body = (root / 'docs/wine-repro/wbemprox-timezone/test-body.h').read_text()

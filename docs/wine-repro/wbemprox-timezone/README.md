@@ -191,3 +191,13 @@ for the documented environment; it does not establish the unmeasured
 seasonal, custom-zone or localization modes. Paired Wine runtime, formal
 cross review and consumer validation remain pending, and the candidate
 is not promoted. Raw logs and Windows files are not committed.
+
+## V3 environment skip (2026-11-10)
+
+The default assertion builder targets the
+[v3 candidate](../../../patches/candidates/wbemprox-timezone-v3/README.md).
+Its only test changes are win_skip -> skip for the two unmeasured fixture
+conditions; the native wrapper maps both spellings to the same function.
+Per maintainer decision the successful Windows standard-time L1 is retained
+without a rerun. UTC type/presence-only coverage is still partial, and no
+new expected value or passed paired runtime is inferred from this change.

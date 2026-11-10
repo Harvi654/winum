@@ -173,8 +173,8 @@ static void test_current_timezone(void)
      * standard time with zero standard adjustment. Never guess those values. */
     comparable = comparable && state == TIME_ZONE_ID_STANDARD && state == dynamic_state
                  && !dynamic_before.DynamicDaylightTimeDisabled && before.StandardBias == 0;
-    if(!comparable) win_skip("Only property types/presence checked outside measured stable standard-time conditions\n");
-    if(comparable && !have_display) win_skip("Display source unavailable; label equality is not measured for this setup\n");
+    if(!comparable) skip("Only property types/presence checked outside measured stable standard-time conditions\n");
+    if(comparable && !have_display) skip("Display source unavailable; label equality is not measured for this setup\n");
     timezone_row(object, &before, have_display ? display : NULL, comparable);
     IWbemClassObject_Release(object); object = NULL;
     got = 0;

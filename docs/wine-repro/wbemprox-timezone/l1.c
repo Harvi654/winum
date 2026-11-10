@@ -32,7 +32,7 @@ static void timezone_skip(const char *format, ...)
     printf("SKIP ");
     va_start(args,format);vprintf(format,args);va_end(args);
 }
-#define win_skip timezone_skip
+#define skip timezone_skip
 #include "test-body.h"
 static DWORD WINAPI watchdog(void *event)
 {
