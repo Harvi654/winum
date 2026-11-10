@@ -179,3 +179,25 @@ Consequences:
   recalculates the button size from the padding where Windows does not
   (at least `TB_SETROWS`). Padding v6 should be written once Inventor's
   complete size calls are known, so that the L4 palette stays right.
+
+## Inventor's complete palette sequence (second and third trace, 2026-11-10)
+
+Filtered `+toolbar` traces of the palette in Inventor 2027 under Wine
+(summary only; the trace lines are not committed): `TB_SETBITMAPSIZE`
+16x15, `TB_SETBUTTONSIZE` 23x22, `TB_SETBITMAPSIZE` 32x16,
+**`TB_SETBUTTONSIZE` 40x24**, then the 47 buttons one by one (each
+`TB_ADDBITMAP` with its own bitmap handle and `TB_ADDBUTTONS` with one
+button; Wine's buttons 40x24), `TB_SETPADDING(4, 0)`, `TB_SETINDENT`,
+`TB_SETROWS(12, TRUE)` (Wine with padding v5 and setrows v4: 5 per row,
+180x224, i.e. 36x16 buttons), then three resizes. The first trace's grep
+had missed the `TB_SETBUTTONSIZE` calls.
+
+`measure-sequence.c` now also runs this sequence ("inventor-exact",
+steps `1b2Bmpnrwz`) and variants: without the padding, without
+`TB_SETROWS`, the padding before `TB_SETBUTTONSIZE(40,24)`,
+`TB_SETBUTTONSIZE(1,1)` instead of 40x24, and without any
+`TB_SETBUTTONSIZE`. The question for Windows: after
+`TB_SETBUTTONSIZE(40, 24)` and a later `TB_SETPADDING(4, 0)`, does the
+palette end with 40x24 or 36x16 buttons? Trial under Wine with padding
+v5 (`wine-2026-11-10/result-sequence2-...`): 40x24 until `TB_SETROWS`,
+36x16 from there.

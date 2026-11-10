@@ -24,7 +24,12 @@ static HWND parent;
 /* steps: 1 = TB_SETBITMAPSIZE 16x15 (the default size), 2 = TB_SETBITMAPSIZE
  * 32x16, i = TB_SETIMAGELIST 16x16 list, I = TB_SETIMAGELIST 32x16 list,
  * a = TB_ADDBUTTONS (47 in groups 12+10+10+8+7), p = TB_SETPADDING(4, 0),
- * r = TB_SETROWS(12, TRUE), w = width 200, z = TB_AUTOSIZE */
+ * r = TB_SETROWS(12, TRUE), w = width 200, z = TB_AUTOSIZE,
+ * b = TB_SETBUTTONSIZE 23x22, B = TB_SETBUTTONSIZE 40x24, S = TB_SETBUTTONSIZE 1x1,
+ * m = the 47 buttons one by one, each with its own 32x16 bitmap through
+ * TB_ADDBITMAP (separators through TB_ADDBUTTONS only), n = TB_SETINDENT 0.
+ * Inventor's complete palette sequence (second trace, 2026-11-10) is
+ * "inventor-exact"; the value of its TB_SETINDENT is not in the trace. */
 static const struct { const char *name, *steps; } sequences[] =
 {
     { "inventor", "12Iaprwz" },
@@ -36,6 +41,12 @@ static const struct { const char *name, *steps; } sequences[] =
     { "imagelist-only-16", "iaprwz" },
     { "changed-and-back", "121iaprwz" },
     { "inventor-no-setrows", "12Iapwz" },
+    { "inventor-exact", "1b2Bmpnrwz" },
+    { "exact-no-padding", "1b2Bmnrwz" },
+    { "exact-no-setrows", "1b2Bmpnwz" },
+    { "exact-padding-before-buttonsize", "1b2pBmnrwz" },
+    { "exact-buttonsize-minimum", "1b2Smpnrwz" },
+    { "exact-no-buttonsize", "12mpnrwz" },
 };
 
 static const int groups[] = { 12, 10, 10, 8, 7, 0 };
@@ -64,6 +75,52 @@ static HIMAGELIST make_images(int cx, int cy)
     else if (il_add(himl, bitmap, NULL) != 0) b3_error("ImageList_Add", ERROR_INVALID_DATA);
     DeleteObject(bitmap);
     return himl;
+}
+
+static HBITMAP make_bitmap(int cx, int cy)
+{
+    BITMAPINFO bmi;
+    HBITMAP bitmap;
+    void *bits;
+    HDC hdc;
+
+    memset(&bmi, 0, sizeof(bmi));
+    bmi.bmiHeader.biSize = sizeof(bmi.bmiHeader);
+    bmi.bmiHeader.biWidth = cx;
+    bmi.bmiHeader.biHeight = cy;
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 24;
+    hdc = GetDC(NULL);
+    bitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, &bits, NULL, 0);
+    ReleaseDC(NULL, hdc);
+    if (!bitmap) b3_error("CreateDIBSection", GetLastError());
+    else memset(bits, 0x80, ((cx * 3 + 3) & ~3) * cy);
+    return bitmap;
+}
+
+/* Inventor's way: one TB_ADDBITMAP (a bitmap handle, hInst NULL) and one
+ * TB_ADDBUTTONS per button. */
+static void add_one_by_one(HWND tb, TBBUTTON *buttons, int count, HBITMAP *bitmaps)
+{
+    TBADDBITMAP add;
+    TBBUTTON button;
+    int i;
+    LRESULT index;
+
+    for (i = 0; i < count; i++)
+    {
+        button = buttons[i];
+        if (!(button.fsStyle & BTNS_SEP))
+        {
+            bitmaps[i] = make_bitmap(32, 16);
+            add.hInst = NULL;
+            add.nID = (UINT_PTR)bitmaps[i];
+            index = SendMessageW(tb, TB_ADDBITMAP, 1, (LPARAM)&add);
+            if (index < 0) b3_error("TB_ADDBITMAP", ERROR_INVALID_DATA);
+            button.iBitmap = (int)index;
+        }
+        if (!SendMessageW(tb, TB_ADDBUTTONSW, 1, (LPARAM)&button)) b3_error("TB_ADDBUTTONS_1", ERROR_INVALID_DATA);
+    }
 }
 
 static int fill_buttons(TBBUTTON *buttons)
@@ -134,7 +191,8 @@ static void run_sequence(int version, unsigned int s)
 {
     HIMAGELIST himl16 = make_images(16, 16), himl32 = make_images(32, 16);
     TBBUTTON buttons[64];
-    int count = fill_buttons(buttons);
+    HBITMAP bitmaps[64] = { 0 };
+    int count = fill_buttons(buttons), i;
     char label[64];
     const char *step;
     HWND tb;
@@ -162,11 +220,17 @@ static void run_sequence(int version, unsigned int s)
         case 'r': SendMessageW(tb, TB_SETROWS, MAKEWPARAM(12, TRUE), (LPARAM)&rc); break;
         case 'w': SetWindowPos(tb, NULL, 0, 0, 200, 600, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE); break;
         case 'z': SendMessageW(tb, TB_AUTOSIZE, 0, 0); break;
+        case 'b': SendMessageW(tb, TB_SETBUTTONSIZE, 0, MAKELPARAM(23, 22)); break;
+        case 'B': SendMessageW(tb, TB_SETBUTTONSIZE, 0, MAKELPARAM(40, 24)); break;
+        case 'S': SendMessageW(tb, TB_SETBUTTONSIZE, 0, MAKELPARAM(1, 1)); break;
+        case 'm': add_one_by_one(tb, buttons, count, bitmaps); break;
+        case 'n': SendMessageW(tb, TB_SETINDENT, 0, 0); break;
         default: continue;
         }
         print_state(tb, label, *step);
     }
     DestroyWindow(tb);
+    for (i = 0; i < count; i++) if (bitmaps[i]) DeleteObject(bitmaps[i]);
     il_destroy(himl16);
     il_destroy(himl32);
 }
