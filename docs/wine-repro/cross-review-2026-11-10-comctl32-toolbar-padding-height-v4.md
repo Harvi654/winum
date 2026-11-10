@@ -64,3 +64,13 @@ of the proposed environment explanation for that earlier setup failure.
 Verdict: **the v3 P2 gate is answered and the revision is acceptable in
 source**, subject to exact v4 native L1, completed paired L2 and the
 Inventor palette check. No production patch or patches/series was changed.
+
+## V5 follow-up (2026-11-10)
+
+[The v5 review](cross-review-2026-11-10-comctl32-toolbar-padding-height-v5.md)
+confirms that only the test's initial HWND changes to NULL; implementation
+and Windows assertions are unchanged. The old i386 cascade was a test
+bug, not an environment cause. Exact v5 L1 passes 5309 checks on both
+architectures. No new source finding; the earlier measured scope limits
+and Inventor L4 remain. Batch1-6's known L2 failures are recorded with
+the maintainer's attribution rather than described as a green whole run.
