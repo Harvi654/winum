@@ -117,3 +117,64 @@ P2 pump robustness adjustment before approving the new test for promotion**.
 Keep revised native L1, completed neighboring paired L2 and all-2-build
 Inventor L4 open. No patch implementation, series, marker, test body or
 other author's test-run branch was changed by this review.
+
+## V4 follow-up (2026-11-10, 13c9d85)
+
+Read in full: v4 patch/README and v3-to-v4 diff, the corrected investigation
+wording, and the two returned native v3 summaries plus all-2 L1 README.
+The server hunks, all actions/expected recipients and the single hidden-
+window count todo are unchanged; only the message pump and its explanation
+change in the test. No unrelated server/user32 source was re-audited.
+
+- **P2 addressed for the demonstrated stalled-client path.** The pump
+  drains before checking elapsed time and after every wait, including an
+  overdue wakeup. It no longer exits solely because the deadline passed
+  before its first drain. The inner loop dispatches at most 1000 messages
+  per batch. The existing 400/800-ms budgets and absence of a latency
+  assertion are retained. Host-only models using the exact new function
+  dispatch the ready move both after preemption before the first drain
+  and after an overdue wait; unsigned elapsed arithmetic also handles a
+  32-bit tick wrap. Both PE object builds pass -Werror with Wine headers.
+  These are compilation/model checks, not new Wine or Windows execution.
+- **The historical visible/hidden P3 wording is corrected.** The MEASURE
+  source always moved the already-hidden top-level window; the README now
+  says so. The one todo remains justified and no assertion is weakened.
+- **P3, bounded-drain limit:** "never left for the next scenario" is too
+  absolute if a final batch saturates. With 1001 queued messages and an
+  expired budget the new function dispatches 1000 and returns with one
+  still queued (confirmed in the host model). This does not reproduce a
+  problem in the small quiet fixture, but qualify the guarantee by the
+  cap; if that cap is hit in practice, report busy/incomplete collection
+  instead of treating it as established clean separation. A finite cap
+  is reasonable; no unbounded draining is requested.
+
+Native **v3**, not v4, now has actual L1 output from all-2. i386 passes
+34 checks, zero failures/skips and exit 0. x86_64 executes 39 checks with
+one failure: show child under receives six WM_MOUSEMOVE rather than one.
+There is no recipient assertion failure; the five extra receiver checks
+explain the higher check count. The remaining scenarios, including the
+native hidden-window move, match the measured assertions. Consequently
+v3 does not have a two-architecture L1 pass, and none transfers to v4.
+
+Host mouse input in the VM is plausible, **not confirmed**. The summaries
+contain neither per-event input provenance nor coordinates/timestamps, so
+they cannot identify the source of the five extra moves. The v4 README's
+categorical statement that the old pump cannot explain extras because it
+only loses messages is stronger than the evidence: delayed collection
+can misattribute events to a later scenario, as the original P2 noted.
+That does not establish it caused these particular six messages either.
+Keep the cause open, keep count=1 ordinary, and do not convert this native
+failure into a todo, accepted flake or relaxed count.
+
+The planned v4 native run twice on both architectures, without host mouse
+interaction, is the appropriate next check. If excess moves recur, obtain
+new public-API scenario measurements before changing the oracle. Require
+zero skips and complete scenarios, not just exit status. All-2's source
+contains v3 and cannot establish v4 runtime validation; paired L2 with v4
+and the final 32-ms Inventor L4 remain open.
+
+Verdict: **the requested P2 pump fix is acceptable in source; no new P1/P2
+blocker identified in this delta.** The cap wording is a remaining P3,
+and the unexplained native count failure is an open validation gate, not
+a proven implementation defect or proven host-input incident. No candidate,
+implementation, marker or production series was changed by this follow-up.
