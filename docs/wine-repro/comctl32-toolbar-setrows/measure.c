@@ -201,13 +201,22 @@ static void run_palette(int version, BOOL larger, HIMAGELIST himl)
     DestroyWindow(tb);
 }
 
-static void measure_version(int version)
+/* One case per child process: on Windows 10 a TB_SETROWS case did not
+ * return (first run, 2026-11-10), so each case gets a time limit and a
+ * hang is recorded as CHILD_TIMEOUT instead of ending the measurement.
+ * Child arguments: "case V STYLE SHAPE ROWS LARGER" or "palette V LARGER". */
+static int child_main(int argc, char **argv)
 {
-    HIMAGELIST himl;
+    HIMAGELIST himl = NULL;
     struct cc cc;
-    unsigned int st, sh, r;
-    int larger;
+    int version, ok = 0;
 
+    child_start();
+    if (argc < 4) return 2;
+    version = atoi(argv[2]);
+    parent = CreateWindowExW(0, L"STATIC", L"measure", WS_OVERLAPPEDWINDOW, 0, 0, 640, 700,
+                             NULL, NULL, GetModuleHandleW(NULL), NULL);
+    if (!parent) { b3_error("CreateParent", GetLastError()); return 1; }
     if (cc_load(&cc, version))
     {
         il_create = (il_create_fn)(void *)cc_proc(&cc, "ImageList_Create");
@@ -215,27 +224,59 @@ static void measure_version(int version)
         il_destroy = (il_destroy_fn)(void *)cc_proc(&cc, "ImageList_Destroy");
         if (il_create && il_add && il_destroy && (himl = make_images()))
         {
-            for (st = 0; st < ARRAYSIZE(styles); st++)
-                for (sh = 0; sh < ARRAYSIZE(shapes); sh++)
-                    for (r = 0; r < ARRAYSIZE(row_counts); r++)
-                        for (larger = 0; larger < 2; larger++)
-                            run_case(version, st, sh, row_counts[r], larger, himl);
-            for (larger = 0; larger < 2; larger++) run_palette(version, larger, himl);
+            if (!strcmp(argv[1], "case") && argc == 7)
+            {
+                run_case(version, atoi(argv[3]), atoi(argv[4]), atoi(argv[5]), atoi(argv[6]), himl);
+                ok = 1;
+            }
+            else if (!strcmp(argv[1], "palette") && argc == 4)
+            {
+                run_palette(version, atoi(argv[3]), himl);
+                ok = 1;
+            }
             il_destroy(himl);
         }
     }
     cc_unload(&cc);
+    DestroyWindow(parent);
+    if (!ok) return 2;
+    return b3_errors ? 1 : 0;
 }
 
-int main(void)
+#define CHILD_TIMEOUT_MS 3000
+
+int main(int argc, char **argv)
 {
-    if (!b3_start("comctl32-toolbar-setrows", 120000)) return 2;
-    parent = CreateWindowExW(0, L"STATIC", L"measure", WS_OVERLAPPEDWINDOW, 0, 0, 640, 700,
-                             NULL, NULL, GetModuleHandleW(NULL), NULL);
-    if (!parent) { b3_error("CreateParent", GetLastError()); return b3_finish(); }
-    printf("SYSTEM cxedge=%d cyedge=%d\n", GetSystemMetrics(SM_CXEDGE), GetSystemMetrics(SM_CYEDGE));
-    measure_version(5);
-    measure_version(6);
-    DestroyWindow(parent);
+    WCHAR args[64];
+    char label[96];
+    unsigned int st, sh, r;
+    int version, larger, timeouts = 0;
+    DWORD code;
+
+    if (argc > 1) return child_main(argc, argv);
+    if (!b3_start("comctl32-toolbar-setrows", 1800000)) return 2;
+    printf("SYSTEM cxedge=%d cyedge=%d child_timeout_ms=%d\n", GetSystemMetrics(SM_CXEDGE),
+           GetSystemMetrics(SM_CYEDGE), CHILD_TIMEOUT_MS);
+    for (version = 5; version <= 6; version++)
+    {
+        for (st = 0; st < ARRAYSIZE(styles); st++)
+            for (sh = 0; sh < ARRAYSIZE(shapes); sh++)
+                for (r = 0; r < ARRAYSIZE(row_counts); r++)
+                    for (larger = 0; larger < 2; larger++)
+                    {
+                        swprintf(args, ARRAYSIZE(args), L"case %d %u %u %d %d", version, st, sh, row_counts[r], larger);
+                        snprintf(label, sizeof(label), "v=%d style=%s shape=%s rows=%d larger=%d", version,
+                                 styles[st].name, shapes[sh].name, row_counts[r], larger);
+                        code = run_child(label, args, CHILD_TIMEOUT_MS);
+                        if (code == 3) timeouts++;
+                    }
+        for (larger = 0; larger < 2; larger++)
+        {
+            swprintf(args, ARRAYSIZE(args), L"palette %d %d", version, larger);
+            snprintf(label, sizeof(label), "palette v=%d larger=%d", version, larger);
+            if (run_child(label, args, 4 * CHILD_TIMEOUT_MS) == 3) timeouts++;
+        }
+    }
+    printf("TIMEOUTS %d\n", timeouts);
     return b3_finish();
 }

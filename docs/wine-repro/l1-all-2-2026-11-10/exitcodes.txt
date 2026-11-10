@@ -1,0 +1,10 @@
+comctl32 toolbar x86_64=0
+comctl32 toolbar i386=0
+msxml3 domdoc x86_64=0
+msxml3 domdoc i386=0
+urlmon sec_mgr x86_64=0
+urlmon sec_mgr i386=0
+kernel32 actctx x86_64=0
+kernel32 actctx i386=0
+user32 mousemove x86_64=1
+user32 mousemove i386=0

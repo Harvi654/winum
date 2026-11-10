@@ -52,3 +52,7 @@ Wine 11.20 x86_64, built locally, Xvfb 1280x1024:
   button, which failed intermittently with v1).
 - Cross review (Codex) of the test.
 - L4 of the 32 ms default with the all-2 build.
+
+**Superseded by `../server-mousemove-on-show-hide-v4/` (2026-11-10)**:
+message pump fixed after cross review; v3's Windows results are recorded
+there.

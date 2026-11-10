@@ -16,7 +16,7 @@ receiving window and the delay.
 | show / hide a top-level window under the cursor | 1 to the window then under the cursor | 16-31 ms |
 | show / hide a child away from / under the cursor | 1 (A, or the child when under it) | 15-32 ms |
 | 5 show/hide pairs in a row | **1** | 31 ms |
-| move a visible top-level window away from the cursor | 1 to A | 16 ms |
+| move a hidden top-level window away from the cursor (B was hidden in the scenario before; corrected 2026-11-10, cross review P3) | 1 to A | 16 ms |
 | create / destroy a visible child (away or under) | 1 | 16-32 ms |
 | `InvalidateRect` + `UpdateWindow` on A | 0 | - |
 | cursor outside our windows, show / hide | 0 to our windows | - |

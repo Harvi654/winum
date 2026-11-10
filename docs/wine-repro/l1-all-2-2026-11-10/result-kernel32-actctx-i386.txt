@@ -1,0 +1,42 @@
+actctx.c:2360: default actctx
+actctx.c:2440: manifest1
+actctx.c:2466: manifest2 depmanifest1
+actctx.c:2485: manifest2 depmanifest2
+actctx.c:2509: manifest2 depmanifest3
+actctx.c:2540: manifest3
+actctx.c:2597: manifest6
+actctx.c:2610: manifest7
+actctx.c:2626: manifest8
+actctx.c:2642: manifest9
+actctx.c:2684: manifest4
+actctx.c:2703: manifest1 in subdir
+actctx.c:2727: UTF-16 manifest1, with BOM
+actctx.c:2743: UTF-16 manifest1, reverse endian, with BOM
+actctx.c:1208: wrong_manifest1
+actctx.c:1210: wrong_manifest2
+actctx.c:1212: wrong_manifest3
+actctx.c:1214: wrong_manifest4
+actctx.c:1216: wrong_manifest5
+actctx.c:1218: wrong_manifest6
+actctx.c:1220: wrong_manifest7
+actctx.c:1222: wrong_manifest8
+actctx.c:1224: wrong_manifest9
+actctx.c:1226: wrong_manifest10
+actctx.c:1228: wrong_manifest11
+actctx.c:1230: UTF-16 manifest1 without BOM
+actctx.c:1232: manifest2
+actctx.c:1234: manifest2+depmanifest1
+actctx.c:2781: child process manifest1
+29f0:actctx: 51 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+actctx.c:3490: manifest1
+actctx.c:3522: no_supportedOs
+actctx.c:3539: manifest_vista
+actctx.c:3560: manifest_vista_7_8_10_81
+actctx.c:3590: manifest_other_guid
+2e90:actctx: 29 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+2f10:actctx: 20 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+1810:actctx: 20 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+1f10:actctx: 26 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+28a0:actctx: 8 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+28a8:actctx: 44 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+2338:actctx: 3863 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.

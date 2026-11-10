@@ -31,3 +31,7 @@ revised after cross review (both measured classes, all measured states).
 ## L2: test-run/all-1 (2026-11-10)
 
 [docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: no new failure in the touched DLLs, both architectures.
+
+## L1: bundle of test-run/all-2 (2026-11-10)
+
+[docs/wine-repro/l1-all-2-2026-11-10](../../../docs/wine-repro/l1-all-2-2026-11-10/README.md), Windows 10: `msxml3:domdoc` 36894 checks, 0 failures, x86_64 and i386.

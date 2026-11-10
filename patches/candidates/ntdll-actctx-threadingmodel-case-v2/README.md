@@ -147,3 +147,7 @@ patch, series entry or validation marker is changed. Raw logs are not committed.
 ## L2: test-run/all-1 (2026-11-10)
 
 [docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: `ntdll` without a new failure; `kernel32` (where `actctx.c` is) was in no group and did not run. Added to g3 after this run; L2 for kernel32 is still open.
+
+## L1: bundle of test-run/all-2 (2026-11-10)
+
+[docs/wine-repro/l1-all-2-2026-11-10](../../../docs/wine-repro/l1-all-2-2026-11-10/README.md), Windows 10: `kernel32:actctx` 3863 checks, 0 failures, x86_64 and i386.
