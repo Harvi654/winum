@@ -190,7 +190,7 @@ if [ "$VARIANT" = series ] && [ "$MAKE_L1" = 1 ]; then
     B="$OUTDIR/l1-bundle"
     mkdir -p "$B"
     # dll:unit of patches with a Wine test that never ran on Windows
-    L1_UNITS="${L1_UNITS:-advapi32:security msxml3:domdoc ntdll:exception ole32:storage32 shell32:shlfolder shell32:shelldispatch urlmon:sec_mgr}"
+    L1_UNITS="${L1_UNITS:-comctl32:toolbar msxml3:domdoc urlmon:sec_mgr kernel32:actctx user32:mousemove}"
     {
         printf '%s\r\n' '@echo off' 'cd /d "%~dp0"' 'if exist exitcodes.txt exit /b 2'
         for du in $L1_UNITS; do
