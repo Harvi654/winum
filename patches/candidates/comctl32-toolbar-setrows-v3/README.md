@@ -70,3 +70,10 @@ vanilla in no horizontal case.
   `TB_SETPADDING(0, 0)` before the image list and no strings, Windows'
   buttons stay 23x22 in this sequence, Wine's (padding v5) become 16
   wide - for the padding candidate, see the MEASURE README.
+
+## L1, L4 (2026-11-10) - superseded by v4
+
+L1 (`docs/wine-repro/l1-all-3-2026-11-10/`): `comctl32:toolbar` 9069
+checks, 0 failures, both architectures, two runs. L4 in Inventor 2027:
+the palette fell apart after Inventor changed its width. **Superseded by
+`../comctl32-toolbar-setrows-v4/`.**

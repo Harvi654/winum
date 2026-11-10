@@ -172,3 +172,13 @@ case changed from vanilla. Still different from Windows, outside v3:
   padding v5 Wine's are 16 wide (80x208). For the padding candidate:
   Inventor's palette looked right with 16-pixel rows on Windows, so it
   probably sets sizes in another order; to be looked at with padding.
+
+## Candidate v4 (2026-11-10)
+
+v3 failed L4 (Inventor changes the palette's width after `TB_SETROWS`).
+v4 follows the palette sequence above after a width change: buttons per
+row = width / button width, groups kept. Under local Wine
+(`wine-2026-11-10/result-setrows-v4-x86_64.txt`, `compare-v4.txt`): 20 of
+24 palette steps as Windows (the 60x600 step differs by the button width,
+16 against 23 - see the padding v5 README), vertical and horizontal
+cases as v3.

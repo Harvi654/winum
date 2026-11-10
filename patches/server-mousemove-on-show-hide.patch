@@ -48,6 +48,12 @@ queue after every wait, also one that ends past the deadline, so a move
 that is already queued is counted in its own scenario and not left for
 the next one; the inner drain is bounded. Expectations unchanged.
 
+v5 (2026-11-10, after two L1 runs): Windows 10 x86_64 sent more than
+one move in two runs (6 after showing a child under the cursor, 2 after
+five show/hide pairs); i386 always one. A single change now expects at
+least one move to the measured window, a burst of ten changes one to
+nine; the scenarios with no move stay exact.
+
 --- a/server/queue.c
 +++ b/server/queue.c
 @@ -589,6 +589,52 @@
@@ -136,7 +142,7 @@ the next one; the inner drain is bounded. Expectations unchanged.
  	resource.rc \
 --- /dev/null
 +++ b/dlls/user32/tests/mousemove.c
-@@ -0,0 +1,202 @@
+@@ -0,0 +1,207 @@
 +/*
 + * Mouse move sent after window layout changes
 + *
@@ -197,19 +203,24 @@ the next one; the inner drain is bounded. Expectations unchanged.
 +    moves = 0;
 +}
 +
-+static void check_moves_(const char *name, unsigned int expect_count, HWND expect_hwnd, BOOL todo)
++/* Windows sent one move per change or burst in the MEASURE, but more than
++ * one in some later runs (x86_64: 6 after one show, 2 after five show/hide
++ * pairs), so only the lower bound is exact; a burst must still give fewer
++ * moves than changes. */
++static void check_moves_(const char *name, unsigned int min_count, unsigned int max_count, HWND expect_hwnd, BOOL todo)
 +{
 +    unsigned int i;
 +
 +    pump_messages(WAIT_MS);
 +    winetest_push_context("%s", name);
 +    todo_wine_if(todo)
-+    ok(moves == expect_count, "got %u WM_MOUSEMOVE, expected %u\n", moves, expect_count);
++    ok(moves >= min_count && moves <= max_count, "got %u WM_MOUSEMOVE, expected %u to %u\n",
++       moves, min_count, max_count);
 +    for (i = 0; i < moves; i++)
 +        ok(moves_hwnd[i] == expect_hwnd, "move %u went to %p, expected %p\n", i, moves_hwnd[i], expect_hwnd);
 +    winetest_pop_context();
 +}
-+#define check_moves(name, count, hwnd) check_moves_(name, count, hwnd, FALSE)
++#define check_moves(name, count, hwnd) check_moves_(name, count, (count) ? ARRAY_SIZE(moves_hwnd) : 0, hwnd, FALSE)
 +
 +static HWND create_child(HWND parent, DWORD style, int x, int y)
 +{
@@ -293,13 +304,13 @@ the next one; the inner drain is bounded. Expectations unchanged.
 +        ShowWindow(child_away, SW_SHOWNA);
 +        ShowWindow(child_away, SW_HIDE);
 +    }
-+    check_moves("five show/hide pairs", 1, main);
++    check_moves_("five show/hide pairs", 1, 9, main, FALSE);
 +
 +    start_scenario();
 +    SetWindowPos(top_away, NULL, 720, 520, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 +    /* Windows sends a move even for a hidden window that moves; Wine sends
 +     * one only when a visible window moves or changes visibility. */
-+    check_moves_("move hidden top-level", 1, main, TRUE);
++    check_moves_("move hidden top-level", 1, ARRAY_SIZE(moves_hwnd), main, TRUE);
 +
 +    start_scenario();
 +    tmp = create_child(main, WS_VISIBLE, 10, 60);
