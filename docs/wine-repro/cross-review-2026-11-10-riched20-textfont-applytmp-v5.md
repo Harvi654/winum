@@ -91,3 +91,14 @@ The new native output supports the second-ApplyNow correction and direct
 setter control, but does not close the repeated-cycle gap. Require exact
 v5 native L1, completed paired L2 and repeated-use Inventor validation.
 Production patches/series is unchanged.
+
+## V6 follow-up (2026-11-10)
+
+[The v6 review](cross-review-2026-11-10-riched20-textfont-applytmp-v6.md)
+closes P2 for both added cache refreshes: free/clear the old BSTR only on
+an already initialized font, leaving first construction unchanged. The
+new read-between-steps repeat test is supported by followup2 and exact
+v6 native L1 (182 msftedit checks, both architectures). P3's unread
+second-cycle difference remains a narrow todo and an L4 limit; the new
+sequence does not explain it. Bounded v6 revision approved, not complete
+repeated-cycle compatibility. SCF v5 dependency and its order are checked.
