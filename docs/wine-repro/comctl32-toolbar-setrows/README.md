@@ -74,3 +74,77 @@ without `TBSTYLE_FLAT`, all shapes; `CCS_VERT` for the 9-button shape):
 
 Complete results (v6, `CCS_VERT` with separators, the palette sequence):
 next VM visit with the child-process version.
+
+## Windows 10, complete run (2026-11-10), `windows-2026-11-10/`
+
+Child-process version; x86_64 and i686 exit 0 and identical in every
+`CASE`, `PALETTE` and `CHILD_TIMEOUT` line: 676 cases, 24 palette steps,
+`api_errors=0`, comctl32 5.82 and 6.16. **28 cases did not return**
+(`CHILD_TIMEOUT`), all with `CCS_VERT | TBSTYLE_WRAPABLE` and separators,
+in both versions, whenever fewer rows were asked than a vertical layout
+of the groups needs: `g3-4` rows 1, `g1-6-2` rows 1-2, the palette shape
+rows 1-4. Windows spins there (the CPU load seen in the VM); a Wine test
+must not call those.
+
+### Inventor's palette (`CCS_VERT | TBSTYLE_WRAPABLE`, 12+10+10+8+7)
+
+| rows | bLarger FALSE | bLarger TRUE |
+| --- | --- | --- |
+| 5 | 12 per row, `TB_GETROWS` 13 | same |
+| 6 | 10 per row, 14 | same |
+| 8 | 8 per row, 16 | same |
+| 10 | 6 per row, 18 | same |
+| 12 | **5 per row, 19** (layout `5 5 2 S 5 5 S 5 5 S 5 3 S 5 2`) | 4 per row, 21 |
+| 15 | 4 per row, 21 | 3 per row, 26 |
+| 20 | 3 per row, 26 | 2 per row, 32 |
+
+Each group starts a new row, every separator has a row of its own, and
+the number of buttons per row is the one whose button rows (separators
+not counted) are the most that do not exceed the request (bLarger FALSE)
+or the fewest that reach it (TRUE). comctl32 5 and 6 agree. This is what
+candidate v2 computes: 5 columns for `TB_SETROWS(12)`.
+
+After the palette sequence: resizing to the returned rectangle and
+replacing a button keep the layout; a resize to 500x300 re-wraps it to
+one row per group (`12 S 10 S 10 S 8 S 7`), `TB_AUTOSIZE` keeps that, and
+a resize to 60x600 re-wraps to 2 per row. **Windows does not keep the
+columns of `TB_SETROWS` across a resize.** The rectangle is 115x274 for
+`TB_SETROWS(12)` even with `TB_SETPADDING(0, 0)` (buttons 23x22: without
+strings the padding does not change the size, as in the padding MEASURE).
+
+### Wine compared (local Wine 11.20 x86_64, `wine-2026-11-10/`)
+
+`compare.py` compares `TB_GETROWS` and the layout of every case that
+returned on Windows with vanilla Wine and with candidate v2 (on top of
+padding v5); pixel sizes are ignored. Summary of `compare.txt`:
+
+| style | cases | vanilla right | v2 right | v2 wrong where vanilla was right |
+| --- | --- | --- | --- | --- |
+| `CCS_VERT` wrapable (palette style) | 148 | 4 | 144 | 0 |
+| `TBSTYLE_WRAPABLE` | 176 | 18 | 44 | 14 |
+| `TBSTYLE_FLAT \| TBSTYLE_WRAPABLE` | 176 | 18 | 44 | 14 |
+| `TBSTYLE_FLAT`, not wrapable | 176 | 62 | 44 | 18 |
+| palette steps | 24 | 0 | 12 | 0 |
+
+- Vertical wrapable toolbars: v2 matches Windows in 144 of 148 cases.
+  The 4 others are `g3-4` rows 4 (both bLarger): Windows 4 per row
+  (`3 S 4`), v2 2 per row; Windows' choice there does not follow the rule
+  above (rows 3 gives 3 per row, rows 4 gives 4, rows 5 gives 2).
+- Horizontal toolbars with separators: Windows keeps a separator on the
+  row of the last buttons of its group, starts the next group on a new
+  row and counts a separator as a row in `TB_GETROWS` (palette shape,
+  rows 12: `8 4s 8 2s 8 2s 8s 7`, `TB_GETROWS` 12). v2 lays them out like
+  vertical toolbars (`5 5 2 S ...`), wrong in most cases and in 46 where
+  vanilla was right - also for toolbars without `TBSTYLE_WRAPABLE`.
+- Resizes after `TB_SETROWS`: v2 keeps the columns, Windows re-wraps
+  (12 palette steps wrong in both vanilla and v2).
+
+### Consequence for the candidate
+
+v2's rule is right for the case Inventor uses and wrong elsewhere, and
+it changes horizontal toolbars that vanilla handled like Windows. A v3
+limits the group rule to `CCS_VERT` wrapable toolbars, leaves other
+toolbars to vanilla's code, and gets a Wine test from the vertical rows
+above (both comctl32 versions; the hanging cases left out). Whether v3
+can drop v2's "keep the columns on resize" depends on why Inventor needed
+it - Windows does not do it; to be checked in Inventor (L4) with v3.

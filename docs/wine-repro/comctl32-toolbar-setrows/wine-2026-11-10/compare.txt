@@ -1,0 +1,20 @@
+('flatwrap', 'van=X v2=X') 118 e.g. v=5 style=flatwrap shape=g3-4 rows=2 larger=1
+('flatwrap', 'van=X v2=ok') 40 e.g. v=5 style=flatwrap shape=g9 rows=2 larger=0
+('flatwrap', 'van=ok v2=X') 14 e.g. v=5 style=flatwrap shape=g3-4 rows=1 larger=0
+('flatwrap', 'van=ok v2=ok') 4 e.g. v=5 style=flatwrap shape=g9 rows=1 larger=0
+('nowrap', 'van=X v2=X') 114 e.g. v=5 style=nowrap shape=g3-4 rows=2 larger=0
+('nowrap', 'van=ok v2=X') 18 e.g. v=5 style=nowrap shape=g3-4 rows=1 larger=0
+('nowrap', 'van=ok v2=ok') 44 e.g. v=5 style=nowrap shape=g9 rows=1 larger=0
+('palette:autosize', 'van=X v2=X') 4 e.g. P v=5 larger=0 step=autosize
+('palette:replace-5', 'van=X v2=ok') 4 e.g. P v=5 larger=0 step=replace-5
+('palette:resize-500x300', 'van=X v2=X') 4 e.g. P v=5 larger=0 step=resize-500x300
+('palette:resize-60x600', 'van=X v2=X') 4 e.g. P v=5 larger=0 step=resize-60x600
+('palette:resize-to-rect', 'van=X v2=ok') 4 e.g. P v=5 larger=0 step=resize-to-rect
+('palette:setrows', 'van=X v2=ok') 4 e.g. P v=5 larger=0 step=setrows
+('vertwrap', 'van=X v2=X') 4 e.g. v=5 style=vertwrap shape=g3-4 rows=4 larger=0
+('vertwrap', 'van=X v2=ok') 140 e.g. v=5 style=vertwrap shape=g9 rows=2 larger=0
+('vertwrap', 'van=ok v2=ok') 4 e.g. v=5 style=vertwrap shape=g9 rows=1 larger=0
+('wrap', 'van=X v2=X') 118 e.g. v=5 style=wrap shape=g3-4 rows=2 larger=1
+('wrap', 'van=X v2=ok') 40 e.g. v=5 style=wrap shape=g9 rows=2 larger=0
+('wrap', 'van=ok v2=X') 14 e.g. v=5 style=wrap shape=g3-4 rows=1 larger=0
+('wrap', 'van=ok v2=ok') 4 e.g. v=5 style=wrap shape=g9 rows=1 larger=0
