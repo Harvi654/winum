@@ -127,3 +127,54 @@ Verdict: the former **P1/P2 are resolved**; no additional blocking issue
 was found in the v5 delta. Promotion still requires the actual revised
 L1/L2 and applicable consumer validation. Production patches/series is
 unchanged.
+
+## Final v5 validation follow-up (2026-11-10)
+
+Reviewed current main fca497d and all-1 source
+b68741791a7e3b55f2b0038294264a02bc5c089a. Read the complete current
+v4-to-v5 delta, v5 README, lifetime control, common-constructor/class
+producer paths, recorded native unit outputs and all-1 assessment.
+Reparsed the complete table oracles against both architecture measurement
+files: all 106 expected rows per class (50 selection/word, six face,
+50 boundary) still match Windows. Native returns and asserted insertion
+format are retained. The unchanged wider word algorithm remains covered
+by the preceding source review; unrelated RichEdit code was not re-read.
+
+- **P1 remains resolved.** The common constructor initializes FALSE,
+  including windowless editors; only the matching RichEdit50W window
+  path sets TRUE. No new path bypasses initialization in this revision.
+- **P2 is now closed by native execution too.** Exact v5 L1 was returned
+  for batch1-4, run 42698489281: msftedit:editor 382 checks, zero failures
+  or skips on both architectures; riched20:editor 11059 checks, zero
+  failures and nine pre-existing non-Japanese-platform skips each. The
+  alternating RichEdit50W/RichEdit20W test is in the msftedit unit and is
+  not skipped. Its two measured distinguishing results remain ordinary
+  assertions over three creation/destruction rounds. The previously
+  pending revised native gate is therefore satisfied; no rerun requested.
+- **P3 remains a disclosed performance question**, not a new correctness
+  blocker: repeated document-origin lookups have not been profiled on
+  long multi-run text. The fix does not claim new script coverage. No
+  table, todo or algorithm changed after the earlier v5 review.
+
+The candidate is byte-identical to all-1's production-position patch;
+the actual all-1 series orders SCF v5 before its textfont v6 consumer.
+RichEdit20W empty-selection word movement stays vanilla, and the measured
+nonempty-selection correction stays ordinary. The 81 RichEdit20W todo
+rows still describe unchanged word-movement gaps; msftedit's 106 table
+rows have none. No new P1/P2 or broadened exception was identified.
+
+[L2 all-1, run 42788810738](https://github.com/Harvi654/winum/actions/runs/42788810738)
+now supplies the previously pending neighboring validation. The committed
+maintainer assessment in l2-all-1-2026-11-10/README.md records no new
+failure in riched20/msftedit on either architecture, including the
+series-only msftedit:editor unit (382 checks, zero failures). Its explicit
+inspection matters: the old comparison script did not assess newly added
+units. The known wbemprox fixture-skip failure and ntdll time ordering
+failure do not establish a RichEdit regression, and the whole run is not
+called green here. Original full artifact JSON was not independently
+downloaded; this L2 conclusion uses the maintainer's recorded inspection.
+No new runtime or full build was performed for this follow-up.
+
+Verdict: **v5 approved; P1/P2 and revised native/paired RichEdit gates are
+closed.** P3 profiling and Inventor GD&T L4 remain open as documented.
+This review does not promote a patch, edit series or upgrade its marker.
