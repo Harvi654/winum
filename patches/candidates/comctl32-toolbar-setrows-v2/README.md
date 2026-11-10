@@ -43,3 +43,11 @@ Applies with `--fuzz=0` after `comctl32-toolbar-padding-height.patch`
 ## L2: test-run/all-1 (2026-11-10)
 
 [docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: no new failure in the touched DLLs, both architectures.
+
+## MEASURE for a Wine test (2026-11-10)
+
+The maintainer chose a measurement over `l1` with an open point:
+`docs/wine-repro/comctl32-toolbar-setrows/` (separator groups, rows,
+`bLarger`, wrapable styles, comctl32 5 and 6, Inventor's palette
+sequence). From its Windows results: a Wine test for setrows v3, or a
+confirmation that v2 matches.

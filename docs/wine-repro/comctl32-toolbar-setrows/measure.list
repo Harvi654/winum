@@ -1,0 +1,2 @@
+# TB_SETROWS with separator groups (comctl32-toolbar-setrows), one entry; also in measure-bundle.list.
+toolbar-setrows | docs/wine-repro/comctl32-toolbar-setrows/measure.c | -Wextra -lgdi32 -static
