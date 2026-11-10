@@ -65,3 +65,24 @@ Inventor the 16-pixel rows looked right, which on Windows would need
 `TB_SETBUTTONSIZE` or strings; a `+toolbar` trace of the palette (which
 size messages Inventor sends) decides whether v5 is right for Inventor
 for the right reason. Until then: open point before promotion.
+
+### Inventor's sequence (trace, 2026-11-10)
+
+The `+toolbar` trace of the palette shows no `TB_SETBUTTONSIZE`:
+`TB_SETBITMAPSIZE` 16x15 -> 32x16, `TB_SETPADDING(4, 0)`,
+`TB_SETROWS(12, TRUE)`. On the Windows VM the palette's columns are about
+34-36 pixels apart and its rows about 16 (maintainer's screenshot), i.e.
+buttons of bitmap + padding = 36x16: Windows applied the padding here.
+The difference to the measured sequences is that Inventor *changes* the
+bitmap size (the padding MEASURE only set the same size, and Windows
+then recalculated nothing). Most likely Windows recalculates the buttons
+after a real bitmap size change, with the padding current at the next
+layout. For this sequence padding v5 gives what Windows gives (36x16;
+vanilla 36x22), so v5 is right for Inventor for the right reason.
+
+What remains is a narrower Wine difference, older than v5 for the width:
+without a bitmap size change (the setrows MEASURE's sequence) Windows
+keeps 23x22, Wine recalculates in `TOOLBAR_CalcToolbar`. Not needed by
+Inventor; recorded as an open point, not a blocker. A MEASURE of
+"bitmap size change, then padding, then TB_SETROWS" would confirm the
+hypothesis above; proposed for a later VM visit.

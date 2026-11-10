@@ -59,3 +59,16 @@ depends on how Inventor sizes the palette (trace requested).
   dialog. If it still falls apart: a `+toolbar` trace of the palette's
   messages (`TB_SETROWS`, `TB_SETPADDING`, `TB_SETBUTTONSIZE`, sizes).
 - Cross review (Codex).
+
+## L4, 2026-11-10 (Inventor 2027, build 42865261514 of test-run/all-4)
+
+Passed. The drawing-text symbol palette looks as in Inventor on the
+Windows VM (screenshots compared by the maintainer, not committed):
+5 columns, the same groups, separator lines across the palette, also
+after the dialog appears. The `+toolbar` trace of the palette
+(`docs/wine-repro/comctl32-toolbar-setrows/inventor-2026-11-10/`):
+`TB_SETBITMAPSIZE` 16x15, then 32x16, `TB_SETPADDING(4, 0)`,
+`TB_SETROWS(12, TRUE)`, then three resizes. With bLarger TRUE the rule
+gives 4 per row for 44 buttons in 4 groups; the 5 columns on both
+systems come from the width Inventor gives the palette afterwards
+(width / button width), which is what v4 added.
