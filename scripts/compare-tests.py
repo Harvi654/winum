@@ -4,7 +4,8 @@
 #                                Wine test summary line and the failing source lines
 # compare VANILLA SERIES       -> Markdown report on stdout; exit 1 when the
 #                                series adds a failure location or a unit stops
-#                                finishing (L2 regression), or when the two sides
+#                                finishing, or a unit only the series has fails
+#                                or does not finish (L2 regression), or when the two sides
 #                                do not cover the same test groups, else 0.
 #                                VANILLA/SERIES: a results JSON file, or a
 #                                directory searched for results-*-<group>.json
@@ -93,8 +94,21 @@ def compare(vpath, spath):
     regress, fixed, changed, moved = [], [], [], []
     for key in sorted(set(v) | set(s)):
         a, b = v.get(key), s.get(key)
-        if a is None or b is None:
-            changed.append((key, "only in " + ("series" if a is None else "vanilla")))
+        if a is None and b is not None:
+            # a unit the patches added (new test file): vanilla has nothing to
+            # compare with, so every failure in it, or not finishing, counts
+            if not b["finished"]:
+                regress.append((key, "new unit, does not finish with the series (exit %s)" % b["exit"]))
+            elif b["fail_at"] or b["failures"]:
+                msgs = b.get("fail_msg", {})
+                regress.append((key, "new unit with failures: " + (", ".join(
+                    f"{k} x{n}" + (f" ({msgs[k]})" if k in msgs else "")
+                    for k, n in sorted(b["fail_at"].items())) or "%d failures" % b["failures"])))
+            else:
+                changed.append((key, f"only in series: {b['tests']} checks, {b['todo']} todo, 0 failures"))
+            continue
+        if b is None:
+            changed.append((key, "only in vanilla"))
             continue
         if a["finished"] and not b["finished"]:
             regress.append((key, "does not finish with the series (exit %s)" % b["exit"]))
