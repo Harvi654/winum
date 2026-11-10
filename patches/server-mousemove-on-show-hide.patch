@@ -1,15 +1,65 @@
-diff --git a/server/queue.c b/server/queue.c
-index 2449f0c8..7c44b93b 100644
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] server: Send a mouse move to the window under the cursor after show/hide.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 (x86_64 and i686, measured with
+docs/wine-repro/server-mousemove-show-hide/measure.c, 2026-11-08): after a
+window is shown, hidden, created, destroyed or moved, the window under the
+cursor receives one WM_MOUSEMOVE, a burst of changes giving one, within
+15-32 ms; a repaint alone gives none.
+
+Wine sent none after show/hide, so Inventor's sketch showed an edited
+dimension only after the mouse moved. Wine already sends one when a visible
+window moves; this adds the show/hide case, delayed and coalesced.
+
+The change is limited to visibility changes (moves are handled by Wine
+already). WINE_SHOWHIDE_MOUSEMOVE_MS overrides the delay (0 disables it).
+
+v2 (2026-11-08): the delay is 16 ms instead of 100 ms. With 100 ms the
+move landed inside the next message sequence of Wine's own tests, which
+pass on Windows (comctl32 button "expected WM_PAINT, got WM_MOUSEMOVE",
+user32 test_mouse_input), in about half of the L2 runs.
+
+v2 revised (2026-11-09, after cross review): the comment no longer says
+the move arrives after the messages the change itself causes; the
+measurement shows the delay and the coalescing, not the order of the
+other messages.
+
+v2 revised (2026-11-10, after the maintainer's L4 in Inventor 2027 with
+the test-run/all-1 build): with 16 ms the sketch did not redraw after a
+dimension edit until the mouse moved; WINE_SHOWHIDE_MOUSEMOVE_MS=16 and
+24 failed, 32 and 100 worked. The default is now 32 ms, the upper end of
+the delay Windows showed (15-32 ms, two timer ticks).
+
+
+v3 (2026-11-10): add the Wine test dlls/user32/tests/mousemove.c from
+the same MEASURE: one WM_MOUSEMOVE, to the window under the cursor, after
+showing or hiding a top-level window or a child away from or under the
+cursor, after creating or destroying a visible child, one for five
+show/hide pairs, none for a repaint or when the cursor is not over the
+test windows. The test waits 800 ms and does not check the delay. A
+hidden window that moves gets a move on Windows but not here (todo_wine;
+outside this change). The server change is v2's unchanged.
+
+v4 (2026-11-10, after cross review): the test's message pump drains the
+queue after every wait, also one that ends past the deadline, so a move
+that is already queued is counted in its own scenario and not left for
+the next one; the inner drain is bounded. Expectations unchanged.
+
 --- a/server/queue.c
 +++ b/server/queue.c
-@@ -589,6 +589,50 @@ void update_cursor_pos( struct desktop *desktop )
+@@ -589,6 +589,52 @@
      set_cursor_pos( desktop, desktop_shm->cursor.x, desktop_shm->cursor.y );
  }
  
-+/* Windows sends the window under the cursor a mouse move when a window is
-+ * shown or hidden; it arrives after the messages the change itself causes
-+ * (Inventor redraws its view after a sketch dimension edit only then).
-+ * Delay ours a little and send one for a burst of changes. */
++/* Windows sends the window under the cursor one mouse move after a window
++ * is shown, hidden, moved, created or destroyed, a burst of changes giving
++ * one move, within one or two timer ticks (15-32 ms measured). Inventor
++ * redraws its view after a sketch dimension edit only when that move
++ * arrives; under Wine it needs the upper end of that range (16 and 24 ms
++ * were too early, 32 ms works). */
 +static struct timeout_user *cursor_pos_timeout;
 +static struct desktop *cursor_pos_desktop;
 +
@@ -38,7 +88,7 @@ index 2449f0c8..7c44b93b 100644
 +    if (delay_ms < 0)
 +    {
 +        const char *env = getenv( "WINE_SHOWHIDE_MOUSEMOVE_MS" );
-+        delay_ms = env ? atoi( env ) : 100;
++        delay_ms = env ? atoi( env ) : 32;
 +    }
 +    if (!delay_ms) return;
 +    if (cursor_pos_timeout)
@@ -53,11 +103,9 @@ index 2449f0c8..7c44b93b 100644
  /* retrieve default position and time for synthesized messages */
  static void get_message_defaults( struct msg_queue *queue, int *x, int *y, unsigned int *time )
  {
-diff --git a/server/user.h b/server/user.h
-index f1a1f07d..5f043be7 100644
 --- a/server/user.h
 +++ b/server/user.h
-@@ -124,6 +124,7 @@ extern void detach_thread_input( struct msg_queue *queue_from, struct msg_queue
+@@ -124,6 +124,7 @@
  extern void set_clip_rectangle( struct desktop *desktop, const struct rectangle *rect,
                                  unsigned int flags, int reset );
  extern void update_cursor_pos( struct desktop *desktop );
@@ -65,11 +113,9 @@ index f1a1f07d..5f043be7 100644
  extern void post_message( user_handle_t win, unsigned int message,
                            lparam_t wparam, lparam_t lparam );
  extern void send_notify_message( user_handle_t win, unsigned int message,
-diff --git a/server/window.c b/server/window.c
-index 3cd82b0c..76bcf667 100644
 --- a/server/window.c
 +++ b/server/window.c
-@@ -2770,6 +2770,8 @@ DECL_HANDLER(set_window_pos)
+@@ -2770,6 +2770,8 @@
      if ((win->style & old_style & WS_VISIBLE) && (memcmp( &old_client, &win->client_rect, sizeof(old_client) )
          || memcmp( &old_window, &win->window_rect, sizeof(old_window) )))
          update_cursor_pos( win->desktop );
@@ -78,3 +124,218 @@ index 3cd82b0c..76bcf667 100644
  
      if (win->paint_flags & SET_WINPOS_LAYERED_WINDOW) validate_whole_window( win );
  
+--- a/dlls/user32/tests/Makefile.in
++++ b/dlls/user32/tests/Makefile.in
+@@ -19,6 +19,7 @@
+ 	listbox.c \
+ 	menu.c \
+ 	monitor.c \
++	mousemove.c \
+ 	msg.c \
+ 	resource.c \
+ 	resource.rc \
+--- /dev/null
++++ b/dlls/user32/tests/mousemove.c
+@@ -0,0 +1,202 @@
++/*
++ * Mouse move sent after window layout changes
++ *
++ * Original, AI-assisted (Claude), LGPL-2.1-or-later.
++ * Expected values: own Windows 10 MEASURE, x86_64 and i686, 2026-11-08
++ * (docs/wine-repro/server-mousemove-show-hide in winum).
++ */
++
++#include <stdarg.h>
++
++#include "windef.h"
++#include "winbase.h"
++#include "wingdi.h"
++#include "winuser.h"
++
++#include "wine/test.h"
++
++/* Windows delivered the move 15-32 ms after the change. The wait below is
++ * far longer so that a slow machine still sees it; the delay itself is not
++ * checked, only that one move arrives and at which window. */
++#define SETTLE_MS 400
++#define WAIT_MS   800
++
++static HWND moves_hwnd[16];
++static unsigned int moves;
++
++static LRESULT CALLBACK mousemove_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++    if (msg == WM_MOUSEMOVE && moves < ARRAY_SIZE(moves_hwnd)) moves_hwnd[moves++] = hwnd;
++    return DefWindowProcA(hwnd, msg, wparam, lparam);
++}
++
++/* Dispatch what is queued, then wait; the queue is drained once more after
++ * every wait, also one that ends past the deadline, so a message that is
++ * already queued is never left for the next scenario. */
++static void pump_messages(DWORD ms)
++{
++    DWORD start = GetTickCount(), elapsed;
++    unsigned int count;
++    MSG msg;
++
++    for (;;)
++    {
++        for (count = 0; count < 1000 && PeekMessageA(&msg, 0, 0, 0, PM_REMOVE); count++)
++        {
++            TranslateMessage(&msg);
++            DispatchMessageA(&msg);
++        }
++        elapsed = GetTickCount() - start;
++        if (elapsed >= ms) break;
++        MsgWaitForMultipleObjects(0, NULL, FALSE, min(ms - elapsed, 10), QS_ALLINPUT);
++    }
++}
++
++static void start_scenario(void)
++{
++    pump_messages(SETTLE_MS);
++    moves = 0;
++}
++
++static void check_moves_(const char *name, unsigned int expect_count, HWND expect_hwnd, BOOL todo)
++{
++    unsigned int i;
++
++    pump_messages(WAIT_MS);
++    winetest_push_context("%s", name);
++    todo_wine_if(todo)
++    ok(moves == expect_count, "got %u WM_MOUSEMOVE, expected %u\n", moves, expect_count);
++    for (i = 0; i < moves; i++)
++        ok(moves_hwnd[i] == expect_hwnd, "move %u went to %p, expected %p\n", i, moves_hwnd[i], expect_hwnd);
++    winetest_pop_context();
++}
++#define check_moves(name, count, hwnd) check_moves_(name, count, hwnd, FALSE)
++
++static HWND create_child(HWND parent, DWORD style, int x, int y)
++{
++    return CreateWindowA("winetest_mousemove", NULL, WS_CHILD | style, x, y, 40, 40, parent, NULL, NULL, NULL);
++}
++
++static void test_mousemove_after_layout_change(void)
++{
++    HWND main, top_away, top_under, child_away, child_under, tmp;
++    POINT centre, client_centre, pos;
++    WNDCLASSA cls = {0};
++    RECT rect;
++    int i;
++
++    cls.lpfnWndProc = mousemove_proc;
++    cls.hInstance = GetModuleHandleA(NULL);
++    cls.hCursor = LoadCursorA(NULL, (LPCSTR)IDC_ARROW);
++    cls.hbrBackground = GetStockObject(WHITE_BRUSH);
++    cls.lpszClassName = "winetest_mousemove";
++    ok(RegisterClassA(&cls), "RegisterClassA failed, error %lu\n", GetLastError());
++
++    main = CreateWindowA("winetest_mousemove", "A", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
++                         100, 100, 420, 320, NULL, NULL, NULL, NULL);
++    ok(main != NULL, "CreateWindowA failed, error %lu\n", GetLastError());
++    GetClientRect(main, &rect);
++    client_centre.x = rect.right / 2;
++    client_centre.y = rect.bottom / 2;
++    centre = client_centre;
++    ClientToScreen(main, &centre);
++    child_away = create_child(main, 0, 10, 10);
++    child_under = create_child(main, 0, client_centre.x - 20, client_centre.y - 20);
++    top_away = CreateWindowExA(WS_EX_TOOLWINDOW, "winetest_mousemove", "B away", WS_POPUP,
++                               700, 500, 100, 80, NULL, NULL, NULL, NULL);
++    top_under = CreateWindowExA(WS_EX_TOOLWINDOW, "winetest_mousemove", "B under", WS_POPUP,
++                                centre.x - 30, centre.y - 30, 60, 60, NULL, NULL, NULL, NULL);
++    SetForegroundWindow(main);
++    SetCursorPos(centre.x, centre.y);
++    pump_messages(2 * SETTLE_MS);
++
++    GetCursorPos(&pos);
++    if (pos.x != centre.x || pos.y != centre.y || WindowFromPoint(pos) != main)
++    {
++        skip("cursor could not be placed over the test window (%ld,%ld)\n", pos.x, pos.y);
++        goto done;
++    }
++
++    start_scenario();
++    check_moves("nothing", 0, NULL);
++
++    start_scenario();
++    ShowWindow(top_away, SW_SHOWNOACTIVATE);
++    check_moves("show top-level away", 1, main);
++    start_scenario();
++    ShowWindow(top_away, SW_HIDE);
++    check_moves("hide top-level away", 1, main);
++
++    start_scenario();
++    ShowWindow(top_under, SW_SHOWNOACTIVATE);
++    check_moves("show top-level under", 1, top_under);
++    start_scenario();
++    ShowWindow(top_under, SW_HIDE);
++    check_moves("hide top-level under", 1, main);
++
++    start_scenario();
++    ShowWindow(child_away, SW_SHOWNA);
++    check_moves("show child away", 1, main);
++    start_scenario();
++    ShowWindow(child_away, SW_HIDE);
++    check_moves("hide child away", 1, main);
++
++    start_scenario();
++    ShowWindow(child_under, SW_SHOWNA);
++    check_moves("show child under", 1, child_under);
++    start_scenario();
++    ShowWindow(child_under, SW_HIDE);
++    check_moves("hide child under", 1, main);
++
++    start_scenario();
++    for (i = 0; i < 5; i++)
++    {
++        ShowWindow(child_away, SW_SHOWNA);
++        ShowWindow(child_away, SW_HIDE);
++    }
++    check_moves("five show/hide pairs", 1, main);
++
++    start_scenario();
++    SetWindowPos(top_away, NULL, 720, 520, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
++    /* Windows sends a move even for a hidden window that moves; Wine sends
++     * one only when a visible window moves or changes visibility. */
++    check_moves_("move hidden top-level", 1, main, TRUE);
++
++    start_scenario();
++    tmp = create_child(main, WS_VISIBLE, 10, 60);
++    check_moves("create visible child away", 1, main);
++    start_scenario();
++    DestroyWindow(tmp);
++    check_moves("destroy child away", 1, main);
++
++    start_scenario();
++    tmp = create_child(main, WS_VISIBLE, client_centre.x - 20, client_centre.y - 20);
++    check_moves("create visible child under", 1, tmp);
++    start_scenario();
++    DestroyWindow(tmp);
++    check_moves("destroy child under", 1, main);
++
++    start_scenario();
++    InvalidateRect(main, NULL, TRUE);
++    UpdateWindow(main);
++    check_moves("repaint", 0, NULL);
++
++    SetCursorPos(5, 5);
++    start_scenario();
++    ShowWindow(top_away, SW_SHOWNOACTIVATE);
++    check_moves("cursor elsewhere, show", 0, NULL);
++    start_scenario();
++    ShowWindow(top_away, SW_HIDE);
++    check_moves("cursor elsewhere, hide", 0, NULL);
++
++done:
++    DestroyWindow(top_under);
++    DestroyWindow(top_away);
++    DestroyWindow(main);
++    UnregisterClassA("winetest_mousemove", GetModuleHandleA(NULL));
++}
++
++START_TEST(mousemove)
++{
++    test_mousemove_after_layout_change();
++}

@@ -1,3 +1,22 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: msi: Keep transform rows with NULL binary fields.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Our Windows 10 x86_64/i686 MEASURE applies an original two-row transform
+with a missing binary stream for its NULL-object row and a populated binary
+control. Both rows, their notes and the control payload survive. Reading
+the NULL field returns ERROR_INVALID_DATA with zero bytes. Wine dropped
+the entire row when opening the absent stream failed.
+
+v2 (2026-11-09): Keep the production implementation unchanged and add the
+Windows-derived database test. Build the original transform via public
+IStorage APIs rather than requiring Wine's unimplemented transform generator.
+Check row retention, NULL/read semantics and the populated control with
+ordinary ok() assertions. Native assertion L1, cross review and paired MSI
+runtime remain pending. This does not establish the production workaround's
+behavior for corrupt or inaccessible non-NULL streams. No series change.
+
 diff --git a/dlls/msi/table.c b/dlls/msi/table.c
 index 089f2027..cf04690a 100644
 --- a/dlls/msi/table.c
@@ -18,3 +37,165 @@ index 089f2027..cf04690a 100644
              }
  
              MSI_RecordSetStream( rec, i+1, stm );
+--- a/dlls/msi/tests/db.c
++++ b/dlls/msi/tests/db.c
+@@ -3045,6 +3045,151 @@
+     return ERROR_SUCCESS;
+ }
+ 
++static BOOL null_transform_hr(HRESULT hr, const char *operation)
++{
++    ok(hr == S_OK, "%s returned %#lx.\n", operation, hr);
++    return SUCCEEDED(hr);
++}
++static UINT null_transform_query(MSIHANDLE db, const char *sql)
++{
++    MSIHANDLE view = 0;
++    UINT result = MsiDatabaseOpenViewA(db, sql, &view);
++    if(!result) result = MsiViewExecute(view, 0);
++    if(view) { MsiViewClose(view); MsiCloseHandle(view); }
++    return result;
++}
++/* MSI's documented compressed stream-name alphabet, table prefix 0x4840. */
++static void null_transform_encode(const char *name, BOOL table, WCHAR *out)
++{
++    static const char alphabet[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._";
++    if(table) *out++ = 0x4840;
++    while(*name) {
++        const char *a = strchr(alphabet, *name++), *b = *name ? strchr(alphabet, *name) : NULL;
++        if(!a) { *out++ = (unsigned char)name[-1]; continue; }
++        if(b) { *out++ = 0x3800 + (a - alphabet) + ((b - alphabet) << 6); name++; }
++        else *out++ = 0x4800 + (a - alphabet);
++    }
++    *out = 0;
++}
++static BOOL null_transform_write(IStorage *storage, const char *name, BOOL table, const void *data, ULONG size)
++{
++    WCHAR encoded[80];
++    IStream *stream = NULL;
++    ULONG written = 0;
++    HRESULT hr;
++    null_transform_encode(name, table, encoded);
++    hr = IStorage_CreateStream(storage, encoded, STGM_WRITE | STGM_SHARE_EXCLUSIVE, 0, 0, &stream);
++    if(!null_transform_hr(hr, "CreateOwnTransformStream")) return FALSE;
++    hr = IStream_Write(stream, data, size, &written);
++    IStream_Release(stream);
++    if(!null_transform_hr(hr, "WriteOwnTransformStream")) return FALSE;
++    ok(written == size, "Stream write was %lu, expected %lu.\n", written, size);
++    if(written != size) return FALSE;
++    return TRUE;
++}
++static BOOL null_transform_create(const WCHAR *path)
++{
++    static const CLSID transform_class = {0x000c1082,0,0,{0xc0,0,0,0,0,0,0,0x46}};
++    static const WORD pool[] = {1252,0, 8,1, 8,1};
++    static const char strings[] = "null-rowblob-row";
++    static const WORD rows[] = {0x0301,0x8001,1,0, 0x0301,0x8002,2,1};
++    static const BYTE blob[] = {0x57,0x33,0x4d,0x21};
++    IStorage *storage = NULL;
++    BOOL success;
++    if(!null_transform_hr(StgCreateDocfile(path, STGM_CREATE | STGM_READWRITE | STGM_SHARE_EXCLUSIVE,
++                              0, &storage), "StgCreateDocfile")) return FALSE;
++    success = null_transform_hr(IStorage_SetClass(storage, &transform_class), "SetTransformClass")
++         && null_transform_write(storage, "_StringPool", TRUE, pool, sizeof(pool))
++         && null_transform_write(storage, "_StringData", TRUE, strings, sizeof(strings) - 1)
++         && null_transform_write(storage, "WinumNull", TRUE, rows, sizeof(rows))
++         && null_transform_write(storage, "WinumNull.2", FALSE, blob, sizeof(blob));
++    IStorage_Release(storage);
++    return success;
++}
++static void test_transform_null_stream(void)
++{
++    WCHAR temp[MAX_PATH], database[MAX_PATH] = {0}, transform[MAX_PATH] = {0};
++    MSIHANDLE db = 0, view = 0, row = 0;
++    BOOL database_owned = FALSE, transform_owned = FALSE;
++    unsigned int rows = 0, seen = 0;
++    DWORD n;
++    HRESULT hr;
++    UINT result;
++
++    hr = CoInitialize(NULL);
++    ok(SUCCEEDED(hr), "CoInitialize returned %#lx.\n", hr);
++    if(FAILED(hr)) return;
++    n = GetTempPathW(ARRAY_SIZE(temp), temp);
++    ok(n && n < ARRAY_SIZE(temp), "GetTempPath failed, error %lu.\n", GetLastError());
++    if(!n || n >= ARRAY_SIZE(temp)) goto done;
++    database_owned = GetTempFileNameW(temp, L"wnt", 0, database) != 0;
++    ok(database_owned, "Database temp name failed, error %lu.\n", GetLastError());
++    if(!database_owned) goto done;
++    transform_owned = GetTempFileNameW(temp, L"wnt", 0, transform) != 0;
++    ok(transform_owned, "Transform temp name failed, error %lu.\n", GetLastError());
++    if(!transform_owned) goto done;
++
++    result = MsiOpenDatabaseW(database, (LPCWSTR)MSIDBOPEN_CREATE, &db);
++    ok(result == ERROR_SUCCESS, "Create database returned %u.\n", result);
++    if(result) goto done;
++    result = null_transform_query(db, "CREATE TABLE `WinumNull` (`Key` SHORT NOT NULL, `Note` CHAR(40), `Payload` OBJECT PRIMARY KEY `Key`)");
++    ok(result == ERROR_SUCCESS, "Create table returned %u.\n", result);
++    if(result) goto done;
++    result = MsiDatabaseCommit(db);
++    ok(result == ERROR_SUCCESS, "Commit returned %u.\n", result);
++    if(result) goto done;
++    MsiCloseHandle(db); db = 0;
++    result = MsiOpenDatabaseW(database, (LPCWSTR)MSIDBOPEN_DIRECT, &db);
++    ok(result == ERROR_SUCCESS, "Reopen returned %u.\n", result);
++    if(result || !null_transform_create(transform)) goto done;
++    result = MsiDatabaseApplyTransformW(db, transform, 0);
++    ok(result == ERROR_SUCCESS, "Apply transform returned %u.\n", result);
++    if(result) goto done;
++    result = MsiDatabaseOpenViewA(db, "SELECT `Key`, `Note`, `Payload` FROM `WinumNull` ORDER BY `Key`", &view);
++    ok(result == ERROR_SUCCESS, "Open result view returned %u.\n", result);
++    if(result) goto done;
++    result = MsiViewExecute(view, 0);
++    ok(result == ERROR_SUCCESS, "Execute returned %u.\n", result);
++    if(result) goto done;
++    while((result = MsiViewFetch(view, &row)) == ERROR_SUCCESS) {
++        char text[64] = {0}, bytes[8] = {0};
++        DWORD length = sizeof(text), size = sizeof(bytes);
++        int key = MsiRecordGetInteger(row, 1);
++        UINT string_result = MsiRecordGetStringA(row, 2, text, &length);
++        UINT read_result = MsiRecordReadStream(row, 3, bytes, &size);
++
++        ok(string_result == ERROR_SUCCESS, "String read returned %u.\n", string_result);
++        ok(key == 1 || key == 2, "Unexpected row key %d.\n", key);
++        if(key == 1) {
++            seen |= 1;
++            ok(!strcmp(text, "null-row"), "NULL row lost its note.\n");
++            ok(MsiRecordIsNull(row, 3), "NULL row acquired a payload.\n");
++            ok(read_result == ERROR_INVALID_DATA, "NULL stream read returned %u.\n", read_result);
++            ok(!size, "NULL stream read size is %lu.\n", size);
++        } else if(key == 2) {
++            seen |= 2;
++            ok(!strcmp(text, "blob-row"), "Blob row lost its note.\n");
++            ok(!MsiRecordIsNull(row, 3), "Blob row payload is NULL.\n");
++            ok(read_result == ERROR_SUCCESS, "Blob read returned %u.\n", read_result);
++            ok(size == 4, "Blob size is %lu.\n", size);
++            ok(size == 4 && !memcmp(bytes, "W3M!", 4), "Blob contents changed.\n");
++        }
++        rows++;
++        MsiCloseHandle(row); row = 0;
++    }
++    ok(result == ERROR_NO_MORE_ITEMS, "Final fetch returned %u.\n", result);
++    ok(rows == 2, "Transform produced %u rows, expected 2.\n", rows);
++    ok(seen == 3, "Missing NULL/blob row, seen mask %#x.\n", seen);
++
++done:
++    if(row) MsiCloseHandle(row);
++    if(view) { MsiViewClose(view); MsiCloseHandle(view); }
++    if(db) MsiCloseHandle(db);
++    if(transform_owned) ok(DeleteFileW(transform), "Transform cleanup failed, error %lu.\n", GetLastError());
++    if(database_owned) ok(DeleteFileW(database), "Database cleanup failed, error %lu.\n", GetLastError());
++    CoUninitialize();
++}
++
+ static void test_try_transform(void)
+ {
+     static const struct {
+@@ -9385,6 +9530,7 @@
+     test_markers();
+     test_handle_limit();
+     test_try_transform();
++    test_transform_null_stream();
+     test_join();
+     test_temporary_table();
+     test_alter();

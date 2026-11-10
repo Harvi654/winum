@@ -1,14 +1,49 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH v3] comctl32/toolbar: Lay out TB_SETROWS by separator groups in vertical wrapable toolbars.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream. v1 is the Inventor patch from Autodesk-Inventor-for-Linux
+eddb691 (wine-11.19-1).
+
+Windows 10 (own MEASURE, comctl32 5.82 and 6.16, x86_64 and i686,
+2026-11-10): in a CCS_VERT | TBSTYLE_WRAPABLE toolbar, TB_SETROWS starts
+every group of buttons between separators on a new row and gives each
+separator a row of its own; the number of buttons per row is the one that
+gives the most button rows not above the request, or with bLarger the
+fewest that reach it, separators not counted (47 buttons in 5 groups,
+TB_SETROWS(12): 5 per row). The rows stay when buttons are replaced and
+when the toolbar is sized to the returned rectangle; a later change of
+its width wraps it by width again.
+
+Wine set the wrap points and wrapped again by the window's width inside
+TB_SETROWS, so a vertical toolbar came back with one column; Inventor
+sizes its drawing-text symbol palette to that rectangle.
+
+v2 (2026-11-08) handled bLarger (Wine's tbrows_results table).
+
+v3 (2026-11-10, after the measurement): the group rule only for vertical
+wrapable toolbars; other toolbars keep Wine's code, which v2 had changed
+(46 measured horizontal cases that Wine already did like Windows came out
+wrong). The rows are kept until the toolbar's width changes, no longer
+for good (Windows re-wraps after a resize); TB_SETROWS' own resize does
+not count. New test test_setrows_groups with the measured vertical cases
+(left out: rows Windows does not return from, and the 3+4 groups with 4
+rows, where Windows' choice does not follow the rule) and the horizontal
+cases Wine handles like Windows, run for comctl32 5 and 6.
+
 --- a/dlls/comctl32/toolbar.c
 +++ b/dlls/comctl32/toolbar.c
-@@ -169,6 +169,7 @@
+@@ -169,6 +169,9 @@
      TBUTTON_INFO *buttons;      /* pointer to button array */
      LPWSTR       *strings;      /* pointer to string array */
      TBITMAP_INFO *bitmaps;
-+    INT      nRowsColumns;      /* buttons per row set by TB_SETROWS, 0 = none */
++    BOOL     bSettingRows;      /* TB_SETROWS is resizing the toolbar */
++    INT      nRowsColumns;      /* buttons per row set by TB_SETROWS in a vertical
++                                   wrapable toolbar until its width changes, 0 = none */
  #if __WINE_COMCTL32_VERSION == 6
      HTHEME   hTheme;            /* theme */
  #endif
-@@ -1364,6 +1365,44 @@
+@@ -1364,6 +1367,44 @@
      TRACE("max string size %ld x %ld\n", lpSize->cx, lpSize->cy);
  }
  
@@ -53,13 +88,14 @@
  /***********************************************************************
  * 		TOOLBAR_WrapToolbar
  *
-@@ -1392,6 +1431,14 @@
+@@ -1392,6 +1433,15 @@
      if( !(infoPtr->dwStyle & TBSTYLE_WRAPABLE) &&
  	!(infoPtr->dwExStyle & TBSTYLE_EX_VERTICAL) )  return;
  
-+    /* After TB_SETROWS the rows keep their number of buttons when the
-+       window is resized or buttons change, instead of wrapping by width. */
-+    if (infoPtr->nRowsColumns)
++    /* The rows TB_SETROWS set in a vertical wrapable toolbar stay when
++       buttons change; a change of the toolbar's width clears them
++       (TOOLBAR_Size) and the toolbar wraps by width again. */
++    if (infoPtr->nRowsColumns && (infoPtr->dwStyle & CCS_VERT))
 +    {
 +        TOOLBAR_WrapColumns(infoPtr, infoPtr->nRowsColumns);
 +        return;
@@ -68,7 +104,7 @@
      btnPtr = infoPtr->buttons;
      x  = infoPtr->nIndent;
      width = infoPtr->client_rect.right - infoPtr->client_rect.left;
-@@ -1854,6 +1901,16 @@
+@@ -1856,6 +1906,16 @@
      /* infoPtr->nRows is the number of rows on the toolbar */
      infoPtr->nRows = nRows + nSepRows + 1;
  
@@ -85,114 +121,306 @@
      TRACE("toolbar button width %d\n", infoPtr->nButtonWidth);
  }
  
-@@ -4924,89 +4981,36 @@
+@@ -4924,6 +4984,55 @@
+ }
+ 
+ 
++/* TB_SETROWS in a vertical wrapable toolbar (measured on Windows 10,
++ * comctl32 5 and 6): every group of buttons between separators starts a
++ * new row and a separator has a row of its own. The number of buttons per
++ * row is the one that gives the most button rows not above the request,
++ * or with bLarger the fewest that reach it; separators are not counted. */
++static void
++TOOLBAR_SetRowsVertical (TOOLBAR_INFO *infoPtr, INT rows, BOOL bLarger)
++{
++    TBUTTON_INFO *btnPtr = infoPtr->buttons;
++    INT buttons = 0, columns, i;
++
++    if (infoPtr->nRows == rows && infoPtr->nRowsColumns) return;
++
++    for (i = 0; i < infoPtr->nNumButtons; i++)
++        if (!(btnPtr[i].fsState & TBSTATE_HIDDEN) && !(btnPtr[i].fsStyle & BTNS_SEP))
++            buttons++;
++
++    if (rows < 1) rows = 1;
++    for (columns = 1; columns < buttons; columns++)
++        if (TOOLBAR_WrapColumns(infoPtr, columns) <= rows)
++            break;
++    if (bLarger && columns > 1 && TOOLBAR_WrapColumns(infoPtr, columns) < rows)
++        columns--;
++    if (columns < 1) columns = 1;
++
++    TRACE("Trying to wrap at %d (%d buttons, %d rows)\n", columns, buttons, rows);
++    TOOLBAR_WrapColumns(infoPtr, columns);
++    infoPtr->nRowsColumns = columns;
++
++    TOOLBAR_CalcToolbar (infoPtr);
++    TRACE("Result - %d rows, %ld x %ld\n", infoPtr->nRows,
++          infoPtr->rcBound.right - infoPtr->rcBound.left,
++          infoPtr->rcBound.bottom - infoPtr->rcBound.top);
++
++    /* As below: resize only with CCS_NORESIZE. This resize keeps the rows. */
++    if (infoPtr->dwStyle & CCS_NORESIZE)
++    {
++        infoPtr->bSettingRows = TRUE;
++        SetWindowPos(infoPtr->hwndSelf, NULL, 0, 0,
++                     infoPtr->rcBound.right - infoPtr->rcBound.left,
++                     infoPtr->rcBound.bottom - infoPtr->rcBound.top,
++                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
++        infoPtr->bSettingRows = FALSE;
++    }
++
++    InvalidateRect(infoPtr->hwndSelf, NULL, TRUE);
++}
++
++
+ static LRESULT
+ TOOLBAR_SetRows (TOOLBAR_INFO *infoPtr, WPARAM wParam, LPRECT lprc)
+ {
+@@ -4934,7 +5043,9 @@
  
      TRACE("Setting rows to %d (%d)\n", rows, bLarger);
  
 -    if(infoPtr->nRows != rows)
-+    if(infoPtr->nRows != rows || !infoPtr->nRowsColumns)
++    if ((infoPtr->dwStyle & CCS_VERT) && (infoPtr->dwStyle & TBSTYLE_WRAPABLE))
++        TOOLBAR_SetRowsVertical(infoPtr, rows, bLarger);
++    else if(infoPtr->nRows != rows)
      {
          TBUTTON_INFO *btnPtr = infoPtr->buttons;
--        int curColumn = 0; /* Current column                      */
--        int curRow    = 0; /* Current row                         */
--        int hidden    = 0; /* Number of hidden buttons */
--        int seps      = 0; /* Number of separators     */
--        int idealWrap = 0; /* Ideal wrap point         */
--        int i;
--        BOOL wrap;
-+        int buttons = 0, columns, i;
- 
-         /*
--           Calculate new size and wrap points - Under windows, setrows will
--           change the dimensions if needed to show the number of requested
--           rows (if CCS_NORESIZE is set), or will take up the whole window
--           (if no CCS_NORESIZE).
--
--           Basic algorithm - If N buttons, and y rows requested, each row
--           contains N/y buttons.
--
--           FIXME: Handling of separators not obvious from testing results
--           FIXME: Take width of window into account?
-+           Use the fewest buttons per row that fit into the requested number
-+           of rows; every group of buttons (between separators) starts on a
-+           new row and separators are not counted (Windows does this; bLarger
-+           is not needed for it).
-          */
-+        for (i = 0; i < infoPtr->nNumButtons; i++)
-+            if (!(btnPtr[i].fsState & TBSTATE_HIDDEN) && !(btnPtr[i].fsStyle & BTNS_SEP))
-+                buttons++;
+         int curColumn = 0; /* Current column                      */
+@@ -6586,6 +6697,16 @@
+                 IntersectRect(&dummy, &delta_height, &btnPtr->rect))
+                 InvalidateRect(infoPtr->hwndSelf, &btnPtr->rect, TRUE);
+     }
++    {
++        RECT client;
 +
-+        if (rows < 1) rows = 1;
-+        for (columns = 1; columns < buttons; columns++)
-+            if (TOOLBAR_WrapColumns(infoPtr, columns) <= rows)
-+                break;
-+        if (columns < 1) columns = 1;
++        /* Windows wraps by width again after a size change that follows
++           TB_SETROWS; its own resize does not count. */
++        GetClientRect(infoPtr->hwndSelf, &client);
++        if (infoPtr->nRowsColumns && !infoPtr->bSettingRows &&
++            client.right - client.left != infoPtr->client_rect.right - infoPtr->client_rect.left)
++            infoPtr->nRowsColumns = 0;
++    }
+     GetClientRect(infoPtr->hwndSelf, &infoPtr->client_rect);
+     TOOLBAR_AutoSize(infoPtr);
+     return 0;
+--- a/dlls/comctl32/tests/toolbar.c
++++ b/dlls/comctl32/tests/toolbar.c
+@@ -2139,6 +2139,200 @@
+     DestroyWindow(hToolbar);
+ }
  
--        /* Loop through the buttons one by one counting key items  */
--        for (i = 0; i < infoPtr->nNumButtons; i++ )
--        {
--            btnPtr[i].fsState &= ~TBSTATE_WRAP;
--            if (btnPtr[i].fsState & TBSTATE_HIDDEN)
--                hidden++;
--            else if (btnPtr[i].fsStyle & BTNS_SEP)
--                seps++;
--        }
--
--        /* FIXME: Separators make this quite complex */
--        if (seps) FIXME("Separators unhandled\n");
--
--        /* Round up so more per line, i.e., less rows */
--        idealWrap = (infoPtr->nNumButtons - hidden + (rows-1)) / (rows ? rows : 1);
--
--        /* Calculate ideal wrap point if we are allowed to grow, but cannot
--           achieve the requested number of rows. */
--        if (bLarger && idealWrap > 1)
--        {
--            int resRows = (infoPtr->nNumButtons + (idealWrap-1)) / idealWrap;
--            int moreRows = (infoPtr->nNumButtons + (idealWrap-2)) / (idealWrap-1);
--
--            if (resRows < rows && moreRows > rows)
--            {
--                idealWrap--;
--                TRACE("Changing idealWrap due to bLarger (now %d)\n", idealWrap);
--            }
--        }
--
--        curColumn = curRow = 0;
--        wrap = FALSE;
--        TRACE("Trying to wrap at %d (%d,%d,%d)\n", idealWrap,
--              infoPtr->nNumButtons, hidden, rows);
--
--        for (i = 0; i < infoPtr->nNumButtons; i++ )
--        {
--            if (btnPtr[i].fsState & TBSTATE_HIDDEN)
--                continue;
--
--            /* Step on, wrap if necessary or flag next to wrap */
--            if (!wrap) {
--                curColumn++;
--            } else {
--                wrap = FALSE;
--                curColumn = 1;
--                curRow++;
--            }
--
--            if (curColumn > (idealWrap-1)) {
--                wrap = TRUE;
--                btnPtr[i].fsState |= TBSTATE_WRAP;
--            }
--        }
--
--        TRACE("Result - %d rows\n", curRow + 1);
-+        TRACE("Trying to wrap at %d (%d buttons, %d rows)\n", columns, buttons, rows);
-+        TOOLBAR_WrapColumns(infoPtr, columns);
-+        infoPtr->nRowsColumns = columns;
++/* TB_SETROWS with groups of buttons between separators. Expected values:
++ * own Windows 10 MEASURE, comctl32 5.82 and 6.16, x86_64 and i686,
++ * 2026-11-10 (winum docs/wine-repro/comctl32-toolbar-setrows); both
++ * versions gave the same rows. Layout: buttons per row in order, S for a
++ * separator on a row of its own, s after the count when it shares the row.
++ * Vertical wrapable toolbars: every case Windows returned from, except the
++ * 3+4 groups with 4 rows, where Windows' choice does not follow the other
++ * rows (with fewer rows than the groups need Windows does not return).
++ * Horizontal toolbars: the cases Wine already handles like Windows. */
++static void test_setrows_groups(void)
++{
++    static const DWORD styles[] =
++    {
++        TBSTYLE_FLAT | TBSTYLE_WRAPABLE | CCS_VERT, TBSTYLE_FLAT | TBSTYLE_WRAPABLE, TBSTYLE_FLAT,
++    };
++    static const int groups[][6] =
++    {
++        { 9 }, { 3, 4 }, { 1, 6, 2 }, { 12, 10, 10, 8, 7 },
++    };
++    static const struct { int style, shape, rows; BOOL larger; int getrows; const char *layout; } tests[] =
++    {
++    { 0, 0,  1, FALSE,  1, "9" },
++    { 0, 0,  1, TRUE,   1, "9" },
++    { 0, 0,  2, FALSE,  2, "5 4" },
++    { 0, 0,  2, TRUE,   2, "5 4" },
++    { 0, 0,  3, FALSE,  3, "3 3 3" },
++    { 0, 0,  3, TRUE,   3, "3 3 3" },
++    { 0, 0,  4, FALSE,  3, "3 3 3" },
++    { 0, 0,  4, TRUE,   5, "2 2 2 2 1" },
++    { 0, 0,  5, FALSE,  5, "2 2 2 2 1" },
++    { 0, 0,  5, TRUE,   5, "2 2 2 2 1" },
++    { 0, 0,  6, FALSE,  5, "2 2 2 2 1" },
++    { 0, 0,  6, TRUE,   9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0,  8, FALSE,  5, "2 2 2 2 1" },
++    { 0, 0,  8, TRUE,   9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 10, FALSE,  9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 10, TRUE,   9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 12, FALSE,  9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 12, TRUE,   9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 15, FALSE,  9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 15, TRUE,   9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 20, FALSE,  9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 20, TRUE,   9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 1,  2, FALSE,  4, "3 S 4" },
++    { 0, 1,  2, TRUE,   4, "3 S 4" },
++    { 0, 1,  3, FALSE,  5, "3 S 3 1" },
++    { 0, 1,  3, TRUE,   5, "3 S 3 1" },
++    { 0, 1,  5, FALSE,  6, "2 1 S 2 2" },
++    { 0, 1,  5, TRUE,   9, "1 1 1 S 1 1 1 1" },
++    { 0, 1,  6, FALSE,  6, "2 1 S 2 2" },
++    { 0, 1,  6, TRUE,   9, "1 1 1 S 1 1 1 1" },
++    { 0, 1,  8, FALSE,  9, "1 1 1 S 1 1 1 1" },
++    { 0, 1,  8, TRUE,   9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 10, FALSE,  9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 10, TRUE,   9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 12, FALSE,  9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 12, TRUE,   9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 15, FALSE,  9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 15, TRUE,   9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 20, FALSE,  9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 20, TRUE,   9, "1 1 1 S 1 1 1 1" },
++    { 0, 2,  3, FALSE,  7, "1 S 6 S 2" },
++    { 0, 2,  3, TRUE,   7, "1 S 6 S 2" },
++    { 0, 2,  4, FALSE,  8, "1 S 3 3 S 2" },
++    { 0, 2,  4, TRUE,   8, "1 S 3 3 S 2" },
++    { 0, 2,  5, FALSE,  9, "1 S 2 2 2 S 2" },
++    { 0, 2,  5, TRUE,   9, "1 S 2 2 2 S 2" },
++    { 0, 2,  6, FALSE,  9, "1 S 2 2 2 S 2" },
++    { 0, 2,  6, TRUE,  13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2,  8, FALSE,  9, "1 S 2 2 2 S 2" },
++    { 0, 2,  8, TRUE,  13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 10, FALSE, 13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 10, TRUE,  13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 12, FALSE, 13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 12, TRUE,  13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 15, FALSE, 13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 15, TRUE,  13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 20, FALSE, 13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 20, TRUE,  13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 3,  5, FALSE, 13, "12 S 10 S 10 S 8 S 7" },
++    { 0, 3,  5, TRUE,  13, "12 S 10 S 10 S 8 S 7" },
++    { 0, 3,  6, FALSE, 14, "10 2 S 10 S 10 S 8 S 7" },
++    { 0, 3,  6, TRUE,  14, "10 2 S 10 S 10 S 8 S 7" },
++    { 0, 3,  8, FALSE, 16, "8 4 S 8 2 S 8 2 S 8 S 7" },
++    { 0, 3,  8, TRUE,  16, "8 4 S 8 2 S 8 2 S 8 S 7" },
++    { 0, 3, 10, FALSE, 18, "6 6 S 6 4 S 6 4 S 6 2 S 6 1" },
++    { 0, 3, 10, TRUE,  18, "6 6 S 6 4 S 6 4 S 6 2 S 6 1" },
++    { 0, 3, 12, FALSE, 19, "5 5 2 S 5 5 S 5 5 S 5 3 S 5 2" },
++    { 0, 3, 12, TRUE,  21, "4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3" },
++    { 0, 3, 15, FALSE, 21, "4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3" },
++    { 0, 3, 15, TRUE,  26, "3 3 3 3 S 3 3 3 1 S 3 3 3 1 S 3 3 2 S 3 3 1" },
++    { 0, 3, 20, FALSE, 26, "3 3 3 3 S 3 3 3 1 S 3 3 3 1 S 3 3 2 S 3 3 1" },
++    { 0, 3, 20, TRUE,  32, "2 2 2 2 2 2 S 2 2 2 2 2 S 2 2 2 2 2 S 2 2 2 2 S 2 2 2 1" },
++    { 1, 1,  1, FALSE,  1, "7s" },
++    { 1, 1,  1, TRUE,  1, "7s" },
++    { 1, 1,  2, FALSE,  1, "7s" },
++    { 1, 2,  1, FALSE,  1, "9s" },
++    { 1, 2,  1, TRUE,  1, "9s" },
++    { 1, 2,  2, FALSE,  1, "9s" },
++    { 1, 3,  8, TRUE,  9, "12s 10s 10s 8s 7" },
++    { 2, 1,  1, FALSE,  1, "7s" },
++    { 2, 1,  1, TRUE,  1, "7s" },
++    { 2, 1,  2, TRUE,  3, "3s 4" },
++    { 2, 1,  5, FALSE,  5, "2 1s 2 2" },
++    { 2, 1,  6, FALSE,  5, "2 1s 2 2" },
++    { 2, 2,  1, FALSE,  1, "9s" },
++    { 2, 2,  1, TRUE,  1, "9s" },
++    { 2, 3,  1, FALSE,  1, "47s" },
++    { 2, 3,  1, TRUE,  1, "47s" },
++    };
++    HIMAGELIST (WINAPI *pImageList_Create)(int, int, UINT, int, int);
++    int (WINAPI *pImageList_Add)(HIMAGELIST, HBITMAP, HBITMAP);
++    BOOL (WINAPI *pImageList_Destroy_)(HIMAGELIST);
++    TBBUTTON buttons[64];
++    HIMAGELIST himl;
++    HBITMAP bitmap;
++    HMODULE module;
++    unsigned int t;
++    HDC hdc;
++
++    module = GetModuleHandleA("comctl32.dll");
++    pImageList_Create = (void *)GetProcAddress(module, "ImageList_Create");
++    pImageList_Add = (void *)GetProcAddress(module, "ImageList_Add");
++    pImageList_Destroy_ = (void *)GetProcAddress(module, "ImageList_Destroy");
++    hdc = GetDC(NULL);
++    bitmap = CreateCompatibleBitmap(hdc, 64, 16);
++    ReleaseDC(NULL, hdc);
++    himl = pImageList_Create(16, 16, ILC_COLOR24, 4, 0);
++    ok(himl != NULL, "ImageList_Create failed\n");
++    ok(pImageList_Add(himl, bitmap, NULL) == 0, "ImageList_Add failed\n");
++    DeleteObject(bitmap);
++
++    for (t = 0; t < ARRAY_SIZE(tests); t++)
++    {
++        char layout[128] = "", part[16];
++        int count = 0, g, i, in_row = 0, row_sep = 0, rows;
++        LONG top = LONG_MIN;
++        HWND toolbar;
++        RECT rc;
++
++        memset(buttons, 0, sizeof(buttons));
++        for (g = 0; g < ARRAY_SIZE(groups[0]) && groups[tests[t].shape][g]; g++)
++        {
++            if (g) buttons[count++].fsStyle = BTNS_SEP;
++            for (i = 0; i < groups[tests[t].shape][g]; i++, count++)
++            {
++                buttons[count].iBitmap = count % 4;
++                buttons[count].idCommand = 100 + count;
++                buttons[count].fsState = TBSTATE_ENABLED;
++                buttons[count].fsStyle = BTNS_BUTTON;
++                buttons[count].iString = -1;
++            }
++        }
++
++        toolbar = CreateWindowExA(0, TOOLBARCLASSNAMEA, NULL, WS_CHILD | WS_VISIBLE | CCS_NORESIZE |
++                                  CCS_NOPARENTALIGN | CCS_NODIVIDER | styles[tests[t].style],
++                                  0, 0, 300, 400, hMainWnd, NULL, GetModuleHandleA(NULL), NULL);
++        ok(toolbar != NULL, "CreateWindowExA failed\n");
++        SendMessageA(toolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
++        SendMessageA(toolbar, TB_SETIMAGELIST, 0, (LPARAM)himl);
++        ok(SendMessageA(toolbar, TB_ADDBUTTONSA, count, (LPARAM)buttons), "TB_ADDBUTTONS failed\n");
++        SendMessageA(toolbar, TB_SETROWS, MAKEWPARAM(tests[t].rows, tests[t].larger), (LPARAM)&rc);
++
++        for (i = 0; i <= count; i++)
++        {
++            if (i < count)
++                ok(SendMessageA(toolbar, TB_GETITEMRECT, i, (LPARAM)&rc), "TB_GETITEMRECT %d failed\n", i);
++            if (i == count || rc.top != top)
++            {
++                if (top != LONG_MIN)
++                {
++                    if (in_row) sprintf(part, "%s%d%s", layout[0] ? " " : "", in_row, row_sep ? "s" : "");
++                    else sprintf(part, "%sS", layout[0] ? " " : "");
++                    strcat(layout, part);
++                }
++                if (i == count) break;
++                top = rc.top;
++                in_row = row_sep = 0;
++            }
++            if (buttons[i].fsStyle & BTNS_SEP) row_sep = 1;
++            else in_row++;
++        }
++
++        winetest_push_context("%u: style %d, shape %d, %d rows, larger %d", t, tests[t].style,
++                              tests[t].shape, tests[t].rows, tests[t].larger);
++        rows = SendMessageA(toolbar, TB_GETROWS, 0, 0);
++        ok(rows == tests[t].getrows, "got %d rows, expected %d\n", rows, tests[t].getrows);
++        ok(!strcmp(layout, tests[t].layout), "got layout \"%s\", expected \"%s\"\n", layout, tests[t].layout);
++        winetest_pop_context();
++        DestroyWindow(toolbar);
++    }
++    pImageList_Destroy_(himl);
++}
++
+ static void test_getstring(void)
+ {
+     HWND hToolbar = NULL;
+@@ -3430,6 +3624,7 @@
+     test_createtoolbarex();
+     test_dispinfo();
+     test_setrows();
++    test_setrows_groups();
+     test_getstring();
+     test_tooltip();
+     test_get_set_style();
+@@ -3460,6 +3655,7 @@
+     test_wrap();
+     test_padding_height();
+     test_padding_bitmap_size();
++    test_setrows_groups();
  
-         /* recalculate toolbar */
-         TOOLBAR_CalcToolbar (infoPtr);
-+        TRACE("Result - %d rows, %ld x %ld\n", infoPtr->nRows,
-+              infoPtr->rcBound.right - infoPtr->rcBound.left,
-+              infoPtr->rcBound.bottom - infoPtr->rcBound.top);
- 
-         /* Resize if necessary (Only if NORESIZE is set - odd, but basically
-            if NORESIZE is NOT set, then the toolbar will always be resized to
+     PostQuitMessage(0);
+     while(GetMessageA(&msg,0,0,0)) {
