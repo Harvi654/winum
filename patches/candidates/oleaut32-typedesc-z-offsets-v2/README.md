@@ -156,3 +156,7 @@ verify the predicted four writer-size todos in Wine; the corrected Wine
 runtime and paired oleaut32 L2 still need to be recorded. Formal cross
 review and remaining consumer validation stay open. No production patch,
 test marker, series entry or candidates-4 branch is changed.
+
+## L2: test-run/all-1 (2026-11-10)
+
+[docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: `oleaut32:typelib` no new failure, the four record-size todos as expected, both architectures.

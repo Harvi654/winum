@@ -143,3 +143,7 @@ result remains evidence for the historical ReadProcessMemory version only.
 All todo_wine checks execute as ordinary assertions in the native harness.
 Kernel32 actctx paired L2 and consumer validation remain open. No production
 patch, series entry or validation marker is changed. Raw logs are not committed.
+
+## L2: test-run/all-1 (2026-11-10)
+
+[docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: `ntdll` without a new failure; `kernel32` (where `actctx.c` is) was in no group and did not run. Added to g3 after this run; L2 for kernel32 is still open.

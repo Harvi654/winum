@@ -63,3 +63,9 @@ Verdict: **implementation approved; the test needs a v3** (`win_skip` ->
 `skip` for the unmeasured setups, P1) before promotion, and a re-run of L1
 is not needed for that change alone (on Windows `win_skip` and `skip` are
 the same). P2 is a coverage gap to record or close with a MEASURE.
+
+## Confirmed by L2 (2026-11-10)
+
+`test-run/all-1` (run 42788810738): `wbemprox:timezone` 84 checks, 1
+failure per architecture at `timezone.c:186`, the first `win_skip`. P1
+confirmed; see `docs/wine-repro/l2-all-1-2026-11-10/`.

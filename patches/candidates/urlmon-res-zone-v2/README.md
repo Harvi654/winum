@@ -21,3 +21,7 @@ Windows for every URL except the module mapping. To check: L2 against
 vanilla, L1 of the test (urlmon:sec_mgr is in the L1 bundle), then
 AutoCAD on the `autocad` branch (WPF must accept zone 3 for the icons).
 Cross review by the other assistant before the series.
+
+## L2: test-run/all-1 (2026-11-10)
+
+[docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: no new failure in the touched DLLs, both architectures.

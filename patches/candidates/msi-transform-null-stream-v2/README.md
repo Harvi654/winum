@@ -100,3 +100,7 @@ are recorded; no Windows files or raw logs are committed.
 
 Observed vanilla/patched Wine runtime comparison and paired MSI L2 are still
 pending. This candidate is not promoted and patches/series is unchanged.
+
+## L2: test-run/all-1 (2026-11-10)
+
+[docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: no new failure in the touched DLLs, both architectures.

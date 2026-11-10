@@ -140,3 +140,7 @@ committed. The fixed-view native pass does not expand coverage to invalid
 inputs, concurrent view mutations, OOM injection or other unmeasured cases.
 Wine runtime pairing and the review/consumer gates above remain open; the
 production patch, missing production test marker and series are unchanged.
+
+## L2: test-run/all-1 (2026-11-10)
+
+[docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: `shell32:selection` 357 checks, 0 failures, both architectures (the first-state focus check holds on Wine); no new failure in the other shell32 units.

@@ -88,3 +88,7 @@ marshaller's missing encoded-array path as a validation risk. Keep the
 candidate outside production until paired typelib/tmarshal/rpcrt4 checks
 and Design Accelerator Shaft/gear L4 address that risk. The root patch page's
 marker remains unchanged because the tested candidate has not been promoted.
+
+## L2: test-run/all-1 (2026-11-10)
+
+[docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: no new failure in the touched DLLs, both architectures.

@@ -126,3 +126,7 @@ Only summarized text results are recorded; no raw logs or Windows files.
 No runtime claim is made for vanilla or patched Wine by this native pass.
 Broader HTTP modes and the review/runtime/consumer gates above stay open;
 the production patch, marker and patches/series remain unchanged.
+
+## L2: test-run/all-1 (2026-11-10)
+
+[docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: no new failure in the touched DLLs, both architectures.

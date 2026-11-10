@@ -43,3 +43,7 @@ Run 42772681118 (`docs/wine-repro/batch1-measure/l1-2026-11-10-batch1-6/`).
 L1: `msftedit:richole` 182 tests and `riched20:richole` 183279 tests, 0 failures, x86_64 and i386. L2 (paired, both architectures): 6 regressions, all known and
 none from batch 1 (production setrows v1, mousemove v1, urlmon v1 and its
 tests-first test; ntdll threadpool timing).
+
+## L2: test-run/all-1 (2026-11-10)
+
+[docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: no new failure in the touched DLLs, both architectures.

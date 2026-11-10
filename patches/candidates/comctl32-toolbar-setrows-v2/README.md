@@ -39,3 +39,7 @@ Applies with `--fuzz=0` after `comctl32-toolbar-padding-height.patch`
   separator handling was compared with Windows only visually;
 - L4: Inventor's drawing text editor symbol palette still shows 5 columns
   and its groups as on Windows.
+
+## L2: test-run/all-1 (2026-11-10)
+
+[docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: no new failure in the touched DLLs, both architectures.

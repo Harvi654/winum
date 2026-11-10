@@ -89,3 +89,7 @@ normalization subset only. No raw logs or Windows binaries are committed.
 PA19 apply/decode and the large-old-file reference-window regression remain
 uncovered. This subset pass does not close the full-patch validation gate;
 the production marker stays missing, and patches/series is unchanged.
+
+## L2: test-run/all-1 (2026-11-10)
+
+[docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: `mspatcha:signature` 50 checks, 0 failures, both architectures; `apply_patch` unchanged. Decode coverage still open.

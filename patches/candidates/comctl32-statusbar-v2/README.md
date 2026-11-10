@@ -233,3 +233,7 @@ both PE architectures (576 rows total); the v5 correction and themed-v6
 preservation hold in both. Failed theme disabling and missing unthemed-v6
 Wine coverage remain unchanged. This completes this focused measurement set,
 not the complete paired comctl32 L2 suites or CAD L4 validation.
+
+## L2: test-run/all-1 (2026-11-10)
+
+[docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: no new failure in the touched DLLs, both architectures.

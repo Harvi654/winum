@@ -114,3 +114,7 @@ No further attachment VM rerun is needed for this body. Final changed-test
 cross review, neighboring-suite L2 for v5, and applicable Inventor L4
 remain pending; SOLIDWORKS L4 stays deferred. Candidate only: production
 patches/series and its marker remain unchanged.
+
+## L2: test-run/all-1 (2026-11-10)
+
+[docs/wine-repro/l2-all-1-2026-11-10](../../../docs/wine-repro/l2-all-1-2026-11-10/README.md), run 42788810738, with every current candidate: `user32:attachment` 12039 checks, 16 todos, 0 failures, both architectures; no new failure in user32 and the other groups (neighbouring-suite L2). The one regression of the run is an ntdll i386 time check, unrelated.
