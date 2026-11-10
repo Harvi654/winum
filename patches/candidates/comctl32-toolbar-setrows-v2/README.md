@@ -55,3 +55,6 @@ confirmation that v2 matches.
 ## L1: bundle of test-run/all-2 (2026-11-10)
 
 [docs/wine-repro/l1-all-2-2026-11-10](../../../docs/wine-repro/l1-all-2-2026-11-10/README.md), Windows 10: `comctl32:toolbar` 5309 checks, 0 failures, x86_64 and i386 - Wine's existing `test_setrows` only. The MEASURE of separator groups (first run, same visit) shows Windows placing groups differently from v2: see `docs/wine-repro/comctl32-toolbar-setrows/README.md`. A v3 follows the complete measurement.
+
+**Superseded by `../comctl32-toolbar-setrows-v3/` (2026-11-10)** after
+the complete measurement.

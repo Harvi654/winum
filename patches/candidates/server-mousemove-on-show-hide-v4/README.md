@@ -33,3 +33,8 @@ with the patch 33 checks, 0 failures, 1 todo, three runs.
 - L2 with v4 (next test run); all-2 ran v3.
 - Codex: re-read of the pump change.
 - L4 of the 32 ms default with the all-2 build.
+
+## L4, 2026-11-10 (Inventor 2027, build of test-run/all-2)
+
+The 32 ms default works: after a dimension edit the sketch shows the new
+value without moving the mouse (maintainer).

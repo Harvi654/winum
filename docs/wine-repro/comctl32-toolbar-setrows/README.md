@@ -156,3 +156,19 @@ toolbars to vanilla's code, and gets a Wine test from the vertical rows
 above (both comctl32 versions; the hanging cases left out). Whether v3
 can drop v2's "keep the columns on resize" depends on why Inventor needed
 it - Windows does not do it; to be checked in Inventor (L4) with v3.
+
+## Candidate v3 (2026-11-10)
+
+`patches/candidates/comctl32-toolbar-setrows-v3/`: the group rule only
+for vertical wrapable toolbars, rows dropped on a width change. Under
+local Wine (`wine-2026-11-10/result-setrows-v3-x86_64.txt`,
+`compare-v3.txt`): 144 of 148 vertical cases as Windows, no horizontal
+case changed from vanilla. Still different from Windows, outside v3:
+
+- After a width change Wine wraps a vertical toolbar by width the old
+  way (palette 500x300: Windows `12 S 10 S 10 S 8 S 7`, Wine `22s 25s`).
+- With `TB_SETPADDING(0, 0)` set before the image list and no strings,
+  Windows' buttons stay 23x22 (rectangle 115x274 for 5 per row); with
+  padding v5 Wine's are 16 wide (80x208). For the padding candidate:
+  Inventor's palette looked right with 16-pixel rows on Windows, so it
+  probably sets sizes in another order; to be looked at with padding.
