@@ -84,7 +84,15 @@ Child-process version; x86_64 and i686 exit 0 and identical in every
 in both versions, whenever fewer rows were asked than a vertical layout
 of the groups needs: `g3-4` rows 1, `g1-6-2` rows 1-2, the palette shape
 rows 1-4. Windows spins there (the CPU load seen in the VM); a Wine test
-must not call those.
+must not call those. Which call spins is not known: the program prints
+nothing between creating the toolbar, `TB_ADDBUTTONSW` and `TB_SETROWS`
+(cross review of the measurement, P2). Only those cases are affected;
+the conclusions below use completed cases only.
+
+Completion accounting (cross review P2: the parent counts only
+timeouts): checked in the returned files - every other child ended with
+exit 0 (`CHILD_END ... exit=00000000`), on both architectures, and no
+`ERROR` line was printed.
 
 ### Inventor's palette (`CCS_VERT | TBSTYLE_WRAPABLE`, 12+10+10+8+7)
 
