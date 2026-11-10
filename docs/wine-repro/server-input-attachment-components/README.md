@@ -339,3 +339,32 @@ and paired runtime L2 are pending. The final pair must include contextual
 failure messages, not just a first-per-line summary. No third run has
 started. Keep native v5 L1 for the combined VM round after the pending
 textfont-followup2 results. No textfont changes or VM runs were started.
+
+
+Final focused pair (round 3):
+[run 42772336963](https://github.com/Harvi654/winum/actions/runs/42772336963),
+test-run/batch4-4 at ee07735, based on main 8ef6ad8. It is now in progress;
+this supersedes the candidate's pre-run scheduling status. Both full
+source variants were strictly applied before push: identical v5 test and
+Makefile bytes, identical compiled candidate implementation only on series,
+vanilla server queue/window byte-identical to upstream. Production series
+ordering remains unchanged. The source check and gate fixtures do not
+substitute for runtime validation.
+
+The branch-only gate requires all 44 scenarios, 592 component snapshots,
+2180 positives, no unexplained skips or flaky checks, zero ordinary series
+failures and a vanilla target signal. It additionally records up to forty
+actual contextual failure lines per architecture and an omitted count,
+including unexpected todo successes; repeated failures at one source line
+are no longer reduced to the first context. Public notices expose the same
+filtered synthetic data. The gate was checked for both valid scope modes,
+ordinary failure, flaky and incomplete scenarios, and preservation of two
+distinct contexts at the same location. No result is claimed yet.
+
+Native v5 L1 remains pending for the combined VM round after
+textfont-followup2; do not run an older attachment bundle. A focused
+component pass will not clear the wider neighboring L2 or unavailable
+absolute Windows-state scope. If this final pair fails, record its full
+remaining evidence and stop before a further test adjustment. Both main
+and the run-record branch were pushed successfully; the earlier pull
+authentication failure did not block delivery.
