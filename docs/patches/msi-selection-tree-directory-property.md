@@ -1,6 +1,6 @@
 # msi-selection-tree-directory-property.patch
 
-<!-- winum-test: missing -->
+<!-- winum-test: l3-only: after three native fixture attempts, the own MSI dialog actor never established a positive feature-selection control, so the directory-binding Windows oracle is unavailable; retain the Wine direct/indirect dialog reproducer and SOLIDWORKS installation L4 pending a redesigned native UI measurement (temporary maintainer exception 2026-11-10) -->
 
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
@@ -8,13 +8,31 @@
 - **Origin:** Solidworks-for-Linux (private for now), `patches/`
 - **In winum:** `patches/series` from winum-11.20-1
 
+## Accepted temporary exception (maintainer decision, 2026-11-10)
+
+The maintainer accepts the proposed temporary l3-only exception below for
+this release. The native selection oracle is unavailable because none of
+the three fixture attempts established the positive selection control;
+unchanged before/after properties do not become Windows expected values.
+Retain the original Wine direct/indirect UI reproducer and recorded
+SOLIDWORKS installer L4, with consumer work currently deferred as documented.
+
+**Open follow-up after the release:** use another public-API automation
+route, first identifying the own dialog's actual ownership and proving
+selection/closure independently of the failed caller-thread actor. Measure
+both directory bindings natively, then add an exact Windows-tested Wine
+assertion and replace this temporary exception. Do not repeat the stopped
+fixture unchanged or close this item before the new oracle exists.
+
 ## Problem as the user saw it
 
 SOLIDWORKS installation: the feature tree overwrote INSTALLDIR.
 
 ## Cause and fix
 
-SelectionTree and PathEdit bind to the directory property as on Windows.
+The workaround preserves the resolved directory property while allowing
+browse indirection to follow the selected feature. Its native selection
+contract remains unmeasured; retention uses the dated temporary exception.
 
 ## Wine test
 
@@ -39,7 +57,9 @@ The original native MEASURE reached both own dialogs in its third iteration
 The maintainer dismissed the UI manually. Both architectures exit 1 with
 two automation errors. Unchanged properties without selection are not a
 native oracle. The fixture is stopped under AGENTS.md's three-round rule;
-no assertion L1, replacement candidate or release exception is claimed.
+no assertion L1 or replacement candidate is claimed. A temporary release
+exception is now accepted by the dated maintainer decision above; native
+automation redesign remains open after the release.
 See [measurement state](../wine-repro/msi-selection-tree-directory-property/README.md).
 
 ## Evidence
@@ -47,11 +67,11 @@ See [measurement state](../wine-repro/msi-selection-tree-directory-property/READ
 Solidworks-for-Linux `docs/wine-repro/msi-feature-map/README.md`; overview in `docs/patch-status.md`.
 
 
-## Draft for maintainer decision (2026-11-10): native UI automation gap
+## Original proposal (2026-11-10), now accepted: native UI automation gap
 
-**Proposal only; the active marker remains missing.** This is an explicit
-request for a temporary validation exception, not an assertion that public
-Windows APIs cannot test SelectionTree.
+**Accepted temporarily by the dated maintainer decision above.** The
+proposal details are retained; this is not an assertion that public Windows
+APIs cannot test SelectionTree.
 
 What we measured: three iterations of our original temporary MSI fixture,
 built for x86_64/i686. The final iteration successfully creates both own
@@ -71,12 +91,11 @@ the missing positive feature-selection control. Under the three-round
 rule the current fixture is stopped; do not request a fourth retry or
 convert its non-selection observations into expected values.
 
-Proposed exact reason, **subject to maintainer approval**:
+Accepted temporary reason (original proposal wording):
 
 > l3-only: after three native fixture attempts, the own MSI dialog actor never established a positive feature-selection control, so the directory-binding Windows oracle is unavailable; retain the Wine direct/indirect dialog reproducer and SOLIDWORKS installation L4 pending a redesigned native UI measurement.
 
-This would be a temporary automation exception by explicit maintainer
-decision. It is weaker than proving that an open tool cannot build a valid
+This is a temporary automation exception by explicit maintainer decision. It is weaker than proving that an open tool cannot build a valid
 call, and must not be recorded as such. Windows supports the APIs; the
 current actor is the limitation.
 
@@ -108,4 +127,4 @@ identifies only the fixture dialog's thread/process ownership, establishes
 a reliable and positively verified feature selection, then measures both
 bindings on Windows. Only after those outputs should an exact native-
 tested Wine assertion replace this exception. No fourth iteration, new
-candidate, guessed native value or marker change is made by this draft.
+candidate or guessed native value is introduced by the accepted exception.
