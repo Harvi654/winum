@@ -98,3 +98,41 @@ completes under a local Wine 11.20 build.
 So the padding height applies to buttons without text as well when a
 changed bitmap size recalculates them (v3 had limited it to text), and
 only the same-size call recalculates nothing.
+
+## Sequence MEASURE (2026-11-10): `measure-sequence.c`
+
+Why: in the setrows measurement Windows kept 23x22 buttons without
+strings after `TB_SETPADDING(0, 0)` and `TB_SETROWS`, while Wine with v5
+had 16x16 - v5 changes there a height vanilla Wine has like Windows.
+Inventor's palette (trace, `../comctl32-toolbar-setrows/inventor-2026-11-10/`)
+does `TB_SETBITMAPSIZE` 16x15, then 32x16, `TB_SETPADDING(4, 0)`,
+`TB_SETROWS(12, TRUE)`, and on Windows its buttons look like bitmap +
+padding (36x16, from a screenshot only). This program measures it.
+
+Per comctl32 5 and 6, a `CCS_VERT | TBSTYLE_WRAPABLE` toolbar with 47
+buttons without strings in groups 12+10+10+8+7, one child process per
+sequence (10 s limit), a `STEP` line after every step with
+`TB_GETBUTTONSIZE`, `TB_GETPADDING`, the first item's rectangle,
+`TB_GETROWS`, the client size and the layout. Steps: `1`
+`TB_SETBITMAPSIZE` 16x15 (the default), `2` 32x16, `i`/`I` image list
+16x16/32x16, `a` the buttons, `p` `TB_SETPADDING(4, 0)`, `r`
+`TB_SETROWS(12, TRUE)`, `w` width 200, `z` `TB_AUTOSIZE`.
+
+| Sequence | Steps | Question |
+| --- | --- | --- |
+| inventor | `12Iaprwz` | Inventor's order |
+| inventor-buttons-late | `12Iparwz` | buttons after the padding |
+| padding-first | `p12Iarwz` | padding before the size change |
+| padding-between | `1p2Iarwz` | padding between the two sizes |
+| no-size-change | `1iaprwz` | same as the setrows MEASURE, padding 4,0 |
+| imagelist-only-32 | `Iaprwz` | size changed by the image list only |
+| imagelist-only-16 | `iaprwz` | no size change at all |
+| changed-and-back | `121iaprwz` | a change undone before the buttons |
+| inventor-no-setrows | `12Iapwz` | Inventor's order without `TB_SETROWS` |
+
+Trial under Wine 11.20 with padding v5 and setrows v4
+(`wine-2026-11-10/`): completes, no error. Inventor's order gives 36x16
+after `TB_SETROWS`; "no-size-change" gives 20x16 (Wine recalculates on
+`TB_SETROWS` whatever happened before).
+
+Run in the VM: own list `sequence.list`; about 20 s, no input.
