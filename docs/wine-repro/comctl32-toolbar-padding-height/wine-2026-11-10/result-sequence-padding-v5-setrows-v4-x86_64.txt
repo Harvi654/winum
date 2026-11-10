@@ -1,0 +1,212 @@
+MEASURE topic=comctl32-toolbar-padding-sequence schema=1 bits=64
+SYSTEM cxedge=2 cyedge=2
+CHILD_BEGIN v=5 seq=inventor steps=12Iaprwz
+COMCTL32 requested=5 dll=5.81
+STEP v=5 seq=inventor - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=inventor 1 button=23,21 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=inventor 2 button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=inventor I button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=inventor a button=39,22 pad=7,6 item0=0,0,39,22 rows=13 client=300x400 layout=[7 5 7 3 7 3 7 1 7]
+STEP v=5 seq=inventor p button=39,22 pad=4,0 item0=0,0,39,22 rows=13 client=300x400 layout=[7 5 7 3 7 3 7 1 7]
+STEP v=5 seq=inventor r button=36,16 pad=4,0 item0=0,0,36,16 rows=21 client=144x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=5 seq=inventor w button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+STEP v=5 seq=inventor z button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+CHILD_END v=5 seq=inventor steps=12Iaprwz exit=00000000
+CHILD_BEGIN v=5 seq=inventor-buttons-late steps=12Iparwz
+COMCTL32 requested=5 dll=5.81
+STEP v=5 seq=inventor-buttons-late - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=inventor-buttons-late 1 button=23,21 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=inventor-buttons-late 2 button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=inventor-buttons-late I button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=inventor-buttons-late p button=39,22 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=inventor-buttons-late a button=39,22 pad=4,0 item0=0,0,39,22 rows=13 client=300x400 layout=[7 5 7 3 7 3 7 1 7]
+STEP v=5 seq=inventor-buttons-late r button=36,16 pad=4,0 item0=0,0,36,16 rows=21 client=144x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=5 seq=inventor-buttons-late w button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+STEP v=5 seq=inventor-buttons-late z button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+CHILD_END v=5 seq=inventor-buttons-late steps=12Iparwz exit=00000000
+CHILD_BEGIN v=5 seq=padding-first steps=p12Iarwz
+COMCTL32 requested=5 dll=5.81
+STEP v=5 seq=padding-first - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=padding-first p button=23,22 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=padding-first 1 button=20,15 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=padding-first 2 button=36,16 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=padding-first I button=36,16 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=padding-first a button=36,16 pad=4,0 item0=0,0,36,16 rows=12 client=300x400 layout=[8 4 8 2 8 2 8 7]
+STEP v=5 seq=padding-first r button=36,16 pad=4,0 item0=0,0,36,16 rows=21 client=144x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=5 seq=padding-first w button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+STEP v=5 seq=padding-first z button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+CHILD_END v=5 seq=padding-first steps=p12Iarwz exit=00000000
+CHILD_BEGIN v=5 seq=padding-between steps=1p2Iarwz
+COMCTL32 requested=5 dll=5.81
+STEP v=5 seq=padding-between - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=padding-between 1 button=23,21 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=padding-between p button=23,21 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=padding-between 2 button=36,16 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=padding-between I button=36,16 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=padding-between a button=36,16 pad=4,0 item0=0,0,36,16 rows=12 client=300x400 layout=[8 4 8 2 8 2 8 7]
+STEP v=5 seq=padding-between r button=36,16 pad=4,0 item0=0,0,36,16 rows=21 client=144x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=5 seq=padding-between w button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+STEP v=5 seq=padding-between z button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+CHILD_END v=5 seq=padding-between steps=1p2Iarwz exit=00000000
+CHILD_BEGIN v=5 seq=no-size-change steps=1iaprwz
+COMCTL32 requested=5 dll=5.81
+STEP v=5 seq=no-size-change - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=no-size-change 1 button=23,21 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=no-size-change i button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=no-size-change a button=23,22 pad=7,6 item0=0,0,23,22 rows=9 client=300x400 layout=[12 10 10 8 7]
+STEP v=5 seq=no-size-change p button=23,22 pad=4,0 item0=0,0,23,22 rows=9 client=300x400 layout=[12 10 10 8 7]
+STEP v=5 seq=no-size-change r button=20,16 pad=4,0 item0=0,0,20,16 rows=21 client=80x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=5 seq=no-size-change w button=20,16 pad=4,0 item0=0,0,20,16 rows=14 client=200x600 layout=[10 2 S 10 S 10 S 8 S 7]
+STEP v=5 seq=no-size-change z button=20,16 pad=4,0 item0=0,0,20,16 rows=14 client=200x600 layout=[10 2 S 10 S 10 S 8 S 7]
+CHILD_END v=5 seq=no-size-change steps=1iaprwz exit=00000000
+CHILD_BEGIN v=5 seq=imagelist-only-32 steps=Iaprwz
+COMCTL32 requested=5 dll=5.81
+STEP v=5 seq=imagelist-only-32 - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=imagelist-only-32 I button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=imagelist-only-32 a button=39,22 pad=7,6 item0=0,0,39,22 rows=13 client=300x400 layout=[7 5 7 3 7 3 7 1 7]
+STEP v=5 seq=imagelist-only-32 p button=39,22 pad=4,0 item0=0,0,39,22 rows=13 client=300x400 layout=[7 5 7 3 7 3 7 1 7]
+STEP v=5 seq=imagelist-only-32 r button=36,16 pad=4,0 item0=0,0,36,16 rows=21 client=144x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=5 seq=imagelist-only-32 w button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+STEP v=5 seq=imagelist-only-32 z button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+CHILD_END v=5 seq=imagelist-only-32 steps=Iaprwz exit=00000000
+CHILD_BEGIN v=5 seq=imagelist-only-16 steps=iaprwz
+COMCTL32 requested=5 dll=5.81
+STEP v=5 seq=imagelist-only-16 - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=imagelist-only-16 i button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=imagelist-only-16 a button=23,22 pad=7,6 item0=0,2,23,24 rows=9 client=300x400 layout=[12 10 10 8 7]
+STEP v=5 seq=imagelist-only-16 p button=23,22 pad=4,0 item0=0,2,23,24 rows=9 client=300x400 layout=[12 10 10 8 7]
+STEP v=5 seq=imagelist-only-16 r button=20,16 pad=4,0 item0=0,0,20,16 rows=21 client=80x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=5 seq=imagelist-only-16 w button=20,16 pad=4,0 item0=0,0,20,16 rows=14 client=200x600 layout=[10 2 S 10 S 10 S 8 S 7]
+STEP v=5 seq=imagelist-only-16 z button=20,16 pad=4,0 item0=0,0,20,16 rows=14 client=200x600 layout=[10 2 S 10 S 10 S 8 S 7]
+CHILD_END v=5 seq=imagelist-only-16 steps=iaprwz exit=00000000
+CHILD_BEGIN v=5 seq=changed-and-back steps=121iaprwz
+COMCTL32 requested=5 dll=5.81
+STEP v=5 seq=changed-and-back - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=changed-and-back 1 button=23,21 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=changed-and-back 2 button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=changed-and-back 1 button=23,21 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=changed-and-back i button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=changed-and-back a button=23,22 pad=7,6 item0=0,0,23,22 rows=9 client=300x400 layout=[12 10 10 8 7]
+STEP v=5 seq=changed-and-back p button=23,22 pad=4,0 item0=0,0,23,22 rows=9 client=300x400 layout=[12 10 10 8 7]
+STEP v=5 seq=changed-and-back r button=20,16 pad=4,0 item0=0,0,20,16 rows=21 client=80x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=5 seq=changed-and-back w button=20,16 pad=4,0 item0=0,0,20,16 rows=14 client=200x600 layout=[10 2 S 10 S 10 S 8 S 7]
+STEP v=5 seq=changed-and-back z button=20,16 pad=4,0 item0=0,0,20,16 rows=14 client=200x600 layout=[10 2 S 10 S 10 S 8 S 7]
+CHILD_END v=5 seq=changed-and-back steps=121iaprwz exit=00000000
+CHILD_BEGIN v=5 seq=inventor-no-setrows steps=12Iapwz
+COMCTL32 requested=5 dll=5.81
+STEP v=5 seq=inventor-no-setrows - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=inventor-no-setrows 1 button=23,21 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=inventor-no-setrows 2 button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=inventor-no-setrows I button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=5 seq=inventor-no-setrows a button=39,22 pad=7,6 item0=0,0,39,22 rows=13 client=300x400 layout=[7 5 7 3 7 3 7 1 7]
+STEP v=5 seq=inventor-no-setrows p button=39,22 pad=4,0 item0=0,0,39,22 rows=13 client=300x400 layout=[7 5 7 3 7 3 7 1 7]
+STEP v=5 seq=inventor-no-setrows w button=39,22 pad=4,0 item0=0,0,39,22 rows=15 client=200x600 layout=[5 5 2 5 5 5 5 5 3 5 2]
+STEP v=5 seq=inventor-no-setrows z button=39,22 pad=4,0 item0=0,0,39,22 rows=15 client=200x600 layout=[5 5 2 5 5 5 5 5 3 5 2]
+CHILD_END v=5 seq=inventor-no-setrows steps=12Iapwz exit=00000000
+CHILD_BEGIN v=6 seq=inventor steps=12Iaprwz
+COMCTL32 requested=6 dll=6.0
+STEP v=6 seq=inventor - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=inventor 1 button=23,21 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=inventor 2 button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=inventor I button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=inventor a button=39,22 pad=7,6 item0=0,0,39,22 rows=13 client=300x400 layout=[7 5 7 3 7 3 7 1 7]
+STEP v=6 seq=inventor p button=39,22 pad=4,0 item0=0,0,39,22 rows=13 client=300x400 layout=[7 5 7 3 7 3 7 1 7]
+STEP v=6 seq=inventor r button=36,16 pad=4,0 item0=0,0,36,16 rows=21 client=144x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=6 seq=inventor w button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+STEP v=6 seq=inventor z button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+CHILD_END v=6 seq=inventor steps=12Iaprwz exit=00000000
+CHILD_BEGIN v=6 seq=inventor-buttons-late steps=12Iparwz
+COMCTL32 requested=6 dll=6.0
+STEP v=6 seq=inventor-buttons-late - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=inventor-buttons-late 1 button=23,21 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=inventor-buttons-late 2 button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=inventor-buttons-late I button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=inventor-buttons-late p button=39,22 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=inventor-buttons-late a button=39,22 pad=4,0 item0=0,0,39,22 rows=13 client=300x400 layout=[7 5 7 3 7 3 7 1 7]
+STEP v=6 seq=inventor-buttons-late r button=36,16 pad=4,0 item0=0,0,36,16 rows=21 client=144x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=6 seq=inventor-buttons-late w button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+STEP v=6 seq=inventor-buttons-late z button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+CHILD_END v=6 seq=inventor-buttons-late steps=12Iparwz exit=00000000
+CHILD_BEGIN v=6 seq=padding-first steps=p12Iarwz
+COMCTL32 requested=6 dll=6.0
+STEP v=6 seq=padding-first - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=padding-first p button=23,22 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=padding-first 1 button=20,15 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=padding-first 2 button=36,16 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=padding-first I button=36,16 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=padding-first a button=36,16 pad=4,0 item0=0,0,36,16 rows=12 client=300x400 layout=[8 4 8 2 8 2 8 7]
+STEP v=6 seq=padding-first r button=36,16 pad=4,0 item0=0,0,36,16 rows=21 client=144x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=6 seq=padding-first w button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+STEP v=6 seq=padding-first z button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+CHILD_END v=6 seq=padding-first steps=p12Iarwz exit=00000000
+CHILD_BEGIN v=6 seq=padding-between steps=1p2Iarwz
+COMCTL32 requested=6 dll=6.0
+STEP v=6 seq=padding-between - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=padding-between 1 button=23,21 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=padding-between p button=23,21 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=padding-between 2 button=36,16 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=padding-between I button=36,16 pad=4,0 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=padding-between a button=36,16 pad=4,0 item0=0,0,36,16 rows=12 client=300x400 layout=[8 4 8 2 8 2 8 7]
+STEP v=6 seq=padding-between r button=36,16 pad=4,0 item0=0,0,36,16 rows=21 client=144x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=6 seq=padding-between w button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+STEP v=6 seq=padding-between z button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+CHILD_END v=6 seq=padding-between steps=1p2Iarwz exit=00000000
+CHILD_BEGIN v=6 seq=no-size-change steps=1iaprwz
+COMCTL32 requested=6 dll=6.0
+STEP v=6 seq=no-size-change - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=no-size-change 1 button=23,21 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=no-size-change i button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=no-size-change a button=23,22 pad=7,6 item0=0,0,23,22 rows=9 client=300x400 layout=[12 10 10 8 7]
+STEP v=6 seq=no-size-change p button=23,22 pad=4,0 item0=0,0,23,22 rows=9 client=300x400 layout=[12 10 10 8 7]
+STEP v=6 seq=no-size-change r button=20,16 pad=4,0 item0=0,0,20,16 rows=21 client=80x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=6 seq=no-size-change w button=20,16 pad=4,0 item0=0,0,20,16 rows=14 client=200x600 layout=[10 2 S 10 S 10 S 8 S 7]
+STEP v=6 seq=no-size-change z button=20,16 pad=4,0 item0=0,0,20,16 rows=14 client=200x600 layout=[10 2 S 10 S 10 S 8 S 7]
+CHILD_END v=6 seq=no-size-change steps=1iaprwz exit=00000000
+CHILD_BEGIN v=6 seq=imagelist-only-32 steps=Iaprwz
+COMCTL32 requested=6 dll=6.0
+STEP v=6 seq=imagelist-only-32 - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=imagelist-only-32 I button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=imagelist-only-32 a button=39,22 pad=7,6 item0=0,0,39,22 rows=13 client=300x400 layout=[7 5 7 3 7 3 7 1 7]
+STEP v=6 seq=imagelist-only-32 p button=39,22 pad=4,0 item0=0,0,39,22 rows=13 client=300x400 layout=[7 5 7 3 7 3 7 1 7]
+STEP v=6 seq=imagelist-only-32 r button=36,16 pad=4,0 item0=0,0,36,16 rows=21 client=144x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=6 seq=imagelist-only-32 w button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+STEP v=6 seq=imagelist-only-32 z button=36,16 pad=4,0 item0=0,0,36,16 rows=19 client=200x600 layout=[5 5 2 S 5 5 S 5 5 S 5 3 S 5 2]
+CHILD_END v=6 seq=imagelist-only-32 steps=Iaprwz exit=00000000
+CHILD_BEGIN v=6 seq=imagelist-only-16 steps=iaprwz
+COMCTL32 requested=6 dll=6.0
+STEP v=6 seq=imagelist-only-16 - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=imagelist-only-16 i button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=imagelist-only-16 a button=23,22 pad=7,6 item0=0,2,23,24 rows=9 client=300x400 layout=[12 10 10 8 7]
+STEP v=6 seq=imagelist-only-16 p button=23,22 pad=4,0 item0=0,2,23,24 rows=9 client=300x400 layout=[12 10 10 8 7]
+STEP v=6 seq=imagelist-only-16 r button=20,16 pad=4,0 item0=0,0,20,16 rows=21 client=80x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=6 seq=imagelist-only-16 w button=20,16 pad=4,0 item0=0,0,20,16 rows=14 client=200x600 layout=[10 2 S 10 S 10 S 8 S 7]
+STEP v=6 seq=imagelist-only-16 z button=20,16 pad=4,0 item0=0,0,20,16 rows=14 client=200x600 layout=[10 2 S 10 S 10 S 8 S 7]
+CHILD_END v=6 seq=imagelist-only-16 steps=iaprwz exit=00000000
+CHILD_BEGIN v=6 seq=changed-and-back steps=121iaprwz
+COMCTL32 requested=6 dll=6.0
+STEP v=6 seq=changed-and-back - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=changed-and-back 1 button=23,21 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=changed-and-back 2 button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=changed-and-back 1 button=23,21 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=changed-and-back i button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=changed-and-back a button=23,22 pad=7,6 item0=0,0,23,22 rows=9 client=300x400 layout=[12 10 10 8 7]
+STEP v=6 seq=changed-and-back p button=23,22 pad=4,0 item0=0,0,23,22 rows=9 client=300x400 layout=[12 10 10 8 7]
+STEP v=6 seq=changed-and-back r button=20,16 pad=4,0 item0=0,0,20,16 rows=21 client=80x240 layout=[4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3]
+STEP v=6 seq=changed-and-back w button=20,16 pad=4,0 item0=0,0,20,16 rows=14 client=200x600 layout=[10 2 S 10 S 10 S 8 S 7]
+STEP v=6 seq=changed-and-back z button=20,16 pad=4,0 item0=0,0,20,16 rows=14 client=200x600 layout=[10 2 S 10 S 10 S 8 S 7]
+CHILD_END v=6 seq=changed-and-back steps=121iaprwz exit=00000000
+CHILD_BEGIN v=6 seq=inventor-no-setrows steps=12Iapwz
+COMCTL32 requested=6 dll=6.0
+STEP v=6 seq=inventor-no-setrows - button=23,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=inventor-no-setrows 1 button=23,21 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=inventor-no-setrows 2 button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=inventor-no-setrows I button=39,22 pad=7,6 item0=-1,-1,-1,-1 rows=1 client=300x400 layout=[]
+STEP v=6 seq=inventor-no-setrows a button=39,22 pad=7,6 item0=0,0,39,22 rows=13 client=300x400 layout=[7 5 7 3 7 3 7 1 7]
+STEP v=6 seq=inventor-no-setrows p button=39,22 pad=4,0 item0=0,0,39,22 rows=13 client=300x400 layout=[7 5 7 3 7 3 7 1 7]
+STEP v=6 seq=inventor-no-setrows w button=39,22 pad=4,0 item0=0,0,39,22 rows=15 client=200x600 layout=[5 5 2 5 5 5 5 5 3 5 2]
+STEP v=6 seq=inventor-no-setrows z button=39,22 pad=4,0 item0=0,0,39,22 rows=15 client=200x600 layout=[5 5 2 5 5 5 5 5 3 5 2]
+CHILD_END v=6 seq=inventor-no-setrows steps=12Iapwz exit=00000000
+CHILDREN_FAILED 0
+SUMMARY topic=comctl32-toolbar-padding-sequence api_errors=0 complete=1 expectations=none
+X connection to :99 broken (explicit kill or server shutdown).
+X connection to :99 broken (explicit kill or server shutdown).

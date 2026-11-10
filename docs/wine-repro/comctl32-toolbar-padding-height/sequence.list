@@ -1,0 +1,2 @@
+# Padding with the palette sequence of Inventor (bitmap size change, padding, TB_SETROWS); one entry; also in measure-bundle.list.
+toolbar-padding-sequence | docs/wine-repro/comctl32-toolbar-padding-height/measure-sequence.c | -Wextra -lgdi32 -static

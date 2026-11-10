@@ -1,0 +1,2 @@
+toolbar-padding-sequence x86_64=0
+toolbar-padding-sequence i686=0
