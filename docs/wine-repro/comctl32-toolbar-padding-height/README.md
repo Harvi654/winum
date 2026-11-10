@@ -201,3 +201,39 @@ steps `1b2Bmpnrwz`) and variants: without the padding, without
 palette end with 40x24 or 36x16 buttons? Trial under Wine with padding
 v5 (`wine-2026-11-10/result-sequence2-...`): 40x24 until `TB_SETROWS`,
 36x16 from there.
+
+## Inventor's exact sequence on Windows 10 (2026-11-10), `windows-2026-11-10-sequence2/`
+
+x86_64 and i686 identical, exit 0, no child failed, comctl32 5.82 and
+6.16 identical. Button size (`TB_GETBUTTONSIZE`):
+
+| Sequence | after 40x24 / bitmap | after `TB_SETPADDING(4,0)` | after `TB_SETROWS` | after resize |
+| --- | --- | --- | --- | --- |
+| inventor-exact (`1b2Bmpnrwz`) | 40x24 | 40x24 | **40x24** | 40x24 |
+| exact-no-padding | 40x24 | - | 40x24 | 40x24 |
+| exact-no-setrows | 40x24 | 40x24 | - | 40x24 |
+| exact-padding-before-buttonsize | 40x24 | (before) | 40x24 | 40x24 |
+| exact-buttonsize-minimum (1x1) | 39x22 | 39x22 | 39x22 | 39x22 |
+| exact-no-buttonsize | 39x22 | 39x22 | 39x22 | 39x22 |
+
+So Windows' palette buttons are 40x24 (5 per row after Inventor's
+resize to 200 pixels in the measurement); neither `TB_SETPADDING` nor
+`TB_SETROWS` changes the size; `TB_SETBUTTONSIZE(1, 1)` does not shrink
+below the bitmap size + padding (39x22).
+
+**Conclusion.** The difference is not in padding v5: its rule
+(bitmap + padding when the bitmap size is set) matches every measured
+`TB_SETBITMAPSIZE` step, e.g. 20x15 and 36x16 with the padding set
+first, where vanilla's +6 height would give 21/22. The difference was
+`TB_SETROWS` recalculating the size in `TOOLBAR_CalcToolbar` (in the
+setrows candidate). Setrows v5 only lays the buttons out there; with it,
+under local Wine (`wine-2026-11-10/result-sequence2-padding-v5-setrows-v5-x86_64.txt`)
+every button size of every step of every sequence equals Windows'. What
+still differs are layouts *before* `TB_SETROWS` (Wine's width wrap of a
+vertical toolbar, an old Wine difference outside both candidates).
+
+No padding v6 is needed. The open point "v5 changes a case vanilla has
+like Windows" came from the setrows sequence with padding 0, where v5
+plus setrows v4 gave 16x16; with setrows v5 it is 23x22 as on Windows.
+The 16-pixel rows read from the Windows screenshot are not what Windows
+measures (40x24); to be compared again in the L4 with setrows v5.

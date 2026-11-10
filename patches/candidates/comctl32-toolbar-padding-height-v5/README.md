@@ -86,3 +86,14 @@ keeps 23x22, Wine recalculates in `TOOLBAR_CalcToolbar`. Not needed by
 Inventor; recorded as an open point, not a blocker. A MEASURE of
 "bitmap size change, then padding, then TB_SETROWS" would confirm the
 hypothesis above; proposed for a later VM visit.
+
+## Resolved (2026-11-10): no v6
+
+The measurement of Inventor's exact palette sequence
+(`docs/wine-repro/comctl32-toolbar-padding-height/`, last section) shows
+the button-size difference came from `TB_SETROWS` recalculating the size
+(setrows candidate), not from this patch: v5's bitmap + padding rule
+matches Windows at every measured `TB_SETBITMAPSIZE`. Fixed in
+`../comctl32-toolbar-setrows-v5/`; with it, v5 no longer changes the
+setrows sequence's 23x22 (Windows 23x22, vanilla 16x22, v5 + setrows v4
+16x16, v5 + setrows v5 23x22).

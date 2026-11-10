@@ -72,3 +72,10 @@ after the dialog appears. The `+toolbar` trace of the palette
 gives 4 per row for 44 buttons in 4 groups; the 5 columns on both
 systems come from the width Inventor gives the palette afterwards
 (width / button width), which is what v4 added.
+
+## L1 (all-4, 2026-11-10) - superseded by v5
+
+`docs/wine-repro/l1-all-4-2026-11-10/`: `comctl32:toolbar` 10353 checks,
+0 failures, both architectures, two runs. **Superseded by
+`../comctl32-toolbar-setrows-v5/`** (no button size recalculation in
+`TB_SETROWS`, measured).

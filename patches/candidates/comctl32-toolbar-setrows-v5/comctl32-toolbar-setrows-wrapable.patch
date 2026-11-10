@@ -1,0 +1,680 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH v5] comctl32/toolbar: Lay out TB_SETROWS by separator groups in vertical wrapable toolbars.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream. v1 is the Inventor patch from Autodesk-Inventor-for-Linux
+eddb691 (wine-11.19-1).
+
+Windows 10 (own MEASURE, comctl32 5.82 and 6.16, x86_64 and i686,
+2026-11-10): in a CCS_VERT | TBSTYLE_WRAPABLE toolbar, TB_SETROWS starts
+every group of buttons between separators on a new row and gives each
+separator a row of its own; the number of buttons per row is the one that
+gives the most button rows not above the request, or with bLarger the
+fewest that reach it, separators not counted (47 buttons in 5 groups,
+TB_SETROWS(12): 5 per row). The rows stay when buttons are replaced and
+when the toolbar is sized to the returned rectangle; after a change of
+its width it has as many buttons per row as fit into the new width,
+still with the groups and separator rows.
+
+Wine set the wrap points and wrapped again by the window's width inside
+TB_SETROWS, so a vertical toolbar came back with one column; Inventor
+sizes its drawing-text symbol palette to that rectangle.
+
+v2 (2026-11-08) handled bLarger (Wine's tbrows_results table).
+
+v3 (2026-11-10, after the measurement): the group rule only for vertical
+wrapable toolbars; other toolbars keep Wine's code, which v2 had changed
+(46 measured horizontal cases that Wine already did like Windows came out
+wrong). The rows are kept until the toolbar's width changes, no longer
+for good (Windows re-wraps after a resize); TB_SETROWS' own resize does
+not count. New test test_setrows_groups with the measured vertical cases
+(left out: rows Windows does not return from, and the 3+4 groups with 4
+rows, where Windows' choice does not follow the rule) and the horizontal
+cases Wine handles like Windows, run for comctl32 5 and 6.
+
+v4 (2026-11-10, after the maintainer's L4 in Inventor 2027): with v3 the
+palette fell apart - Inventor changes the toolbar's width after
+TB_SETROWS, and v3 handed it to Wine's width wrap, which puts the
+separators inside rows. Windows (same measurement, palette sequence)
+keeps the groups and separator rows after a width change and fits
+width / button width buttons per row (500 pixels: one row per group;
+60 pixels: 2 per row with its 23-pixel buttons). v4 does that in
+TOOLBAR_Size. New test test_setrows_palette with the measured sequence;
+the 60-pixel step is todo_wine, Wine's buttons being 16 pixels wide there
+(button size with TB_SETPADDING(0, 0) and no strings, outside this patch).
+
+v5 (2026-11-10, after a MEASURE of Inventor's complete palette sequence):
+Windows keeps the button size through TB_SETROWS - it is set by
+TB_SETBITMAPSIZE (bitmap + the padding current then) or TB_SETBUTTONSIZE,
+and a later TB_SETPADDING does not change it. TB_SETROWS here used
+TOOLBAR_CalcToolbar, which recalculated it from the current padding
+(Inventor's palette: 36x16 instead of Windows' 40x24; 23x22 buttons with
+padding 0 became 16x16). It now only lays the buttons out again. New test
+test_setrows_button_size with three measured sequences, Inventor's among
+them; the 60-pixel palette step of test_setrows_palette, todo_wine in v4
+because of that recalculation, now passes.
+
+--- a/dlls/comctl32/toolbar.c
++++ b/dlls/comctl32/toolbar.c
+@@ -169,6 +169,9 @@
+     TBUTTON_INFO *buttons;      /* pointer to button array */
+     LPWSTR       *strings;      /* pointer to string array */
+     TBITMAP_INFO *bitmaps;
++    BOOL     bSettingRows;      /* TB_SETROWS is resizing the toolbar */
++    INT      nRowsColumns;      /* buttons per row after TB_SETROWS in a vertical
++                                   wrapable toolbar, 0 = none */
+ #if __WINE_COMCTL32_VERSION == 6
+     HTHEME   hTheme;            /* theme */
+ #endif
+@@ -1364,6 +1367,44 @@
+     TRACE("max string size %ld x %ld\n", lpSize->cx, lpSize->cy);
+ }
+ 
++/* Wrap after "columns" buttons; a separator ends the row and gets a row of
++ * its own, so every group of buttons starts on a new row. Returns the number
++ * of button rows (separator rows not counted). */
++static INT
++TOOLBAR_WrapColumns(TOOLBAR_INFO *infoPtr, INT columns)
++{
++    TBUTTON_INFO *btnPtr = infoPtr->buttons;
++    INT i, column = 0, last = -1, rows = 0;
++
++    for (i = 0; i < infoPtr->nNumButtons; i++)
++        btnPtr[i].fsState &= ~TBSTATE_WRAP;
++
++    for (i = 0; i < infoPtr->nNumButtons; i++)
++    {
++        if (btnPtr[i].fsState & TBSTATE_HIDDEN)
++            continue;
++
++        if (btnPtr[i].fsStyle & BTNS_SEP)
++        {
++            if (column && last >= 0)
++                btnPtr[last].fsState |= TBSTATE_WRAP;
++            btnPtr[i].fsState |= TBSTATE_WRAP;
++            column = 0;
++            last = i;
++            continue;
++        }
++
++        if (!column) rows++;
++        last = i;
++        if (++column >= columns)
++        {
++            btnPtr[i].fsState |= TBSTATE_WRAP;
++            column = 0;
++        }
++    }
++    return rows;
++}
++
+ /***********************************************************************
+ * 		TOOLBAR_WrapToolbar
+ *
+@@ -1392,6 +1433,15 @@
+     if( !(infoPtr->dwStyle & TBSTYLE_WRAPABLE) &&
+ 	!(infoPtr->dwExStyle & TBSTYLE_EX_VERTICAL) )  return;
+ 
++    /* After TB_SETROWS a vertical wrapable toolbar keeps its groups and
++       separator rows; TOOLBAR_Size sets the buttons per row from a new
++       width. */
++    if (infoPtr->nRowsColumns && (infoPtr->dwStyle & CCS_VERT))
++    {
++        TOOLBAR_WrapColumns(infoPtr, infoPtr->nRowsColumns);
++        return;
++    }
++
+     btnPtr = infoPtr->buttons;
+     x  = infoPtr->nIndent;
+     width = infoPtr->client_rect.right - infoPtr->client_rect.left;
+@@ -1856,6 +1906,16 @@
+     /* infoPtr->nRows is the number of rows on the toolbar */
+     infoPtr->nRows = nRows + nSepRows + 1;
+ 
++    /* With TB_SETROWS rows in a vertical toolbar, a separator is a line
++       between groups of rows: make it as wide as the toolbar. */
++    if (infoPtr->nRowsColumns && (infoPtr->dwStyle & CCS_VERT))
++    {
++        for (i = 0, btnPtr = infoPtr->buttons; i < infoPtr->nNumButtons; i++, btnPtr++)
++            if ((btnPtr->fsStyle & BTNS_SEP) && (btnPtr->fsState & TBSTATE_WRAP) &&
++                !(btnPtr->fsState & TBSTATE_HIDDEN))
++                btnPtr->rect.right = infoPtr->rcBound.right;
++    }
++
+     TRACE("toolbar button width %d\n", infoPtr->nButtonWidth);
+ }
+ 
+@@ -4924,6 +4984,59 @@
+ }
+ 
+ 
++/* TB_SETROWS in a vertical wrapable toolbar (measured on Windows 10,
++ * comctl32 5 and 6): every group of buttons between separators starts a
++ * new row and a separator has a row of its own. The number of buttons per
++ * row is the one that gives the most button rows not above the request,
++ * or with bLarger the fewest that reach it; separators are not counted. */
++static void
++TOOLBAR_SetRowsVertical (TOOLBAR_INFO *infoPtr, INT rows, BOOL bLarger)
++{
++    TBUTTON_INFO *btnPtr = infoPtr->buttons;
++    INT buttons = 0, columns, i;
++
++    if (infoPtr->nRows == rows && infoPtr->nRowsColumns) return;
++
++    for (i = 0; i < infoPtr->nNumButtons; i++)
++        if (!(btnPtr[i].fsState & TBSTATE_HIDDEN) && !(btnPtr[i].fsStyle & BTNS_SEP))
++            buttons++;
++
++    if (rows < 1) rows = 1;
++    for (columns = 1; columns < buttons; columns++)
++        if (TOOLBAR_WrapColumns(infoPtr, columns) <= rows)
++            break;
++    if (bLarger && columns > 1 && TOOLBAR_WrapColumns(infoPtr, columns) < rows)
++        columns--;
++    if (columns < 1) columns = 1;
++
++    TRACE("Trying to wrap at %d (%d buttons, %d rows)\n", columns, buttons, rows);
++    TOOLBAR_WrapColumns(infoPtr, columns);
++    infoPtr->nRowsColumns = columns;
++
++    /* Windows keeps the button size here (measured: buttons sized with
++       TB_SETBITMAPSIZE or TB_SETBUTTONSIZE stay so after a later
++       TB_SETPADDING and TB_SETROWS); only lay them out again. */
++    infoPtr->iTopMargin = default_top_margin(infoPtr);
++    TOOLBAR_LayoutToolbar (infoPtr);
++    TRACE("Result - %d rows, %ld x %ld\n", infoPtr->nRows,
++          infoPtr->rcBound.right - infoPtr->rcBound.left,
++          infoPtr->rcBound.bottom - infoPtr->rcBound.top);
++
++    /* As below: resize only with CCS_NORESIZE. This resize keeps the rows. */
++    if (infoPtr->dwStyle & CCS_NORESIZE)
++    {
++        infoPtr->bSettingRows = TRUE;
++        SetWindowPos(infoPtr->hwndSelf, NULL, 0, 0,
++                     infoPtr->rcBound.right - infoPtr->rcBound.left,
++                     infoPtr->rcBound.bottom - infoPtr->rcBound.top,
++                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
++        infoPtr->bSettingRows = FALSE;
++    }
++
++    InvalidateRect(infoPtr->hwndSelf, NULL, TRUE);
++}
++
++
+ static LRESULT
+ TOOLBAR_SetRows (TOOLBAR_INFO *infoPtr, WPARAM wParam, LPRECT lprc)
+ {
+@@ -4934,7 +5047,9 @@
+ 
+     TRACE("Setting rows to %d (%d)\n", rows, bLarger);
+ 
+-    if(infoPtr->nRows != rows)
++    if ((infoPtr->dwStyle & CCS_VERT) && (infoPtr->dwStyle & TBSTYLE_WRAPABLE))
++        TOOLBAR_SetRowsVertical(infoPtr, rows, bLarger);
++    else if(infoPtr->nRows != rows)
+     {
+         TBUTTON_INFO *btnPtr = infoPtr->buttons;
+         int curColumn = 0; /* Current column                      */
+@@ -6586,6 +6701,17 @@
+                 IntersectRect(&dummy, &delta_height, &btnPtr->rect))
+                 InvalidateRect(infoPtr->hwndSelf, &btnPtr->rect, TRUE);
+     }
++    {
++        RECT client;
++
++        /* After TB_SETROWS, a change of width (not TB_SETROWS' own resize)
++           gives as many buttons per row as fit into the new width; the
++           groups and separator rows stay (measured on Windows 10). */
++        GetClientRect(infoPtr->hwndSelf, &client);
++        if (infoPtr->nRowsColumns && !infoPtr->bSettingRows && infoPtr->nButtonWidth > 0 &&
++            client.right - client.left != infoPtr->client_rect.right - infoPtr->client_rect.left)
++            infoPtr->nRowsColumns = max(1, (client.right - client.left) / infoPtr->nButtonWidth);
++    }
+     GetClientRect(infoPtr->hwndSelf, &infoPtr->client_rect);
+     TOOLBAR_AutoSize(infoPtr);
+     return 0;
+--- a/dlls/comctl32/tests/toolbar.c
++++ b/dlls/comctl32/tests/toolbar.c
+@@ -2139,6 +2139,422 @@
+     DestroyWindow(hToolbar);
+ }
+ 
++/* Buttons per row in order, read from TB_GETITEMRECT: S for a separator on
++ * a row of its own, s after the count when it shares a row with buttons. */
++static void setrows_layout(HWND toolbar, const TBBUTTON *buttons, int count, char *layout)
++{
++    int i, in_row = 0, row_sep = 0;
++    LONG top = LONG_MIN;
++    char part[16];
++    RECT rc;
++
++    layout[0] = 0;
++    for (i = 0; i <= count; i++)
++    {
++        if (i < count)
++            ok(SendMessageA(toolbar, TB_GETITEMRECT, i, (LPARAM)&rc), "TB_GETITEMRECT %d failed\n", i);
++        if (i == count || rc.top != top)
++        {
++            if (top != LONG_MIN)
++            {
++                if (in_row) sprintf(part, "%s%d%s", layout[0] ? " " : "", in_row, row_sep ? "s" : "");
++                else sprintf(part, "%sS", layout[0] ? " " : "");
++                strcat(layout, part);
++            }
++            if (i == count) break;
++            top = rc.top;
++            in_row = row_sep = 0;
++        }
++        if (buttons[i].fsStyle & BTNS_SEP) row_sep = 1;
++        else in_row++;
++    }
++}
++
++static void setrows_fill(TBBUTTON *buttons, const int *groups, int max_groups, int *count)
++{
++    int g, i;
++
++    *count = 0;
++    memset(buttons, 0, 64 * sizeof(*buttons));
++    for (g = 0; g < max_groups && groups[g]; g++)
++    {
++        if (g) buttons[(*count)++].fsStyle = BTNS_SEP;
++        for (i = 0; i < groups[g]; i++, (*count)++)
++        {
++            buttons[*count].iBitmap = *count % 4;
++            buttons[*count].idCommand = 100 + *count;
++            buttons[*count].fsState = TBSTATE_ENABLED;
++            buttons[*count].fsStyle = BTNS_BUTTON;
++            buttons[*count].iString = -1;
++        }
++    }
++}
++
++/* TB_SETROWS with groups of buttons between separators. Expected values:
++ * own Windows 10 MEASURE, comctl32 5.82 and 6.16, x86_64 and i686,
++ * 2026-11-10 (winum docs/wine-repro/comctl32-toolbar-setrows); both
++ * versions gave the same rows. Layout: buttons per row in order, S for a
++ * separator on a row of its own, s after the count when it shares the row.
++ * Vertical wrapable toolbars: every case Windows returned from, except the
++ * 3+4 groups with 4 rows, where Windows' choice does not follow the other
++ * rows (with fewer rows than the groups need Windows does not return).
++ * Horizontal toolbars: the cases Wine already handles like Windows. */
++static void test_setrows_groups(void)
++{
++    static const DWORD styles[] =
++    {
++        TBSTYLE_FLAT | TBSTYLE_WRAPABLE | CCS_VERT, TBSTYLE_FLAT | TBSTYLE_WRAPABLE, TBSTYLE_FLAT,
++    };
++    static const int groups[][6] =
++    {
++        { 9 }, { 3, 4 }, { 1, 6, 2 }, { 12, 10, 10, 8, 7 },
++    };
++    static const struct { int style, shape, rows; BOOL larger; int getrows; const char *layout; } tests[] =
++    {
++    { 0, 0,  1, FALSE,  1, "9" },
++    { 0, 0,  1, TRUE,   1, "9" },
++    { 0, 0,  2, FALSE,  2, "5 4" },
++    { 0, 0,  2, TRUE,   2, "5 4" },
++    { 0, 0,  3, FALSE,  3, "3 3 3" },
++    { 0, 0,  3, TRUE,   3, "3 3 3" },
++    { 0, 0,  4, FALSE,  3, "3 3 3" },
++    { 0, 0,  4, TRUE,   5, "2 2 2 2 1" },
++    { 0, 0,  5, FALSE,  5, "2 2 2 2 1" },
++    { 0, 0,  5, TRUE,   5, "2 2 2 2 1" },
++    { 0, 0,  6, FALSE,  5, "2 2 2 2 1" },
++    { 0, 0,  6, TRUE,   9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0,  8, FALSE,  5, "2 2 2 2 1" },
++    { 0, 0,  8, TRUE,   9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 10, FALSE,  9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 10, TRUE,   9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 12, FALSE,  9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 12, TRUE,   9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 15, FALSE,  9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 15, TRUE,   9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 20, FALSE,  9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 0, 20, TRUE,   9, "1 1 1 1 1 1 1 1 1" },
++    { 0, 1,  2, FALSE,  4, "3 S 4" },
++    { 0, 1,  2, TRUE,   4, "3 S 4" },
++    { 0, 1,  3, FALSE,  5, "3 S 3 1" },
++    { 0, 1,  3, TRUE,   5, "3 S 3 1" },
++    { 0, 1,  5, FALSE,  6, "2 1 S 2 2" },
++    { 0, 1,  5, TRUE,   9, "1 1 1 S 1 1 1 1" },
++    { 0, 1,  6, FALSE,  6, "2 1 S 2 2" },
++    { 0, 1,  6, TRUE,   9, "1 1 1 S 1 1 1 1" },
++    { 0, 1,  8, FALSE,  9, "1 1 1 S 1 1 1 1" },
++    { 0, 1,  8, TRUE,   9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 10, FALSE,  9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 10, TRUE,   9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 12, FALSE,  9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 12, TRUE,   9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 15, FALSE,  9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 15, TRUE,   9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 20, FALSE,  9, "1 1 1 S 1 1 1 1" },
++    { 0, 1, 20, TRUE,   9, "1 1 1 S 1 1 1 1" },
++    { 0, 2,  3, FALSE,  7, "1 S 6 S 2" },
++    { 0, 2,  3, TRUE,   7, "1 S 6 S 2" },
++    { 0, 2,  4, FALSE,  8, "1 S 3 3 S 2" },
++    { 0, 2,  4, TRUE,   8, "1 S 3 3 S 2" },
++    { 0, 2,  5, FALSE,  9, "1 S 2 2 2 S 2" },
++    { 0, 2,  5, TRUE,   9, "1 S 2 2 2 S 2" },
++    { 0, 2,  6, FALSE,  9, "1 S 2 2 2 S 2" },
++    { 0, 2,  6, TRUE,  13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2,  8, FALSE,  9, "1 S 2 2 2 S 2" },
++    { 0, 2,  8, TRUE,  13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 10, FALSE, 13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 10, TRUE,  13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 12, FALSE, 13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 12, TRUE,  13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 15, FALSE, 13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 15, TRUE,  13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 20, FALSE, 13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 2, 20, TRUE,  13, "1 S 1 1 1 1 1 1 S 1 1" },
++    { 0, 3,  5, FALSE, 13, "12 S 10 S 10 S 8 S 7" },
++    { 0, 3,  5, TRUE,  13, "12 S 10 S 10 S 8 S 7" },
++    { 0, 3,  6, FALSE, 14, "10 2 S 10 S 10 S 8 S 7" },
++    { 0, 3,  6, TRUE,  14, "10 2 S 10 S 10 S 8 S 7" },
++    { 0, 3,  8, FALSE, 16, "8 4 S 8 2 S 8 2 S 8 S 7" },
++    { 0, 3,  8, TRUE,  16, "8 4 S 8 2 S 8 2 S 8 S 7" },
++    { 0, 3, 10, FALSE, 18, "6 6 S 6 4 S 6 4 S 6 2 S 6 1" },
++    { 0, 3, 10, TRUE,  18, "6 6 S 6 4 S 6 4 S 6 2 S 6 1" },
++    { 0, 3, 12, FALSE, 19, "5 5 2 S 5 5 S 5 5 S 5 3 S 5 2" },
++    { 0, 3, 12, TRUE,  21, "4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3" },
++    { 0, 3, 15, FALSE, 21, "4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3" },
++    { 0, 3, 15, TRUE,  26, "3 3 3 3 S 3 3 3 1 S 3 3 3 1 S 3 3 2 S 3 3 1" },
++    { 0, 3, 20, FALSE, 26, "3 3 3 3 S 3 3 3 1 S 3 3 3 1 S 3 3 2 S 3 3 1" },
++    { 0, 3, 20, TRUE,  32, "2 2 2 2 2 2 S 2 2 2 2 2 S 2 2 2 2 2 S 2 2 2 2 S 2 2 2 1" },
++    { 1, 1,  1, FALSE,  1, "7s" },
++    { 1, 1,  1, TRUE,  1, "7s" },
++    { 1, 1,  2, FALSE,  1, "7s" },
++    { 1, 2,  1, FALSE,  1, "9s" },
++    { 1, 2,  1, TRUE,  1, "9s" },
++    { 1, 2,  2, FALSE,  1, "9s" },
++    { 1, 3,  8, TRUE,  9, "12s 10s 10s 8s 7" },
++    { 2, 1,  1, FALSE,  1, "7s" },
++    { 2, 1,  1, TRUE,  1, "7s" },
++    { 2, 1,  2, TRUE,  3, "3s 4" },
++    { 2, 1,  5, FALSE,  5, "2 1s 2 2" },
++    { 2, 1,  6, FALSE,  5, "2 1s 2 2" },
++    { 2, 2,  1, FALSE,  1, "9s" },
++    { 2, 2,  1, TRUE,  1, "9s" },
++    { 2, 3,  1, FALSE,  1, "47s" },
++    { 2, 3,  1, TRUE,  1, "47s" },
++    };
++    HIMAGELIST (WINAPI *pImageList_Create)(int, int, UINT, int, int);
++    int (WINAPI *pImageList_Add)(HIMAGELIST, HBITMAP, HBITMAP);
++    BOOL (WINAPI *pImageList_Destroy_)(HIMAGELIST);
++    TBBUTTON buttons[64];
++    HIMAGELIST himl;
++    HBITMAP bitmap;
++    HMODULE module;
++    unsigned int t;
++    HDC hdc;
++
++    module = GetModuleHandleA("comctl32.dll");
++    pImageList_Create = (void *)GetProcAddress(module, "ImageList_Create");
++    pImageList_Add = (void *)GetProcAddress(module, "ImageList_Add");
++    pImageList_Destroy_ = (void *)GetProcAddress(module, "ImageList_Destroy");
++    hdc = GetDC(NULL);
++    bitmap = CreateCompatibleBitmap(hdc, 64, 16);
++    ReleaseDC(NULL, hdc);
++    himl = pImageList_Create(16, 16, ILC_COLOR24, 4, 0);
++    ok(himl != NULL, "ImageList_Create failed\n");
++    ok(pImageList_Add(himl, bitmap, NULL) == 0, "ImageList_Add failed\n");
++    DeleteObject(bitmap);
++
++    for (t = 0; t < ARRAY_SIZE(tests); t++)
++    {
++        char layout[128];
++        int count, rows;
++        HWND toolbar;
++        RECT rc;
++
++        setrows_fill(buttons, groups[tests[t].shape], ARRAY_SIZE(groups[0]), &count);
++
++        toolbar = CreateWindowExA(0, TOOLBARCLASSNAMEA, NULL, WS_CHILD | WS_VISIBLE | CCS_NORESIZE |
++                                  CCS_NOPARENTALIGN | CCS_NODIVIDER | styles[tests[t].style],
++                                  0, 0, 300, 400, hMainWnd, NULL, GetModuleHandleA(NULL), NULL);
++        ok(toolbar != NULL, "CreateWindowExA failed\n");
++        SendMessageA(toolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
++        SendMessageA(toolbar, TB_SETIMAGELIST, 0, (LPARAM)himl);
++        ok(SendMessageA(toolbar, TB_ADDBUTTONSA, count, (LPARAM)buttons), "TB_ADDBUTTONS failed\n");
++        SendMessageA(toolbar, TB_SETROWS, MAKEWPARAM(tests[t].rows, tests[t].larger), (LPARAM)&rc);
++
++        setrows_layout(toolbar, buttons, count, layout);
++
++        winetest_push_context("%u: style %d, shape %d, %d rows, larger %d", t, tests[t].style,
++                              tests[t].shape, tests[t].rows, tests[t].larger);
++        rows = SendMessageA(toolbar, TB_GETROWS, 0, 0);
++        ok(rows == tests[t].getrows, "got %d rows, expected %d\n", rows, tests[t].getrows);
++        ok(!strcmp(layout, tests[t].layout), "got layout \"%s\", expected \"%s\"\n", layout, tests[t].layout);
++        winetest_pop_context();
++        DestroyWindow(toolbar);
++    }
++    pImageList_Destroy_(himl);
++}
++
++/* Inventor's palette sequence on the same Windows run: TB_SETPADDING(0, 0),
++ * TB_SETROWS(12), the toolbar sized to the returned rectangle, button 5
++ * deleted and inserted again, a resize to 500x300, TB_AUTOSIZE, a resize to
++ * 60x600. After TB_SETROWS a change of width gives as many buttons per row
++ * as fit, keeping the groups. TB_SETROWS keeps the 23x22 buttons although
++ * the padding is 0 (no recalculation), so 60 pixels fit 2 per row. */
++static void test_setrows_palette(void)
++{
++    static const int groups[] = { 12, 10, 10, 8, 7, 0 };
++    static const struct { const char *step; int getrows[2]; const char *layout[2]; } steps[] =
++    {
++        { "setrows", { 19, 21 }, { "5 5 2 S 5 5 S 5 5 S 5 3 S 5 2", "4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3" } },
++        { "resize-to-rect", { 19, 21 }, { "5 5 2 S 5 5 S 5 5 S 5 3 S 5 2", "4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3" } },
++        { "replace-5", { 19, 21 }, { "5 5 2 S 5 5 S 5 5 S 5 3 S 5 2", "4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3" } },
++        { "resize-500x300", { 13, 13 }, { "12 S 10 S 10 S 8 S 7", "12 S 10 S 10 S 8 S 7" } },
++        { "autosize", { 13, 13 }, { "12 S 10 S 10 S 8 S 7", "12 S 10 S 10 S 8 S 7" } },
++        { "resize-60x600", { 32, 32 }, { "2 2 2 2 2 2 S 2 2 2 2 2 S 2 2 2 2 2 S 2 2 2 2 S 2 2 2 1",
++                                         "2 2 2 2 2 2 S 2 2 2 2 2 S 2 2 2 2 2 S 2 2 2 2 S 2 2 2 1" } },
++    };
++    HIMAGELIST (WINAPI *pImageList_Create)(int, int, UINT, int, int);
++    int (WINAPI *pImageList_Add)(HIMAGELIST, HBITMAP, HBITMAP);
++    BOOL (WINAPI *pImageList_Destroy_)(HIMAGELIST);
++    TBBUTTON buttons[64], button;
++    char layout[128];
++    HIMAGELIST himl;
++    HBITMAP bitmap;
++    HMODULE module;
++    int count, larger, s, rows;
++    HWND toolbar;
++    RECT rc;
++    HDC hdc;
++
++    module = GetModuleHandleA("comctl32.dll");
++    pImageList_Create = (void *)GetProcAddress(module, "ImageList_Create");
++    pImageList_Add = (void *)GetProcAddress(module, "ImageList_Add");
++    pImageList_Destroy_ = (void *)GetProcAddress(module, "ImageList_Destroy");
++    hdc = GetDC(NULL);
++    bitmap = CreateCompatibleBitmap(hdc, 64, 16);
++    ReleaseDC(NULL, hdc);
++    himl = pImageList_Create(16, 16, ILC_COLOR24, 4, 0);
++    ok(himl != NULL, "ImageList_Create failed\n");
++    ok(pImageList_Add(himl, bitmap, NULL) == 0, "ImageList_Add failed\n");
++    DeleteObject(bitmap);
++
++    for (larger = 0; larger < 2; larger++)
++    {
++        setrows_fill(buttons, groups, ARRAY_SIZE(groups), &count);
++        toolbar = CreateWindowExA(0, TOOLBARCLASSNAMEA, NULL, WS_CHILD | WS_VISIBLE | CCS_NORESIZE |
++                                  CCS_NOPARENTALIGN | CCS_NODIVIDER | TBSTYLE_FLAT | TBSTYLE_WRAPABLE | CCS_VERT,
++                                  0, 0, 300, 400, hMainWnd, NULL, GetModuleHandleA(NULL), NULL);
++        ok(toolbar != NULL, "CreateWindowExA failed\n");
++        SendMessageA(toolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
++        SendMessageA(toolbar, TB_SETPADDING, 0, MAKELPARAM(0, 0));
++        SendMessageA(toolbar, TB_SETIMAGELIST, 0, (LPARAM)himl);
++        ok(SendMessageA(toolbar, TB_ADDBUTTONSA, count, (LPARAM)buttons), "TB_ADDBUTTONS failed\n");
++
++        for (s = 0; s < ARRAY_SIZE(steps); s++)
++        {
++            switch (s)
++            {
++            case 0: SendMessageA(toolbar, TB_SETROWS, MAKEWPARAM(12, larger), (LPARAM)&rc); break;
++            case 1: SetWindowPos(toolbar, NULL, 0, 0, rc.right - rc.left, rc.bottom - rc.top,
++                                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE); break;
++            case 2:
++                memset(&button, 0, sizeof(button));
++                SendMessageA(toolbar, TB_GETBUTTON, 5, (LPARAM)&button);
++                SendMessageA(toolbar, TB_DELETEBUTTON, 5, 0);
++                SendMessageA(toolbar, TB_INSERTBUTTONA, 5, (LPARAM)&button);
++                break;
++            case 3: SetWindowPos(toolbar, NULL, 0, 0, 500, 300, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE); break;
++            case 4: SendMessageA(toolbar, TB_AUTOSIZE, 0, 0); break;
++            case 5: SetWindowPos(toolbar, NULL, 0, 0, 60, 600, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE); break;
++            }
++            winetest_push_context("larger %d, %s", larger, steps[s].step);
++            setrows_layout(toolbar, buttons, count, layout);
++            rows = SendMessageA(toolbar, TB_GETROWS, 0, 0);
++            ok(rows == steps[s].getrows[larger], "got %d rows, expected %d\n", rows, steps[s].getrows[larger]);
++            ok(!strcmp(layout, steps[s].layout[larger]), "got layout \"%s\", expected \"%s\"\n",
++               layout, steps[s].layout[larger]);
++            winetest_pop_context();
++        }
++        DestroyWindow(toolbar);
++    }
++    pImageList_Destroy_(himl);
++}
++
++/* Button size around TB_SETROWS. Windows sets it when the bitmap size is
++ * set (bitmap + the padding current then) or with TB_SETBUTTONSIZE; a later
++ * TB_SETPADDING and TB_SETROWS change nothing. Sequences from the same
++ * Windows 10 MEASURE (winum docs/wine-repro/comctl32-toolbar-padding-height,
++ * measure-sequence.c, 2026-11-10; comctl32 5.82 and 6.16 alike); the first
++ * is Inventor's symbol palette: bitmap size 16x15, button size 23x22,
++ * bitmap size 32x16, button size 40x24, the buttons one by one with their
++ * own bitmaps, padding 4x0, TB_SETROWS(12, TRUE). */
++static void test_setrows_button_size(void)
++{
++    static const int groups[] = { 12, 10, 10, 8, 7, 0 };
++    static const struct
++    {
++        const char *name, *steps;
++        DWORD size;
++        const char *setrows, *width;
++    } tests[] =
++    {
++        { "inventor", "1b2Bmpr", MAKELONG(40, 24), "4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3", "5 5 2 S 5 5 S 5 5 S 5 3 S 5 2" },
++        { "no-size-change", "1iapr", MAKELONG(23, 22), "4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3", "8 4 S 8 2 S 8 2 S 8 S 7" },
++        { "padding-first", "p12Iar", MAKELONG(36, 16), "4 4 4 S 4 4 2 S 4 4 2 S 4 4 S 4 3", "5 5 2 S 5 5 S 5 5 S 5 3 S 5 2" },
++    };
++    HIMAGELIST (WINAPI *pImageList_Create)(int, int, UINT, int, int);
++    int (WINAPI *pImageList_Add)(HIMAGELIST, HBITMAP, HBITMAP);
++    BOOL (WINAPI *pImageList_Destroy_)(HIMAGELIST);
++    TBBUTTON buttons[64], button;
++    HIMAGELIST himl16, himl32;
++    HBITMAP bitmap16, bitmap32, bitmaps[64];
++    TBADDBITMAP add;
++    char layout[128];
++    HMODULE module;
++    const char *step;
++    int count, t, i;
++    DWORD size;
++    HWND toolbar;
++    RECT rc;
++    HDC hdc;
++
++    module = GetModuleHandleA("comctl32.dll");
++    pImageList_Create = (void *)GetProcAddress(module, "ImageList_Create");
++    pImageList_Add = (void *)GetProcAddress(module, "ImageList_Add");
++    pImageList_Destroy_ = (void *)GetProcAddress(module, "ImageList_Destroy");
++    hdc = GetDC(NULL);
++    bitmap16 = CreateCompatibleBitmap(hdc, 64, 16);
++    bitmap32 = CreateCompatibleBitmap(hdc, 128, 16);
++    ReleaseDC(NULL, hdc);
++    himl16 = pImageList_Create(16, 16, ILC_COLOR24, 4, 0);
++    himl32 = pImageList_Create(32, 16, ILC_COLOR24, 4, 0);
++    ok(himl16 && himl32, "ImageList_Create failed\n");
++    ok(pImageList_Add(himl16, bitmap16, NULL) == 0, "ImageList_Add failed\n");
++    ok(pImageList_Add(himl32, bitmap32, NULL) == 0, "ImageList_Add failed\n");
++    DeleteObject(bitmap16);
++    DeleteObject(bitmap32);
++
++    for (t = 0; t < ARRAY_SIZE(tests); t++)
++    {
++        winetest_push_context("%s", tests[t].name);
++        setrows_fill(buttons, groups, ARRAY_SIZE(groups), &count);
++        memset(bitmaps, 0, sizeof(bitmaps));
++        toolbar = CreateWindowExA(0, TOOLBARCLASSNAMEA, NULL, WS_CHILD | WS_VISIBLE | CCS_NORESIZE |
++                                  CCS_NOPARENTALIGN | CCS_NODIVIDER | TBSTYLE_FLAT | TBSTYLE_WRAPABLE | CCS_VERT,
++                                  0, 0, 300, 400, hMainWnd, NULL, GetModuleHandleA(NULL), NULL);
++        ok(toolbar != NULL, "CreateWindowExA failed\n");
++        SendMessageA(toolbar, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
++        for (step = tests[t].steps; *step; step++)
++        {
++            switch (*step)
++            {
++            case '1': SendMessageA(toolbar, TB_SETBITMAPSIZE, 0, MAKELPARAM(16, 15)); break;
++            case '2': SendMessageA(toolbar, TB_SETBITMAPSIZE, 0, MAKELPARAM(32, 16)); break;
++            case 'b': SendMessageA(toolbar, TB_SETBUTTONSIZE, 0, MAKELPARAM(23, 22)); break;
++            case 'B': SendMessageA(toolbar, TB_SETBUTTONSIZE, 0, MAKELPARAM(40, 24)); break;
++            case 'i': SendMessageA(toolbar, TB_SETIMAGELIST, 0, (LPARAM)himl16); break;
++            case 'I': SendMessageA(toolbar, TB_SETIMAGELIST, 0, (LPARAM)himl32); break;
++            case 'p': SendMessageA(toolbar, TB_SETPADDING, 0, MAKELPARAM(4, 0)); break;
++            case 'r': SendMessageA(toolbar, TB_SETROWS, MAKEWPARAM(12, TRUE), (LPARAM)&rc); break;
++            case 'a':
++                ok(SendMessageA(toolbar, TB_ADDBUTTONSA, count, (LPARAM)buttons), "TB_ADDBUTTONS failed\n");
++                break;
++            case 'm':
++                for (i = 0; i < count; i++)
++                {
++                    button = buttons[i];
++                    if (!(button.fsStyle & BTNS_SEP))
++                    {
++                        hdc = GetDC(NULL);
++                        bitmaps[i] = CreateCompatibleBitmap(hdc, 32, 16);
++                        ReleaseDC(NULL, hdc);
++                        add.hInst = NULL;
++                        add.nID = (UINT_PTR)bitmaps[i];
++                        button.iBitmap = SendMessageA(toolbar, TB_ADDBITMAP, 1, (LPARAM)&add);
++                    }
++                    ok(SendMessageA(toolbar, TB_ADDBUTTONSA, 1, (LPARAM)&button), "TB_ADDBUTTONS %d failed\n", i);
++                }
++                break;
++            }
++        }
++        size = SendMessageA(toolbar, TB_GETBUTTONSIZE, 0, 0);
++        ok(size == tests[t].size, "after TB_SETROWS button size %ux%u, expected %ux%u\n", LOWORD(size), HIWORD(size),
++           LOWORD(tests[t].size), HIWORD(tests[t].size));
++        setrows_layout(toolbar, buttons, count, layout);
++        ok(!strcmp(layout, tests[t].setrows), "after TB_SETROWS layout \"%s\", expected \"%s\"\n", layout, tests[t].setrows);
++        SetWindowPos(toolbar, NULL, 0, 0, 200, 600, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE);
++        size = SendMessageA(toolbar, TB_GETBUTTONSIZE, 0, 0);
++        ok(size == tests[t].size, "after the resize button size %ux%u, expected %ux%u\n", LOWORD(size), HIWORD(size),
++           LOWORD(tests[t].size), HIWORD(tests[t].size));
++        setrows_layout(toolbar, buttons, count, layout);
++        ok(!strcmp(layout, tests[t].width), "after the resize layout \"%s\", expected \"%s\"\n", layout, tests[t].width);
++        DestroyWindow(toolbar);
++        for (i = 0; i < count; i++) if (bitmaps[i]) DeleteObject(bitmaps[i]);
++        winetest_pop_context();
++    }
++    pImageList_Destroy_(himl16);
++    pImageList_Destroy_(himl32);
++}
++
+ static void test_getstring(void)
+ {
+     HWND hToolbar = NULL;
+@@ -3430,6 +3846,9 @@
+     test_createtoolbarex();
+     test_dispinfo();
+     test_setrows();
++    test_setrows_groups();
++    test_setrows_palette();
++    test_setrows_button_size();
+     test_getstring();
+     test_tooltip();
+     test_get_set_style();
+@@ -3460,6 +3879,9 @@
+     test_wrap();
+     test_padding_height();
+     test_padding_bitmap_size();
++    test_setrows_groups();
++    test_setrows_palette();
++    test_setrows_button_size();
+ 
+     PostQuitMessage(0);
+     while(GetMessageA(&msg,0,0,0)) {
