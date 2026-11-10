@@ -42,3 +42,6 @@ scf-word-boundary | docs/wine-repro/riched20-scf-word-insertion-point/measure-bo
 toolbar-padding-followup | docs/wine-repro/comctl32-toolbar-padding-height/measure-followup.c | -Wextra -lgdi32 -static
 textfont-followup | docs/wine-repro/riched20-textfont-applytmp/measure-followup.c | -Wextra -lole32 -loleaut32 -luuid -static
 textfont-followup2 | docs/wine-repro/riched20-textfont-applytmp/measure-followup2.c | -Wextra -lole32 -loleaut32 -luuid -static
+ndrstub-l3-both | docs/wine-repro/rpcrt4-ndrstubcall3/l3-both.c | -Wextra -lrpcrt4 -lole32 -luuid -static
+ndrstub-l3-ndr64-only | docs/wine-repro/rpcrt4-ndrstubcall3/l3-ndr64-only.c | -Wextra -lrpcrt4 -lole32 -luuid -static
+ndrstub-l3-fallback | docs/wine-repro/rpcrt4-ndrstubcall3/l3-fallback.c | -Wextra -lrpcrt4 -lole32 -luuid -static

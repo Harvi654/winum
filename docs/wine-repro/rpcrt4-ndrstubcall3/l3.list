@@ -1,0 +1,3 @@
+ndrstub-l3-both | docs/wine-repro/rpcrt4-ndrstubcall3/l3-both.c | -Wextra -lrpcrt4 -lole32 -luuid -static
+ndrstub-l3-ndr64-only | docs/wine-repro/rpcrt4-ndrstubcall3/l3-ndr64-only.c | -Wextra -lrpcrt4 -lole32 -luuid -static
+ndrstub-l3-fallback | docs/wine-repro/rpcrt4-ndrstubcall3/l3-fallback.c | -Wextra -lrpcrt4 -lole32 -luuid -static

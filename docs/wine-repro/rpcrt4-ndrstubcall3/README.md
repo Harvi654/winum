@@ -343,3 +343,9 @@ It has not been run as L3 here. It cannot replace missing L1 or justify
 contract remains unresolved. Review the supported scope before deciding
 how to handle that release gate. Existing CAD workaround behavior is
 retained; no implementation removal or scope change is made by this record.
+
+## L3 reproducer (2026-11-10)
+
+See [L3.md](L3.md): the maintainer's L3-only decision for this patch and
+three Wine-only scenarios built from `com-measure.c` (which gained a hook,
+`CONFIGURE_SERVER_INFO`, unused by the MEASURE itself).

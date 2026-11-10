@@ -1,12 +1,24 @@
 # rpcrt4-ndrstubcall3.patch
 
-<!-- winum-test: missing -->
+<!-- winum-test: l3-only: a valid native call needs NDR64 tables that only MIDL generates; Wine COM sends NDR on both sides (maintainer decision 2026-11-09, docs/wine-repro/rpcrt4-ndrstubcall3/L3.md) -->
 
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
 - **DLL:** `rpcrt4`
 - **Origin:** Autodesk-Inventor-for-Linux, commit `4031558`, first shipped in `wine-11.19-1`
 - **In winum:** `patches/series` from winum-11.20-1
+
+## Exception (maintainer decision, 2026-11-09)
+
+L3 only. Windows has NdrStubCall3 (x86_64), but a valid call needs NDR64
+format tables, which only Microsoft's MIDL generates; with open tools the
+Windows measurement could not reach the server (`docs/wine-repro/rpcrt4-ndrstubcall3/README.md`).
+Wine's COM marshals NDR on both sides, so the patch uses the interface's
+NDR entry and the NDR64 path is never taken in Wine. Reproducer:
+[L3.md](../wine-repro/rpcrt4-ndrstubcall3/L3.md) (three Wine-only
+scenarios). L4: Stress Analysis Mesh View; at the next L4 also check the
+log for "NDR64 syntax is not supported". Follow-up: a native oracle if an
+open NDR64 generator ever exists.
 
 ## Problem as the user saw it
 

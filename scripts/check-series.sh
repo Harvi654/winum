@@ -4,9 +4,10 @@
 # Each docs/patches/<patch>.md carries one machine-readable line:
 #   <!-- winum-test: l1 -->
 #   <!-- winum-test: l3-only: <reason> -->
+#   <!-- winum-test: known-deviation: <reason> -->  (maintainer's exception)
 #   <!-- winum-test: test-not-on-windows -->   (test exists, L1 not run)
 #   <!-- winum-test: missing -->
-# Only the first two pass. Usage: check-series.sh [--report]
+# Only the first three pass. Usage: check-series.sh [--report]
 #   --report  print the table and the count, but exit 0 (branch builds)
 # Original, AI-assisted (Claude), LGPL-2.1-or-later.
 set -euo pipefail
@@ -25,14 +26,14 @@ while IFS= read -r p; do
         [ -n "$state" ] || state="no marker"
     fi
     case "$state" in
-        l1|l3-only:?*) ok=$((ok + 1)); mark=ok ;;
+        l1|l3-only:?*|known-deviation:?*) ok=$((ok + 1)); mark=ok ;;
         *) fail=$((fail + 1)); mark=MISSING ;;
     esac
     printf '%-8s %-48s %s\n' "$mark" "$name" "$state"
 done < "$HERE/patches/series"
-echo "series check: $ok with L1 or a reason for L3 only, $fail without"
+echo "series check: $ok with L1, a reason for L3 only or a known deviation, $fail without"
 if [ "$fail" -gt 0 ] && [ "$report" = 0 ]; then
-    echo "every patch in patches/series needs a Windows-tested Wine test or an 'l3-only' reason (AGENTS.md)" >&2
+    echo "every patch in patches/series needs a Windows-tested Wine test, an 'l3-only' reason or a 'known-deviation' exception (AGENTS.md)" >&2
     exit 1
 fi
 exit 0

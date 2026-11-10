@@ -64,6 +64,15 @@ Their own AGENTS.md / HANDOFF.md cover the programs; this file covers Wine.
   one line, `<!-- winum-test: l1 -->` or `<!-- winum-test: l3-only: reason -->`;
   `scripts/check-series.sh` checks this and the build of a release tag fails
   without it.
+- Exceptions are the maintainer's decision, recorded with a date on the
+  patch page: `l3-only` also when Windows has the function but a valid
+  call cannot be built with open tools (rpcrt4 NdrStubCall3, NDR64), and
+  `<!-- winum-test: known-deviation: reason -->` for a patch a program
+  needs whose behaviour is measured and differs from Windows (combase
+  stub activation context, 2026-11-10). The page then says what Windows
+  does, what the patch does instead, why it is kept (the L4 it fixed),
+  the risk, and the follow-up that replaces it; the follow-up stays open
+  until a conforming patch replaces it.
 - Pull requests from others: read the whole diff, especially `scripts/`,
   anything that downloads, and `.github/workflows/`. Say what was read in
   full and what was only skimmed.

@@ -201,6 +201,9 @@ int main(void)
             server_info.ProcString = NULL;
             server_info.FmtStringOffset = NULL;
         }
+#ifdef CONFIGURE_SERVER_INFO
+        CONFIGURE_SERVER_INFO(); /* L3 reproducer scenarios (l3-*.c); unused by the MEASURE */
+#endif
         stub_vtable.header.pServerInfo = &server_info;
         stub_vtable.header.pDispatchTable = methods;
         proxy_info.pStubVtblList = (const PCInterfaceStubVtblList *)stub_list;

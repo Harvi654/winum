@@ -1,12 +1,34 @@
 # combase-stub-activation-context.patch
 
-<!-- winum-test: missing -->
+<!-- winum-test: known-deviation: Windows runs incoming calls with no context (STA) or the caller's (MTA); the patch uses the context saved at first marshaling; kept for Stress Analysis (maintainer decision 2026-11-10) -->
 
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
 - **DLL:** `combase`
 - **Origin:** Autodesk-Inventor-for-Linux, commit `cc2c036`, first shipped in `wine-11.19-1`
 - **In winum:** `patches/series` from winum-11.20-1
+
+## Known deviation (maintainer decision, 2026-11-10)
+
+- **Windows (measured, Windows 10 x86_64/i686, own IClassFactory, v2
+  candidate):** an incoming call to an STA server runs with no activation
+  context; to an MTA server with the context of the caller. The context
+  at the first marshaling is not kept.
+- **This patch:** saves the context active when the stub manager is
+  created and activates it around every `IRpcStubBuffer_Invoke`.
+- **Why it is kept:** without it Stress Analysis crashes when the mesher
+  calls back into Inventor (`FEA_Addin_Utils.dll`, class from an add-in
+  manifest not found); with it Mesh View works (L4).
+- **Risk:** calls can run with a context where Windows has none (STA) or
+  a different one (MTA). That can make a class or DLL resolvable that
+  Windows would not resolve for that call; it is unlikely to make one
+  unresolvable that Windows finds.
+- **Follow-up (open):** a patch that follows the measurement (caller's
+  context for MTA servers, none for STA), checked against the v2 test
+  (`patches/candidates/combase-stub-activation-context-v2/`) and in Stress
+  Analysis; first find out whether the mesher's call comes from the same
+  process (if not, the caller's context does not reach us and another
+  mechanism is involved).
 
 ## Problem as the user saw it
 
