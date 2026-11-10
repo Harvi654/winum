@@ -103,3 +103,14 @@ remain open. The earlier Actions input still exercises the same executable
 mouse-move change, but not the newly revised msxml3 test. Verdict unchanged:
 the timing experiment is supported; production promotion is not approved by
 this comment revision alone.
+
+## V3 test and 32-ms follow-up (2026-11-10)
+
+[The v3 review](cross-review-2026-11-10-server-mousemove-v3.md) confirms
+unchanged current-v2 server hunks, the maintainer's L4-supported 32-ms
+default, and all selected native scenario oracles including the narrow
+hidden-window-move todo. It requests a P2 test-pump robustness adjustment:
+clock expiry can bypass dispatch of an already-queued move after a client
+stall. The previous server-global/allocation/order limits are not closed
+by this new single-desktop test. All-2 and exact native test L1 remain
+pending; no final promotion approval is inferred from a running job.
