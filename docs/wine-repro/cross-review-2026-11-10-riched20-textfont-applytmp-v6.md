@@ -66,7 +66,7 @@ unchanged. No todo was broadened to hide an ApplyNow regression.
 SCF v5 initializes editor->msftedit to FALSE in the common ME_MakeEditor
 constructor and only sets it TRUE for the RichEdit50W window class in
 create_windowed_editor. The textfont Reset consumer still uses that flag.
-SCF precedes textfont in the actual series (entries 23/24); both candidate
+SCF precedes textfont in the actual series (file lines 23/24); both candidate
 patches are byte-identical to their copies in test-run/batch1-6 at
 9262481caf3f189e9c5849a4a458206c146a7336. They must be promoted together
 in that order, not textfont with the old production flag producer.
