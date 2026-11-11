@@ -125,3 +125,74 @@ candidate that may be promoted with them (see notes).
   synthetic test, starting with toolbar `TB_SETROWS`/button size and the
   show/hide mouse move.
 - L5: a week of normal use of the release.
+
+## Independent corrections and qualifications (Codex, 2026-11-11)
+
+Checked overview `05ecc3a` against the recorded reviews, candidate notes,
+L1/L2 summaries and current markers. `check-series.sh --report` confirms
+41 valid / 21 missing; those are current markers, not promotion approval.
+No Wine/CAD execution or independent rerun of CI was performed here.
+
+- **#22, NULL termination: proposed L1 is not established.** The patch
+  changes only the fallback after `CoInternetGetSecurityUrl != S_OK`.
+  Reading pinned Wine 11.20 `sec_mgr.c` (`7298a818...`, complete
+  `map_url_to_zone`, `parse_security_url`, `CoInternetGetSecurityUrl`)
+  shows that absent protocol info normally yields a copied string and
+  S_OK, bypassing the fix. The candidate even asserts S_OK from that API
+  for every added URL. Thus `x`, empty and unknown-scheme rows and a green
+  sec_mgr summary do not demonstrate a regression test of the fallback.
+  The status page's statement that they reach it is unsupported. Require
+  a measured fixture that demonstrably exercises this branch and detects
+  the missing terminator, plus independent patch review, before assigning
+  L1; or record a justified maintainer exception. Do not upgrade this
+  marker merely by naming the res-zone test. This is an additional gate
+  beyond parseerror v3, not a request to remove the production fix.
+- **#3/#4, toolbar: replace "none" with bounded scope.** Padding v5 still
+  leaves TBSTYLE_LIST height and string-width retention differences
+  ([review](../wine-repro/cross-review-2026-11-10-comctl32-toolbar-padding-height-v4.md)).
+  Setrows v5 retains P2 measurement gaps for hidden/edge separators,
+  variable widths, indent and separator/tooltip geometry, and P3 repeated
+  requests/returned-rectangle coverage. Its MEASURE still lacks child-error
+  aggregation and pre-call markers; documentation and inspection of each
+  successful child made the stored cases usable, not the instrument fully
+  repaired. Keep these alongside the four known matrix deviations
+  ([review](../wine-repro/cross-review-2026-11-11-toolbar-setrows-v5.md)).
+- **#19, mousemove: approval is for the bounded test revision.** Inherited
+  P2 server-global cancellation across desktops and lack of a message-order
+  barrier remain; P3 timeout-allocation cleanup, override parsing and the
+  final 1000-message drain cap also remain. Singles saturating at 16 cannot
+  detect later wrong recipients; host input can mask a missing generated
+  event. Host-input causation is maintainer-reported, not proved by native
+  one-line summaries. Preserve these qualifications, not just extra-move
+  tolerance ([review](../wine-repro/cross-review-2026-11-11-server-mousemove-v5.md)).
+- **#15/#16/#17, RichEdit:** caret's selection-preservation todo and lack of
+  the same ordinary caret test on msftedit remain; SCF's long-text lookup
+  performance P3 remains. Promote SCF v5 before and together with textfont
+  v6: old production SCF does not supply its initialized discriminator.
+  The unread-cycle todo is not the only textfont scope limit: prior
+  CacheParms/TrackParms combinations, detached/wave-underline controls and
+  vanilla's separate CacheParms ownership issue remain outside the fix
+  ([v6 review](../wine-repro/cross-review-2026-11-10-riched20-textfont-applytmp-v6.md)).
+- **L4 wording needs evidence links or qualification.** The committed all-1
+  L2 report names a successful smoke-build job; it does not record the
+  claimed per-feature status-bar, Design Accelerator, caret, GD&T or
+  repeated-spell-check outcomes. In particular SCF/textfont candidate notes
+  and reviews still leave those feature L4s open. Treat the table's all-1
+  outcomes as newly reported/unconfirmed here until a dated maintainer
+  result identifies build and exercised features; old production L4 is
+  not automatically new-candidate L4. Retain deferred other-consumer L4.
+  All-5's palette comparison is explicitly recorded, but differing image
+  scales do not verify pixel dimensions. Mousemove's default works in the
+  all-3 record (`42835150574`); its all-1 override experiment is separate.
+- **Other omitted follow-ups:** #23 retains the short-string `memcmp`
+  safety/style suggestions; #33 lacks full WINDOWPOS preservation checks;
+  #36 has a class-cleanup skip-path P3. #7's approval covers the signature
+  test only: the decoder still lacks a full independent review as well as
+  native decoder fixtures; keep `l3-only`. These are not closed by a green
+  neighboring L2. Existing detailed reviews remain the authoritative scope.
+
+The actctx follow-up and timezone v3 re-reads in `05ecc3a` do close their
+stated review gates. The parseerror P2 guard/P3 wording and exact-final
+native L1 remain correctly listed as pending. L2 conclusions above use the
+committed maintainer assessments; they are not claims that every all-N
+comparison was green or that skipped value/scenario paths were exercised.
