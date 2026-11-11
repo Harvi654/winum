@@ -40,7 +40,7 @@ have a candidate; the urlmon NULL terminator gets a proposed l3-only.
 | 23 | urlmon-res-zone-local-machine | `urlmon-res-zone-v2` (includes the tests-first test) | Codex, approve after follow-up (bf3c3b9) | all-2: `urlmon:sec_mgr` 692/0, both arch | ok | AutoCAD, deferred | l1 | module res: URL todo_wine; `patches/tests-first/series` entry is removed with it |
 | 24 | wbemprox-timezone | `wbemprox-timezone-v3` | Claude, approve v3 (2026-11-11) | v2 body 104/0 (v3 differs only in skip()) | ok (83/0, all-2..5) | Inventor runs (v1) | l1 | no value coverage in the UTC CI; unmeasured DST modes |
 | 28 | server-input-attachment-components | `server-input-attachment-components-v5` | Claude, approve | 16719/0, both arch | ok (`user32:attachment` 12039, 16 todo; neighbouring suites) | Inventor smoke (all-1); SOLIDWORKS deferred | l1 | absolute inactive-state view not available in CI |
-| 29 | msxml3-parseerror-filepos | `msxml3-parseerror-filepos-v3` (2026-11-11: the empty-string `get_errorCode` check for both classes, wording; implementation as v2) | Codex: v2 approved with P2/P3; **v3 re-read pending** | v2 body all-2 36894/0; **v3 L1 pending** (`test-run/all-6` bundle) | v2 ok; v3 in all-6 | SOLIDWORKS, deferred | l1 | Codex re-read, L1 of v3 |
+| 29 | msxml3-parseerror-filepos | `msxml3-parseerror-filepos-v3` (2026-11-11: the empty-string `get_errorCode` check for both classes, wording; implementation as v2) | Codex: v2 approved with P2/P3; v3 approved (`e1635a1`) | v3 all-6 36900/0 both architectures | v3 all-6: no new failure | SOLIDWORKS, deferred | l1 | - |
 | 30 | wininet-http-same-position-seek | `wininet-same-position-seek-v2` | Claude, approve | 200/0, both arch | ok (`wininet:http`) | SOLIDWORKS, deferred | l1 | chunked/close-delimited seeks todo_wine |
 | 33 | comctl32-header-null-layout | `comctl32-header-null-layout-v2` | Codex, approve | batch1, both arch | ok | Inventor smoke; SOLIDWORKS deferred | l1 | - |
 | 36 | comctl32-ownerdraw-existing-capture | `comctl32-ownerdraw-existing-capture-v2` | Codex, approve | batch1, both arch | ok | Inventor smoke; SOLIDWORKS deferred | l1 | - |
@@ -81,8 +81,9 @@ candidate that may be promoted with them (see notes).
 
 ## Before the promotion
 
-1. **parseerror v3**: written 2026-11-11 (see table); Codex re-read and
-   one VM visit for `msxml3:domdoc` (both architectures, `test-run/all-6`).
+1. ~~parseerror v3~~ - Codex approved (`e1635a1`); L1 all-6 36900/0
+   on both architectures, L2 all-6 without a new failure
+   ([record](../wine-repro/l1-all-6-2026-11-11/README.md)).
 2. ~~L3 reproducers~~ - run 2026-11-11 (run 42999903587, KDE Wayland,
    [record](../wine-repro/l3-ci-2026-11-11/README.md)), results on the
    patch pages: NdrStubCall3 as designed (the expected ndr64-only code in
@@ -91,8 +92,10 @@ candidate that may be promoted with them (see notes).
    visual bug unreproduced on this compositor; **xinput-bad-device
    uncovered** (Wine never called the legacy device queries, so the fault
    was not raised). The l3-only markers rest on the missing Windows
-   counterpart, not on these runs; whether the uncovered XInput branch
-   blocks the tag is the maintainer's decision.
+   counterpart, not on these runs. Maintainer decision 2026-11-11: the
+   uncovered XInput branch does not block the tag (no Windows counterpart;
+   the patch fixed Inventor's crash at Hole); Codex adjusts the
+   reproducer after the release (open point below).
 3. ~~Maintainer: the l3-only reason for urlmon-maptozone-null-terminate~~ -
    approved 2026-11-11.
 4. Maintainer: approval of this overview (or entries struck).
@@ -135,7 +138,12 @@ without a local Wine build (`build-l3.yml`, `scripts/run-l3-local.sh`).
 - Open measurements: msi selection tree (temporary l3-only); combase
   conforming replacement (known deviation); mspatcha decoder fixtures
   (l3-only); Wine's width wrap of vertical toolbars before `TB_SETROWS`;
-  the 3+4/4-rows setrows case; wbemprox values outside standard time.
+  the 3+4/4-rows setrows case; wbemprox values outside standard time;
+  winex11-xinput-bad-device L3: the reproducer did not reach the patched
+  branch on KDE Wayland (Wine never called the legacy device queries);
+  Codex makes the fixture provoke the mapping query and the run is
+  repeated (maintainer decision 2026-11-11); PutImage pixel sampling of
+  the composited output.
 - Wine bug reports (words only, AGENTS.md) for the fixes with a clean
   synthetic test, starting with toolbar `TB_SETROWS`/button size and the
   show/hide mouse move.
@@ -208,7 +216,7 @@ No Wine/CAD execution or independent rerun of CI was performed here.
 
 The actctx follow-up and timezone v3 re-reads in `05ecc3a` do close their
 stated review gates. The parseerror P2 guard/P3 wording and exact-final
-native L1 remain correctly listed as pending. L2 conclusions above use the
+native L1 remained pending at the time of this review (closed later on 2026-11-11: Codex `e1635a1`, L1 all-6). L2 conclusions above use the
 committed maintainer assessments; they are not claims that every all-N
 comparison was green or that skipped value/scenario paths were exercised.
 

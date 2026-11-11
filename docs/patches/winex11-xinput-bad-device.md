@@ -36,6 +36,14 @@ and scoped Linux fault helper are in
 
 ## Open points
 
+- L3 branch not covered yet (run 42999903587, 2026-11-11): Wine did not
+  call XOpenDevice/XGetDeviceButtonMapping on the KDE Wayland session, so
+  the injected XI_BadDevice was never raised. Maintainer decision
+  2026-11-11: this does not block `winum-11.20-1`; the l3-only marker
+  rests on the missing Windows counterpart and the patch fixed Inventor's
+  crash at Hole (L4). Codex changes the reproducer after the release so
+  that Wine queries the mapping, and the run is repeated.
+
 No Wine test (Xwayland device behaviour).
 
 ## Evidence

@@ -1,0 +1,2 @@
+msxml3 domdoc x86_64=0
+msxml3 domdoc i386=0

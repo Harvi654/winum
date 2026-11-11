@@ -1,0 +1,4 @@
+domdoc.c:129: Tests skipped: class DOMDocument40, iface IXMLDOMDocument not supported
+domdoc.c:129: Tests skipped: class DOMDocument40, iface IXMLDOMDocument2 not supported
+domdoc.c:129: Tests skipped: class MXNamespaceManager40, iface IMXNamespaceManager not supported
+2a74:domdoc: 36900 tests executed (0 marked as todo, 0 as flaky, 0 failures), 3 skipped.
