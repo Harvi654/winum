@@ -15,8 +15,8 @@ regression, a `test_ClipCursor` check that fails in vanilla Wine too (3 of
 "L2 ok" below means: no new failure in the touched DLL's tests and the
 neighbouring suites in that run.
 
-Today: 41 of 62 entries carry a valid marker, 21 do not. Every one of the
-21 has a candidate or (urlmon NULL terminator) a test in a candidate.
+Today: 41 of 62 entries carry a valid marker, 21 do not. 20 of the 21
+have a candidate; the urlmon NULL terminator gets a proposed l3-only.
 
 ## Status
 
@@ -36,11 +36,11 @@ Today: 41 of 62 entries carry a valid marker, 21 do not. Every one of the
 | 17 | riched20-textfont-applytmp | `riched20-textfont-applytmp-v6` | Codex, approve v6 | batch1-6, both arch | ok | repeated spell check, no black text (all-1) | l1 | second unread temp cycle todo_wine |
 | 19 | server-mousemove-on-show-hide | `server-mousemove-on-show-hide-v5` | Codex, approve (2c8870f) | all-4: two runs, both arch, 0 failures | ok (all-4, all-5) | sketch value updates at once with 32 ms (all-2) | l1 | hidden-window move todo_wine; counts saturate at 16 (P3); host input can add moves (P3) |
 | 20 | shell32-folderview-selection | `shell32-folderview-selection-v2` | Claude, approve | 357/0, both arch | ok (`shell32:selection` 357/0) | click/double-click (v1) | l1 | unmeasured NULL/invalid PIDL branches |
-| 22 | urlmon-maptozone-null-terminate | none; its URLs (`x`, `""`, `unknownscheme:`) are in the test of `urlmon-res-zone-v2` | production patch, no candidate | through `urlmon:sec_mgr` (all-2, 692/0) | ok | AutoCAD, deferred | l1, page names the test in `urlmon-res-zone-local-machine.patch` | confirm in the page that those URLs reach the fixed copy path; no own test |
+| 22 | urlmon-maptozone-null-terminate | none | production patch, no candidate | **not testable** (2026-11-11): the res-zone test's URLs reach the copy, but pass with and without the fix, also with heap tail checking - the fix stops an out-of-bounds read with no API-visible effect (page, last section) | ok | AutoCAD, deferred | **l3-only** (proposed, reason on the page) | maintainer's decision on the l3-only reason |
 | 23 | urlmon-res-zone-local-machine | `urlmon-res-zone-v2` (includes the tests-first test) | Codex, approve after follow-up (bf3c3b9) | all-2: `urlmon:sec_mgr` 692/0, both arch | ok | AutoCAD, deferred | l1 | module res: URL todo_wine; `patches/tests-first/series` entry is removed with it |
 | 24 | wbemprox-timezone | `wbemprox-timezone-v3` | Claude, approve v3 (2026-11-11) | v2 body 104/0 (v3 differs only in skip()) | ok (83/0, all-2..5) | Inventor runs (v1) | l1 | no value coverage in the UTC CI; unmeasured DST modes |
 | 28 | server-input-attachment-components | `server-input-attachment-components-v5` | Claude, approve | 16719/0, both arch | ok (`user32:attachment` 12039, 16 todo; neighbouring suites) | Inventor smoke (all-1); SOLIDWORKS deferred | l1 | absolute inactive-state view not available in CI |
-| 29 | msxml3-parseerror-filepos | `msxml3-parseerror-filepos-v2` | Codex: approve bounded change, **P2 required before promotion** | all-2: `msxml3:domdoc` 36894/0 (v2 body) | ok | SOLIDWORKS, deferred | l1 after v3 | **blocker**: v3 must add the `get_errorCode` check for the empty string (both classes, measured S_OK/0xc00ce558) and fix the P3 wording; then L1 of `msxml3:domdoc` again |
+| 29 | msxml3-parseerror-filepos | `msxml3-parseerror-filepos-v3` (2026-11-11: the empty-string `get_errorCode` check for both classes, wording; implementation as v2) | Codex: v2 approved with P2/P3; **v3 re-read pending** | v2 body all-2 36894/0; **v3 L1 pending** (`test-run/all-6` bundle) | v2 ok; v3 in all-6 | SOLIDWORKS, deferred | l1 | Codex re-read, L1 of v3 |
 | 30 | wininet-http-same-position-seek | `wininet-same-position-seek-v2` | Claude, approve | 200/0, both arch | ok (`wininet:http`) | SOLIDWORKS, deferred | l1 | chunked/close-delimited seeks todo_wine |
 | 33 | comctl32-header-null-layout | `comctl32-header-null-layout-v2` | Codex, approve | batch1, both arch | ok | Inventor smoke; SOLIDWORKS deferred | l1 | - |
 | 36 | comctl32-ownerdraw-existing-capture | `comctl32-ownerdraw-existing-capture-v2` | Codex, approve | batch1, both arch | ok | Inventor smoke; SOLIDWORKS deferred | l1 | - |
@@ -55,7 +55,7 @@ candidate that may be promoted with them (see notes).
 | --- | --- | --- | --- |
 | 1 | combase-stub-activation-context | known-deviation (2026-11-10) | candidate `combase-stub-activation-context-v2` blocked; production stays |
 | 5 | kernelbase-account-domain-sid | l1 | |
-| 7 | mspatcha-pa19-32bit-and-large-files | l3-only (2026-11-10) | optional: replace with `mspatcha-signature-v2` (adds the signature test; Claude approve; L1 50/0; L2 50/0); marker unchanged |
+| 7 | mspatcha-pa19-32bit-and-large-files | l3-only (2026-11-10) | **replace with `mspatcha-signature-v2`** (maintainer, 2026-11-11): adds the signature test (Claude approve; L1 50/0; L2 50/0); marker stays l3-only for the PA19 decoder |
 | 8 | msxml3-domdoc-importnode | l1 | |
 | 10 | ntdll-locate-xstate-feature-enabled | l1 | |
 | 11 | ole32-storage-thread-lock | l1 | |
@@ -81,20 +81,27 @@ candidate that may be promoted with them (see notes).
 
 ## Before the promotion
 
-1. **parseerror v3** (blocker): add the empty-string `get_errorCode`
-   assertion for both classes and the P3 wording; Codex re-reads; one
-   VM visit for `msxml3:domdoc` (both architectures).
-2. Maintainer: approve this overview (or strike entries); decide whether
-   mspatcha's file is replaced by the signature-test candidate.
+1. **parseerror v3**: written 2026-11-11 (see table); Codex re-read and
+   one VM visit for `msxml3:domdoc` (both architectures, `test-run/all-6`).
+2. **L3 reproducers not yet run by the maintainer**: rpcrt4 NdrStubCall3
+   (`docs/wine-repro/rpcrt4-ndrstubcall3/L3.md`) and the three winex11
+   reproducers (`docs/wine-repro/winex11-flush-putimage/`,
+   `winex11-shape-alpha-xwayland/`, `winex11-xinput-bad-device/`, each
+   README). Their l3-only markers rest on them; the maintainer runs them
+   before the tag and the results are recorded on the patch pages.
+3. Maintainer: the l3-only reason for urlmon-maptozone-null-terminate.
+4. Maintainer: approval of this overview (or entries struck).
 
 ## Promotion steps (after approval, one commit on `main`)
 
 1. Copy each candidate file over its production file in `patches/` (table
-   above). For the status bar: produce one patch = production +
-   `0001` + `0002`, checked to give the same tree at `--fuzz=0`.
+   above, and mspatcha-signature-v2 for entry 7). For the status bar:
+   produce one patch = production + `0001` + `0002`, checked to give the
+   same tree at `--fuzz=0`.
 2. Remove `urlmon-tests-res-zones.patch` from `patches/tests-first/series`
    (the test moves into `urlmon-res-zone-local-machine.patch`).
-3. Set the marker in each of the 21 pages (`<!-- winum-test: l1 -->`),
+3. Set the marker in each of the 21 pages (`<!-- winum-test: l1 -->`; for
+   urlmon-maptozone-null-terminate the approved l3-only line),
    update their validation table (L1/L2/L4 with dates and runs, as above)
    and history; mark the candidate folders as promoted (nothing deleted).
 4. `WINUM_BUILD`: stays 1 - nothing was published under 11.20-1, so the

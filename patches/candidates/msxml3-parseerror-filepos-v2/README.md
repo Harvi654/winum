@@ -35,3 +35,7 @@ revised after cross review (both measured classes, all measured states).
 ## L1: bundle of test-run/all-2 (2026-11-10)
 
 [docs/wine-repro/l1-all-2-2026-11-10](../../../docs/wine-repro/l1-all-2-2026-11-10/README.md), Windows 10: `msxml3:domdoc` 36894 checks, 0 failures, x86_64 and i386.
+
+**Superseded by `../msxml3-parseerror-filepos-v3/` (2026-11-11)**: the
+review's P2 (a direct check of the empty-string error code) and P3
+(wording) are done there.

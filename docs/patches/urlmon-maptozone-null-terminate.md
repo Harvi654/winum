@@ -44,3 +44,37 @@ Wine test missing; added for AutoCAD, not Inventor.
 
 Autodesk-Inventor-for-Linux [`docs/arch-hyprland.md`](https://github.com/Harvi654/Autodesk-Inventor-for-Linux/blob/main/docs/arch-hyprland.md) (search for the patch name).
 
+
+## Check of a test through the res-zone test (2026-11-11)
+
+Question (maintainer): do the checks of the res-zone test that reach
+this copy - URLs `x`, `""`, `unknownscheme:abc`, `unknownscheme://host/path`
+in `urlmon-res-zone-v2`'s `sec_mgr.c` test - fail without this patch?
+
+Local run, Wine 11.20 x86_64, `urlmon:sec_mgr` with the res-zone v2
+test: once with this patch and res-zone v2, once with res-zone v2 only.
+Both 854 checks with the same two results (two "succeeded inside todo"
+for `res://shell32.dll/#2/#130`, unrelated); also identical with
+`WINEDEBUG=warn+heap` (heap tail checking). A `+urlmon` trace shows
+`map_url_to_zone` does reach the copy for those URLs
+(`CoInternetGetSecurityUrl` fails, then `CreateUri` on the copy).
+
+So the checks pass without the fix: the missing terminator makes
+`CreateUri` read past the copied string, but for these URLs the zone
+and the result come out the same (the scheme decides, and what follows
+in memory does not change it). The fix stops an out-of-bounds read; its
+effect is not visible through any API result, so a Windows test cannot
+show it.
+
+Proposed marker (maintainer's decision): `l3-only: the fix stops an
+out-of-bounds read of the copied URL in map_url_to_zone; zone and
+results are the same with and without it, so no API-visible behaviour
+can be tested on Windows; reproducer: the runs above
+(docs/patches/urlmon-maptozone-null-terminate.md)`.
+
+Commands (from a Wine 11.20 build tree with the series):
+
+```sh
+WINEDEBUG=warn+heap ./wine dlls/urlmon/tests/x86_64-windows/urlmon_test.exe sec_mgr
+WINEDEBUG=+urlmon ./wine dlls/urlmon/tests/x86_64-windows/urlmon_test.exe sec_mgr 2>&1 | grep -A6 'MapUrlToZone.*unknownscheme'
+```
