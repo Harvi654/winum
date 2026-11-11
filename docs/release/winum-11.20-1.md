@@ -196,3 +196,14 @@ stated review gates. The parseerror P2 guard/P3 wording and exact-final
 native L1 remain correctly listed as pending. L2 conclusions above use the
 committed maintainer assessments; they are not claims that every all-N
 comparison was green or that skipped value/scenario paths were exercised.
+
+Additional validation detail: **#13's review labels the rpcrt4 consumer
+risk P1 (validation)**: the Windows-correct `VT_ARRAY | vt` pointee can
+reach a marshaller path that lacks its handling. The required v3 L4 is
+specifically **Design Accelerator Shaft and one gear generator**, not
+merely a generic Inventor smoke; link that result before closing it
+([review](../wine-repro/cross-review-2026-11-08-typedesc-pointee-v3.md)).
+Also, the valid markers on #61/#62 do not erase their other-consumer L4:
+both patch pages still list SOLIDWORKS open (OpenGL viewport for #62).
+Record these as deferred under current policy, including the #62 format
+selection risk, rather than omitting them from the deferred-L4 list.
