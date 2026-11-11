@@ -29,7 +29,7 @@ fixture with region reset and excluded-window controls is in
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
 | L1 | L3 only: the changed X11/compositor path is absent on Windows |
 | L2 | not recorded per patch |
-| L3 | reproducer added 2026-11-09; x86_64/i686 strict build passed; paired Xwayland visual/input-region execution pending |
+| L3 | reproducer added 2026-11-09; 2026-11-11, [run 42999903587](../wine-repro/l3-ci-2026-11-11/README.md), KDE Wayland: ARGB visual chosen only for the eligible targets; all five cases transparent with the patch; the opaque rectangle did not appear without it (unreproduced on this compositor) |
 | L4 | No black rectangles. (Inventor, maintainer) |
 | L5 | in Inventor's runtime since `wine-11.19-1` (2026-10-19); a week of use not formally recorded - maintainer to confirm |
 | Cross review | not recorded (written before the cross-review rule) |

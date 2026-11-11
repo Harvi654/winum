@@ -29,7 +29,7 @@ and scoped Linux fault helper are in
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
 | L1 | L3 only: no legacy XInput/Xlib error-handler counterpart on Windows |
 | L2 | not recorded per patch |
-| L3 | reproducer/fault helper added 2026-11-09; both PE architectures and Linux helper compile strictly; paired X11 error/fallback execution pending |
+| L3 | reproducer/fault helper added 2026-11-09; 2026-11-11, [run 42999903587](../wine-repro/l3-ci-2026-11-11/README.md), KDE Wayland: **uncovered** - Wine never called XOpenDevice/XGetDeviceButtonMapping during the run (no call, no fault), clicks fine in all modes; fixture follow-up needed |
 | L4 | Hole command works. (Inventor, maintainer) |
 | L5 | in Inventor's runtime since `wine-11.19-1` (2026-10-19); a week of use not formally recorded - maintainer to confirm |
 | Cross review | not recorded (written before the cross-review rule) |

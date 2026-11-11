@@ -13,7 +13,7 @@ static MIDL_SYNTAX_INFO entries[2];
 
 /* Only an NDR64 entry and no NDR tables at all.
  * Expected: the stub raises RPC_X_WRONG_STUB_VERSION, the client gets
- * RPC_E_SERVERFAULT (80010105), the server is not called; Wine logs
+ * HRESULT 80070725, the server is not called; Wine logs
  * "NDR64 syntax is not supported". */
 static void l3_configure(void)
 {

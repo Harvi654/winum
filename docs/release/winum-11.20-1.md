@@ -83,18 +83,22 @@ candidate that may be promoted with them (see notes).
 
 1. **parseerror v3**: written 2026-11-11 (see table); Codex re-read and
    one VM visit for `msxml3:domdoc` (both architectures, `test-run/all-6`).
-2. **L3 reproducers not yet run by the maintainer**: rpcrt4 NdrStubCall3
-   (`docs/wine-repro/rpcrt4-ndrstubcall3/L3.md`) and the three winex11
-   reproducers (`docs/wine-repro/winex11-flush-putimage/`,
-   `winex11-shape-alpha-xwayland/`, `winex11-xinput-bad-device/`, each
-   README). Their l3-only markers rest on them; the maintainer runs them
-   before the tag and the results are recorded on the patch pages.
+2. ~~L3 reproducers~~ - run 2026-11-11 (run 42999903587, KDE Wayland,
+   [record](../wine-repro/l3-ci-2026-11-11/README.md)), results on the
+   patch pages: NdrStubCall3 as designed (the expected ndr64-only code in
+   L3.md was a wrong prediction, corrected); flush-putimage X side
+   confirmed, pixels inconclusive; shape-alpha eligibility as designed,
+   visual bug unreproduced on this compositor; **xinput-bad-device
+   uncovered** (Wine never called the legacy device queries, so the fault
+   was not raised). The l3-only markers rest on the missing Windows
+   counterpart, not on these runs; whether the uncovered XInput branch
+   blocks the tag is the maintainer's decision.
 3. ~~Maintainer: the l3-only reason for urlmon-maptozone-null-terminate~~ -
    approved 2026-11-11.
 4. Maintainer: approval of this overview (or entries struck).
 
-The L3 reproducers (item 2) are prepared by Codex so that they run
-without a local Wine build; the maintainer sends the results.
+The L3 reproducers (item 2) were prepared by Codex so that they run
+without a local Wine build (`build-l3.yml`, `scripts/run-l3-local.sh`).
 
 ## Promotion steps (after approval, one commit on `main`)
 

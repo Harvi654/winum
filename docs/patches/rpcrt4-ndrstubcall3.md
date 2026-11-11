@@ -39,7 +39,7 @@ None in the patch.
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
 | L1 | **no Wine test** - needs one, measured on Windows first |
 | L2 | not recorded per patch |
-| L3 | not recorded |
+| L3 | 2026-11-11, [run 42999903587](../wine-repro/l3-ci-2026-11-11/README.md), KDE Wayland: both and fallback hr 0 / value 42, ndr64-only refused (0x80070725, server not called), i686 no export - as designed |
 | L4 | Mesh View works. (Inventor, maintainer) |
 | L5 | in Inventor's runtime since `wine-11.19-1` (2026-10-19); a week of use not formally recorded - maintainer to confirm |
 | Cross review | not recorded (written before the cross-review rule) |
