@@ -27,3 +27,7 @@ Units only in the series, all finished without failures: msi
 v3 `skip()` instead of `win_skip`). `kernel32:actctx` 3296 -> 3863 checks
 and `mshtml:dom`/`htmldoc`/`events` ran on both sides without a new
 failure.
+
+Follow-up (2026-11-11): the `user32.x86_64.input` "got pos (49,51)"
+check came back in all-5 and fails in vanilla Wine as well (3 of 6
+local runs); see `../l1-all-5-2026-11-11/`.

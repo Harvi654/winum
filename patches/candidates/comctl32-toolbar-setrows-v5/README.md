@@ -39,3 +39,12 @@ padding sequence MEASURE every button size equals Windows'.
 - L1 (bundle of `test-run/all-5`), L2 (`all-5`), cross review (Codex).
 - L4 in Inventor: the palette's buttons are now 40x24 as measured on
   Windows (v4 gave 36x16 under Wine); compare with Inventor on Windows.
+
+## L1, L2, L4 (2026-11-11)
+
+`docs/wine-repro/l1-all-5-2026-11-11/`: every setrows check passed on
+Windows 10 in both architectures (one unrelated failure of the older
+`test_WM_PAINT` on x86_64, from messages outside the test). L2 of
+all-5: the only regression is a `test_ClipCursor` check that fails in
+vanilla Wine too (3 of 6 local runs). L4 in Inventor 2027: the palette
+matches Inventor on Windows (5 columns, same groups).
