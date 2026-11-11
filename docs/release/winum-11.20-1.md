@@ -251,3 +251,19 @@ selection risk, rather than omitting them from the deferred-L4 list.
   (64 entries: the status bar there was two incremental files at the
   end). `bash -n scripts/*.sh` passes; `scripts/check-series.sh` without
   `--report`: 62 of 62, exit 0.
+- Patch headers (`4cf6123`, other assistant): 36 files got the header
+  AGENTS.md asks for; only the text above the first hunk changed (checked
+  per file), the series applied at `--fuzz=0` gives the same tree as
+  `a9c8454` (`diff -r`), and `check-series.sh` now also checks the header:
+  62 of 62, exit 0.
+- Step 6, L2: run 43020629590 on `test-run/release-1` (`a9c8454`, the
+  promoted series alone, no substitutions). First attempt: the
+  `test (vanilla, g3)` runner stopped after 52 minutes with no step result
+  and no log (runner failure), so `compare` failed; the maintainer re-ran
+  the failed jobs. Attempt 2: 516 units, **regressions 0**, fixed 0,
+  moved 2 (`user32.win`, the same two failures shifted by the patched test
+  file, as in every earlier run). Units only in the series all finished
+  without failures. Valid for `4cf6123`, whose tree is identical.
+- Step 6, build: Build Wine run 43022221734 on `main` at `4cf6123`,
+  success (both architectures and the source archive). The release
+  itself is built again from the signed tag by the same workflow.
