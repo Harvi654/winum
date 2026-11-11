@@ -78,3 +78,9 @@ Commands (from a Wine 11.20 build tree with the series):
 WINEDEBUG=warn+heap ./wine dlls/urlmon/tests/x86_64-windows/urlmon_test.exe sec_mgr
 WINEDEBUG=+urlmon ./wine dlls/urlmon/tests/x86_64-windows/urlmon_test.exe sec_mgr 2>&1 | grep -A6 'MapUrlToZone.*unknownscheme'
 ```
+
+**Maintainer decision (2026-11-11):** l3-only approved with the reason
+above (the fix stops a read past the end of the copied URL; not
+observable through the API). The marker line is set with the promotion
+of winum-11.20-1:
+`<!-- winum-test: l3-only: the fix stops an out-of-bounds read of the copied URL in map_url_to_zone; zone and results are the same with and without it, so no API-visible behaviour can be tested on Windows (maintainer decision 2026-11-11) -->`

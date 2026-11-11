@@ -36,7 +36,7 @@ have a candidate; the urlmon NULL terminator gets a proposed l3-only.
 | 17 | riched20-textfont-applytmp | `riched20-textfont-applytmp-v6` | Codex, approve v6 | batch1-6, both arch | ok | repeated spell check, no black text (all-1) | l1 | second unread temp cycle todo_wine |
 | 19 | server-mousemove-on-show-hide | `server-mousemove-on-show-hide-v5` | Codex, approve (2c8870f) | all-4: two runs, both arch, 0 failures | ok (all-4, all-5) | sketch value updates at once with 32 ms (all-2) | l1 | hidden-window move todo_wine; counts saturate at 16 (P3); host input can add moves (P3) |
 | 20 | shell32-folderview-selection | `shell32-folderview-selection-v2` | Claude, approve | 357/0, both arch | ok (`shell32:selection` 357/0) | click/double-click (v1) | l1 | unmeasured NULL/invalid PIDL branches |
-| 22 | urlmon-maptozone-null-terminate | none | production patch, no candidate | **not testable** (2026-11-11): the res-zone test's URLs reach the copy, but pass with and without the fix, also with heap tail checking - the fix stops an out-of-bounds read with no API-visible effect (page, last section) | ok | AutoCAD, deferred | **l3-only** (proposed, reason on the page) | maintainer's decision on the l3-only reason |
+| 22 | urlmon-maptozone-null-terminate | none | production patch, no candidate | **not testable** (2026-11-11): the res-zone test's URLs reach the copy, but pass with and without the fix, also with heap tail checking - the fix stops an out-of-bounds read with no API-visible effect (page, last section) | ok | AutoCAD, deferred | **l3-only** (maintainer decision 2026-11-11, reason on the page) | - |
 | 23 | urlmon-res-zone-local-machine | `urlmon-res-zone-v2` (includes the tests-first test) | Codex, approve after follow-up (bf3c3b9) | all-2: `urlmon:sec_mgr` 692/0, both arch | ok | AutoCAD, deferred | l1 | module res: URL todo_wine; `patches/tests-first/series` entry is removed with it |
 | 24 | wbemprox-timezone | `wbemprox-timezone-v3` | Claude, approve v3 (2026-11-11) | v2 body 104/0 (v3 differs only in skip()) | ok (83/0, all-2..5) | Inventor runs (v1) | l1 | no value coverage in the UTC CI; unmeasured DST modes |
 | 28 | server-input-attachment-components | `server-input-attachment-components-v5` | Claude, approve | 16719/0, both arch | ok (`user32:attachment` 12039, 16 todo; neighbouring suites) | Inventor smoke (all-1); SOLIDWORKS deferred | l1 | absolute inactive-state view not available in CI |
@@ -89,8 +89,12 @@ candidate that may be promoted with them (see notes).
    `winex11-shape-alpha-xwayland/`, `winex11-xinput-bad-device/`, each
    README). Their l3-only markers rest on them; the maintainer runs them
    before the tag and the results are recorded on the patch pages.
-3. Maintainer: the l3-only reason for urlmon-maptozone-null-terminate.
+3. ~~Maintainer: the l3-only reason for urlmon-maptozone-null-terminate~~ -
+   approved 2026-11-11.
 4. Maintainer: approval of this overview (or entries struck).
+
+The L3 reproducers (item 2) are prepared by Codex so that they run
+without a local Wine build; the maintainer sends the results.
 
 ## Promotion steps (after approval, one commit on `main`)
 
