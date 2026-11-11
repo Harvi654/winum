@@ -1,3 +1,17 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] winex11.drv: Use an ARGB visual for region-clipped windows under Xwayland.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Pixels outside a SetWindowRgn region are transparent, since Wayland
+compositors ignore the X shape (Inventor's sketch input boxes had black
+rectangles around them).
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/winex11-shape-alpha-xwayland.md.
+
 diff --git a/dlls/winex11.drv/bitblt.c b/dlls/winex11.drv/bitblt.c
 index 1f910400..6b19ea32 100644
 --- a/dlls/winex11.drv/bitblt.c

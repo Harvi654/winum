@@ -1,7 +1,8 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
 Subject: [PATCH] msi: Keep measured required attr26 selections after costing.
 
-AI-assisted (Codex), original code; LGPL-2.1-or-later.
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
 
 Windows v14 stable preparation returns success for Absent on an attr26
 Local child without deselecting it. Unknown/Absent targets are not extended.

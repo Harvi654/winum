@@ -1,7 +1,8 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
 Subject: [PATCH] msi: Respect required DisallowAdvertise state timing.
 
-AI-assisted (Codex), original code; LGPL-2.1-or-later.
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
 
 Windows v14 attr26 accepts API Advertised before costing, which later resets
 it. Post-cost already Local attr26 stays Local on Advertised. Attr18 remains

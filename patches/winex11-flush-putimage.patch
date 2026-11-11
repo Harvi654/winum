@@ -1,3 +1,16 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] winex11.drv: Flush the display after PutImage.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+XFlush after X11DRV_PutImage and xrenderdrv_PutImage (WebView2 pages
+were one frame behind until the next mouse move).
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/winex11-flush-putimage.md.
+
 --- a/dlls/winex11.drv/bitblt.c
 +++ b/dlls/winex11.drv/bitblt.c
 @@ -1295,6 +1295,13 @@

@@ -1,7 +1,8 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
 Subject: [PATCH] msi: Keep Level-zero features disabled through costing.
 
-AI-assisted (Codex), original code; LGPL-2.1-or-later.
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
 
 Windows v14 disabled required children remain Request unknown and are not
 published, including controls. Do not replace a child's zero Level with an

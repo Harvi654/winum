@@ -1,7 +1,8 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
 Subject: [PATCH] msi: Preserve post-cost Local feature requests for execution.
 
-AI-assisted (Codex), original code; LGPL-2.1-or-later.
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
 
 A successful immediate CA Local request after CostFinalize must update
 Action as well as ActionRequest. In level mode propagate it through all

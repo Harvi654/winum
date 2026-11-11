@@ -1,3 +1,16 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] shell32: Support CopyHere from ZIP archives in shell automation.
+
+AI-assisted (Claude, Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Copies from stored and deflated ZIP archives (the SOLIDWORKS installer
+did not extract its ZIP payloads).
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/shell32-automation-zip-copy.md.
+
 --- a/dlls/shell32/Makefile.in
 +++ b/dlls/shell32/Makefile.in
 @@ -1,7 +1,8 @@

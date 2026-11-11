@@ -1,3 +1,15 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] explorer: Add opt-in hidden parenting hosts to the task list.
+
+AI-assisted (Claude, Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+SOLIDWORKS helper windows appeared as separate taskbar entries.
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/explorer-tasklist-parenting-hosts.md.
+
 --- a/programs/explorer/systray.c
 +++ b/programs/explorer/systray.c
 @@ -1206,6 +1206,68 @@

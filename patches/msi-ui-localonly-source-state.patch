@@ -1,7 +1,8 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
 Subject: [PATCH] msi: Normalize Local-only and FollowParent UI Source requests.
 
-AI-assisted (Codex), original code; LGPL-2.1-or-later.
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
 
 Windows v15-3 x64/i686: UI Set(Source) on Local L100 attr8/10 features
 with only Local-only components returns success and keeps Request Local.

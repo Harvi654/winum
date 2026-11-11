@@ -1,7 +1,8 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
 Subject: [PATCH] msi: Reset pre-cost API requests during fresh costing.
 
-AI-assisted (Codex), original code; LGPL-2.1-or-later.
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
 
 UI dependency: apply msi-executeaction-ui-selection-transfer.patch too.
 Windows v15-2/3 now measures the fresh UI handoff. It reconstructs selection

@@ -1,3 +1,17 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] urlmon: Copy the terminating null with the URL in map_url_to_zone.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Before CreateUri reads the copy (AutoCAD's ribbon icons failed at
+random). The read past the buffer is not observable through the API;
+L3 only by the maintainer's decision of 2026-11-11.
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/urlmon-maptozone-null-terminate.md.
+
 --- a/dlls/urlmon/sec_mgr.c
 +++ b/dlls/urlmon/sec_mgr.c
 @@ -564,7 +564,8 @@

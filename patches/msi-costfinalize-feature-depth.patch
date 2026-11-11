@@ -1,7 +1,8 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
 Subject: [PATCH] msi: Reject feature trees deeper than 16 levels at CostFinalize.
 
-AI-assisted (Codex), original code; LGPL-2.1-or-later.
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
 
 Windows 10 x64/i686 depth measurement: Root->DeepRoot->N succeeds for
 N=1..14 (3..16 levels). N=15 (17 levels) and all larger measured chains

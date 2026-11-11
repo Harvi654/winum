@@ -1,7 +1,8 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
 Subject: [PATCH] msi: Select required descendants with one post-cost worklist.
 
-AI-assisted (Codex), original code; LGPL-2.1-or-later.
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
 
 Windows v13/v14 x64/i686: post-cost Local selects required descendants of
 its explicit target and newly promoted ancestors, including attr24/18/26,

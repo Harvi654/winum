@@ -1,7 +1,8 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
 Subject: [PATCH] msi: Reject cyclic feature parents during CostInitialize.
 
-AI-assisted (Codex), original code; LGPL-2.1-or-later.
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
 
 Windows v14 cycle probes0/1 return1603 at CostInitialize without a crash.
 Validate parent links with a linear three-state walk before recursive costing

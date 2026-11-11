@@ -1,5 +1,15 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msxml3: Use the schema target namespace in MSXML6 schema caches.
+
+AI-assisted (Claude, Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
 MSXML6-only cache namespace adoption with Windows reference tests.
 AI-assisted; LGPL-2.1-or-later. Native MSXML3 XSD and unrelated error mapping differences remain todo_wine.
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/msxml3-schema-cache-namespace.md.
 
 --- a/dlls/msxml3/schema.c
 +++ b/dlls/msxml3/schema.c

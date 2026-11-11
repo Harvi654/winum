@@ -1,3 +1,16 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] winex11.drv: Promote managed owners across threads asynchronously.
+
+AI-assisted (Claude, Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Avoids a deadlock between threads (the SOLIDWORKS simulation mesh
+stalled).
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/winex11-owner-managed-async.md.
+
 --- a/dlls/winex11.drv/window.c
 +++ b/dlls/winex11.drv/window.c
 @@ -1206,7 +1206,10 @@

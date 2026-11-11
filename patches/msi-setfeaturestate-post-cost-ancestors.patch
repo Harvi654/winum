@@ -1,7 +1,8 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
 Subject: [PATCH] msi: Promote unselected post-cost Local feature ancestors.
 
-AI-assisted (Codex), original code; LGPL-2.1-or-later.
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
 
 Windows10 v11/v12, x64 and i686: an immediate post-CostFinalize
 SetFeatureState(Local) promotes the entire measured unselected ancestor

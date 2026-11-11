@@ -1,3 +1,16 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ntdll: Return NULL from RtlLocateExtendedFeature2 for a feature that is not enabled.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Checked before the XSAVE area is touched (Inventor's Frame Analysis
+solver crashed on CPUs with compacted XSAVE).
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/ntdll-locate-xstate-feature-enabled.md.
+
 diff --git a/dlls/ntdll/exception.c b/dlls/ntdll/exception.c
 index 1802244..82891af 100644
 --- a/dlls/ntdll/exception.c

@@ -1,3 +1,18 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] rpcrt4: Implement NdrStubCall3 with the NDR syntax of the server info.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Like NdrClientCall3: the NDR format strings from pSyntaxInfo, then the
+existing NdrStubCall2 interpreter; NDR64-only metadata is rejected
+(Inventor's Stress Analysis Mesh View disappeared without a message).
+L3 only by the maintainer's decision of 2026-11-09.
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/rpcrt4-ndrstubcall3.md.
+
 --- a/dlls/rpcrt4/ndr_stubless.c
 +++ b/dlls/rpcrt4/ndr_stubless.c
 @@ -1222,13 +1222,13 @@

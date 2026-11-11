@@ -1,3 +1,16 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] winex11.drv: Use the identity button mapping when the XInput device query fails.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+The X error from XGetDeviceButtonMapping is caught (Inventor's Hole
+command crashed with XI_BadDevice under Xwayland).
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/winex11-xinput-bad-device.md.
+
 --- a/dlls/winex11.drv/mouse.c
 +++ b/dlls/winex11.drv/mouse.c
 @@ -263,31 +263,54 @@

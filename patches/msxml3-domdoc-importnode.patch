@@ -1,3 +1,16 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msxml3: Implement IXMLDOMDocument3::importNode.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+A clone of the node owned by the importing document, without a parent
+(Inventor's Frame Generator created only an empty folder).
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/msxml3-domdoc-importnode.md.
+
 diff --git a/dlls/msxml3/domdoc.c b/dlls/msxml3/domdoc.c
 index 678e00e..ed85d30 100644
 --- a/dlls/msxml3/domdoc.c

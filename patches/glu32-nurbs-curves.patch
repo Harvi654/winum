@@ -1,6 +1,16 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] glu32: Implement NURBS curves.
+
+AI-assisted (Claude, Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
 Curve-only NURBS support, AI-assisted; LGPL-2.1-or-later.
 Original implementation from the public de Boor recurrence; no Mesa/SGI code.
 In functional series following Windows reference checks and local CAD L4 validation.
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/glu32-nurbs-curves.md.
 
 --- a/dlls/glu32/tests/glu.c
 +++ b/dlls/glu32/tests/glu.c

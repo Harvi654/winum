@@ -1,7 +1,8 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
 Subject: [PATCH] msi: Transfer fresh UI selection to execute properties.
 
-AI-assisted (Codex), original code; LGPL-2.1-or-later.
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
 
 Windows v15 x64/i686: ADDLOCAL is replaced by every UI Local request;
 REMOVE contains UI Local-to-Absent changes only. Optional Source uses

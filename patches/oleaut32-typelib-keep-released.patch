@@ -1,4 +1,8 @@
-oleaut32: Keep a released type library read from a file for a while.
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] oleaut32: Keep a released type library read from a file for a while.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
 
 A type library read from a file stays in the typelib cache after its last
 Release (up to 8 of them, the least recently released goes first), and

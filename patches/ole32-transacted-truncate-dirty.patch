@@ -1,3 +1,17 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ole32: Mark a transacted stream entry dirty when its size is set.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+A stream truncated to 0 in a transacted storage lost its data on commit;
+TransactedSnapshotImpl_StreamSetSize now marks the entry dirty when it
+drops the link to the parent's data.
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/ole32-transacted-truncate-dirty.md.
+
 --- a/dlls/ole32/storage32.c
 +++ b/dlls/ole32/storage32.c
 @@ -6385,6 +6385,10 @@ static HRESULT TransactedSnapshotImpl_StreamSetSize(StorageBaseImpl *base,

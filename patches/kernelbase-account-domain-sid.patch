@@ -1,3 +1,16 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] kernelbase: Fail GetWindowsAccountDomainSid with ERROR_NON_ACCOUNT_SID for well-known SIDs.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+As .NET expects, instead of ERROR_INVALID_SID (Inventor's Content Center
+stayed empty and a refresh crashed with Win32Exception: Invalid SID).
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/kernelbase-account-domain-sid.md.
+
 diff --git a/dlls/advapi32/tests/security.c b/dlls/advapi32/tests/security.c
 index 571842b6..eff602b7 100644
 --- a/dlls/advapi32/tests/security.c

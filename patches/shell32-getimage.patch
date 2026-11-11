@@ -1,3 +1,16 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] shell32: Use the registered thumbnail handler in IShellItemImageFactory::GetImage.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+With the file's icon as fallback (Inventor's New/Open dialog showed no
+big icons and an empty preview).
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/shell32-getimage.md.
+
 diff --git a/dlls/shell32/shellitem.c b/dlls/shell32/shellitem.c
 index 93a60d63..9bee3e79 100644
 --- a/dlls/shell32/shellitem.c

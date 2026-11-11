@@ -1,7 +1,8 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
 Subject: [PATCH] msi: Report Local for measured required Source selections.
 
-AI-assisted (Codex), original code; LGPL-2.1-or-later.
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
 
 Windows v14 attr26 Source requests become Local, through API before/after
 costing and ADDSOURCE. Restrict coercion to the measured attr26 combination.

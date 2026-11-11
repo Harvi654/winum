@@ -1,3 +1,16 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ole32: Serialise the structured storage objects of one file with a recursive lock.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Four threads wrote into one compound file at once and Inventor's Frame
+Analysis solver crashed while writing its results.
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/ole32-storage-thread-lock.md.
+
 --- a/dlls/ole32/storage32.h
 +++ b/dlls/ole32/storage32.h
 @@ -360,6 +360,8 @@

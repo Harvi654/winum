@@ -1,3 +1,19 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] combase: Run stub calls in the activation context saved at stub manager creation.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Inventor's Stress Analysis mesher calls back into Inventor on an RPC
+worker without an activation context, so a class from an add-in manifest
+is not found and FEA_Addin_Utils.dll crashes. Known deviation from
+Windows (measured: STA calls run without a context, MTA calls with the
+caller's); kept by the maintainer's decision of 2026-11-10.
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/combase-stub-activation-context.md.
+
 --- a/dlls/combase/combase_private.h
 +++ b/dlls/combase/combase_private.h
 @@ -237,6 +237,7 @@

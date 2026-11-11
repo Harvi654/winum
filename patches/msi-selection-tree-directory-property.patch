@@ -1,3 +1,17 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msi: Keep the resolved directory property when a SelectionTree control binds it.
+
+AI-assisted (Claude, Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Browse indirection still follows the selected feature (the SOLIDWORKS
+installer's feature tree overwrote INSTALLDIR). Temporary L3-only
+exception by the maintainer's decision of 2026-11-10.
+
+Header added on 2026-11-11, before winum-11.20-1 (the patch body is
+unchanged). Problem, cause, Windows behaviour and validation:
+docs/patches/msi-selection-tree-directory-property.md.
+
 --- a/dlls/msi/dialog.c
 +++ b/dlls/msi/dialog.c
 @@ -634,7 +634,11 @@

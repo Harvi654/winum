@@ -1,7 +1,8 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
 Subject: [PATCH] msi: Select ADDLOCAL ancestors and required descendants.
 
-AI-assisted (Codex), original code; LGPL-2.1-or-later.
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
 
 On a fresh installation, select the ancestors of ADDLOCAL features and
 recursively select UIDisallowAbsent descendants. Optional FollowParent
