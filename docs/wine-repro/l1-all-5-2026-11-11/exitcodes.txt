@@ -1,0 +1,2 @@
+comctl32 toolbar x86_64=1
+comctl32 toolbar i386=0

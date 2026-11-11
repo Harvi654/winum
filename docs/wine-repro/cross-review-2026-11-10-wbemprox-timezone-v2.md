@@ -69,3 +69,13 @@ the same). P2 is a coverage gap to record or close with a MEASURE.
 `test-run/all-1` (run 42788810738): `wbemprox:timezone` 84 checks, 1
 failure per architecture at `timezone.c:186`, the first `win_skip`. P1
 confirmed; see `docs/wine-repro/l2-all-1-2026-11-10/`.
+
+## Re-read of v3 (Claude, 2026-11-11)
+
+v3 (`9c736d1`, Codex) differs from v2 only in the two `win_skip` calls,
+now `skip` (diff checked: the `builtin.c` hunks are byte-identical).
+That is the P1 change requested above. On Windows both are skips, so
+the v2 native L1 (104 checks, 0 failures) stands for v3; L2 all-2 to
+all-5: `wbemprox:timezone` 83 checks, 0 failures, both architectures
+(the UTC container now skips the value comparisons). P2 (no value
+coverage in UTC) stays an open point. Verdict: **approve v3**.

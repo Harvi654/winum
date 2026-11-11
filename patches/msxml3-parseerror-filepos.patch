@@ -1,5 +1,5 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
-Subject: [PATCH] msxml3: Implement IXMLDOMParseError::get_filepos.
+Subject: [PATCH v3] msxml3: Implement IXMLDOMParseError::get_filepos.
 
 AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
 upstream.
@@ -15,10 +15,11 @@ offset of the offending character (0 after loadXML(""), 8 for
 Wine returned E_NOTIMPL. SOLIDWORKS calls get_filepos after loadXML("")
 fails, and the E_NOTIMPL preceded its C++ exception.
 
-The change is limited to get_filepos: Wine does not record error positions
-(filepos stays 0, marked todo_wine), and get_line and get_linepos, which
-still return S_OK without an error, are left as they are (get_errorCode
-and get_reason already return S_FALSE then).
+The change is limited to get_filepos and to recording the parse error of
+an empty string (see the second v2 revision): Wine does not record error
+positions (filepos stays 0, marked todo_wine), and get_line and
+get_linepos, which still return S_OK without an error, are left as they
+are (get_errorCode and get_reason already return S_FALSE then).
 
 v2 (2026-11-08): v1 returned S_OK also without a parse error; its own
 test failed on Windows 10 (L1). Returns S_FALSE then, and the test covers
@@ -36,6 +37,12 @@ get_errorCode) reported no error there, where Windows reports
 0xc00ce558 (XML_E_MISSINGROOT) and get_filepos returns S_OK - the
 SOLIDWORKS case. loadXML of an empty string now records that code; a
 NULL string is left as it was (not measured).
+
+v3 (2026-11-11, after cross review): the test checks the error code
+recorded for loadXML("") directly - get_errorCode returns S_OK and
+0xc00ce558 for DOMDocument30 and DOMDocument60, as measured - so a
+different code no longer passes. The description above now says that
+the empty-string error is part of the change. Implementation unchanged.
 
 --- a/dlls/msxml3/domdoc.c
 +++ b/dlls/msxml3/domdoc.c
@@ -67,7 +74,7 @@ NULL string is left as it was (not measured).
  static HRESULT WINAPI parseError_get_errorXPath(
 --- a/dlls/msxml3/tests/domdoc.c
 +++ b/dlls/msxml3/tests/domdoc.c
-@@ -12935,11 +12935,87 @@
+@@ -12935,11 +12935,103 @@
      free_bstrs();
  }
  
@@ -139,6 +146,22 @@ NULL string is left as it was (not measured).
 +        ok(hr == (loads[i].hr == S_OK ? S_FALSE : S_OK), "Unexpected hr %#lx.\n", hr);
 +        ok(b == (loads[i].hr == S_OK ? VARIANT_FALSE : VARIANT_TRUE), "Unexpected result %d.\n", b);
 +        check_filepos(doc, loads[i].hr, loads[i].filepos, loads[i].todo);
++        if (!loads[i].xml[0])
++        {
++            /* the code Windows records for an empty string */
++            IXMLDOMParseError *error;
++            LONG code = -1;
++
++            hr = IXMLDOMDocument_get_parseError(doc, &error);
++            ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++            if (SUCCEEDED(hr))
++            {
++                hr = IXMLDOMParseError_get_errorCode(error, &code);
++                ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++                ok(code == (LONG)0xc00ce558, "Unexpected error code %#lx.\n", code);
++                IXMLDOMParseError_Release(error);
++            }
++        }
 +        IXMLDOMDocument_Release(doc);
 +        winetest_pop_context();
 +    }
@@ -155,7 +178,7 @@ NULL string is left as it was (not measured).
  
      doc = create_document(&IID_IXMLDOMDocument);
  
-@@ -12953,6 +13029,15 @@
+@@ -12953,6 +13045,15 @@
      todo_wine
      check_interface(error, &IID_IXMLDOMParseError2, FALSE);
  
@@ -171,7 +194,7 @@ NULL string is left as it was (not measured).
      hr = IXMLDOMParseError_get_line(error, NULL);
      ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
  
-@@ -12963,7 +13048,11 @@
+@@ -12963,7 +13064,11 @@
      ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
  
      IXMLDOMParseError_Release(error);

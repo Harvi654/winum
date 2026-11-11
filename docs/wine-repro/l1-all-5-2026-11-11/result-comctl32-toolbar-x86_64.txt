@@ -1,0 +1,7 @@
+toolbar.c:3495: Test failed: WM_PAINT without TBSTYLE_TRANSPARENT: the msg sequence is not complete: expected 0000 - actual 007f
+toolbar.c:3495: Failed sequence WM_PAINT without TBSTYLE_TRANSPARENT:
+toolbar.c:3495:   0: expected: 004e id 0 - actual: 004e wp 00000000 lp b001fecf0 id 88
+toolbar.c:3495:   1: expected: nothing - actual: 007f wp 00000002 lp 00000000 id 127
+toolbar.c:3495:   2: expected: nothing - actual: 007f wp 00000000 lp 00000000 id 127
+v6util.h:92: created cc6.manifest
+04c0:toolbar: 11108 tests executed (0 marked as todo, 0 as flaky, 1 failure), 0 skipped.

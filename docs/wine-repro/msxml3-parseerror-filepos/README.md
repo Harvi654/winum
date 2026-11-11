@@ -21,6 +21,6 @@ MEASURE bundle workflow.
 column). Results: `windows-2026-11-08/`.
 
 Wine 11.20: the parse error object keeps only the code and the reason, so
-line, linepos and filepos are always 0, and its getters return S_OK also
-without an error. Candidate v2 of the patch:
-`patches/candidates/msxml3-parseerror-filepos-v2/`.
+line, linepos and filepos are always 0; without an error `get_errorCode`
+and `get_reason` return S_FALSE (as on Windows), `get_line` and
+`get_linepos` S_OK (corrected 2026-11-11, cross review P3). Candidate of the patch: `patches/candidates/msxml3-parseerror-filepos-v3/`.
