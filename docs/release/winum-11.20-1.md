@@ -87,15 +87,16 @@ candidate that may be promoted with them (see notes).
 2. ~~L3 reproducers~~ - run 2026-11-11 (run 42999903587, KDE Wayland,
    [record](../wine-repro/l3-ci-2026-11-11/README.md)), results on the
    patch pages: NdrStubCall3 as designed (the expected ndr64-only code in
-   L3.md was a wrong prediction, corrected); flush-putimage X side
-   confirmed, pixels inconclusive; shape-alpha eligibility as designed,
+   L3.md was a wrong prediction, corrected); flush-putimage explicit
+   XFlush-call behavior confirmed (not delivery timing), pixels inconclusive;
+   shape-alpha eligibility as designed,
    visual bug unreproduced on this compositor; **xinput-bad-device
    uncovered** (Wine never called the legacy device queries, so the fault
    was not raised). The l3-only markers rest on the missing Windows
    counterpart, not on these runs. Maintainer decision 2026-11-11: the
-   uncovered XInput branch does not block the tag (no Windows counterpart;
-   the patch fixed Inventor's crash at Hole); Codex adjusts the
-   reproducer after the release (open point below).
+   uncovered XInput branch does **not block winum-11.20-1**, retaining
+   the Hole-command L4 and the no-Windows-counterpart reason. Codex will
+   revise the fixture after release to trigger an actual mapping query.
 3. ~~Maintainer: the l3-only reason for urlmon-maptozone-null-terminate~~ -
    approved 2026-11-11.
 4. Maintainer: approval of this overview (or entries struck).
@@ -135,15 +136,15 @@ without a local Wine build (`build-l3.yml`, `scripts/run-l3-local.sh`).
   resumes).
 - Deferred L4: SOLIDWORKS (server input, parseerror, wininet, header,
   owner-draw, mshtml, msi tree) and AutoCAD (urlmon x2).
-- Open measurements: msi selection tree (temporary l3-only); combase
+- Open measurements: XInput mapping-query fixture trigger and same-PID
+  fault coverage (post-release, non-blocking maintainer decision above);
+  msi selection tree (temporary l3-only); combase
   conforming replacement (known deviation); mspatcha decoder fixtures
   (l3-only); Wine's width wrap of vertical toolbars before `TB_SETROWS`;
   the 3+4/4-rows setrows case; wbemprox values outside standard time;
-  winex11-xinput-bad-device L3: the reproducer did not reach the patched
-  branch on KDE Wayland (Wine never called the legacy device queries);
-  Codex makes the fixture provoke the mapping query and the run is
-  repeated (maintainer decision 2026-11-11); PutImage pixel sampling of
-  the composited output.
+  a validated PutImage pixel-observation method (presentation timing
+  remains inconclusive). Codex owns the XInput fixture revision above;
+  a source-device switch is a proposed trigger, not a verified solution.
 - Wine bug reports (words only, AGENTS.md) for the fixes with a clean
   synthetic test, starting with toolbar `TB_SETROWS`/button size and the
   show/hide mouse move.

@@ -109,3 +109,18 @@ prefixes, runtimes and raw output, including on interruption. Only the
 filtered summary remains. Application prefixes and installed Wine are not
 changed. A timeout or absent required observer/fault evidence remains
 inconclusive; use the interpretation above before recording L3 success.
+
+## Run 42999903587 and post-release follow-up (2026-11-11)
+
+The [reviewed collection](../l3-ci-2026-11-11/README.md) has two XI_HOOK
+records per mode/build but no XI_CALL or FAULT, even in observe mode.
+Clicks worked; the legacy query and patched error branch remain uncovered.
+
+Maintainer decision: this does not block the winum-11.20-1 tag. The
+l3-only basis is no Windows counterpart, and the patch fixed the reported
+Inventor Hole command crash. After release, revise the fixture/procedure
+to trigger an actual mapping query; investigate a source-device switch
+without treating it as an already working trigger. Require an observe
+call control followed by same-PID fault coverage and matched-build
+fallback/survival/raw-input results. The follow-up remains open; no fixture
+code change or new fault-injection pass is claimed now.

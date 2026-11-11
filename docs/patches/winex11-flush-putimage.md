@@ -29,7 +29,7 @@ fixture and independent observer are in
 | L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
 | L1 | L3 only: Windows has no Xlib request buffer or Wine X11 driver |
 | L2 | not recorded per patch |
-| L3 | reproducer added 2026-11-09; 2026-11-11, [run 42999903587](../wine-repro/l3-ci-2026-11-11/README.md), KDE Wayland: X side confirmed (without the patch PutImage waits 1.7-7.7 s for an unrelated flush, with it 0 ms); pixel sampling inconclusive (DC read stayed at background in both builds) |
+| L3 | reproducer added 2026-11-09; 2026-11-11, [run 42999903587](../wine-repro/l3-ci-2026-11-11/README.md), KDE Wayland: explicit XFlush-call behavior confirmed (next same-writer/display XFlush 1.7-7.7 s later without the patch, same millisecond tick with it; actual buffer residence/delivery not measured); pixel sampling inconclusive (DC read stayed at background in both builds) |
 | L4 | Fixed with `--disable-gpu`; with WebView2's GPU process another path still lags. (Inventor, maintainer) |
 | L5 | in Inventor's runtime since `wine-11.19-1` (2026-10-19); a week of use not formally recorded - maintainer to confirm |
 | Cross review | not recorded (written before the cross-review rule) |
