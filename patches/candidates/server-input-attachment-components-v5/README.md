@@ -1,5 +1,7 @@
 # Server input attachment components v5: isolate first-child window choice
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 Candidate only, final test adjustment (round 3). Supersedes v4 for further
 validation. Production patches/series, its patch and the missing test
 marker remain unchanged. Server implementation and all 592 literal native

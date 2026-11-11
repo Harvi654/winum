@@ -1,6 +1,6 @@
 # oleaut32-typedesc-pointee.patch
 
-<!-- winum-test: missing -->
+<!-- winum-test: l1 -->
 
 **Problem as the user saw it:** Inventor's Design Accelerator (Shaft,
 gears, ...) said "Failed to create shaft". Its add-in could not register
@@ -29,11 +29,12 @@ named the method. Details in Autodesk-Inventor-for-Linux,
 
 | Level | Result | Date, build |
 | --- | --- | --- |
-| L0 | v1 in Inventor `wine-11.20-6`; v2 full build in winum CI ([run 42179812897](https://github.com/Harvi654/winum/actions/runs/42179812897), `e8e73d4`, both architectures, no fuzz) | 2026-10-16 (v1); 2026-11-06 (v2) |
-| L1 | no Wine test yet | open |
-| L2 | v2 x86_64: `typelib` 7724/0, `tmarshal` 754/0 (Codex review build, same results with and without the cache candidate); i686 open | 2026-11-06 |
-| L4 | v1: Design Accelerator Shaft works in Inventor 2026/2027 | 2026-10 |
+| L0 | v1 in Inventor `wine-11.20-6`; v2 full build in winum CI ([run 42179812897](https://github.com/Harvi654/winum/actions/runs/42179812897), `e8e73d4`, both architectures, no fuzz); winum-11.20-1 series (promoted 2026-11-11): every entry applies with `--fuzz=0` on the official 11.20 archive; the tree is identical to that of `test-run/all-6` (run 42997560598) | 2026-10-16 (v1); 2026-11-06 (v2) |
+| L1 | 2026-11-09, both arch (promoted file: `oleaut32-typedesc-pointee-v3`) | 2026-11-11 |
+| L2 | v2 x86_64: `typelib` 7724/0, `tmarshal` 754/0 (Codex review build, same results with and without the cache candidate); i686 open; winum-11.20-1: ok (`oleaut32:typelib`) | 2026-11-06 |
+| L4 | v1: Design Accelerator Shaft works in Inventor 2026/2027; winum-11.20-1: Design Accelerator (all-1) | 2026-10 |
 | L5 | v1: in use since October 2026 | |
+| Cross review | Claude, approve | 2026-11-11 |
 
 ## Open points
 
@@ -53,6 +54,8 @@ stores a pointer parameter whose pointee is `VT_ARRAY | vt` as a simple type. Wi
 library with such a parameter.
 
 ## History
+
+- **2026-11-11, promoted** into `patches/series` for winum-11.20-1 from `oleaut32-typedesc-pointee-v3` (maintainer approval of `docs/release/winum-11.20-1.md` at `ef64451`).
 
 - **v3 candidate, 2026-11-09:** the stored-description compatibility test
   passed Windows 10 L1 in both architectures: 31 tests, zero failures/skips

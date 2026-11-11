@@ -1,5 +1,7 @@
 # comctl32 status-bar background v2 candidate
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1 (merged with v1 into one file, `patches/comctl32-statusbar-erase-background.patch`). This folder stays as the record of the candidate.
+
 Original, AI-assisted (Codex), LGPL-2.1-or-later. Not submitted upstream.
 Candidate only: **not in `patches/series`**. Claude's cross review and Windows
 10 L1 passed (see below); paired L2 remains pending. No RX 6400 fixture work

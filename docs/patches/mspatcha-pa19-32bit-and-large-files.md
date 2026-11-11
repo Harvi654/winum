@@ -125,3 +125,7 @@ below/equal/above the reference window, require actual old-prefix references,
 compare the entire result, and include corrupt/truncated/wrong-old controls.
 Then measure native ApplyPatchToFile* and run the same fixtures on Wine.
 No such new decoder test or native pass is claimed in this proposal.
+
+## History
+
+- **2026-11-11:** the production file is replaced by the `mspatcha-signature-v2` candidate (adds the signature test; L1 50/0 and L2 50/0, both architectures; Claude approve). The marker stays l3-only for the PA19 decoder (maintainer, 2026-11-11).

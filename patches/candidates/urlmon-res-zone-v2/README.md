@@ -1,5 +1,7 @@
 # urlmon res: zone v2 (candidate)
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 Replaces `patches/urlmon-res-zone-local-machine.patch` (same file name,
 so it can be swapped in on a test branch). Its test is the one from
 `patches/tests-first/urlmon-tests-res-zones.patch`, with `todo_wine` on

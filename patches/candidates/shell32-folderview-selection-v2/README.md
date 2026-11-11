@@ -1,5 +1,7 @@
 # Shell folder-view selection v2: Windows-derived functional test
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 Original, AI-assisted (Codex), LGPL-2.1-or-later. Candidate only; production
 patch, test marker and patches/series are unchanged. Initial work was saved
 as WIP in 0776d2c before completion of this candidate's documentation/checks.

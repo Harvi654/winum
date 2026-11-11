@@ -1,5 +1,7 @@
 # Activation-context threading-model case v2: conformance test
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 Original, AI-assisted (Codex), LGPL-2.1-or-later. Candidate only, not submitted
 upstream. Replace `ntdll-actctx-threadingmodel-case.patch` in a private recipe
 with this file; do not apply both. The parser implementation is unchanged from

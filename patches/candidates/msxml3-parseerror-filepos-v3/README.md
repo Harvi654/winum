@@ -1,5 +1,7 @@
 # msxml3-parseerror-filepos v3 (candidate)
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 Replaces `patches/msxml3-parseerror-filepos.patch` after review and
 validation. v2 with one more test check, after Codex's review of the
 current v2 (`docs/wine-repro/cross-review-2026-11-09-msxml3-parseerror-v2.md`,

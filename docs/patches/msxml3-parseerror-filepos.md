@@ -1,6 +1,6 @@
 # msxml3-parseerror-filepos.patch
 
-<!-- winum-test: missing -->
+<!-- winum-test: l1 -->
 
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
@@ -24,13 +24,13 @@ SOLIDWORKS Installation Manager stopped with a fatal exception after the serial 
 
 | Level | Result |
 | --- | --- |
-| L0 | full builds full-1/full-2 |
-| L1 | **fails on Windows** (Windows 10 VM (Mac host), L1 bundle of run 42483162074 (2026-11-08)): `domdoc.c:12959` - for a document without a parse error Windows returns S_FALSE from `get_filepos` (filepos 0), the patch returns S_OK; both architectures. Needs a MEASURE and v2 |
-| L2 | not recorded |
+| L0 | full builds full-1/full-2; winum-11.20-1 series (promoted 2026-11-11): every entry applies with `--fuzz=0` on the official 11.20 archive; the tree is identical to that of `test-run/all-6` (run 42997560598) |
+| L1 | v3 all-6 36900/0 both architectures (promoted file: `msxml3-parseerror-filepos-v3` (2026-11-11: the empty-string `get_errorCode` check for both classes, wording; implementation as v2)) |
+| L2 | not recorded; winum-11.20-1: v3 all-6: no new failure |
 | L3 | 32/64-bit standalone probes, three fixtures |
-| L4 | Installation Manager passes the serial step; combined smoke |
+| L4 | Installation Manager passes the serial step; combined smoke; winum-11.20-1: SOLIDWORKS, deferred |
 | L5 | in use since 2026-10-28 (maintainer to confirm) |
-| Cross review | not recorded (written before the cross-review rule) |
+| Cross review | Codex: v2 approved with P2/P3; v3 approved (`e1635a1`) |
 
 ## Open points
 
@@ -40,3 +40,6 @@ Stored positions can still be zero.
 
 Solidworks-for-Linux `docs/wine-repro/msxml-filepos/README.md`; overview in `docs/patch-status.md`.
 
+## History
+
+- **2026-11-11, promoted** into `patches/series` for winum-11.20-1 from `msxml3-parseerror-filepos-v3` (2026-11-11: the empty-string `get_errorCode` check for both classes, wording; implementation as v2) (maintainer approval of `docs/release/winum-11.20-1.md` at `ef64451`).

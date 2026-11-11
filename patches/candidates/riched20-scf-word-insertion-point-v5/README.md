@@ -1,5 +1,7 @@
 # riched20-scf-word-insertion-point v5: class flag initialised
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 Candidate only: `patches/series`, the production patch and its page marker
 are unchanged. Substitute `riched20-scf-word-insertion-point.patch` from
 this folder for the production file at its place in the series (entry 23).

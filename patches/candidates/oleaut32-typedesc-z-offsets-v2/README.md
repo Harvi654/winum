@@ -1,5 +1,7 @@
 # MSFT type description offsets v2: reader compatibility test
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 Original, AI-assisted (Codex), LGPL-2.1-or-later. Candidate only, not submitted
 upstream. Replace the production `oleaut32-typedesc-z-offsets.patch` in a
 private recipe with this file; do not apply both. All three implementation

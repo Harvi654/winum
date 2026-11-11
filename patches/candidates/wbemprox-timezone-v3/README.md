@@ -1,5 +1,7 @@
 # Win32_TimeZone v3: environment skips stay skips on Wine
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 Candidate only; production patch, patches/series and marker are unchanged.
 Supersedes [v2](../wbemprox-timezone-v2/README.md) for further validation.
 The implementation, measured native values and test conditions are exactly

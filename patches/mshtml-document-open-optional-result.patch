@@ -1,3 +1,24 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: mshtml: Accept an omitted document open result.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Our own Windows 10 x86_64/i686 MEASURE opens fresh, initialized and loaded
+HTML documents successfully with either a supplied result pointer or NULL.
+A supplied pointer receives a non-NULL dispatch, but callers may omit it.
+Wine unconditionally writes through the pointer before checking the document
+and again when returning the successful window result. Guard both writes
+and acquire the output reference only when a result was requested.
+
+v2 (2026-11-09): Keep the production guards unchanged and add a Wine test
+beside the existing document open tests. Use fresh copies of our loaded,
+ready HTML for the positive control and NULL case, checking the measured
+S_OK and usable parent window before and after close. Do not assert a
+returned dispatch interface type unrelated to this fix. These assertions
+still need native L1 and paired Wine runtime validation. Unpatched Wine
+faults at the unconditional NULL output write; do not skip that call or
+turn the fault into an expected Windows result. No production series change.
+
 --- a/dlls/mshtml/htmldoc.c
 +++ b/dlls/mshtml/htmldoc.c
 @@ -1443,7 +1443,7 @@
@@ -22,3 +43,137 @@
      return S_OK;
  }
  
+--- a/dlls/mshtml/tests/dom.c
++++ b/dlls/mshtml/tests/dom.c
+@@ -7565,6 +7565,122 @@
+     IHTMLTxtRange_Release(range);
+ }
+ 
++static void test_doc_open_optional_result(void)
++{
++    static const char html[] = "<html><head><title>Winum fixture</title></head><body></body></html>";
++    unsigned int omit_result;
++
++    for(omit_result = 0; omit_result < 2; omit_result++) {
++        IHTMLDocument2 *doc = NULL;
++        IPersistStreamInit *persist = NULL;
++        IUnknown *identity = NULL;
++        IHTMLWindow2 *window = NULL;
++        IDispatch *result = NULL;
++        IStream *stream = NULL;
++        BOOL complete = FALSE;
++        BSTR mime = NULL;
++        HGLOBAL memory;
++        VARIANT omitted;
++        DWORD start;
++        HRESULT hr;
++        void *bytes;
++
++        hr = CoCreateInstance(&CLSID_HTMLDocument, NULL, CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER,
++                &IID_IHTMLDocument2, (void **)&doc);
++        ok(hr == S_OK, "Mode %u: CoCreateInstance returned %#lx.\n", omit_result, hr);
++        if(FAILED(hr) || !doc)
++            goto next_case;
++        hr = IHTMLDocument2_QueryInterface(doc, &IID_IUnknown, (void **)&identity);
++        ok(hr == S_OK, "Mode %u: IUnknown query returned %#lx.\n", omit_result, hr);
++        if(FAILED(hr))
++            goto next_case;
++        hr = IHTMLDocument2_QueryInterface(doc, &IID_IPersistStreamInit, (void **)&persist);
++        ok(hr == S_OK, "Mode %u: IPersistStreamInit query returned %#lx.\n", omit_result, hr);
++        if(FAILED(hr))
++            goto next_case;
++
++        memory = GlobalAlloc(GMEM_MOVEABLE, sizeof(html) - 1);
++        ok(memory != NULL, "Mode %u: GlobalAlloc failed.\n", omit_result);
++        if(!memory)
++            goto next_case;
++        bytes = GlobalLock(memory);
++        ok(bytes != NULL, "Mode %u: GlobalLock failed.\n", omit_result);
++        if(!bytes) {
++            GlobalFree(memory);
++            goto next_case;
++        }
++        memcpy(bytes, html, sizeof(html) - 1);
++        GlobalUnlock(memory);
++        hr = CreateStreamOnHGlobal(memory, TRUE, &stream);
++        ok(hr == S_OK, "Mode %u: CreateStreamOnHGlobal returned %#lx.\n", omit_result, hr);
++        if(FAILED(hr)) {
++            GlobalFree(memory);
++            goto next_case;
++        }
++        hr = IPersistStreamInit_Load(persist, stream);
++        ok(hr == S_OK, "Mode %u: Load returned %#lx.\n", omit_result, hr);
++        if(FAILED(hr))
++            goto next_case;
++
++        start = GetTickCount();
++        do {
++            BSTR state = NULL;
++            MSG message;
++
++            hr = IHTMLDocument2_get_readyState(doc, &state);
++            complete = hr == S_OK && state && !lstrcmpiW(state, L"complete");
++            SysFreeString(state);
++            if(FAILED(hr) || complete)
++                break;
++            while(GetTickCount() - start < 5000 && PeekMessageW(&message, NULL, 0, 0, PM_REMOVE)) {
++                TranslateMessage(&message);
++                DispatchMessageW(&message);
++            }
++            Sleep(10);
++        }while(GetTickCount() - start < 5000);
++        ok(hr == S_OK, "Mode %u: get_readyState returned %#lx.\n", omit_result, hr);
++        ok(complete, "Mode %u: document did not finish loading.\n", omit_result);
++        if(!complete)
++            goto next_case;
++
++        hr = IHTMLDocument2_get_parentWindow(doc, &window);
++        ok(hr == S_OK, "Mode %u: parentWindow before open returned %#lx.\n", omit_result, hr);
++        ok(window != NULL, "Mode %u: no parentWindow before open.\n", omit_result);
++        if(FAILED(hr) || !window)
++            goto next_case;
++        IHTMLWindow2_Release(window);
++        window = NULL;
++        mime = SysAllocString(L"text/html");
++        ok(mime != NULL, "Mode %u: SysAllocString failed.\n", omit_result);
++        if(!mime)
++            goto next_case;
++        VariantInit(&omitted);
++        V_VT(&omitted) = VT_ERROR;
++        V_ERROR(&omitted) = DISP_E_PARAMNOTFOUND;
++
++        hr = IHTMLDocument2_open(doc, mime, omitted, omitted, omitted, omit_result ? NULL : &result);
++        ok(hr == S_OK, "Mode %u: open returned %#lx.\n", omit_result, hr);
++        if(!omit_result)
++            ok(result != NULL, "No dispatch returned for a supplied result pointer.\n");
++        if(SUCCEEDED(hr)) {
++            hr = IHTMLDocument2_close(doc);
++            ok(hr == S_OK, "Mode %u: close returned %#lx.\n", omit_result, hr);
++        }
++        hr = IHTMLDocument2_get_parentWindow(doc, &window);
++        ok(hr == S_OK, "Mode %u: parentWindow after close returned %#lx.\n", omit_result, hr);
++        ok(window != NULL, "Mode %u: no parentWindow after close.\n", omit_result);
++
++next_case:
++        if(window) IHTMLWindow2_Release(window);
++        if(result) IDispatch_Release(result);
++        SysFreeString(mime);
++        if(stream) IStream_Release(stream);
++        if(persist) IPersistStreamInit_Release(persist);
++        if(doc) IHTMLDocument2_Release(doc);
++        if(identity) IUnknown_Release(identity);
++    }
++}
++
+ static void test_doc_open(IHTMLDocument2 *doc)
+ {
+     IHTMLElementCollection *col;
+@@ -13928,6 +14044,8 @@
+             CW_USEDEFAULT, CW_USEDEFAULT, 500, 500, NULL, NULL, NULL, NULL);
+ 
+     check_ie();
++
++    test_doc_open_optional_result();
+ 
+     run_domtest(doc_str1, test_doc_elem);
+     run_domtest(doc_str1, test_get_set_attr);

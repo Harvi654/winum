@@ -1,5 +1,7 @@
 # comctl32-header-null-layout v2: NULL members too, and a Windows-derived test
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 Candidate only: `patches/series`, the production patch and its page marker
 are unchanged. Substitute `comctl32-header-null-layout.patch` from this
 folder for the production file at its place in the series (entry 42).

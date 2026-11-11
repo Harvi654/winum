@@ -1,6 +1,6 @@
 # wininet-http-same-position-seek.patch
 
-<!-- winum-test: missing -->
+<!-- winum-test: l1 -->
 
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
@@ -30,13 +30,13 @@ The candidate is not yet in patches/series.
 
 | Level | Result |
 | --- | --- |
-| L0 | full builds full-1/full-2 |
-| L1 | 2026-11-09: v2 exact-body test passes on offline Windows 10 x86_64/i686, 200 checks / zero failures / 12 cases / 12 requests / exit 0 each (96d3ca3 sources). Production has no test until candidate promotion. |
-| L2 | not recorded |
+| L0 | full builds full-1/full-2; winum-11.20-1 series (promoted 2026-11-11): every entry applies with `--fuzz=0` on the official 11.20 archive; the tree is identical to that of `test-run/all-6` (run 42997560598) |
+| L1 | 200/0, both arch (promoted file: `wininet-same-position-seek-v2`) |
+| L2 | not recorded; winum-11.20-1: ok (`wininet:http`) |
 | L3 | x64 probe 42/48 -> 48/48 fixtures |
-| L4 | media list retrieved, download reached 97% (completion not confirmed); combined smoke |
+| L4 | media list retrieved, download reached 97% (completion not confirmed); combined smoke; winum-11.20-1: SOLIDWORKS, deferred |
 | L5 | in use since 2026-10-28 (maintainer to confirm) |
-| Cross review | not recorded (written before the cross-review rule) |
+| Cross review | Claude, approve |
 
 ## Open points
 
@@ -49,3 +49,6 @@ the candidate or change the production test marker.
 
 Solidworks-for-Linux `docs/wine-repro/wininet-body/same-position-seek.md`; overview in `docs/patch-status.md`.
 
+## History
+
+- **2026-11-11, promoted** into `patches/series` for winum-11.20-1 from `wininet-same-position-seek-v2` (maintainer approval of `docs/release/winum-11.20-1.md` at `ef64451`). Open: chunked/close-delimited seeks todo_wine.

@@ -1,6 +1,6 @@
 # oleaut32-typedesc-z-offsets.patch
 
-<!-- winum-test: missing -->
+<!-- winum-test: l1 -->
 
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
@@ -29,13 +29,13 @@ vendor type library is used.
 
 | Level | Result |
 | --- | --- |
-| L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06) |
-| L1 | Corrected candidate body: Windows 10 x86_64/i686, 40095 checks each, 0 failures, exit 0 (2026-11-09; assertion revision 1ef60e0, combined recipe at 8400e60). Original body passed 40091 checks. Production has no integrated test yet |
-| L2 | not recorded per patch |
+| L0 | Inventor Wine release `wine-11.19-1` (2026-10-19, CI) and later; winum CI, full build of the 27-patch series, both architectures, no fuzz (2026-11-06); winum-11.20-1 series (promoted 2026-11-11): every entry applies with `--fuzz=0` on the official 11.20 archive; the tree is identical to that of `test-run/all-6` (run 42997560598) |
+| L1 | 40095/0, both arch (promoted file: `oleaut32-typedesc-z-offsets-v2`) |
+| L2 | not recorded per patch; winum-11.20-1: ok (4 expected size todos) |
 | L3 | not recorded |
-| L4 | Design Accelerator Shaft works. (Inventor, maintainer) |
+| L4 | Design Accelerator Shaft works. (Inventor, maintainer); winum-11.20-1: Design Accelerator (all-1) |
 | L5 | in Inventor's runtime since `wine-11.19-1` (2026-10-19); a week of use not formally recorded - maintainer to confirm |
-| Cross review | not recorded (written before the cross-review rule) |
+| Cross review | Claude, approve |
 
 ## Open points
 
@@ -49,6 +49,8 @@ Autodesk-Inventor-for-Linux [`docs/arch-hyprland.md`](https://github.com/Harvi65
 
 
 ## History
+
+- **2026-11-11, promoted** into `patches/series` for winum-11.20-1 from `oleaut32-typedesc-z-offsets-v2` (maintainer approval of `docs/release/winum-11.20-1.md` at `ef64451`). Open: writer leaves record size 0 (separate gap).
 
 - 2026-11-09: Recorded complete native MEASURE and assertion L1 for the v2
   candidate. All three production implementation hunks are unchanged; both

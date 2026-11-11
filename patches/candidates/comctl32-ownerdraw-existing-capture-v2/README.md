@@ -1,5 +1,7 @@
 # comctl32-ownerdraw-existing-capture v2: Windows order instead of a skip
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 Candidate only: `patches/series`, the production patch and its page marker
 are unchanged. Substitute `comctl32-ownerdraw-existing-capture.patch` from
 this folder for the production file at its place in the series (entry 45).

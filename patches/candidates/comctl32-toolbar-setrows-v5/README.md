@@ -1,5 +1,7 @@
 # comctl32-toolbar-setrows-wrapable v5 (candidate)
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 v4 with `TB_SETROWS` no longer recalculating the button size. Applies
 after `comctl32-toolbar-padding-height-v5`. Written by Claude, 2026-11-10.
 

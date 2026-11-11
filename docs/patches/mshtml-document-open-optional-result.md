@@ -1,6 +1,6 @@
 # mshtml-document-open-optional-result.patch
 
-<!-- winum-test: missing -->
+<!-- winum-test: l1 -->
 
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
@@ -30,13 +30,13 @@ The production marker stays missing because that test is not promoted.
 
 | Level | Result |
 | --- | --- |
-| L0 | full builds full-1/full-2 |
-| L1 | v2 candidate: Windows 10 x86_64/i686, 34 checks each, 0 failures, exit 0 in both returned result sets (2026-11-09). Production has no integrated test yet |
-| L2 | not recorded |
+| L0 | full builds full-1/full-2; winum-11.20-1 series (promoted 2026-11-11): every entry applies with `--fuzz=0` on the official 11.20 archive; the tree is identical to that of `test-run/all-6` (run 42997560598) |
+| L1 | 34/0, both arch (promoted file: `mshtml-document-open-optional-result-v2`) |
+| L2 | not recorded; winum-11.20-1: ok with pinned Gecko since all-2 (`mshtml:dom` 44107 -> 44140) |
 | L3 | compiled; Gecko-dependent probes not run |
-| L4 | Simulation study, mesh, solver, results |
+| L4 | Simulation study, mesh, solver, results; winum-11.20-1: SOLIDWORKS Simulation, deferred |
 | L5 | in use since 2026-10-28 (maintainer to confirm) |
-| Cross review | not recorded (written before the cross-review rule) |
+| Cross review | Claude, approve |
 
 ## Open points
 
@@ -51,6 +51,8 @@ Solidworks-for-Linux `docs/wine-repro/mshtml-open/README.md`; overview in `docs/
 
 
 ## History
+
+- **2026-11-11, promoted** into `patches/series` for winum-11.20-1 from `mshtml-document-open-optional-result-v2` (maintainer approval of `docs/release/winum-11.20-1.md` at `ef64451`). Open: loaded state only in the test.
 
 - 2026-11-09: Recorded native public-API MEASURE and exact-body assertion L1
   for the v2 candidate. Both architectures passed 34 checks in two returned

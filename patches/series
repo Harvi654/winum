@@ -3,8 +3,9 @@
 # patches/ is applied. Each patch has a status page in docs/patches/<name>.md
 # with its validation levels; docs/patches/README.md is the overview.
 
-# From Autodesk-Inventor-for-Linux (its wine-11.20-6, alphabetical); the
-# oleaut32 typedesc-pointee patch is v2 here.
+# From Autodesk-Inventor-for-Linux (its wine-11.20-6, alphabetical). From
+# winum-11.20-1, 21 of them are the promoted candidates of
+# docs/release/winum-11.20-1.md (oleaut32 typedesc-pointee is v3).
 combase-stub-activation-context.patch
 comctl32-statusbar-erase-background.patch
 comctl32-toolbar-padding-height.patch

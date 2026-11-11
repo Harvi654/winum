@@ -1,5 +1,7 @@
 # server-mousemove-on-show-hide v5 (candidate)
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 v4 with the test's counts bounded after two Windows runs. Server change
 unchanged (32 ms default, L4 in Inventor passed). Written by Claude,
 2026-11-10.

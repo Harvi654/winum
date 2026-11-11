@@ -2,4 +2,5 @@
 # applies them to both variants, after patches/series, so a test run shows
 # what vanilla Wine and the series fail. Never in a normal build: when the
 # fix is ready, the test moves into the fix's patch and out of this list.
-urlmon-tests-res-zones.patch
+# urlmon-tests-res-zones.patch: moved into urlmon-res-zone-local-machine.patch
+# (winum-11.20-1); the file stays as the record.

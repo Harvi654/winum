@@ -1,5 +1,7 @@
 # mshtml document open optional result: v2 candidate
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 Original, AI-assisted (Codex), LGPL-2.1-or-later. Not submitted upstream.
 This candidate keeps the production implementation unchanged and adds a
 Windows-derived conformance test. It is not in the production series.

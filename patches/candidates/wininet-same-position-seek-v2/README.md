@@ -1,5 +1,7 @@
 # HTTP same-position seek v2: Windows-derived body-continuity test
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 Original, AI-assisted (Codex), LGPL-2.1-or-later. Candidate only; the
 production patch, test marker and patches/series are unchanged.
 

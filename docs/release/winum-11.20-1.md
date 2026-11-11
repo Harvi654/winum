@@ -99,12 +99,16 @@ candidate that may be promoted with them (see notes).
    revise the fixture after release to trigger an actual mapping query.
 3. ~~Maintainer: the l3-only reason for urlmon-maptozone-null-terminate~~ -
    approved 2026-11-11.
-4. Maintainer: approval of this overview (or entries struck).
+4. ~~Maintainer: approval of this overview~~ - approved in full on
+   2026-11-11 (at `ef64451`): all 21 candidates and markers as proposed.
 
 The L3 reproducers (item 2) were prepared by Codex so that they run
 without a local Wine build (`build-l3.yml`, `scripts/run-l3-local.sh`).
 
 ## Promotion steps (after approval, one commit on `main`)
+
+Done 2026-11-11, steps 1-5 in one commit; step 6 and the results are
+recorded under "Promotion record" below.
 
 1. Copy each candidate file over its production file in `patches/` (table
    above, and mspatcha-signature-v2 for entry 7). For the status bar:
@@ -231,3 +235,19 @@ Also, the valid markers on #61/#62 do not erase their other-consumer L4:
 both patch pages still list SOLIDWORKS open (OpenGL viewport for #62).
 Record these as deferred under current policy, including the #62 format
 selection risk, rather than omitting them from the deferred-L4 list.
+
+## Promotion record (2026-11-11)
+
+- Steps 1-3: the 20 candidates and `mspatcha-signature-v2` are copied over
+  their production files, byte-identical to the files tested in
+  `test-run/all-6`; the status bar is one file (v1 + `0001` + `0002`).
+  `urlmon-tests-res-zones.patch` is commented out of
+  `patches/tests-first/series` (the file stays). 21 pages have their
+  marker, validation rows and a history entry; the candidate folders say
+  "Promoted".
+- Step 4: `WINUM_BUILD=1`.
+- Step 5: all 62 entries apply with `--fuzz=0` on Wine 11.20; the
+  resulting tree is identical (`diff -r`) to the tree of `test-run/all-6`
+  (64 entries: the status bar there was two incremental files at the
+  end). `bash -n scripts/*.sh` passes; `scripts/check-series.sh` without
+  `--report`: 62 of 62, exit 0.

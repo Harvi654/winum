@@ -1,5 +1,7 @@
 # Typedesc pointee v3: native representation correction
 
+> **Promoted 2026-11-11** into `patches/series` for winum-11.20-1. This folder stays as the record of the candidate.
+
 Original, AI-assisted (Codex), LGPL-2.1-or-later. Candidate only; not submitted
 upstream. Replaces the production `oleaut32-typedesc-pointee.patch` in a private
 recipe, **not** an incremental patch to apply after it. No series or L1 marker

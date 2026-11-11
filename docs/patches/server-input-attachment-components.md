@@ -1,6 +1,6 @@
 # server-input-attachment-components.patch
 
-<!-- winum-test: missing -->
+<!-- winum-test: l1 -->
 
 *Status page. Levels as in winum's AGENTS.md. "Not recorded" means no result was written down, not that the check failed.*
 
@@ -41,13 +41,13 @@ contains no test, so its marker remains missing until candidate promotion.
 
 | Level | Result |
 | --- | --- |
-| L0 | SOLIDWORKS full builds (full-1 2026-10-25, full-2 2026-10-26) |
-| L1 | production v1 has no test; separate v2 candidate passed Windows 10 x86_64/i386 (10195 checks each, 0 failures, 2026-11-09) |
-| L2 | v2 run 42695491325: attachment finishes but fails 2377 (i386) / 2370 (x86_64) active/focus checks; four new i386 win mouse-message failures; not cleared |
+| L0 | SOLIDWORKS full builds (full-1 2026-10-25, full-2 2026-10-26); winum-11.20-1 series (promoted 2026-11-11): every entry applies with `--fuzz=0` on the official 11.20 archive; the tree is identical to that of `test-run/all-6` (run 42997560598) |
+| L1 | 16719/0, both arch (promoted file: `server-input-attachment-components-v5`) |
+| L2 | v2 run 42695491325: attachment finishes but fails 2377 (i386) / 2370 (x86_64) active/focus checks; four new i386 win mouse-message failures; not cleared; winum-11.20-1: ok (`user32:attachment` 12039, 16 todo; neighbouring suites) |
 | L3 | graph shim: 61,458 cases incl. allocation failures, 0 invariant failures, ASan/UBSan |
-| L4 | four GUI probes and typing in Installation Manager; combined CAD smoke |
+| L4 | four GUI probes and typing in Installation Manager; combined CAD smoke; winum-11.20-1: Inventor smoke (all-1); SOLIDWORKS deferred |
 | L5 | in use since 2026-10-28 (maintainer to confirm a week) |
-| Cross review | not recorded (written before the cross-review rule) |
+| Cross review | Claude, approve |
 
 ## Open points
 
@@ -79,3 +79,7 @@ Expected native rows and implementation are unchanged. Revised native L1,
 paired L2 and cross review remain pending; the production marker is not
 promoted. The round-2 original JSON has first messages per source line,
 so later contexts' attribution needs verification in the final run.
+
+## History
+
+- **2026-11-11, promoted** into `patches/series` for winum-11.20-1 from `server-input-attachment-components-v5` (maintainer approval of `docs/release/winum-11.20-1.md` at `ef64451`). Open: absolute inactive-state view not available in CI.
