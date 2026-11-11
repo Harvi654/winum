@@ -1,0 +1,61 @@
+name: Build L3 comparison runtimes
+on:
+  workflow_dispatch:
+  push:
+    branches: ['test-run/l3-*']
+permissions:
+  contents: read
+concurrency:
+  group: l3-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  runtimes:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [full, without-putimage, without-shape, without-xinput]
+    steps:
+      - name: Build dependencies
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed git mingw-w64-gcc \
+            alsa-lib libpulse gnutls krb5 dbus fontconfig freetype2 \
+            libx11 libxext libxi libxrandr libxrender libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
+            wayland mesa libglvnd vulkan-icd-loader vulkan-headers \
+            gst-plugins-base-libs sdl2 libcups libgphoto2 sane libpcap v4l-utils pcsclite unixodbc ocl-icd opencl-headers \
+            giflib wine-mono wine-gecko
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Build private comparison recipe
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash scripts/build-l3-ci.sh "$VARIANT" out
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: l3-${{ matrix.variant }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
+  fixtures:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 30
+    steps:
+      - run: pacman -Syu --noconfirm --needed git mingw-w64-gcc libx11 libxi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash scripts/build-l3-fixtures.sh out
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: l3-fixtures
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
