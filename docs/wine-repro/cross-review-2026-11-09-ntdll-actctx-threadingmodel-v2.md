@@ -55,3 +55,16 @@ hunks remain identical. All 62 patches applied at fuzz 0 and both complete
 kernel32 test EXEs plus ntdll DLLs linked. The old 609-check L1 is historical; refreshed native
 reader validation and a paired L2 including kernel32.actctx remain pending.
 This note records the changes, not a replacement reviewer verdict.
+
+## Re-read of the follow-up (Claude, 2026-11-11)
+
+Read the test as it is now (`a8b7724`): `test_com_threading_model_case`
+in `dlls/kernel32/tests/actctx.c`, next to `test_find_com_redirection`,
+using its `comclassredirect_data`. The 21 values x 2 element kinds, the
+expected models and both `todo_wine` (rejection of invalid values,
+defaults of a missing attribute) are those of the reviewed version; the
+parser hunks are unchanged. Cleanup releases the context and deletes
+each manifest, also on early exits. Native L1 of this body: all-2
+bundle, `kernel32:actctx` 3863 checks, 0 failures, both architectures;
+L2: `kernel32` runs in g3 since all-2, no new failure in all-2 to all-5.
+Verdict: **approve the follow-up**; the review gate is closed.
