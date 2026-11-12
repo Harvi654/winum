@@ -1,0 +1,182 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ole32: Return STG_E_INVALIDNAME and STG_E_PATHNOTFOUND, and do not inherit STGM_SIMPLE in sub-storages.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows (measured, Windows 10 22H2, 2026-11-11): StgCreateDocfile and
+StgOpenStorage return STG_E_INVALIDNAME for a name CreateFile rejects with
+ERROR_INVALID_NAME (a '*' or '|', or Autodesk Inventor's pseudo path
+"**<assembly>*LocalDocs*<storage>*<part>.ipt"), and StgCreateDocfile returns
+STG_E_PATHNOTFOUND for a missing directory. A sub-storage opened with
+STGM_SIMPLE can open, create and commit storages and streams inside it;
+opening a missing child returns STG_E_FILENOTFOUND.
+
+Wine returned E_FAIL for every CreateFile error but ERROR_FILE_EXISTS, and
+StorageInternalImpl kept STGM_SIMPLE from the caller's mode, so every
+OpenStorage/CreateStorage inside it returned STG_E_INVALIDFUNCTION. Inventor
+2027 stores a Reference Model part inside the assembly (LocalDocs): it
+opens LocalDocs with STGM_SIMPLE and creates the part's storage there.
+Under Wine LocalDocs stayed empty and the part was unresolved after reopen.
+
+Limited to the measured error codes; other CreateFile errors keep E_FAIL.
+Simple mode keeps restricting a root storage; only sub-storages no longer
+inherit it.
+
+v2 (2026-11-11, after cross review): the tests only check what was
+measured (no output-pointer check after StgOpenStorage with a '*' name and
+after OpenStorage of a missing sub-storage, which were not measured; the
+pseudo-path case keeps its check; the measured open mode for the '*'
+name). Wording of this note corrected 2026-11-12 after the second review.
+
+v4 (2026-11-12, after the second review): the missing directory in
+test_invalid_name carries the process id, so that it surely does not exist.
+
+--- a/dlls/ole32/storage32.c
++++ b/dlls/ole32/storage32.c
+@@ -5610,7 +5610,9 @@
+     newStorage->base.IStorage_iface.lpVtbl = &StorageInternalImpl_Vtbl;
+     newStorage->base.IPropertySetStorage_iface.lpVtbl = &IPropertySetStorage_Vtbl;
+     newStorage->base.baseVtbl = &StorageInternalImpl_BaseVtbl;
+-    newStorage->base.openFlags = (openFlags & ~STGM_CREATE);
++    /* Simple mode only restricts a root storage; a sub-storage opened with
++     * STGM_SIMPLE behaves like a normal one. */
++    newStorage->base.openFlags = (openFlags & ~(STGM_CREATE | STGM_SIMPLE));
+ 
+     newStorage->base.reverted = FALSE;
+ 
+@@ -8604,10 +8606,20 @@
+ 
+   if (hFile == INVALID_HANDLE_VALUE)
+   {
+-    if(GetLastError() == ERROR_FILE_EXISTS)
+-      hr = STG_E_FILEALREADYEXISTS;
+-    else
+-      hr = E_FAIL;
++    switch (GetLastError())
++    {
++      case ERROR_FILE_EXISTS:
++        hr = STG_E_FILEALREADYEXISTS;
++        break;
++      case ERROR_PATH_NOT_FOUND:
++        hr = STG_E_PATHNOTFOUND;
++        break;
++      case ERROR_INVALID_NAME:
++        hr = STG_E_INVALIDNAME;
++        break;
++      default:
++        hr = E_FAIL;
++    }
+     goto end;
+   }
+ 
+@@ -8900,6 +8912,10 @@
+         hr = STG_E_SHAREVIOLATION;
+         break;
+ 
++      case ERROR_INVALID_NAME:
++        hr = STG_E_INVALIDNAME;
++        break;
++
+       default:
+         hr = E_FAIL;
+     }
+--- a/dlls/ole32/tests/storage32.c
++++ b/dlls/ole32/tests/storage32.c
+@@ -889,6 +889,87 @@
+     ok(ret, "file didn't exist\n");
+ }
+ 
++static void test_simple_substorage(void)
++{
++    static const DWORD simple = STGM_SIMPLE | STGM_SHARE_EXCLUSIVE | STGM_READWRITE;
++    IStorage *root, *docs, *sub;
++    IStream *stm;
++    HRESULT hr;
++
++    hr = StgCreateDocfile(NULL, STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_READWRITE | STGM_DELETEONRELEASE, 0, &root);
++    ok(hr == S_OK, "StgCreateDocfile failed: %#lx\n", hr);
++    hr = IStorage_CreateStorage(root, L"LocalDocs", STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_READWRITE, 0, 0, &docs);
++    ok(hr == S_OK, "CreateStorage failed: %#lx\n", hr);
++    hr = IStorage_CreateStorage(docs, L"existing", STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_READWRITE, 0, 0, &sub);
++    ok(hr == S_OK, "CreateStorage failed: %#lx\n", hr);
++    IStorage_Release(sub);
++    IStorage_Release(docs);
++
++    /* Autodesk Inventor opens sub-storages with STGM_SIMPLE; that does not
++     * restrict them like a simple-mode root storage */
++    hr = IStorage_OpenStorage(root, L"LocalDocs", NULL, simple, NULL, 0, &docs);
++    ok(hr == S_OK, "OpenStorage failed: %#lx\n", hr);
++
++    hr = IStorage_OpenStorage(docs, L"missing", NULL, simple, NULL, 0, &sub);
++    ok(hr == STG_E_FILENOTFOUND, "OpenStorage(missing) returned %#lx\n", hr);
++
++    hr = IStorage_OpenStorage(docs, L"existing", NULL, simple, NULL, 0, &sub);
++    ok(hr == S_OK, "OpenStorage(existing) returned %#lx\n", hr);
++    if (hr == S_OK) IStorage_Release(sub);
++
++    hr = IStorage_CreateStorage(docs, L"created", simple | STGM_CREATE, 0, 0, &sub);
++    ok(hr == S_OK, "CreateStorage(created) returned %#lx\n", hr);
++    if (hr == S_OK)
++    {
++        hr = IStorage_CreateStream(sub, L"Data", STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_READWRITE, 0, 0, &stm);
++        ok(hr == S_OK, "CreateStream failed: %#lx\n", hr);
++        if (hr == S_OK) IStream_Release(stm);
++        hr = IStorage_Commit(sub, 0);
++        ok(hr == S_OK, "Commit failed: %#lx\n", hr);
++        IStorage_Release(sub);
++    }
++
++    hr = IStorage_CreateStream(docs, L"stream", simple | STGM_CREATE, 0, 0, &stm);
++    ok(hr == S_OK, "CreateStream(stream) returned %#lx\n", hr);
++    if (hr == S_OK) IStream_Release(stm);
++
++    IStorage_Release(docs);
++    IStorage_Release(root);
++}
++
++static void test_invalid_name(void)
++{
++    static const DWORD create_mode = STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_READWRITE;
++    WCHAR temp[MAX_PATH], pseudo[MAX_PATH], star[MAX_PATH], nodir[MAX_PATH];
++    IStorage *stg;
++    HRESULT hr;
++
++    GetTempPathW(ARRAY_SIZE(temp), temp);
++    /* the kind of name Autodesk Inventor passes for a part stored inside an assembly */
++    swprintf(pseudo, ARRAY_SIZE(pseudo), L"**%swinetest.iam*LocalDocs*xAaaa*part.ipt", temp);
++    swprintf(star, ARRAY_SIZE(star), L"%swine*test.stg", temp);
++    swprintf(nodir, ARRAY_SIZE(nodir), L"%swinetest-no-such-dir-%lu\\test.stg", temp, GetCurrentProcessId());
++
++    stg = (IStorage *)0xdeadbeef;
++    hr = StgCreateDocfile(pseudo, create_mode, 0, &stg);
++    ok(hr == STG_E_INVALIDNAME, "StgCreateDocfile(pseudo path) returned %#lx\n", hr);
++    ok(!stg, "got storage %p\n", stg);
++
++    hr = StgCreateDocfile(star, create_mode, 0, &stg);
++    ok(hr == STG_E_INVALIDNAME, "StgCreateDocfile(name with *) returned %#lx\n", hr);
++
++    hr = StgCreateDocfile(nodir, create_mode, 0, &stg);
++    ok(hr == STG_E_PATHNOTFOUND, "StgCreateDocfile(missing directory) returned %#lx\n", hr);
++
++    stg = (IStorage *)0xdeadbeef;
++    hr = StgOpenStorage(pseudo, NULL, STGM_SHARE_EXCLUSIVE | STGM_READWRITE, NULL, 0, &stg);
++    ok(hr == STG_E_INVALIDNAME, "StgOpenStorage(pseudo path) returned %#lx\n", hr);
++    ok(!stg, "got storage %p\n", stg);
++
++    hr = StgOpenStorage(star, NULL, STGM_SHARE_EXCLUSIVE | STGM_READWRITE, NULL, 0, &stg);
++    ok(hr == STG_E_INVALIDNAME, "StgOpenStorage(name with *) returned %#lx\n", hr);
++}
++
+ static void test_storage_suminfo(void)
+ {
+     IStorage *stg = NULL;
+@@ -4068,6 +4149,8 @@
+     test_stgcreatestorageex();
+     test_storage_stream();
+     test_open_storage();
++    test_invalid_name();
++    test_simple_substorage();
+     test_storage_suminfo();
+     test_storage_refcount();
+     test_streamenum();
