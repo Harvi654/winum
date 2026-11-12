@@ -35,5 +35,37 @@ Open:
   CallShader, custom hit attributes, nested arrays, 16/64-bit or integer
   leaves (the reviewer's extra probes pass but are not committed); no GPU
   readback test; the CI images and packages are not pinned.
-- Publishing the DLLs with a winum release (a second archive next to Wine,
-  pinned by SHA-256 in the installers).
+- P3 (review 2026-11-12, `docs/wine-repro/review-2026-11-12-vkd3d-ray-payload.md`):
+  no fixture reaches the `OpCompositeInsert` branch (more than 13
+  constituents, e.g. a `float4x4` payload member).
+
+Further L4: an RTX 5080 (tester, 2026-11-07) and an RX 9060 XT (RDNA 4,
+maintainer, 2026-11-12). License of the patch: MIT, like the dxil-spirv
+files it changes (the header said LGPL until 2026-11-12); the DLLs are
+LGPL-2.1-or-later like vkd3d-proton.
+
+## Release
+
+`version.env` names the upstream release (`VKD3D_VERSION`, `VKD3D_TAG`,
+`VKD3D_COMMIT`) and winum's build number (`VKD3D_WINUM_BUILD`, raised
+whenever a patch here changes). The maintainer makes the signed tag
+`vkd3d-proton-<VKD3D_VERSION>-winum-<VKD3D_WINUM_BUILD>` on `main`
+(`git tag -s`, then `git push origin <tag>`); `build-vkd3d.yml` checks that
+the tag matches `version.env` and that no release of that name exists,
+runs the shader check, builds, and publishes the release with:
+
+- `vkd3d-proton-<version>-winum-<build>.tar.zst`: `x64/` and `x86/` with
+  `d3d12.dll` and `d3d12core.dll` (the layout of upstream's release archive,
+  so the Inventor installer unpacks it the same way), `BUILDINFO.txt`
+  (upstream commit, patch hashes, winum commit, tool versions) and
+  `SHA256SUMS` of the DLLs;
+- `vkd3d-proton-<version>-winum-<build>-source.tar.xz`: the complete
+  source (upstream tag with submodules, patches applied, the patches,
+  `README.txt` with the build command);
+- a `.sha256` for each archive and a signed build provenance attestation
+  (`gh attestation verify FILE -R Harvi654/winum`).
+
+It is not marked "Latest" (that is the Wine release). A published release is
+never replaced; a change is a new build number. The installers pin the
+archive by URL and SHA-256 (Autodesk-Inventor-for-Linux: `VKD3D_*` in
+`scripts/lib/common.sh`, `nix/inventor.nix`).

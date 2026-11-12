@@ -1,38 +1,88 @@
-# Build of vkd3d-proton 3.0.1 with gpu/vkd3d-proton/*.patch (Inventor's GPU
-# ray tracing). On main and topic branches when gpu/vkd3d-proton changes;
-# uploads artifacts, publishes nothing yet (see gpu/vkd3d-proton/README.md). Also shows the synthetic shaders in
-# gpu/vkd3d-proton/tests/ failing spirv-val without the patch and passing
-# with it.
+# vkd3d-proton (Direct3D 12 on Vulkan) with gpu/vkd3d-proton/*.patch, for
+# Inventor's GPU ray tracing. Version and build number: gpu/vkd3d-proton/version.env.
+#
+# - push to main or a topic/<name> branch that changes gpu/vkd3d-proton or this
+#   file, or "Run workflow": the shader check and the build, as artifacts
+#   (30 days, nothing published).
+# - push of a tag vkd3d-proton-<version>-winum-<build> (made by the maintainer,
+#   signed): the same from the tag, then the release of that name with the
+#   DLLs (.tar.zst, the same layout as upstream's release archive), their
+#   complete source (vkd3d-proton is LGPL 2.1+), .sha256 files and a signed
+#   provenance attestation. The tag must match version.env. An existing
+#   release is never rebuilt or replaced, and it is not marked "Latest"
+#   (that stays the Wine release).
+#
+# The shader check: the synthetic shaders in gpu/vkd3d-proton/tests/ must be
+# rejected by spirv-val with the upstream converter (long-vector diagnostic)
+# and accepted with the patched one.
 name: Build vkd3d-proton
 
 on:
   push:
     branches: [main, 'topic/**']
+    tags: ['vkd3d-proton-*']
     paths: ['gpu/vkd3d-proton/**', '.github/workflows/build-vkd3d.yml']
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
-env:
-  VKD3D_TAG: v3.0.1
-  VKD3D_COMMIT: 3b10bd7a7ec6a7347e616cf8bea59333afec2255
+concurrency:
+  group: build-vkd3d-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      name: ${{ steps.plan.outputs.name }}
+      version: ${{ steps.plan.outputs.version }}
+      publish: ${{ steps.plan.outputs.publish }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Plan
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          . gpu/vkd3d-proton/version.env
+          version="$VKD3D_VERSION-winum-$VKD3D_WINUM_BUILD"
+          name="vkd3d-proton-$version" publish=0
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            [ "$GITHUB_REF_NAME" = "$name" ] || { echo "tag $GITHUB_REF_NAME does not match gpu/vkd3d-proton/version.env ($name)"; exit 1; }
+            if gh release view "$name" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "release $name exists - not rebuilding or replacing it (raise VKD3D_WINUM_BUILD for a new one)"; exit 1
+            fi
+            publish=1
+          fi
+          { echo "name=$name"; echo "version=$version"; echo "publish=$publish"; } >> "$GITHUB_OUTPUT"
+          echo "name=$name publish=$publish"
+
   build:
+    needs: plan
     runs-on: ubuntu-24.04
     container: archlinux:base-devel
+    permissions:
+      contents: read
     timeout-minutes: 120
+    env:
+      NAME: ${{ needs.plan.outputs.name }}
+      VERSION: ${{ needs.plan.outputs.version }}
     steps:
       - name: Dependencies (official Arch repositories)
-        run: pacman -Syu --noconfirm --needed git meson ninja cmake glslang mingw-w64-gcc wine python
+        run: pacman -Syu --noconfirm --needed git meson ninja cmake glslang mingw-w64-gcc wine python zstd
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: winum
       - name: vkd3d-proton source
         run: |
+          git config --global --add safe.directory '*'
+          . winum/gpu/vkd3d-proton/version.env
           git clone --branch "$VKD3D_TAG" --recursive --depth 1 --shallow-submodules https://github.com/HansKristian-Work/vkd3d-proton.git src
           test "$(git -C src rev-parse HEAD)" = "$VKD3D_COMMIT"
+          git -C src submodule status --recursive > submodules.txt
+          cat submodules.txt
       - name: Shader check without the patches
         run: |
           cmake -S src/subprojects/dxil-spirv -B check-base -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5
@@ -65,14 +115,94 @@ jobs:
           done
           [ "$count" -eq 6 ] || { echo "expected 6 fixtures, found $count"; fail=1; }
           exit $fail
+      # Complete corresponding source, before anything is built in the tree:
+      # the upstream tag with its submodules and the patches applied, the
+      # patches themselves and how the DLLs were built.
+      - name: Source archive
+        run: |
+          . winum/gpu/vkd3d-proton/version.env
+          mkdir -p dist "stage/$NAME-source/winum-gpu-vkd3d-proton"
+          cp -a src "stage/$NAME-source/vkd3d-proton"
+          find "stage/$NAME-source/vkd3d-proton" -name .git -prune -exec rm -rf {} +
+          cp -a winum/gpu/vkd3d-proton/. "stage/$NAME-source/winum-gpu-vkd3d-proton/"
+          cp submodules.txt "stage/$NAME-source/"
+          cat > "stage/$NAME-source/README.txt" <<EOF
+          $NAME - complete source of the DLLs in $NAME.tar.zst
+
+          vkd3d-proton/   https://github.com/HansKristian-Work/vkd3d-proton tag $VKD3D_TAG
+                          (commit $VKD3D_COMMIT) with its submodules
+                          (submodules.txt) and the patches in
+                          winum-gpu-vkd3d-proton/ applied (patch -p1 --fuzz=0).
+          License: vkd3d-proton is LGPL-2.1-or-later (vkd3d-proton/LICENSE,
+          COPYING); its subprojects carry their own licenses (dxil-spirv: MIT).
+
+          Built in an archlinux:base-devel container (BUILDINFO.txt in the DLL
+          archive lists the tool versions) with:
+            cd vkd3d-proton && ./package-release.sh $VERSION <destdir> --no-package
+          Workflow: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          EOF
+          tar -C stage -cJf "dist/$NAME-source.tar.xz" "$NAME-source"
       - name: Build Windows DLLs
         run: |
           cd src
-          ./package-release.sh 3.0.1-winum-rt ../out --no-package
-          find ../out -name '*.dll' | sort
-          cd ../out && find . -name '*.dll' -exec sha256sum {} + | sort -k2 > SHA256SUMS && cat SHA256SUMS
+          ./package-release.sh "$VERSION" ../out --no-package
+          cd ../out
+          test -d "$NAME/x64" && test -d "$NAME/x86"
+          find . -name '*.dll' | sort
+          {
+            echo "$NAME"
+            echo "vkd3d-proton $(git -C ../src rev-parse HEAD) + winum gpu/vkd3d-proton patches:"
+            for p in ../winum/gpu/vkd3d-proton/*.patch; do echo "  $(basename "$p") $(sha256sum "$p" | cut -d' ' -f1)"; done
+            echo "winum commit: $(git -C ../winum rev-parse HEAD)"
+            echo "tools: $(pacman -Q mingw-w64-gcc mingw-w64-binutils meson glslang | tr '\n' ' ')"
+            echo "workflow run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > "$NAME/BUILDINFO.txt"
+          (cd "$NAME" && find . -name '*.dll' -exec sha256sum {} + | sort -k2 > SHA256SUMS && cat SHA256SUMS)
+          tar --zstd -cf "../dist/$NAME.tar.zst" "$NAME"
+      - name: Checksums
+        run: |
+          cd dist
+          for f in *.tar.zst *.tar.xz; do sha256sum "$f" > "$f.sha256"; done
+          cat *.sha256
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: vkd3d-proton-3.0.1-winum-rt
-          path: out/
+          name: ${{ needs.plan.outputs.name }}
+          path: dist/
           retention-days: 30
+
+  release:
+    needs: [plan, build]
+    if: needs.plan.outputs.publish == '1'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write       # create the release
+      id-token: write       # sign the attestation (Sigstore)
+      attestations: write   # store it
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ needs.plan.outputs.name }}
+          path: up
+      - name: Both archives present
+        env:
+          NAME: ${{ needs.plan.outputs.name }}
+        run: |
+          ls -la up
+          for f in "$NAME.tar.zst" "$NAME-source.tar.xz"; do
+            test -f "up/$f" && test -f "up/$f.sha256" || { echo "missing $f or its .sha256"; exit 1; }
+          done
+          (cd up && sha256sum -c ./*.sha256)
+      # gh attestation verify FILE -R Harvi654/winum
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: |
+            up/*.tar.zst
+            up/*.tar.xz
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.name }}
+        run: |
+          gh release create "$TAG" up/* -R "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$TAG" --latest=false \
+            --notes "vkd3d-proton with the patches of gpu/vkd3d-proton/ at tag $TAG (Inventor's GPU ray tracing), built by the \"Build vkd3d-proton\" workflow: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. The .tar.zst has the same layout as upstream's release archive (x64/, x86/) plus BUILDINFO.txt and SHA256SUMS. vkd3d-proton is LGPL 2.1+; the complete source of this build is the -source.tar.xz next to it. Check the download: sha256sum -c, and gh attestation verify FILE -R $GITHUB_REPOSITORY."

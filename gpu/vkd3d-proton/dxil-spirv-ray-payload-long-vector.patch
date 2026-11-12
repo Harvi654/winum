@@ -4,7 +4,14 @@ For vkd3d-proton 3.0.1 (subprojects/dxil-spirv 62dbb07). Ported from
 Autodesk-Inventor-for-Linux PR #3 (krokosik, written with Codex and
 GPT-6.1-Sol, patches/gpu/vkd3d-ray-payload.patch for 2.14.1); the hunk
 that only replaced get_effective_storage_class() with the same lookup is
-left out. LGPL-2.1-or-later like vkd3d-proton.
+left out. Port AI-assisted (Claude). Not submitted upstream.
+
+License: the changed files belong to dxil-spirv, which is MIT licensed
+(SPDX-License-Identifier: MIT in each file); this patch is MIT like them.
+The vkd3d-proton DLLs it is built into are LGPL-2.1-or-later, so their
+release carries the complete source (gpu/vkd3d-proton/README.md).
+(Header corrected 2026-11-12: it said LGPL-2.1-or-later before; the code
+is unchanged.)
 
 DXC copies a float3x4 in a ray payload as a <12 x float> load and store.
 dxil-spirv 3.0.1 emits that as a 12-component OpTypeVector, which SPIR-V
