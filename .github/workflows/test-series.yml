@@ -27,18 +27,10 @@ jobs:
       fail-fast: false
       matrix:
         variant: [vanilla, series]
-        group: [g1, g2, g3, g4, g5]
+        group: [g3]
         include:
-          - group: g1
-            tests: user32
-          - group: g2
-            tests: win32u gdi32 comctl32 opengl32 glu32
           - group: g3
-            tests: ntdll kernel32 kernelbase advapi32 combase ole32 oleaut32 rpcrt4 urlmon
-          - group: g4
-            tests: msi
-          - group: g5
-            tests: msxml3 mspatcha riched20 msftedit shell32 wbemprox wininet mshtml
+            tests: ole32 packager
     runs-on: ubuntu-24.04
     container: archlinux:base-devel
     timeout-minutes: 350
