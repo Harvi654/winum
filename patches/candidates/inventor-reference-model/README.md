@@ -1,7 +1,7 @@
 # Inventor Import CAD "Reference Model": candidate
 
 Original, AI-assisted (Claude), LGPL-2.1-or-later. Not submitted upstream.
-Not in `patches/series` yet: approved for promotion (2026-11-12).
+Promoted into `patches/series` on 2026-11-12 for winum-11.20-2 (the files there are byte-identical to these).
 
 ## Problem
 
@@ -61,7 +61,9 @@ multibyte code page) is not measured; Wine's packager has no IDataObject.
 
 ## Open
 
-- promotion into `patches/series` (cross review and validation done).
+- promotion into `patches/series`: done 2026-11-12 (winum-11.20-2). The
+  maintainer's L1 (offline Windows 10 VM), the winum L2 runs and the L4 on
+  Arch are on the four pages in `docs/patches/`.
 
 ## Resume
 

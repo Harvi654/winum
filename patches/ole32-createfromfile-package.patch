@@ -1,0 +1,737 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ole32: Embed a file without an OLE server as a Package in OleCreateFromFileEx.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows (measured, Windows 10 22H2, 2026-11-11): OleCreateFromFileEx on a
+file whose class is not an OLE embedding server (.htm, .txt, an unknown
+extension) succeeds and creates a Package: class
+{0003000C-0000-0000-C000-000000000046}, user type "Package", storage with
+\1CompObj and \1Ole10Native (label, source path, temp path, contents, and
+the three paths again in UTF-16). This also holds for .htm, although MSHTML
+there can load the file; no class involved is marked Insertable.
+
+Wine bound the file moniker to IDataObject and failed (MSHTML:
+IPersistFile::Load not implemented; other types MK_E_INVALIDEXTENSION).
+Autodesk Inventor 2027 embeds its import report (.htm) this way; Import CAD
+with Reference Model ended with "Could not Insert Object".
+
+Limited to files whose class has no Insertable key under its CLSID;
+such a class keeps the existing path. For a package, OLERENDER_FORMAT
+stores no cache either (measured), so it is accepted without one (FIXME
+kept). The \1CompObj user type is "OLE Package" as
+measured; Windows also writes the ProgID "Package", which Wine's
+WriteFmtUserTypeStg leaves out when the class has none registered.
+
+v2 (2026-11-11, after cross review): a file is packaged only when it is
+not a compound file and its class has no Insertable key under its CLSID or
+its ProgID; the last error is saved before WARN; files over 2 GB and paths
+of MAX_PATH or more are refused instead of being cut short (the package
+format holds MAX_PATH paths).
+
+v3 (2026-11-12, after cross review by Codex; measured with pkgprobe,
+Windows 10 22H2 x64 and x86, docs/wine-repro/ole32-createfromfile-html):
+only an Insertable key under the CLSID keeps the class path - a ProgID
+marked Insertable still gives a Package on Windows, so that check is gone.
+A file that cannot be opened (missing, a directory, opened by another
+handle without sharing) and a path of MAX_PATH or more return
+STG_E_FILENOTFOUND as on Windows. The contents are copied in chunks
+instead of being read into memory; size and read errors are reported
+separately. Tests: the failures, an empty file, and the Insertable cases;
+the extent of a Package follows its label (width grows with the name,
+height does not, every aspect the same). The test registers its class in
+HKEY_CLASSES_ROOT where allowed, else under HKCU (Wine's HKCR does not show
+HKCU-only classes to RegQueryValueW). Temporary names carry the process id.
+
+v4 (2026-11-12, after the second review; measured with pkgprobe on
+Windows 10 22H2, x64 and x86): the writer no longer refuses a path whose
+ANSI form is longer than MAX_PATH - what Windows does with such a path
+(a multibyte code page) is not measured; the packager now reads such a
+package through its UTF-16 name instead. Tests: the registered class
+names are unique per process; the Package's extent and its drawing on a
+scaled, offset DC; loading with a temporary directory near the limit (fits, fits
+only without a " (2)", fits neither). All passed on Windows 10 x86_64 and
+i686.
+
+v5 (2026-11-12, after the third review): exact extents are checked only
+in the configurations measured (96 dpi, 32x32 icons, Segoe UI icon title
+font 15 or 25 pixels high), elsewhere skipped; that the width follows the
+label and the height does not is checked always. The temporary directory
+limit is also checked for a Package without the UTF-16 names (ANSI only),
+which Windows loads with the same limit (pkgprobe part O, x64 and x86).
+Temporary directory names carry the tick count as well. Passed on Windows
+10 x86_64 and i686.
+
+--- a/dlls/ole32/ole2.c
++++ b/dlls/ole32/ole2.c
+@@ -3010,6 +3010,121 @@
+     return hr;
+ }
+ 
++/* {0003000C-0000-0000-C000-000000000046}, the OLE 1 Package object (packager.dll) */
++static const CLSID clsid_package = {0x0003000c, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
++
++/* Whether a file is embedded by its own class: compound files, and files whose
++ * class is marked Insertable under its CLSID (an Insertable key under the
++ * ProgID alone still gives a Package, as on Windows). */
++static BOOL embed_by_class(const OLECHAR *filename)
++{
++    CLSID clsid;
++    HKEY key;
++
++    if (StgIsStorageFile( filename ) == S_OK) return TRUE;
++    if (FAILED(GetClassFile( filename, &clsid ))) return FALSE;
++    if (COM_OpenKeyForCLSID( &clsid, L"Insertable", KEY_READ, &key ) != S_OK) return FALSE;
++    RegCloseKey( key );
++    return TRUE;
++}
++
++static HRESULT write_counted( IStream *stm, const void *data, DWORD len, DWORD count )
++{
++    HRESULT hr = IStream_Write( stm, &count, sizeof(count), NULL );
++    if (SUCCEEDED(hr)) hr = IStream_Write( stm, data, len, NULL );
++    return hr;
++}
++
++/* Wraps a file without an OLE server in a Package: the \1Ole10Native stream
++ * holds the file's name, path and contents. */
++static HRESULT create_package( const OLECHAR *filename, IStorage *stg )
++{
++    static const WORD type = 2, unknown[2] = { 0, 3 };
++    static WCHAR user_type[] = L"OLE Package";
++    const WCHAR *label = wcsrchr( filename, '\\' ) ? wcsrchr( filename, '\\' ) + 1 : filename;
++    DWORD label_len = wcslen( label ), path_len = wcslen( filename );
++    DWORD labela_len, patha_len, size, total, read;
++    LARGE_INTEGER filesize;
++    char *labela = NULL, *patha = NULL;
++    BYTE buf[0x4000];
++    IStream *stm;
++    HANDLE file;
++    HRESULT hr;
++
++    /* Windows answers a path of MAX_PATH or more, like any file it cannot
++     * open, with STG_E_FILENOTFOUND (measured) */
++    if (path_len >= MAX_PATH) return STG_E_FILENOTFOUND;
++    patha_len = WideCharToMultiByte( CP_ACP, 0, filename, -1, NULL, 0, NULL, NULL );
++    labela_len = WideCharToMultiByte( CP_ACP, 0, label, -1, NULL, 0, NULL, NULL );
++
++    file = CreateFileW( filename, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL );
++    if (file == INVALID_HANDLE_VALUE)
++    {
++        WARN( "cannot open %s: %lu\n", debugstr_w(filename), GetLastError() );
++        return STG_E_FILENOTFOUND;
++    }
++    if (!GetFileSizeEx( file, &filesize ))
++    {
++        hr = HRESULT_FROM_WIN32( GetLastError() );
++        CloseHandle( file );
++        return hr;
++    }
++    /* the stream's sizes are DWORDs */
++    if (filesize.QuadPart > 0x7fff0000)
++    {
++        CloseHandle( file );
++        return STG_E_MEDIUMFULL;
++    }
++    size = filesize.u.LowPart;
++
++    if (!(labela = malloc( labela_len )) || !(patha = malloc( patha_len )))
++    {
++        hr = E_OUTOFMEMORY;
++        goto done;
++    }
++    WideCharToMultiByte( CP_ACP, 0, label, -1, labela, labela_len, NULL, NULL );
++    WideCharToMultiByte( CP_ACP, 0, filename, -1, patha, patha_len, NULL, NULL );
++
++    hr = IStorage_CreateStream( stg, L"\1Ole10Native", STGM_CREATE | STGM_WRITE | STGM_SHARE_EXCLUSIVE, 0, 0, &stm );
++    if (FAILED(hr)) goto done;
++
++    total = sizeof(type) + labela_len + patha_len + sizeof(unknown) + 4 + patha_len + 4 + size
++            + 4 + path_len * sizeof(WCHAR) + 4 + label_len * sizeof(WCHAR) + 4 + path_len * sizeof(WCHAR);
++    hr = IStream_Write( stm, &total, sizeof(total), NULL );
++    if (SUCCEEDED(hr)) hr = IStream_Write( stm, &type, sizeof(type), NULL );
++    if (SUCCEEDED(hr)) hr = IStream_Write( stm, labela, labela_len, NULL );
++    if (SUCCEEDED(hr)) hr = IStream_Write( stm, patha, patha_len, NULL );
++    if (SUCCEEDED(hr)) hr = IStream_Write( stm, unknown, sizeof(unknown), NULL );
++    if (SUCCEEDED(hr)) hr = write_counted( stm, patha, patha_len, patha_len );
++    if (SUCCEEDED(hr)) hr = IStream_Write( stm, &size, sizeof(size), NULL );
++    /* the contents, as many bytes as counted above */
++    while (SUCCEEDED(hr) && size)
++    {
++        if (!ReadFile( file, buf, min( size, sizeof(buf) ), &read, NULL ))
++            hr = HRESULT_FROM_WIN32( GetLastError() );
++        else if (!read)
++            hr = STG_E_READFAULT; /* the file shrank while it was copied */
++        else
++        {
++            hr = IStream_Write( stm, buf, read, NULL );
++            size -= read;
++        }
++    }
++    if (SUCCEEDED(hr)) hr = write_counted( stm, filename, path_len * sizeof(WCHAR), path_len );
++    if (SUCCEEDED(hr)) hr = write_counted( stm, label, label_len * sizeof(WCHAR), label_len );
++    if (SUCCEEDED(hr)) hr = write_counted( stm, filename, path_len * sizeof(WCHAR), path_len );
++    IStream_Release( stm );
++
++    if (SUCCEEDED(hr)) hr = WriteClassStg( stg, &clsid_package );
++    if (SUCCEEDED(hr)) hr = WriteFmtUserTypeStg( stg, 0, user_type );
++
++done:
++    CloseHandle( file );
++    free( labela );
++    free( patha );
++    return hr;
++}
++
+ /******************************************************************************
+  *              OleCreateFromFileEx        [OLE32.@]
+  */
+@@ -3030,6 +3145,23 @@
+     for (i = 0; i < num_fmts; i++)
+         TRACE("\t%ld: fmt %s adv flags %ld\n", i, debugstr_formatetc(fmts + i), adv_flags[i]);
+ 
++    /* Files whose class is not an OLE embedding server (also .htm, .txt or an
++     * unknown extension) are embedded as a Package, like Windows does. */
++    if (!embed_by_class( filename ))
++    {
++        if (renderopt == OLERENDER_FORMAT) FIXME( "caching formats of a package is not supported\n" );
++        hr = create_package( filename, stg );
++        if (SUCCEEDED(hr)) hr = OleLoad( stg, &IID_IUnknown, client_site, (void**)&unk );
++        if (FAILED(hr))
++        {
++            WARN( "embedding %s as a package failed: %#lx\n", debugstr_w(filename), hr );
++            return hr;
++        }
++        hr = IUnknown_QueryInterface( unk, iid, obj );
++        IUnknown_Release( unk );
++        return hr;
++    }
++
+     hr = CreateFileMoniker( filename, &mon );
+     if (FAILED(hr)) return hr;
+ 
+--- a/dlls/ole32/tests/ole2.c
++++ b/dlls/ole32/tests/ole2.c
+@@ -4618,6 +4618,510 @@
+     ReleaseStgMedium( NULL );
+ }
+ 
++static void test_OleCreateFromFile_package(void)
++{
++    static const CLSID clsid_package = {0x0003000c, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
++    static const char contents[] = "<html><body>package test</body></html>\r\n";
++    static const WCHAR *const exts[] = { L".htm", L".wtst" };
++    WCHAR path[MAX_PATH], name[MAX_PATH];
++    char buf[1024];
++    IStorage *stg;
++    IStream *stm;
++    IUnknown *obj;
++    CLSID clsid;
++    HANDLE file;
++    DWORD written;
++    ULONG read;
++    HRESULT hr;
++    BOOL found;
++    int i;
++    ULONG j;
++
++    for (i = 0; i < ARRAY_SIZE(exts); i++)
++    {
++        winetest_push_context("%s", wine_dbgstr_w(exts[i]));
++
++        GetTempPathW(ARRAY_SIZE(path), path);
++        swprintf(name, ARRAY_SIZE(name), L"winetest_olecff%lu%s", GetCurrentProcessId(), exts[i]);
++        lstrcatW(path, name);
++        file = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
++        ok(file != INVALID_HANDLE_VALUE, "CreateFile failed: %lu\n", GetLastError());
++        WriteFile(file, contents, sizeof(contents) - 1, &written, NULL);
++        CloseHandle(file);
++
++        hr = StgCreateDocfile(NULL, STGM_READWRITE | STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_DELETEONRELEASE, 0, &stg);
++        ok(hr == S_OK, "StgCreateDocfile failed: %#lx\n", hr);
++
++        /* how Autodesk Inventor embeds its translation report */
++        obj = NULL;
++        hr = OleCreateFromFileEx(&CLSID_NULL, path, &IID_IUnknown, 0, OLERENDER_NONE, 0, NULL, NULL, NULL, NULL,
++                                 NULL, stg, (void **)&obj);
++        ok(hr == S_OK, "OleCreateFromFileEx failed: %#lx\n", hr);
++        ok(obj != NULL, "got NULL object\n");
++
++        hr = ReadClassStg(stg, &clsid);
++        ok(hr == S_OK, "ReadClassStg failed: %#lx\n", hr);
++        ok(IsEqualCLSID(&clsid, &clsid_package), "got class %s\n", wine_dbgstr_guid(&clsid));
++
++        hr = IStorage_OpenStream(stg, L"\1Ole10Native", NULL, STGM_READ | STGM_SHARE_EXCLUSIVE, 0, &stm);
++        ok(hr == S_OK, "OpenStream(\\1Ole10Native) failed: %#lx\n", hr);
++        if (hr == S_OK)
++        {
++            read = 0;
++            IStream_Read(stm, buf, sizeof(buf), &read);
++            found = FALSE;
++            for (j = 0; j + sizeof(contents) - 1 <= read; j++)
++                if (!memcmp(buf + j, contents, sizeof(contents) - 1)) found = TRUE;
++            ok(found, "file contents not in the package stream (%lu bytes)\n", read);
++            IStream_Release(stm);
++        }
++
++        if (obj) IUnknown_Release(obj);
++        IStorage_Release(stg);
++        DeleteFileW(path);
++        winetest_pop_context();
++    }
++}
++
++/* per process, so that concurrent test runs do not share registry keys */
++static WCHAR probe_ext[32], probe_progid[64], probe_clsid_key[64];
++
++/* HKEY_CLASSES_ROOT where it may be written, otherwise the user's classes
++ * (Windows refuses new HKCR keys to a standard user) */
++static HKEY classes_root;
++
++static void set_class_key(const WCHAR *key, const WCHAR *value)
++{
++    HKEY hkey;
++    LONG ret;
++
++    ret = RegCreateKeyExW(classes_root, key, 0, NULL, 0, KEY_WRITE, NULL, &hkey, NULL);
++    ok(!ret, "RegCreateKeyEx(%s) failed: %ld\n", wine_dbgstr_w(key), ret);
++    if (ret) return;
++    if (value) RegSetValueExW(hkey, NULL, 0, REG_SZ, (const BYTE *)value, (lstrlenW(value) + 1) * sizeof(WCHAR));
++    RegCloseKey(hkey);
++}
++
++static void delete_class_keys(void)
++{
++    RegDeleteTreeW(classes_root, probe_ext);
++    RegDeleteTreeW(classes_root, probe_progid);
++    RegDeleteTreeW(classes_root, probe_clsid_key);
++    RegDeleteKeyW(classes_root, probe_ext);
++    RegDeleteKeyW(classes_root, probe_progid);
++    RegDeleteKeyW(classes_root, probe_clsid_key);
++}
++
++static void open_classes_root(void)
++{
++    WCHAR guid[40];
++    GUID clsid;
++    HKEY hkey;
++
++    CoCreateGuid(&clsid);
++    StringFromGUID2(&clsid, guid, ARRAY_SIZE(guid));
++    swprintf(probe_ext, ARRAY_SIZE(probe_ext), L".wts%lu", GetCurrentProcessId());
++    swprintf(probe_progid, ARRAY_SIZE(probe_progid), L"WineTest.PkgProbe%lu", GetCurrentProcessId());
++    swprintf(probe_clsid_key, ARRAY_SIZE(probe_clsid_key), L"CLSID\\%s", guid);
++
++    if (!RegCreateKeyExW(HKEY_CLASSES_ROOT, probe_ext, 0, NULL, 0, KEY_WRITE, NULL, &hkey, NULL))
++    {
++        RegCloseKey(hkey);
++        RegDeleteKeyW(HKEY_CLASSES_ROOT, probe_ext);
++        RegOpenKeyExW(HKEY_CLASSES_ROOT, NULL, 0, KEY_ALL_ACCESS, &classes_root);
++        return;
++    }
++    RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Classes", 0, NULL, 0, KEY_ALL_ACCESS, NULL, &classes_root, NULL);
++}
++
++static HRESULT create_from_file(const WCHAR *path, CLSID *clsid)
++{
++    IUnknown *obj = NULL;
++    IStorage *stg;
++    HRESULT hr;
++
++    hr = StgCreateDocfile(NULL, STGM_READWRITE | STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_DELETEONRELEASE, 0, &stg);
++    ok(hr == S_OK, "StgCreateDocfile failed: %#lx\n", hr);
++    if (FAILED(hr)) return hr;
++    hr = OleCreateFromFile(&CLSID_NULL, path, &IID_IUnknown, OLERENDER_NONE, NULL, NULL, stg, (void **)&obj);
++    if (SUCCEEDED(hr)) ok(obj != NULL, "got NULL object\n");
++    else ok(!obj, "got object %p\n", obj);
++    memset(clsid, 0, sizeof(*clsid));
++    ReadClassStg(stg, clsid);
++    if (obj) IUnknown_Release(obj);
++    IStorage_Release(stg);
++    return hr;
++}
++
++/* what Windows 10 returned, measured with pkgprobe (docs/wine-repro) */
++static void test_OleCreateFromFile_package_errors(void)
++{
++    static const CLSID clsid_package = {0x0003000c, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
++    WCHAR dir[MAX_PATH], path[MAX_PATH + 100];
++    CLSID clsid;
++    HANDLE file;
++    HRESULT hr;
++    DWORD written;
++    int i;
++
++    GetTempPathW(ARRAY_SIZE(dir), dir);
++    swprintf(dir + lstrlenW(dir), MAX_PATH - lstrlenW(dir), L"winetest_olecff%lx%lx", GetCurrentProcessId(), GetTickCount());
++    ok(CreateDirectoryW(dir, NULL), "CreateDirectory failed: %lu\n", GetLastError());
++
++    swprintf(path, ARRAY_SIZE(path), L"%s\\missing.txt", dir);
++    hr = create_from_file(path, &clsid);
++    ok(hr == STG_E_FILENOTFOUND, "missing file: got %#lx\n", hr);
++
++    hr = create_from_file(dir, &clsid);
++    ok(hr == STG_E_FILENOTFOUND, "directory: got %#lx\n", hr);
++
++    swprintf(path, ARRAY_SIZE(path), L"%s\\locked.txt", dir);
++    file = CreateFileW(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
++    ok(file != INVALID_HANDLE_VALUE, "CreateFile failed: %lu\n", GetLastError());
++    WriteFile(file, "locked\r\n", 8, &written, NULL);
++    hr = create_from_file(path, &clsid);
++    ok(hr == STG_E_FILENOTFOUND, "file opened without sharing: got %#lx\n", hr);
++    CloseHandle(file);
++    DeleteFileW(path);
++
++    swprintf(path, ARRAY_SIZE(path), L"%s\\empty.txt", dir);
++    file = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
++    CloseHandle(file);
++    hr = create_from_file(path, &clsid);
++    ok(hr == S_OK, "empty file: got %#lx\n", hr);
++    ok(IsEqualCLSID(&clsid, &clsid_package), "empty file: got class %s\n", wine_dbgstr_guid(&clsid));
++    DeleteFileW(path);
++
++    swprintf(path, ARRAY_SIZE(path), L"%s\\", dir);
++    for (i = lstrlenW(path); i < MAX_PATH + 40; i++) path[i] = 'a';
++    lstrcpyW(path + i, L".txt");
++    hr = create_from_file(path, &clsid);
++    ok(hr == STG_E_FILENOTFOUND, "path of %u characters: got %#lx\n", lstrlenW(path), hr);
++
++    /* only an Insertable key under the CLSID keeps the class's own path */
++    open_classes_root();
++    swprintf(path, ARRAY_SIZE(path), L"%s\\probe%s", dir, probe_ext);
++    file = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
++    WriteFile(file, "probe\r\n", 7, &written, NULL);
++    CloseHandle(file);
++    for (i = 0; i < 4; i++)
++    {
++        WCHAR key[128];
++
++        winetest_push_context("case %d", i);
++        delete_class_keys();
++        set_class_key(probe_ext, probe_progid);
++        set_class_key(probe_progid, L"Package probe");
++        if (i >= 1)
++        {
++            swprintf(key, ARRAY_SIZE(key), L"%s\\CLSID", probe_progid);
++            set_class_key(key, probe_clsid_key + 6);
++            set_class_key(probe_clsid_key, L"Package probe");
++            swprintf(key, ARRAY_SIZE(key), L"%s\\ProgID", probe_clsid_key);
++            set_class_key(key, probe_progid);
++        }
++        if (i == 2)
++        {
++            swprintf(key, ARRAY_SIZE(key), L"%s\\Insertable", probe_progid);
++            set_class_key(key, NULL);
++        }
++        if (i == 3)
++        {
++            swprintf(key, ARRAY_SIZE(key), L"%s\\Insertable", probe_clsid_key);
++            set_class_key(key, NULL);
++        }
++        hr = create_from_file(path, &clsid);
++        if (i < 3)
++        {
++            ok(hr == S_OK, "got %#lx\n", hr);
++            ok(IsEqualCLSID(&clsid, &clsid_package), "got class %s\n", wine_dbgstr_guid(&clsid));
++        }
++        else
++        {
++            ok(hr == REGDB_E_CLASSNOTREG, "got %#lx\n", hr);
++            ok(IsEqualCLSID(&clsid, &CLSID_NULL), "got class %s\n", wine_dbgstr_guid(&clsid));
++        }
++        winetest_pop_context();
++    }
++    delete_class_keys();
++    RegCloseKey(classes_root);
++    DeleteFileW(path);
++    RemoveDirectoryW(dir);
++}
++
++static void draw_box(IViewObject2 *view, HDC dc, int window_org, RECT *box)
++{
++    RECTL bounds = { 10, 10, 60, 60 };
++    SIZE ext;
++    HRESULT hr;
++    int x, y;
++
++    PatBlt(dc, 0, 0, 400, 400, WHITENESS);
++    SetMapMode(dc, MM_ANISOTROPIC);
++    SetWindowExtEx(dc, 100, 100, NULL);
++    SetViewportExtEx(dc, 200, 200, NULL);
++    SetViewportOrgEx(dc, 50, 50, NULL);
++    SetWindowOrgEx(dc, window_org, window_org, NULL);
++    hr = IViewObject2_Draw(view, DVASPECT_CONTENT, -1, NULL, NULL, NULL, dc, &bounds, NULL, NULL, 0);
++    ok(hr == S_OK, "Draw failed: %#lx\n", hr);
++    GetWindowExtEx(dc, &ext);
++    ok(ext.cx == 100 && ext.cy == 100, "window extent changed to %ldx%ld\n", ext.cx, ext.cy);
++    ok(GetMapMode(dc) == MM_ANISOTROPIC, "map mode changed to %d\n", GetMapMode(dc));
++    SetMapMode(dc, MM_TEXT);
++    SetWindowOrgEx(dc, 0, 0, NULL);
++    SetViewportOrgEx(dc, 0, 0, NULL);
++    SetRect(box, 400, 400, -1, -1);
++    for (y = 0; y < 400; y++)
++        for (x = 0; x < 400; x++)
++            if (GetPixel(dc, x, y) != RGB(255, 255, 255))
++            {
++                if (x < box->left) box->left = x;
++                if (x > box->right) box->right = x;
++                if (y < box->top) box->top = y;
++                if (y > box->bottom) box->bottom = y;
++            }
++}
++
++/* a Package draws relative to its bounds as the DC maps them: moving the
++ * window origin by -20 logical units (40 device pixels at this scale)
++ * moves the drawing by 40 pixels, as on Windows 10; the DC's mapping is
++ * left as it was */
++static void check_package_draw(IViewObject2 *view)
++{
++    HBITMAP bmp, old;
++    HDC screen, dc;
++    RECT a, b;
++
++    screen = GetDC(NULL);
++    dc = CreateCompatibleDC(screen);
++    bmp = CreateCompatibleBitmap(screen, 400, 400);
++    ReleaseDC(NULL, screen);
++    old = SelectObject(dc, bmp);
++    draw_box(view, dc, 0, &a);
++    draw_box(view, dc, -20, &b);
++    ok(a.right >= 0 && b.right >= 0, "nothing drawn\n");
++    ok(b.left - a.left == 40 && b.top - a.top == 40 && b.right - a.right == 40 && b.bottom - a.bottom == 40,
++       "drawn at %ld,%ld-%ld,%ld and %ld,%ld-%ld,%ld\n", a.left, a.top, a.right, a.bottom, b.left, b.top, b.right, b.bottom);
++    SelectObject(dc, old);
++    DeleteObject(bmp);
++    DeleteDC(dc);
++}
++
++/* the extent of a Package, measured on Windows 10 at 96 dpi with 32x32
++ * icons and a Segoe UI icon title font 15 and 25 pixels high (pkgprobe):
++ * 5/4 of the wider of the icon and the label plus one pixel, and the icon
++ * plus 11/10 of the label's height plus 5.5 pixels. That rule is inferred
++ * from these measurements, so exact values are checked only there; the
++ * width following the label and the height staying are checked always. */
++static void test_OleCreateFromFile_package_extent(void)
++{
++    static const WCHAR *names[] = { L"r.txt", L"report.txt", L"a much longer file name for the package label.txt" };
++    WCHAR dir[MAX_PATH], path[MAX_PATH];
++    SIZEL size, other, expect, first = {0, 0};
++    SIZE text;
++    TEXTMETRICW tm;
++    BOOL measured;
++    IViewObject2 *view;
++    IUnknown *obj;
++    IStorage *stg;
++    LOGFONTW lf;
++    HFONT font, old_font;
++    HANDLE file;
++    HRESULT hr;
++    HDC dc;
++    int i, dpix, dpiy, cx, cy;
++
++    GetTempPathW(ARRAY_SIZE(dir), dir);
++    swprintf(dir + lstrlenW(dir), MAX_PATH - lstrlenW(dir), L"winetest_olecfx%lx%lx", GetCurrentProcessId(), GetTickCount());
++    ok(CreateDirectoryW(dir, NULL), "CreateDirectory failed: %lu\n", GetLastError());
++
++    SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof(lf), &lf, 0);
++    dc = GetDC(NULL);
++    dpix = GetDeviceCaps(dc, LOGPIXELSX);
++    dpiy = GetDeviceCaps(dc, LOGPIXELSY);
++    font = CreateFontIndirectW(&lf);
++    old_font = SelectObject(dc, font);
++    GetTextMetricsW(dc, &tm);
++    measured = dpix == 96 && dpiy == 96 && GetSystemMetrics(SM_CXICON) == 32 && GetSystemMetrics(SM_CYICON) == 32 &&
++               !lstrcmpW(lf.lfFaceName, L"Segoe UI") && (tm.tmHeight == 15 || tm.tmHeight == 25);
++    if (!measured)
++        skip("exact extents: %s, %ld px high, %d dpi, %dx%d icons not measured\n", wine_dbgstr_w(lf.lfFaceName),
++             tm.tmHeight, dpix, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
++
++    for (i = 0; i < ARRAY_SIZE(names); i++)
++    {
++        winetest_push_context("%s", wine_dbgstr_w(names[i]));
++        GetTextExtentPoint32W(dc, names[i], lstrlenW(names[i]), &text);
++        cx = max(GetSystemMetrics(SM_CXICON), text.cx + 1) * 5 / 4;
++        cy = GetSystemMetrics(SM_CYICON) + (11 * text.cy + 55) / 10;
++        expect.cx = MulDiv(cx, 2540, dpix);
++        expect.cy = MulDiv(cy, 2540, dpiy);
++
++        swprintf(path, ARRAY_SIZE(path), L"%s\\%s", dir, names[i]);
++        file = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
++        ok(file != INVALID_HANDLE_VALUE, "CreateFile failed: %lu\n", GetLastError());
++        CloseHandle(file);
++
++        stg = NULL;
++        hr = StgCreateDocfile(NULL, STGM_READWRITE | STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_DELETEONRELEASE, 0, &stg);
++        ok(hr == S_OK, "StgCreateDocfile failed: %#lx\n", hr);
++        obj = NULL;
++        if (SUCCEEDED(hr))
++        {
++            hr = OleCreateFromFile(&CLSID_NULL, path, &IID_IUnknown, OLERENDER_NONE, NULL, NULL, stg, (void **)&obj);
++            ok(hr == S_OK, "OleCreateFromFile failed: %#lx\n", hr);
++        }
++        if (obj)
++        {
++            hr = IUnknown_QueryInterface(obj, &IID_IViewObject2, (void **)&view);
++            ok(hr == S_OK, "QueryInterface(IViewObject2) failed: %#lx\n", hr);
++            if (hr == S_OK)
++            {
++                size.cx = size.cy = 0;
++                hr = IViewObject2_GetExtent(view, DVASPECT_CONTENT, -1, NULL, &size);
++                ok(hr == S_OK, "GetExtent failed: %#lx\n", hr);
++                if (measured)
++                    ok(size.cx == expect.cx && size.cy == expect.cy, "got %ldx%ld, expected %ldx%ld (text %ldx%ld)\n",
++                       size.cx, size.cy, expect.cx, expect.cy, text.cx, text.cy);
++                ok(size.cx > 0 && size.cy > 0, "got %ldx%ld\n", size.cx, size.cy);
++                if (i == 0) first = size;
++                else
++                {
++                    ok(size.cx > first.cx, "width %ld, shortest name %ld\n", size.cx, first.cx);
++                    ok(size.cy == first.cy, "height %ld, shortest name %ld\n", size.cy, first.cy);
++                }
++                hr = IViewObject2_GetExtent(view, DVASPECT_ICON, -1, NULL, &other);
++                ok(hr == S_OK && other.cx == size.cx && other.cy == size.cy,
++                   "DVASPECT_ICON: %#lx %ldx%ld\n", hr, other.cx, other.cy);
++                if (i == 1) check_package_draw(view);
++                IViewObject2_Release(view);
++            }
++            IUnknown_Release(obj);
++        }
++        if (stg) IStorage_Release(stg);
++        DeleteFileW(path);
++        winetest_pop_context();
++    }
++    SelectObject(dc, old_font);
++    DeleteObject(font);
++    ReleaseDC(NULL, dc);
++    RemoveDirectoryW(dir);
++}
++
++/* a Package without the UTF-16 names that follow the contents: what older
++ * writers produce (the ANSI name is counted with its terminator) */
++static void write_ansi_package(IStorage *stg, const char *name)
++{
++    static const CLSID clsid_package = {0x0003000c, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
++    static const WORD type = 2, unknown[2] = { 0, 3 };
++    static const char data[] = "ansi only\r\n";
++    char path[MAX_PATH];
++    DWORD total, n, size = sizeof(data) - 1;
++    IStream *stm;
++    HRESULT hr;
++
++    sprintf(path, "C:\\%s", name);
++    total = sizeof(type) + strlen(name) + 1 + strlen(path) + 1 + sizeof(unknown) + 4 + strlen(path) + 1 + 4 + size;
++    hr = IStorage_CreateStream(stg, L"\1Ole10Native", STGM_CREATE | STGM_WRITE | STGM_SHARE_EXCLUSIVE, 0, 0, &stm);
++    ok(hr == S_OK, "CreateStream failed: %#lx\n", hr);
++    if (FAILED(hr)) return;
++    IStream_Write(stm, &total, 4, NULL);
++    IStream_Write(stm, &type, 2, NULL);
++    IStream_Write(stm, name, strlen(name) + 1, NULL);
++    IStream_Write(stm, path, strlen(path) + 1, NULL);
++    IStream_Write(stm, unknown, 4, NULL);
++    n = strlen(path) + 1;
++    IStream_Write(stm, &n, 4, NULL);
++    IStream_Write(stm, path, n, NULL);
++    IStream_Write(stm, &size, 4, NULL);
++    IStream_Write(stm, data, size, NULL);
++    IStream_Release(stm);
++    hr = WriteClassStg(stg, &clsid_package);
++    ok(hr == S_OK, "WriteClassStg failed: %#lx\n", hr);
++}
++
++/* loading a Package copies its file into the temporary directory; Windows
++ * 10 fails (E_FAIL) only when the name, or a numbered name for a second
++ * copy, does not fit into MAX_PATH - with or without the UTF-16 names
++ * (measured with pkgprobe parts K and O) */
++static void test_OleCreateFromFile_package_tmp_limit(void)
++{
++    static const struct { int len; HRESULT first, second; } tests[] = {
++        { 105, S_OK, S_OK }, { 106, S_OK, E_FAIL }, { 109, S_OK, E_FAIL }, { 110, E_FAIL, E_FAIL },
++    };
++    WCHAR dir[MAX_PATH], path[MAX_PATH], tmp[MAX_PATH], old_tmp[MAX_PATH], old_temp[MAX_PATH], got[MAX_PATH + 1];
++    IUnknown *obj, *a, *b;
++    IStorage *stg, *stgs[2];
++    char ansi_name[151];
++    HANDLE file;
++    HRESULT hr;
++    DWORD tmp_len, temp_len;
++    int i, j, k, n;
++
++    GetTempPathW(ARRAY_SIZE(dir), dir);
++    swprintf(dir + lstrlenW(dir), MAX_PATH - lstrlenW(dir), L"wtl%lx%lx", GetCurrentProcessId(), GetTickCount());
++    ok(CreateDirectoryW(dir, NULL), "CreateDirectory failed: %lu\n", GetLastError());
++    /* a file name of 150 characters */
++    swprintf(path, ARRAY_SIZE(path), L"%s\\", dir);
++    for (n = lstrlenW(path), j = 0; j < 146; j++) path[n + j] = 'm';
++    lstrcpyW(path + n + 146, L".txt");
++    file = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
++    ok(file != INVALID_HANDLE_VALUE, "CreateFile failed: %lu\n", GetLastError());
++    CloseHandle(file);
++
++    hr = StgCreateDocfile(NULL, STGM_READWRITE | STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_DELETEONRELEASE, 0, &stg);
++    ok(hr == S_OK, "StgCreateDocfile failed: %#lx\n", hr);
++    if (FAILED(hr)) return;
++    obj = NULL;
++    hr = OleCreateFromFile(&CLSID_NULL, path, &IID_IUnknown, OLERENDER_NONE, NULL, NULL, stg, (void **)&obj);
++    ok(hr == S_OK, "OleCreateFromFile failed: %#lx\n", hr);
++    if (obj) IUnknown_Release(obj);
++    stgs[0] = stg;
++    hr = StgCreateDocfile(NULL, STGM_READWRITE | STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_DELETEONRELEASE, 0, &stgs[1]);
++    ok(hr == S_OK, "StgCreateDocfile failed: %#lx\n", hr);
++    if (FAILED(hr)) stgs[1] = NULL;
++    memset(ansi_name, 'q', 146);
++    strcpy(ansi_name + 146, ".txt");
++    if (stgs[1]) write_ansi_package(stgs[1], ansi_name);
++
++    tmp_len = GetEnvironmentVariableW(L"TMP", old_tmp, ARRAY_SIZE(old_tmp));
++    temp_len = GetEnvironmentVariableW(L"TEMP", old_temp, ARRAY_SIZE(old_temp));
++    for (i = 0; i < ARRAY_SIZE(tests); i++)
++    {
++        winetest_push_context("%d", tests[i].len);
++        /* a directory whose GetTempPath length is tests[i].len */
++        swprintf(tmp, ARRAY_SIZE(tmp), L"%s\\", dir);
++        for (n = lstrlenW(tmp); n < tests[i].len - 1; n++) tmp[n] = 'k';
++        tmp[n] = 0;
++        ok(CreateDirectoryW(tmp, NULL), "CreateDirectory failed: %lu\n", GetLastError());
++        SetEnvironmentVariableW(L"TMP", tmp);
++        SetEnvironmentVariableW(L"TEMP", tmp);
++        GetTempPathW(ARRAY_SIZE(got), got);
++        ok(lstrlenW(got) == tests[i].len, "GetTempPath length %u\n", lstrlenW(got));
++
++        for (k = 0; k < 2; k++)
++        {
++            if (!stgs[k]) continue;
++            a = b = NULL;
++            hr = OleLoad(stgs[k], &IID_IUnknown, NULL, (void **)&a);
++            ok(hr == tests[i].first, "%s: first load: got %#lx\n", k ? "ANSI only" : "UTF-16", hr);
++            hr = OleLoad(stgs[k], &IID_IUnknown, NULL, (void **)&b);
++            ok(hr == tests[i].second, "%s: second load: got %#lx\n", k ? "ANSI only" : "UTF-16", hr);
++            if (b) IUnknown_Release(b);
++            if (a) IUnknown_Release(a);
++        }
++
++        SetEnvironmentVariableW(L"TMP", tmp_len ? old_tmp : NULL);
++        SetEnvironmentVariableW(L"TEMP", temp_len ? old_temp : NULL);
++        ok(RemoveDirectoryW(tmp), "RemoveDirectory failed: %lu\n", GetLastError());
++        winetest_pop_context();
++    }
++    IStorage_Release(stg);
++    if (stgs[1]) IStorage_Release(stgs[1]);
++    DeleteFileW(path);
++    RemoveDirectoryW(dir);
++}
++
+ START_TEST(ole2)
+ {
+     DWORD dwRegister;
+@@ -4670,6 +5174,10 @@
+     test_data_cache_contents();
+     test_OleCreateStaticFromData();
+     test_ReleaseStgMedium();
++    test_OleCreateFromFile_package();
++    test_OleCreateFromFile_package_errors();
++    test_OleCreateFromFile_package_extent();
++    test_OleCreateFromFile_package_tmp_limit();
+ 
+     CoUninitialize();
+ }

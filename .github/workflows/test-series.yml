@@ -34,7 +34,7 @@ jobs:
           - group: g2
             tests: win32u gdi32 comctl32 opengl32 glu32
           - group: g3
-            tests: ntdll kernel32 kernelbase advapi32 combase ole32 oleaut32 rpcrt4 urlmon
+            tests: ntdll kernel32 kernelbase advapi32 combase ole32 oleaut32 rpcrt4 urlmon packager
           - group: g4
             tests: msi
           - group: g5

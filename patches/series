@@ -79,3 +79,7 @@ msi-source-directory-component-state.patch
 # description needed for GPU ray tracing.
 oleaut32-typelib-keep-released.patch
 opengl32-window-format-color-bits.patch
+ole32-createfromfile-package.patch
+ole32-storage-localdocs.patch
+ole32-propset-null-strings.patch
+packager-save-view-advise.patch

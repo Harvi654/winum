@@ -31,7 +31,7 @@ WORK="${WORK:-${XDG_CACHE_HOME:-$HOME/.cache}/winum/test-$VARIANT}"
 JOBS="${JOBS:-$(nproc)}"
 # test directories of the DLLs patches/series changes (the server, win32u and
 # winex11.drv changes are exercised by the user32/gdi32/win32u tests)
-TESTS="${TESTS:-advapi32 combase comctl32 gdi32 glu32 kernel32 kernelbase msi mspatcha mshtml msxml3 ntdll ole32 oleaut32 opengl32 riched20 msftedit rpcrt4 shell32 urlmon user32 wbemprox win32u wininet}"
+TESTS="${TESTS:-advapi32 combase comctl32 gdi32 glu32 kernel32 kernelbase msi mspatcha mshtml msxml3 ntdll ole32 oleaut32 opengl32 packager riched20 msftedit rpcrt4 shell32 urlmon user32 wbemprox win32u wininet}"
 UNIT_TIMEOUT="${UNIT_TIMEOUT:-300}"
 GROUP="${GROUP:-all}"
 MAKE_L1="${MAKE_L1:-1}"
