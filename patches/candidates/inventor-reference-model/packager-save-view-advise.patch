@@ -1,0 +1,993 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] packager: Implement class, user type, save, extent, advise and IViewObject2 for packages.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows (measured, Windows 10 22H2, 2026-11-11): the Package object created
+for a file has IOleObject, IPersistStorage, IDataObject and IViewObject;
+GetClassID/GetUserClassID return {0003000C-0000-0000-C000-000000000046},
+GetUserType "Package", IsDirty S_FALSE, and OleSave writes \1CompObj and
+\1Ole10Native; a saved package loads again.
+
+Wine's packager could load a package but returned E_NOTIMPL for the class,
+user type, IsDirty, Save, SaveCompleted, HandsOffStorage, GetExtent and
+Advise, and had no IViewObject. Autodesk Inventor 2027 asks for each of
+these (in this order: IViewObject2, Advise, SetHostNames, GetUserClassID,
+then GetClassID/Save on save) and drops the object when IViewObject2 or
+Advise fails (SetHostNames may fail).
+
+Save writes back the \1Ole10Native stream as loaded (Windows rewrites it
+with the path of its own temporary copy). IDataObject is not implemented;
+no caller here asks for it (Windows' Package answers GetData with
+CF_METAFILEPICT and CF_ENHMETAFILE). Needs ole32 (OleRegGetUserType,
+CreateOleAdviseHolder, WriteClassStg, WriteFmtUserTypeStg) and gdi32 in
+IMPORTS.
+
+v2 (2026-11-11, after cross review): InitNew stays E_NOTIMPL (not
+measured, not needed); Load checks the stored path lengths against its
+MAX_PATH buffers and drops the kept stream when it fails. Header
+corrected: SetHostNames still returns E_NOTIMPL and Inventor continues;
+the icon extent (96 dpi) and EnumAdvise with no sinks are not measured.
+
+v3 (2026-11-12, after cross review by Codex; measured with pkgprobe,
+Windows 10 22H2 x64 and x86, ole32 docs/wine-repro/ole32-createfromfile-html):
+- Load keeps the stream in a temporary docfile instead of memory (no 1 GiB
+  limit), copying with Read/Write only (the container's stream may not
+  implement CopyTo); a file name that does not fit into the temporary
+  directory with a " (n)" suffix fails with E_FAIL, as OleLoad does on
+  Windows, instead of overflowing the buffer.
+- Save writes the class and \1CompObj ("OLE Package") itself, as
+  IPersistStorage::Save does on Windows.
+- EnumAdvise: E_FAIL before the first Advise, then E_NOTIMPL with a NULL
+  enumerator (measured).
+- Extent and Draw: the same for every aspect and index (measured).
+- SetAdvise sends no notification for ADVF_PRIMEFIRST, as measured; no
+  change needed.
+
+v4 (2026-11-12, after the second review; measured with pkgprobe on
+Windows 10 22H2, x64 and x86, ole32 docs/wine-repro/ole32-createfromfile-html):
+- Temporary copy: the name itself must fit (GetTempPath + name + 1 <= 260),
+  and a numbered name only when the first is taken; else E_FAIL. This
+  matches Windows at every length measured (251 to 261, with and without
+  a collision); v3 refused names that fit.
+- Extent: Windows' size, in screen pixels: width 5/4 of the wider of the
+  icon and the label plus one, height the icon plus 11/10 of the label's
+  height plus 5.5, label in the icon title font; inferred from, and exact
+  for, every case measured (three names, icon title fonts of 15 and 25
+  pixels). The height
+  rests on these two font sizes; the font cannot be changed for a
+  measurement outside an interactive desktop.
+- Draw keeps the caller's mapping: the bounds are mapped to device pixels
+  first, so moving the DC's origin moves the drawing by as much (as on
+  Windows); the DC is left as it was. Windows' exact pixel placement
+  inside the bounds is not reproduced.
+- Load reads a package whose ANSI path is longer than its buffer through
+  the UTF-16 path.
+- Tests: the sink returned by GetAdvise is released.
+
+v5 (2026-11-12, after the third review): the name decoded from the ANSI
+path was counted with its terminator, so a package without the UTF-16
+names was refused one character too early; trailing terminators are
+dropped before the length check (Windows: the same limit with and without
+the UTF-16 names, measured). The extent rule is an inference from the
+measured cases (two icon title font sizes), stated as such.
+
+--- a/dlls/packager/Makefile.in
++++ b/dlls/packager/Makefile.in
+@@ -1,5 +1,5 @@
+ MODULE = packager.dll
+-IMPORTS = uuid shell32 shlwapi user32
++IMPORTS = ole32 uuid shell32 shlwapi user32 gdi32
+ 
+ SOURCES = \
+ 	packager.rc \
+--- a/dlls/packager/packager_main.c
++++ b/dlls/packager/packager_main.c
+@@ -36,14 +36,29 @@
+ struct Package {
+     IOleObject IOleObject_iface;
+     IPersistStorage IPersistStorage_iface;
++    IViewObject2 IViewObject2_iface;
+ 
+     LONG ref;
+ 
+     WCHAR filename[MAX_PATH];
++    /* shown under the icon: the name of the packaged file */
++    WCHAR label[MAX_PATH];
++
++    /* a copy of the \1Ole10Native stream as loaded, written back by Save;
++     * kept in a temporary docfile, not in memory */
++    IStorage *native;
+ 
+     IOleClientSite *clientsite;
++
++    IAdviseSink *view_sink;
++    DWORD view_aspects, view_advf;
++
++    IOleAdviseHolder *advise_holder;
+ };
+ 
++/* {0003000C-0000-0000-C000-000000000046}, the class stored with a package */
++static const CLSID CLSID_Package_Alt = {0x0003000c, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
++
+ static inline struct Package *impl_from_IOleObject(IOleObject *iface)
+ {
+     return CONTAINING_RECORD(iface, struct Package, IOleObject_iface);
+@@ -54,6 +69,51 @@
+     return CONTAINING_RECORD(iface, struct Package, IPersistStorage_iface);
+ }
+ 
++static inline struct Package *impl_from_IViewObject2(IViewObject2 *iface)
++{
++    return CONTAINING_RECORD(iface, struct Package, IViewObject2_iface);
++}
++
++/* A package is shown as its file's icon with the file name under it. The
++ * layout in screen pixels, as measured on Windows 10 (pkgprobe, ole32
++ * docs/wine-repro): the width is 5/4 of the wider of the icon and the
++ * label plus one pixel, the height the icon plus 11/10 of the label's
++ * height plus 5.5 pixels (two font sizes measured). */
++static void get_layout(struct Package *This, SIZE *icon, SIZE *text, SIZE *total)
++{
++    LOGFONTW lf;
++    HFONT font, old;
++    HDC dc;
++
++    icon->cx = GetSystemMetrics(SM_CXICON);
++    icon->cy = GetSystemMetrics(SM_CYICON);
++    text->cx = text->cy = 0;
++    if(*This->label && SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof(lf), &lf, 0) &&
++            (font = CreateFontIndirectW(&lf))){
++        dc = GetDC(NULL);
++        old = SelectObject(dc, font);
++        GetTextExtentPoint32W(dc, This->label, lstrlenW(This->label), text);
++        SelectObject(dc, old);
++        ReleaseDC(NULL, dc);
++        DeleteObject(font);
++    }
++    total->cx = max(icon->cx, text->cx + 1) * 5 / 4;
++    total->cy = icon->cy + (11 * text->cy + 55) / 10;
++}
++
++/* the same for every aspect and index, in HIMETRIC */
++static void get_extent(struct Package *This, SIZEL *size)
++{
++    SIZE icon, text, total;
++    HDC dc = GetDC(NULL);
++    int dpix = GetDeviceCaps(dc, LOGPIXELSX), dpiy = GetDeviceCaps(dc, LOGPIXELSY);
++
++    ReleaseDC(NULL, dc);
++    get_layout(This, &icon, &text, &total);
++    size->cx = MulDiv(total.cx, 2540, dpix);
++    size->cy = MulDiv(total.cy, 2540, dpiy);
++}
++
+ static HRESULT WINAPI OleObject_QueryInterface(IOleObject *iface, REFIID riid, void **obj)
+ {
+     struct Package *This = impl_from_IOleObject(iface);
+@@ -65,6 +125,10 @@
+     }else if(IsEqualGUID(riid, &IID_IPersistStorage)){
+         TRACE("(%p)->(IID_IPersistStorage, %p)\n", This, obj);
+         *obj = &This->IPersistStorage_iface;
++    }else if(IsEqualGUID(riid, &IID_IViewObject) ||
++            IsEqualGUID(riid, &IID_IViewObject2)){
++        TRACE("(%p)->(IID_IViewObject2, %p)\n", This, obj);
++        *obj = &This->IViewObject2_iface;
+     }else {
+         FIXME("(%p)->(%s, %p)\n", This, debugstr_guid(riid), obj);
+         *obj = NULL;
+@@ -95,10 +159,16 @@
+     if(!ref){
+         if(This->clientsite)
+             IOleClientSite_Release(This->clientsite);
++        if(This->view_sink)
++            IAdviseSink_Release(This->view_sink);
++        if(This->advise_holder)
++            IOleAdviseHolder_Release(This->advise_holder);
+ 
+         if(*This->filename)
+             DeleteFileW(This->filename);
+ 
++        if(This->native)
++            IStorage_Release(This->native);
+         HeapFree(GetProcessHeap(), 0, This);
+     }
+ 
+@@ -222,15 +292,33 @@
+ static HRESULT WINAPI OleObject_GetUserClassID(IOleObject *iface, CLSID *pClsid)
+ {
+     struct Package *This = impl_from_IOleObject(iface);
+-    FIXME("(%p)->(%p)\n", This, pClsid);
+-    return E_NOTIMPL;
++
++    TRACE("(%p)->(%p)\n", This, pClsid);
++
++    if(!pClsid)
++        return E_POINTER;
++
++    *pClsid = CLSID_Package_Alt;
++    return S_OK;
+ }
+ 
+ static HRESULT WINAPI OleObject_GetUserType(IOleObject *iface, DWORD dwFormOfType, LPOLESTR *pszUserType)
+ {
+     struct Package *This = impl_from_IOleObject(iface);
+-    FIXME("(%p)->(%ld, %p)\n", This, dwFormOfType, pszUserType);
+-    return E_NOTIMPL;
++
++    TRACE("(%p)->(%ld, %p)\n", This, dwFormOfType, pszUserType);
++
++    if(!pszUserType)
++        return E_POINTER;
++
++    if(SUCCEEDED(OleRegGetUserType(&CLSID_Package_Alt, dwFormOfType, pszUserType)))
++        return S_OK;
++
++    /* the type name Windows reports */
++    if(!(*pszUserType = CoTaskMemAlloc(sizeof(L"Package"))))
++        return E_OUTOFMEMORY;
++    lstrcpyW(*pszUserType, L"Package");
++    return S_OK;
+ }
+ 
+ static HRESULT WINAPI OleObject_SetExtent(IOleObject *iface, DWORD dwDrawAspect, SIZEL *psizel)
+@@ -243,28 +331,58 @@
+ static HRESULT WINAPI OleObject_GetExtent(IOleObject *iface, DWORD dwDrawAspect, SIZEL *psizel)
+ {
+     struct Package *This = impl_from_IOleObject(iface);
+-    FIXME("(%p)->(%ld, %p)\n", This, dwDrawAspect, psizel);
+-    return E_NOTIMPL;
++
++    TRACE("(%p)->(%ld, %p)\n", This, dwDrawAspect, psizel);
++
++    if(!psizel)
++        return E_INVALIDARG;
++
++    get_extent(This, psizel);
++    return S_OK;
+ }
+ 
+ static HRESULT WINAPI OleObject_Advise(IOleObject *iface, IAdviseSink *pAdvSink, DWORD *pdwConnection)
+ {
+     struct Package *This = impl_from_IOleObject(iface);
+-    FIXME("(%p)->(%p, %p)\n", This, pAdvSink, pdwConnection);
+-    return E_NOTIMPL;
++    HRESULT hr;
++
++    TRACE("(%p)->(%p, %p)\n", This, pAdvSink, pdwConnection);
++
++    if(!This->advise_holder){
++        hr = CreateOleAdviseHolder(&This->advise_holder);
++        if(FAILED(hr))
++            return hr;
++    }
++
++    return IOleAdviseHolder_Advise(This->advise_holder, pAdvSink, pdwConnection);
+ }
+ 
+ static HRESULT WINAPI OleObject_Unadvise(IOleObject *iface, DWORD dwConnection)
+ {
+     struct Package *This = impl_from_IOleObject(iface);
+-    FIXME("(%p)->(%ld)\n", This, dwConnection);
+-    return E_NOTIMPL;
++
++    TRACE("(%p)->(%ld)\n", This, dwConnection);
++
++    if(!This->advise_holder)
++        return OLE_E_NOCONNECTION;
++
++    return IOleAdviseHolder_Unadvise(This->advise_holder, dwConnection);
+ }
+ 
+ static HRESULT WINAPI OleObject_EnumAdvise(IOleObject *iface, IEnumSTATDATA **ppenumAdvise)
+ {
+     struct Package *This = impl_from_IOleObject(iface);
+-    FIXME("(%p)->(%p)\n", This, ppenumAdvise);
++
++    TRACE("(%p)->(%p)\n", This, ppenumAdvise);
++
++    if(!ppenumAdvise)
++        return E_INVALIDARG;
++
++    /* Windows: E_FAIL before the first Advise, then E_NOTIMPL */
++    if(!This->advise_holder)
++        return E_FAIL;
++
++    *ppenumAdvise = NULL;
+     return E_NOTIMPL;
+ }
+ 
+@@ -342,15 +460,21 @@
+         CLSID *pClassID)
+ {
+     struct Package *This = impl_from_IPersistStorage(iface);
+-    FIXME("(%p)->(%p)\n", This, pClassID);
+-    return E_NOTIMPL;
++
++    TRACE("(%p)->(%p)\n", This, pClassID);
++
++    if(!pClassID)
++        return E_POINTER;
++
++    *pClassID = CLSID_Package_Alt;
++    return S_OK;
+ }
+ 
+ static HRESULT WINAPI PersistStorage_IsDirty(IPersistStorage* iface)
+ {
+     struct Package *This = impl_from_IPersistStorage(iface);
+-    FIXME("(%p)\n", This);
+-    return E_NOTIMPL;
++    TRACE("(%p)\n", This);
++    return S_FALSE;
+ }
+ 
+ static HRESULT WINAPI PersistStorage_InitNew(IPersistStorage* iface,
+@@ -378,6 +502,52 @@
+     return S_OK;
+ }
+ 
++/* plain Read/Write: the container's stream may implement nothing more */
++static HRESULT copy_stream(IStream *src, IStream *dst)
++{
++    LARGE_INTEGER zero = {{0}};
++    BYTE buf[4096];
++    ULONG read;
++    HRESULT hr;
++
++    hr = IStream_Seek(src, zero, STREAM_SEEK_SET, NULL);
++    while(SUCCEEDED(hr)){
++        hr = IStream_Read(src, buf, sizeof(buf), &read);
++        if(FAILED(hr) || !read)
++            break;
++        hr = IStream_Write(dst, buf, read, NULL);
++    }
++    return FAILED(hr) ? hr : S_OK;
++}
++
++/* keeps the whole \1Ole10Native stream so that Save can write it back */
++static HRESULT keep_native_data(struct Package *This, IStream *stream)
++{
++    IStorage *stg;
++    IStream *copy;
++    HRESULT hr;
++
++    hr = StgCreateDocfile(NULL, STGM_CREATE | STGM_READWRITE | STGM_SHARE_EXCLUSIVE |
++            STGM_DELETEONRELEASE, 0, &stg);
++    if(FAILED(hr))
++        return hr;
++    hr = IStorage_CreateStream(stg, L"native", STGM_CREATE | STGM_READWRITE |
++            STGM_SHARE_EXCLUSIVE, 0, 0, &copy);
++    if(SUCCEEDED(hr)){
++        hr = copy_stream(stream, copy);
++        IStream_Release(copy);
++    }
++    if(FAILED(hr)){
++        IStorage_Release(stg);
++        return hr;
++    }
++
++    if(This->native)
++        IStorage_Release(This->native);
++    This->native = stg;
++    return S_OK;
++}
++
+ static HRESULT WINAPI PersistStorage_Load(IPersistStorage* iface,
+         IStorage *pStg)
+ {
+@@ -391,7 +561,7 @@
+     WCHAR filenameW[MAX_PATH];
+     char filenameA[MAX_PATH];
+     WCHAR *stream_filename;
+-    WCHAR *base_end, extension[MAX_PATH];
++    WCHAR *base_end, extension[MAX_PATH], suffix[16];
+ 
+     TRACE("(%p)->(%p)\n", This, pStg);
+ 
+@@ -402,6 +572,10 @@
+         return hr;
+     }
+ 
++    hr = keep_native_data(This, stream);
++    if(FAILED(hr))
++        goto exit;
++
+     /* skip stream size & two unknown bytes */
+     seek.QuadPart = 6;
+     hr = IStream_Seek(stream, seek, STREAM_SEEK_SET, NULL);
+@@ -428,8 +602,15 @@
+     hr = IStream_Read(stream, &filenameA_len, 4, NULL);
+     if(FAILED(hr))
+         goto exit;
+-
+-    hr = IStream_Read(stream, filenameA, filenameA_len, NULL);
++    if(filenameA_len > sizeof(filenameA)){
++        /* longer in a multibyte code page than the buffer: only usable
++         * through the UTF-16 name that follows the payload */
++        TRACE("ANSI path of %lu bytes, using the UTF-16 one\n", filenameA_len);
++        seek.QuadPart = filenameA_len;
++        hr = IStream_Seek(stream, seek, STREAM_SEEK_CUR, NULL);
++        filenameA_len = 0;
++    }else
++        hr = IStream_Read(stream, filenameA, filenameA_len, NULL);
+     if(FAILED(hr))
+         goto exit;
+ 
+@@ -450,13 +631,31 @@
+ 
+     /* read WCHAR filename, if present */
+     hr = IStream_Read(stream, &len, 4, &bytes_read);
++    if(SUCCEEDED(hr) && bytes_read == 4 && len > ARRAY_SIZE(filenameW)){
++        WARN("path too long: %lu\n", len);
++        hr = STG_E_READFAULT;
++        goto exit;
++    }
+     if(SUCCEEDED(hr) && bytes_read == 4 && len > 0){
+         hr = IStream_Read(stream, filenameW, len * sizeof(WCHAR), NULL);
+         if(FAILED(hr))
+             goto exit;
+-    }else{
++    }else if(filenameA_len){
+         len = MultiByteToWideChar(CP_ACP, 0, filenameA, filenameA_len,
+                 filenameW, ARRAY_SIZE(filenameW));
++    }else{
++        WARN("no usable path\n");
++        hr = STG_E_READFAULT;
++        goto exit;
++    }
++
++    /* the ANSI name is counted with its terminator, the UTF-16 one without */
++    while(len && !filenameW[len - 1])
++        --len;
++    if(!len){
++        WARN("empty path\n");
++        hr = STG_E_READFAULT;
++        goto exit;
+     }
+ 
+     stream_filename = filenameW + len - 1;
+@@ -466,8 +665,16 @@
+     if(*stream_filename == '\\')
+         ++stream_filename;
+     stream_filename_len = len - (stream_filename - filenameW);
++    lstrcpynW(This->label, stream_filename, min(stream_filename_len + 1, ARRAY_SIZE(This->label)));
+ 
+     len = GetTempPathW(ARRAY_SIZE(This->filename), This->filename);
++    /* Windows fails the load (E_FAIL) when the name does not fit */
++    if(!len || len + stream_filename_len + 1 > ARRAY_SIZE(This->filename)){
++        WARN("temporary path too long for %s\n", debugstr_wn(stream_filename, stream_filename_len));
++        *This->filename = 0;
++        hr = E_FAIL;
++        goto exit;
++    }
+     memcpy(This->filename + len, stream_filename, stream_filename_len * sizeof(WCHAR));
+     This->filename[len + stream_filename_len] = 0;
+ 
+@@ -490,9 +697,17 @@
+             goto exit;
+         }
+ 
+-        /* file exists, so increment file name and try again */
++        /* file exists, so increment file name and try again, if the
++         * suffix still fits */
+         ++i;
+-        wsprintfW(base_end, L" (%u)", i);
++        swprintf(suffix, ARRAY_SIZE(suffix), L" (%u)", i);
++        if((base_end - This->filename) + lstrlenW(suffix) + lstrlenW(extension) + 1 > ARRAY_SIZE(This->filename)){
++            WARN("no room for a numbered name\n");
++            *This->filename = 0;
++            hr = E_FAIL;
++            goto exit;
++        }
++        lstrcpyW(base_end, suffix);
+         lstrcatW(base_end, extension);
+ 
+         file = CreateFileW(This->filename, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+@@ -526,6 +741,10 @@
+         if(FAILED(hr))
+             DeleteFileW(This->filename);
+     }
++    if(FAILED(hr) && This->native){
++        IStorage_Release(This->native);
++        This->native = NULL;
++    }
+     IStream_Release(stream);
+ 
+     TRACE("Returning: %08lx\n", hr);
+@@ -536,23 +755,48 @@
+         IStorage *pStgSave, BOOL fSameAsLoad)
+ {
+     struct Package *This = impl_from_IPersistStorage(iface);
+-    FIXME("(%p)->(%p, %u)\n", This, pStgSave, fSameAsLoad);
+-    return E_NOTIMPL;
++    IStream *stream, *copy;
++    HRESULT hr;
++
++    TRACE("(%p)->(%p, %u)\n", This, pStgSave, fSameAsLoad);
++
++    if(!pStgSave)
++        return E_INVALIDARG;
++    if(!This->native)
++        return S_OK;
++
++    hr = IStorage_OpenStream(This->native, L"native", NULL,
++            STGM_READ | STGM_SHARE_EXCLUSIVE, 0, &copy);
++    if(FAILED(hr))
++        return hr;
++    hr = IStorage_CreateStream(pStgSave, L"\1Ole10Native",
++            STGM_CREATE | STGM_WRITE | STGM_SHARE_EXCLUSIVE, 0, 0, &stream);
++    if(SUCCEEDED(hr)){
++        hr = copy_stream(copy, stream);
++        IStream_Release(stream);
++    }
++    IStream_Release(copy);
++    /* like Windows, the saved storage also names the class and user type */
++    if(SUCCEEDED(hr))
++        hr = WriteClassStg(pStgSave, &CLSID_Package_Alt);
++    if(SUCCEEDED(hr))
++        hr = WriteFmtUserTypeStg(pStgSave, 0, (WCHAR *)L"OLE Package");
++    return hr;
+ }
+ 
+ static HRESULT WINAPI PersistStorage_SaveCompleted(IPersistStorage* iface,
+         IStorage *pStgNew)
+ {
+     struct Package *This = impl_from_IPersistStorage(iface);
+-    FIXME("(%p)->(%p)\n", This, pStgNew);
+-    return E_NOTIMPL;
++    TRACE("(%p)->(%p)\n", This, pStgNew);
++    return S_OK;
+ }
+ 
+ static HRESULT WINAPI PersistStorage_HandsOffStorage(IPersistStorage* iface)
+ {
+     struct Package *This = impl_from_IPersistStorage(iface);
+-    FIXME("(%p)\n", This);
+-    return E_NOTIMPL;
++    TRACE("(%p)\n", This);
++    return S_OK;
+ }
+ 
+ static IPersistStorageVtbl PersistStorage_Vtbl = {
+@@ -568,6 +812,171 @@
+     PersistStorage_HandsOffStorage
+ };
+ 
++static HRESULT WINAPI ViewObject_QueryInterface(IViewObject2 *iface, REFIID riid, void **obj)
++{
++    struct Package *This = impl_from_IViewObject2(iface);
++    return OleObject_QueryInterface(&This->IOleObject_iface, riid, obj);
++}
++
++static ULONG WINAPI ViewObject_AddRef(IViewObject2 *iface)
++{
++    struct Package *This = impl_from_IViewObject2(iface);
++    return OleObject_AddRef(&This->IOleObject_iface);
++}
++
++static ULONG WINAPI ViewObject_Release(IViewObject2 *iface)
++{
++    struct Package *This = impl_from_IViewObject2(iface);
++    return OleObject_Release(&This->IOleObject_iface);
++}
++
++static HRESULT WINAPI ViewObject_Draw(IViewObject2 *iface, DWORD aspect, LONG index, void *aspect_info,
++        DVTARGETDEVICE *device, HDC target_dc, HDC dc, const RECTL *bounds, const RECTL *wbounds,
++        BOOL (STDMETHODCALLTYPE *cont)(ULONG_PTR), ULONG_PTR cont_arg)
++{
++    struct Package *This = impl_from_IViewObject2(iface);
++    SHFILEINFOW info;
++    HICON icon = NULL;
++    SIZE icon_size, text_size, total;
++    LOGFONTW lf;
++    HFONT font = NULL, old_font = NULL;
++    POINT corners[2];
++    int saved;
++
++    TRACE("(%p)->(%ld, %ld, %p, %p, %p, %p, %s, %p, %p, %Ix)\n", This, aspect, index, aspect_info, device,
++            target_dc, dc, wine_dbgstr_rect((const RECT *)bounds), wbounds, cont, cont_arg);
++
++    if(!dc || !bounds)
++        return E_INVALIDARG;
++
++    /* every aspect is drawn the same way (measured) */
++    if(*This->filename && SHGetFileInfoW(This->filename, 0, &info, sizeof(info), SHGFI_ICON | SHGFI_LARGEICON))
++        icon = info.hIcon;
++    get_layout(This, &icon_size, &text_size, &total);
++
++    /* the bounds are in the caller's logical units: draw into the device
++     * rectangle they map to */
++    corners[0].x = bounds->left;
++    corners[0].y = bounds->top;
++    corners[1].x = bounds->right;
++    corners[1].y = bounds->bottom;
++    LPtoDP(dc, corners, 2);
++
++    saved = SaveDC(dc);
++    SetMapMode(dc, MM_ANISOTROPIC);
++    SetWindowOrgEx(dc, 0, 0, NULL);
++    SetWindowExtEx(dc, total.cx, total.cy, NULL);
++    SetViewportOrgEx(dc, corners[0].x, corners[0].y, NULL);
++    SetViewportExtEx(dc, corners[1].x - corners[0].x, corners[1].y - corners[0].y, NULL);
++
++    DrawIconEx(dc, (total.cx - icon_size.cx) / 2, (total.cy - icon_size.cy - text_size.cy) / 3,
++            icon ? icon : LoadIconW(NULL, (const WCHAR *)IDI_APPLICATION),
++            icon_size.cx, icon_size.cy, 0, NULL, DI_NORMAL);
++    if(*This->label && SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof(lf), &lf, 0) &&
++            (font = CreateFontIndirectW(&lf))){
++        old_font = SelectObject(dc, font);
++        SetBkMode(dc, TRANSPARENT);
++        TextOutW(dc, (total.cx - text_size.cx) / 2, total.cy - text_size.cy - (total.cy - icon_size.cy - text_size.cy) / 3,
++                This->label, lstrlenW(This->label));
++        SelectObject(dc, old_font);
++        DeleteObject(font);
++    }
++    RestoreDC(dc, saved);
++
++    if(icon)
++        DestroyIcon(icon);
++    return S_OK;
++}
++
++static HRESULT WINAPI ViewObject_GetColorSet(IViewObject2 *iface, DWORD aspect, LONG index, void *aspect_info,
++        DVTARGETDEVICE *device, HDC target_dc, LOGPALETTE **colors)
++{
++    struct Package *This = impl_from_IViewObject2(iface);
++
++    TRACE("(%p)->(%ld, %ld, %p, %p, %p, %p)\n", This, aspect, index, aspect_info, device, target_dc, colors);
++
++    if(!colors)
++        return E_INVALIDARG;
++    *colors = NULL;
++    return S_FALSE;
++}
++
++static HRESULT WINAPI ViewObject_Freeze(IViewObject2 *iface, DWORD aspect, LONG index, void *aspect_info,
++        DWORD *freeze)
++{
++    struct Package *This = impl_from_IViewObject2(iface);
++    FIXME("(%p)->(%ld, %ld, %p, %p)\n", This, aspect, index, aspect_info, freeze);
++    return E_NOTIMPL;
++}
++
++static HRESULT WINAPI ViewObject_Unfreeze(IViewObject2 *iface, DWORD freeze)
++{
++    struct Package *This = impl_from_IViewObject2(iface);
++    FIXME("(%p)->(%ld)\n", This, freeze);
++    return E_NOTIMPL;
++}
++
++static HRESULT WINAPI ViewObject_SetAdvise(IViewObject2 *iface, DWORD aspects, DWORD advf, IAdviseSink *sink)
++{
++    struct Package *This = impl_from_IViewObject2(iface);
++
++    TRACE("(%p)->(%ld, %ld, %p)\n", This, aspects, advf, sink);
++
++    if(sink)
++        IAdviseSink_AddRef(sink);
++    if(This->view_sink)
++        IAdviseSink_Release(This->view_sink);
++    This->view_sink = sink;
++    This->view_aspects = aspects;
++    This->view_advf = advf;
++    return S_OK;
++}
++
++static HRESULT WINAPI ViewObject_GetAdvise(IViewObject2 *iface, DWORD *aspects, DWORD *advf, IAdviseSink **sink)
++{
++    struct Package *This = impl_from_IViewObject2(iface);
++
++    TRACE("(%p)->(%p, %p, %p)\n", This, aspects, advf, sink);
++
++    if(aspects)
++        *aspects = This->view_aspects;
++    if(advf)
++        *advf = This->view_advf;
++    if(sink){
++        *sink = This->view_sink;
++        if(*sink)
++            IAdviseSink_AddRef(*sink);
++    }
++    return S_OK;
++}
++
++static HRESULT WINAPI ViewObject_GetExtent(IViewObject2 *iface, DWORD aspect, LONG index,
++        DVTARGETDEVICE *device, SIZEL *size)
++{
++    struct Package *This = impl_from_IViewObject2(iface);
++
++    TRACE("(%p)->(%ld, %ld, %p, %p)\n", This, aspect, index, device, size);
++
++    if(!size)
++        return E_INVALIDARG;
++
++    get_extent(This, size);
++    return S_OK;
++}
++
++static const IViewObject2Vtbl ViewObject_Vtbl = {
++    ViewObject_QueryInterface,
++    ViewObject_AddRef,
++    ViewObject_Release,
++    ViewObject_Draw,
++    ViewObject_GetColorSet,
++    ViewObject_Freeze,
++    ViewObject_Unfreeze,
++    ViewObject_SetAdvise,
++    ViewObject_GetAdvise,
++    ViewObject_GetExtent
++};
++
+ static HRESULT WINAPI PackageCF_QueryInterface(IClassFactory *iface, REFIID riid, void **obj)
+ {
+     TRACE("(static)->(%s, %p)\n", debugstr_guid(riid), obj);
+@@ -612,6 +1021,7 @@
+ 
+     package->IOleObject_iface.lpVtbl = &OleObject_Vtbl;
+     package->IPersistStorage_iface.lpVtbl = &PersistStorage_Vtbl;
++    package->IViewObject2_iface.lpVtbl = &ViewObject_Vtbl;
+ 
+     return IOleObject_QueryInterface(&package->IOleObject_iface, iid, obj);
+ }
+--- a/dlls/packager/tests/oleobj.c
++++ b/dlls/packager/tests/oleobj.c
+@@ -489,11 +489,257 @@
+     }
+ }
+ 
++static void check_user_type(IStorage *stg)
++{
++    CLIPFORMAT cf = 0xdead;
++    WCHAR *type = NULL;
++    HRESULT hr;
++
++    hr = ReadFmtUserTypeStg(stg, &cf, &type);
++    ok(hr == S_OK, "ReadFmtUserTypeStg failed: %08lx\n", hr);
++    if(hr == S_OK){
++        ok(!cf, "got clipboard format %u\n", cf);
++        ok(type && !lstrcmpW(type, L"OLE Package"), "got user type %s\n", wine_dbgstr_w(type));
++        CoTaskMemFree(type);
++    }
++}
++
++static IAdviseSink test_sink;
++
++static HRESULT WINAPI sink_QueryInterface(IAdviseSink *iface, REFIID riid, void **obj)
++{
++    if(IsEqualGUID(riid, &IID_IUnknown) || IsEqualGUID(riid, &IID_IAdviseSink)){
++        *obj = iface;
++        return S_OK;
++    }
++    *obj = NULL;
++    return E_NOINTERFACE;
++}
++
++static ULONG WINAPI sink_AddRef(IAdviseSink *iface) { return 2; }
++static ULONG WINAPI sink_Release(IAdviseSink *iface) { return 1; }
++static LONG view_changes;
++static void WINAPI sink_OnDataChange(IAdviseSink *iface, FORMATETC *fmt, STGMEDIUM *med) {}
++static void WINAPI sink_OnViewChange(IAdviseSink *iface, DWORD aspect, LONG index) { view_changes++; }
++static void WINAPI sink_OnRename(IAdviseSink *iface, IMoniker *mk) {}
++static void WINAPI sink_OnSave(IAdviseSink *iface) {}
++static void WINAPI sink_OnClose(IAdviseSink *iface) {}
++
++static IAdviseSinkVtbl sink_vtbl = {
++    sink_QueryInterface, sink_AddRef, sink_Release, sink_OnDataChange,
++    sink_OnViewChange, sink_OnRename, sink_OnSave, sink_OnClose
++};
++static IAdviseSink test_sink = { &sink_vtbl };
++
++/* measured on Windows 10 with pkgprobe (ole32 docs/wine-repro) */
++static void test_view_advise(IOleObject *oleobj)
++{
++    static const DWORD aspects[] = { DVASPECT_CONTENT, DVASPECT_THUMBNAIL, DVASPECT_ICON, DVASPECT_DOCPRINT };
++    IEnumSTATDATA *enm;
++    IViewObject2 *view;
++    IAdviseSink *sink;
++    SIZEL first, size;
++    DWORD conn, aspect, advf;
++    HRESULT hr;
++    LONG index;
++    int i;
++
++    hr = IOleObject_QueryInterface(oleobj, &IID_IViewObject2, (void **)&view);
++    ok(hr == S_OK, "QueryInterface(IViewObject2) failed: %08lx\n", hr);
++    if(FAILED(hr))
++        return;
++
++    /* every aspect and index gets the same extent */
++    hr = IViewObject2_GetExtent(view, DVASPECT_CONTENT, -1, NULL, &first);
++    ok(hr == S_OK, "GetExtent failed: %08lx\n", hr);
++    ok(first.cx > 0 && first.cy > 0, "got extent %ldx%ld\n", first.cx, first.cy);
++    for(i = 0; i < ARRAY_SIZE(aspects); i++)
++        for(index = -1; index <= 1; index++){
++            size.cx = size.cy = 0;
++            hr = IViewObject2_GetExtent(view, aspects[i], index, NULL, &size);
++            ok(hr == S_OK && size.cx == first.cx && size.cy == first.cy,
++                    "aspect %lu index %ld: got %08lx %ldx%ld\n", aspects[i], index, hr, size.cx, size.cy);
++            size.cx = size.cy = 0;
++            hr = IOleObject_GetExtent(oleobj, aspects[i], &size);
++            ok(hr == S_OK && size.cx == first.cx && size.cy == first.cy,
++                    "IOleObject aspect %lu: got %08lx %ldx%ld\n", aspects[i], hr, size.cx, size.cy);
++        }
++
++    /* no notification when the sink is set, also with ADVF_PRIMEFIRST */
++    view_changes = 0;
++    hr = IViewObject2_SetAdvise(view, DVASPECT_CONTENT, ADVF_PRIMEFIRST, &test_sink);
++    ok(hr == S_OK, "SetAdvise failed: %08lx\n", hr);
++    ok(!view_changes, "got %ld OnViewChange\n", view_changes);
++    hr = IViewObject2_SetAdvise(view, DVASPECT_ICON, ADVF_PRIMEFIRST | ADVF_ONLYONCE, &test_sink);
++    ok(hr == S_OK, "SetAdvise failed: %08lx\n", hr);
++    ok(!view_changes, "got %ld OnViewChange\n", view_changes);
++    sink = NULL;
++    hr = IViewObject2_GetAdvise(view, &aspect, &advf, &sink);
++    ok(hr == S_OK, "GetAdvise failed: %08lx\n", hr);
++    ok(aspect == DVASPECT_ICON, "got aspect %lu\n", aspect);
++    ok(advf == (ADVF_PRIMEFIRST | ADVF_ONLYONCE), "got advf %#lx\n", advf);
++    ok(sink == &test_sink, "got sink %p\n", sink);
++    if(sink)
++        IAdviseSink_Release(sink);
++    hr = IViewObject2_SetAdvise(view, DVASPECT_CONTENT, 0, NULL);
++    ok(hr == S_OK, "SetAdvise(NULL) failed: %08lx\n", hr);
++
++    enm = (IEnumSTATDATA *)0xdeadbeef;
++    hr = IOleObject_EnumAdvise(oleobj, &enm);
++    ok(hr == E_FAIL, "EnumAdvise before Advise returned %08lx\n", hr);
++    ok(enm == (IEnumSTATDATA *)0xdeadbeef, "got enumerator %p\n", enm);
++    hr = IOleObject_Advise(oleobj, &test_sink, &conn);
++    ok(hr == S_OK, "Advise failed: %08lx\n", hr);
++    ok(!view_changes, "got %ld OnViewChange\n", view_changes);
++    enm = (IEnumSTATDATA *)0xdeadbeef;
++    hr = IOleObject_EnumAdvise(oleobj, &enm);
++    ok(hr == E_NOTIMPL, "EnumAdvise after Advise returned %08lx\n", hr);
++    ok(!enm, "got enumerator %p\n", enm);
++    hr = IOleObject_Unadvise(oleobj, conn);
++    ok(hr == S_OK, "Unadvise failed: %08lx\n", hr);
++
++    IViewObject2_Release(view);
++}
++
++static void test_save(void)
++{
++    /* the layout Windows writes (measured with OleCreateFromFileEx) */
++    static BYTE native[] = {
++        0x61, 0x00, 0x00, 0x00, /* size of the rest */
++        0x02, 0x00,
++        'a','.','t','x','t',0, /* label */
++        'C',':','\\','a','.','t','x','t',0, /* source path */
++        0x00, 0x00,
++        0x03, 0x00,
++        0x09, 0x00, 0x00, 0x00, /* ASCIIZ temp path size */
++        'C',':','\\','a','.','t','x','t',0,
++        0x05, 0x00, 0x00, 0x00, /* payload size */
++        'h','e','l','l','o', /* payload */
++        0x08, 0x00, 0x00, 0x00, /* WCHAR temp path */
++        'C',0,':',0,'\\',0,'a',0,'.',0,'t',0,'x',0,'t',0,
++        0x05, 0x00, 0x00, 0x00, /* WCHAR label */
++        'a',0,'.',0,'t',0,'x',0,'t',0,
++        0x08, 0x00, 0x00, 0x00, /* WCHAR source path */
++        'C',0,':',0,'\\',0,'a',0,'.',0,'t',0,'x',0,'t',0,
++    };
++    IStorage *src, *dst;
++    IStream *stm;
++    IOleObject *oleobj;
++    IPersistStorage *persist;
++    BYTE buf[sizeof(native) + 16];
++    WCHAR *type;
++    CLSID clsid;
++    ULONG read;
++    HRESULT hr;
++
++    hr = StgCreateDocfile(NULL, STGM_READWRITE | STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_DELETEONRELEASE, 0, &src);
++    ok(hr == S_OK, "StgCreateDocfile failed: %08lx\n", hr);
++    hr = IStorage_CreateStream(src, L"\1Ole10Native", STGM_WRITE | STGM_SHARE_EXCLUSIVE, 0, 0, &stm);
++    ok(hr == S_OK, "CreateStream failed: %08lx\n", hr);
++    IStream_Write(stm, native, sizeof(native), NULL);
++    IStream_Release(stm);
++    /* embedded packages carry this class (measured on Windows) */
++    hr = WriteClassStg(src, &CLSID_Package_Alt);
++    ok(hr == S_OK, "WriteClassStg failed: %08lx\n", hr);
++
++    hr = CoCreateInstance(&CLSID_Package_Alt, NULL, CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER,
++            &IID_IOleObject, (void**)&oleobj);
++    ok(hr == S_OK, "CoCreateInstance(CLSID_Package_Alt) failed: %08lx\n", hr);
++    hr = IOleObject_QueryInterface(oleobj, &IID_IPersistStorage, (void**)&persist);
++    ok(hr == S_OK, "QueryInterface(IPersistStorage) failed: %08lx\n", hr);
++
++    hr = IPersistStorage_Load(persist, src);
++    ok(hr == S_OK, "Load failed: %08lx\n", hr);
++
++    hr = IPersistStorage_GetClassID(persist, &clsid);
++    ok(hr == S_OK, "GetClassID failed: %08lx\n", hr);
++    ok(IsEqualCLSID(&clsid, &CLSID_Package_Alt), "got class %s\n", wine_dbgstr_guid(&clsid));
++
++    hr = IOleObject_GetUserClassID(oleobj, &clsid);
++    ok(hr == S_OK, "GetUserClassID failed: %08lx\n", hr);
++    ok(IsEqualCLSID(&clsid, &CLSID_Package_Alt), "got class %s\n", wine_dbgstr_guid(&clsid));
++
++    hr = IOleObject_GetUserType(oleobj, USERCLASSTYPE_FULL, &type);
++    ok(hr == S_OK, "GetUserType failed: %08lx\n", hr);
++    if(hr == S_OK){
++        ok(!lstrcmpW(type, L"Package"), "got user type %s\n", wine_dbgstr_w(type));
++        CoTaskMemFree(type);
++    }
++
++    hr = IPersistStorage_IsDirty(persist);
++    ok(hr == S_FALSE, "IsDirty returned %08lx\n", hr);
++
++    test_view_advise(oleobj);
++
++    hr = StgCreateDocfile(NULL, STGM_READWRITE | STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_DELETEONRELEASE, 0, &dst);
++    ok(hr == S_OK, "StgCreateDocfile failed: %08lx\n", hr);
++    hr = OleSave(persist, dst, FALSE);
++    ok(hr == S_OK, "OleSave failed: %08lx\n", hr);
++    hr = IPersistStorage_SaveCompleted(persist, NULL);
++    ok(hr == S_OK, "SaveCompleted failed: %08lx\n", hr);
++
++    hr = ReadClassStg(dst, &clsid);
++    ok(hr == S_OK, "ReadClassStg failed: %08lx\n", hr);
++    ok(IsEqualCLSID(&clsid, &CLSID_Package_Alt), "got class %s\n", wine_dbgstr_guid(&clsid));
++    check_user_type(dst);
++
++    /* Save itself writes the class and user type, not only OleSave */
++    {
++        IStorage *dst2;
++
++        hr = StgCreateDocfile(NULL, STGM_READWRITE | STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_DELETEONRELEASE, 0, &dst2);
++        ok(hr == S_OK, "StgCreateDocfile failed: %08lx\n", hr);
++        hr = IPersistStorage_Save(persist, dst2, FALSE);
++        ok(hr == S_OK, "Save failed: %08lx\n", hr);
++        hr = IPersistStorage_SaveCompleted(persist, NULL);
++        ok(hr == S_OK, "SaveCompleted failed: %08lx\n", hr);
++        hr = ReadClassStg(dst2, &clsid);
++        ok(hr == S_OK, "ReadClassStg failed: %08lx\n", hr);
++        ok(IsEqualCLSID(&clsid, &CLSID_Package_Alt), "got class %s\n", wine_dbgstr_guid(&clsid));
++        check_user_type(dst2);
++        IStorage_Release(dst2);
++    }
++
++    hr = IStorage_OpenStream(dst, L"\1Ole10Native", NULL, STGM_READ | STGM_SHARE_EXCLUSIVE, 0, &stm);
++    ok(hr == S_OK, "OpenStream failed: %08lx\n", hr);
++    if(hr == S_OK){
++        read = 0;
++        IStream_Read(stm, buf, sizeof(buf), &read);
++        /* Windows rewrites the stream (with the path of its own temporary
++         * copy), so only check that it is there and loads again */
++        ok(read > 0, "got %lu bytes\n", read);
++        IStream_Release(stm);
++    }
++
++    {
++        IPersistStorage *persist2;
++        IOleObject *oleobj2;
++
++        hr = CoCreateInstance(&CLSID_Package_Alt, NULL, CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER,
++                &IID_IOleObject, (void**)&oleobj2);
++        ok(hr == S_OK, "CoCreateInstance(CLSID_Package_Alt) failed: %08lx\n", hr);
++        hr = IOleObject_QueryInterface(oleobj2, &IID_IPersistStorage, (void**)&persist2);
++        ok(hr == S_OK, "QueryInterface(IPersistStorage) failed: %08lx\n", hr);
++        hr = IPersistStorage_Load(persist2, dst);
++        ok(hr == S_OK, "Load of the saved package failed: %08lx\n", hr);
++        IOleObject_Close(oleobj2, OLECLOSE_NOSAVE);
++        IPersistStorage_Release(persist2);
++        IOleObject_Release(oleobj2);
++    }
++
++    IOleObject_Close(oleobj, OLECLOSE_NOSAVE);
++    IPersistStorage_Release(persist);
++    IOleObject_Release(oleobj);
++    IStorage_Release(dst);
++    IStorage_Release(src);
++}
++
+ START_TEST(oleobj)
+ {
+     CoInitialize(NULL);
+ 
+     test_packager();
++    test_save();
+ 
+     CoUninitialize();
+ }
