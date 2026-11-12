@@ -17,7 +17,7 @@ and published as versioned releases.
 ## Who uses it
 
 - [Autodesk Inventor on Linux](https://github.com/Harvi654/Autodesk-Inventor-for-Linux)
-- SOLIDWORKS on Linux (not public yet, currently in development, public release planned)
+- SOLIDWORKS 2026 on Linux (not public yet, currently in development, public release planned)
 
 Both projects download a pinned winum release and check its SHA-256. One
 Wine for both programs: a patch that changes a DLL both of them use is
