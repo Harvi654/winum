@@ -46,6 +46,14 @@ LGPL-2.1-or-later like vkd3d-proton.
 
 ## Release
 
+Released: `vkd3d-proton-3.0.1-winum-1` (2026-11-12, run 43227933384),
+`vkd3d-proton-3.0.1-winum-1.tar.zst` SHA-256
+`7d20a226388830a268943c6d0845e0e51f0569fd540df0e2f0153e31a838c8b7`. L4 with
+the released DLLs (maintainer, RX 9060 XT, copy of the Inventor 2027 prefix,
+archive checked with `sha256sum -c` and `gh attestation verify`): GPU ray
+tracing panel GPU, High renders. The DLLs differ bit for bit from the
+earlier test artifact (version string, rebuilt), hence this second L4.
+
 `version.env` names the upstream release (`VKD3D_VERSION`, `VKD3D_TAG`,
 `VKD3D_COMMIT`) and winum's build number (`VKD3D_WINUM_BUILD`, raised
 whenever a patch here changes). The maintainer makes the signed tag
