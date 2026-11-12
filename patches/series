@@ -1,3 +1,4 @@
+# Test build for the L4 of candidate inventor-reference-model (winum PR #1); not for main.
 # Patches of a normal winum build, applied in this order to vanilla Wine $WINE_VERSION
 # (wine/version.env). One name per line; '#' starts a comment. Nothing else in
 # patches/ is applied. Each patch has a status page in docs/patches/<name>.md
