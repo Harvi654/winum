@@ -1,0 +1,222 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ole32: Store NULL VT_LPSTR and VT_LPWSTR properties with a length of 0.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows (measured, Windows 10 22H2, 2026-11-11): IPropertyStorage accepts a
+VT_LPWSTR or VT_LPSTR property whose string pointer is NULL; it stores it
+with a length of 0 and no characters, and ReadMultiple returns the type
+with a NULL pointer.
+
+Wine asserted in PropertyStorage_StringCopy (VT_LPSTR) and dereferenced the
+NULL pointer in lstrlenW/lstrlenA when writing; reading a length of 0 wrote
+before the buffer. Autodesk Inventor 2027 writes such a property when it
+saves a Reference Model part into an assembly; the save was aborted by the
+access violation.
+
+Limited to NULL VT_LPSTR/VT_LPWSTR scalars when writing; reading a zero
+length gives NULL for scalars and vector elements alike.
+
+v2 (2026-11-11, after cross review): header corrected - the shared read
+code also returns NULL for a zero-length string element of a vector instead
+of writing before the buffer.
+
+v4 (2026-11-12, after the second review): the test covers Unicode (the
+default) and ANSI property sets, each also with the NULL strings replacing
+existing ones; passed on Windows 10 x86_64 and i686. The change is in the
+private PropertyStorage_PropVariantCopy() and the property set reader and
+writer, not in the exported PropVariantCopy().
+
+--- a/dlls/ole32/stg_prop.c
++++ b/dlls/ole32/stg_prop.c
+@@ -682,6 +682,13 @@
+     switch (propvar->vt)
+     {
+     case VT_LPSTR:
++        if (!propvar->pszVal)
++        {
++            /* a NULL string is kept as NULL */
++            prop->pszVal = NULL;
++            prop->vt = VT_LPSTR;
++            break;
++        }
+         hr = PropertyStorage_StringCopy(propvar->pszVal, srcCP, &prop->pszVal, targetCP);
+         if (SUCCEEDED(hr))
+             prop->vt = VT_LPSTR;
+@@ -1373,7 +1380,12 @@
+ 
+         *offset += sizeof(DWORD);
+ 
+-        if (codepage == CP_UNICODE && count % sizeof(WCHAR))
++        if (!count)
++        {
++            /* a NULL string is stored with a length of 0 */
++            prop->pszVal = NULL;
++        }
++        else if (codepage == CP_UNICODE && count % sizeof(WCHAR))
+         {
+             WARN("Unicode string has odd number of bytes\n");
+             hr = STG_E_INVALIDHEADER;
+@@ -1487,6 +1499,13 @@
+ 
+         *offset += sizeof(DWORD);
+ 
++        if (!count)
++        {
++            /* a NULL string is stored with a length of 0 */
++            prop->pwszVal = NULL;
++            break;
++        }
++
+         prop->pwszVal = call_IMemoryAllocator_Allocate(pma, count * sizeof(WCHAR));
+         if (prop->pwszVal)
+         {
+@@ -2285,7 +2304,9 @@
+     }
+     case VT_LPSTR:
+     {
+-        if (This->codePage == CP_UNICODE)
++        if (!var->pszVal)
++            len = 0; /* a NULL string: length 0, no characters */
++        else if (This->codePage == CP_UNICODE)
+             len = (lstrlenW(var->pwszVal) + 1) * sizeof(WCHAR);
+         else
+             len = lstrlenA(var->pszVal) + 1;
+@@ -2293,7 +2314,9 @@
+         hr = IStream_Write(This->stm, &dwTemp, sizeof(dwTemp), &count);
+         if (FAILED(hr))
+             goto end;
+-        hr = IStream_Write(This->stm, var->pszVal, len, &count);
++        count = 0;
++        if (len)
++            hr = IStream_Write(This->stm, var->pszVal, len, &count);
+         bytesWritten = count + sizeof(DWORD);
+         break;
+     }
+@@ -2335,14 +2358,16 @@
+     }
+     case VT_LPWSTR:
+     {
+-        len = lstrlenW(var->pwszVal) + 1;
++        /* a NULL string: length 0, no characters */
++        len = var->pwszVal ? lstrlenW(var->pwszVal) + 1 : 0;
+ 
+         StorageUtl_WriteDWord(&dwTemp, 0, len);
+         hr = IStream_Write(This->stm, &dwTemp, sizeof(dwTemp), &count);
+         if (FAILED(hr))
+             goto end;
+-        hr = IStream_Write(This->stm, var->pwszVal, len * sizeof(WCHAR),
+-         &count);
++        count = 0;
++        if (len)
++            hr = IStream_Write(This->stm, var->pwszVal, len * sizeof(WCHAR), &count);
+         bytesWritten = count + sizeof(DWORD);
+         break;
+     }
+--- a/dlls/ole32/tests/stg_prop.c
++++ b/dlls/ole32/tests/stg_prop.c
+@@ -985,10 +985,103 @@
+     ok(ret, "Failed to delete storage file.\n");
+ }
+ 
++static void check_null_strings(IPropertySetStorage *pss, const FMTID *fmtid, DWORD flags, BOOL replace)
++{
++    IPropertyStorage *ps;
++    PROPSPEC spec[3];
++    PROPVARIANT var[3], out[3];
++    HRESULT hr;
++    int i;
++
++    hr = IPropertySetStorage_Create(pss, fmtid, NULL, flags,
++            STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_READWRITE, &ps);
++    ok(hr == S_OK, "Create failed: %#lx\n", hr);
++    if (FAILED(hr)) return;
++
++    for (i = 0; i < 3; i++)
++    {
++        spec[i].ulKind = PRSPEC_PROPID;
++        spec[i].propid = 2 + i;
++        PropVariantInit(&var[i]);
++    }
++    if (replace)
++    {
++        /* the NULL strings below replace existing ones */
++        var[0].vt = VT_LPWSTR;
++        var[0].pwszVal = (WCHAR *)L"old";
++        var[1].vt = VT_LPSTR;
++        var[1].pszVal = (char *)"old";
++        hr = IPropertyStorage_WriteMultiple(ps, 2, spec, var, 2);
++        ok(hr == S_OK, "WriteMultiple failed: %#lx\n", hr);
++        hr = IPropertyStorage_Commit(ps, STGC_DEFAULT);
++        ok(hr == S_OK, "Commit failed: %#lx\n", hr);
++    }
++    /* Autodesk Inventor writes such properties when it saves a part into an assembly */
++    var[0].vt = VT_LPWSTR;
++    var[0].pwszVal = NULL;
++    var[1].vt = VT_LPSTR;
++    var[1].pszVal = NULL;
++    var[2].vt = VT_I4;
++    var[2].lVal = 42;
++
++    hr = IPropertyStorage_WriteMultiple(ps, 3, spec, var, 2);
++    ok(hr == S_OK, "WriteMultiple failed: %#lx\n", hr);
++    hr = IPropertyStorage_Commit(ps, STGC_DEFAULT);
++    ok(hr == S_OK, "Commit failed: %#lx\n", hr);
++    IPropertyStorage_Release(ps);
++
++    /* read back from the stream */
++    hr = IPropertySetStorage_Open(pss, fmtid, STGM_SHARE_EXCLUSIVE | STGM_READ, &ps);
++    ok(hr == S_OK, "Open failed: %#lx\n", hr);
++    if (FAILED(hr)) return;
++    memset(out, 0, sizeof(out));
++    hr = IPropertyStorage_ReadMultiple(ps, 3, spec, out);
++    ok(hr == S_OK, "ReadMultiple failed: %#lx\n", hr);
++    ok(out[0].vt == VT_LPWSTR, "got vt %u\n", out[0].vt);
++    ok(!out[0].pwszVal, "got %s\n", wine_dbgstr_w(out[0].pwszVal));
++    ok(out[1].vt == VT_LPSTR, "got vt %u\n", out[1].vt);
++    ok(!out[1].pszVal, "got %s\n", wine_dbgstr_a(out[1].pszVal));
++    ok(out[2].vt == VT_I4 && out[2].lVal == 42, "got vt %u, %ld\n", out[2].vt, out[2].lVal);
++    FreePropVariantArray(3, out);
++    IPropertyStorage_Release(ps);
++}
++
++static void test_null_strings(void)
++{
++    static const FMTID fmtid = { 0x9b3d0a01, 0x1111, 0x4c4c, { 0x90, 0x01, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66 } };
++    static const DWORD flags[] = { PROPSETFLAG_DEFAULT, PROPSETFLAG_ANSI };
++    IPropertySetStorage *pss;
++    IStorage *stg;
++    HRESULT hr;
++    int i, replace;
++
++    hr = StgCreateDocfile(NULL, STGM_CREATE | STGM_SHARE_EXCLUSIVE | STGM_READWRITE | STGM_DELETEONRELEASE, 0, &stg);
++    ok(hr == S_OK, "StgCreateDocfile failed: %#lx\n", hr);
++    if (FAILED(hr)) return;
++    hr = IStorage_QueryInterface(stg, &IID_IPropertySetStorage, (void **)&pss);
++    ok(hr == S_OK, "QueryInterface failed: %#lx\n", hr);
++
++    /* Unicode (the default) and ANSI property sets */
++    for (i = 0; i < ARRAY_SIZE(flags); i++)
++        for (replace = 0; replace <= 1; replace++)
++        {
++            FMTID id = fmtid;
++
++            winetest_push_context("flags %#lx%s", flags[i], replace ? ", replacing" : "");
++            id.Data1 += i * 2 + replace;
++            check_null_strings(pss, &id, flags[i], replace);
++            winetest_pop_context();
++        }
++
++    IPropertySetStorage_Release(pss);
++    IStorage_Release(stg);
++}
++
+ START_TEST(stg_prop)
+ {
+     testProps();
+     testCodepage();
+     testFmtId();
+     test_propertyset_storage_enum();
++    test_null_strings();
+ }
