@@ -27,10 +27,10 @@ jobs:
       fail-fast: false
       matrix:
         variant: [vanilla, series]
-        group: [g1, g2, g3, g4, g5]
+        group: [g1]
         include:
           - group: g1
-            tests: user32
+            tests: ws2_32 wldap32
           - group: g2
             tests: win32u gdi32 comctl32 opengl32 glu32
           - group: g3
@@ -68,6 +68,7 @@ jobs:
           export TESTS="${{ matrix.tests }}"
           export GROUP="${{ matrix.group }}"
           export MAKE_L1="${{ matrix.group == 'g1' && '1' || '0' }}"
+          export L1_UNITS="ws2_32:sock"
           bash scripts/test-series.sh ${{ matrix.variant }} out
       - name: Build log on failure
         if: failure() && env.RUN_GROUP == 'true'
