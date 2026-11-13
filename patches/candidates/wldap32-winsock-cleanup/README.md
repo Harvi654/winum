@@ -31,7 +31,7 @@ The patch remembers whether `ldap_int_initialize()` had its own successful
 ## How it was found (2026-11-13, a 2012 MacBook, Arch, winum-11.20-2)
 
 The prefix and the commands are in Autodesk-Inventor-for-Linux,
-`docs/arch-hyprland.md`, section "AutoCAD 2027 experiment". In short, with
+branch `autocad`, `docs/autocad-experiment-2026-11.md`. In short, with
 the Identity Manager and the licensing service started as `launch-inventor.sh`
 does:
 
