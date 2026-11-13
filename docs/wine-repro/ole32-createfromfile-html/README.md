@@ -51,7 +51,9 @@ CoCreateInstance(HTMLDocument) hr 0x80004005
 ```
 
 In the Inventor prefix (with Gecko) MSHTML is created and the call fails
-after `IPersistFile::Load` (`E_NOTIMPL`), see `docs/arch-hyprland.md`.
+after `IPersistFile::Load` (`E_NOTIMPL`), see the issue #10 section of
+Autodesk-Inventor-for-Linux's
+[docs/arch-hyprland.md](https://github.com/Harvi654/Autodesk-Inventor-for-Linux/blob/main/docs/arch-hyprland.md).
 
 Windows 10 (a Windows host with a working Inventor), first run:
 
@@ -65,9 +67,11 @@ CoCreateInstance(HTMLDocument) hr 0; IOleObject, IPersistFile, IDataObject,
   storage: \1CompObj (76 bytes), \1Ole10Native (497 / 456 / 467 bytes)
 ```
 
-So Windows packages the file even though MSHTML could load it. With the draft
-patches (`patches/drafts/ole32-createfromfile-package.patch`,
-`patches/drafts/packager-save-view-advise.patch`) Wine also returns a Package;
+So Windows packages the file even though MSHTML could load it. With the first
+drafts of what are now `patches/ole32-createfromfile-package.patch` and
+`patches/packager-save-view-advise.patch` (series since winum-11.20-2; the
+candidate history is in `patches/candidates/inventor-reference-model/`) Wine
+also returns a Package;
 its `\1Ole10Native` is 12 bytes shorter than Windows' for the same path and
 contents and `\1CompObj` is 64 bytes, and the object has no `IDataObject`.
 The second version of `createfromfile.c` dumps both streams and also checks
