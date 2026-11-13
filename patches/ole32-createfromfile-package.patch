@@ -3,6 +3,9 @@ Subject: [PATCH] ole32: Embed a file without an OLE server as a Package in OleCr
 
 AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
 upstream.
+Contributed by krokosik (Autodesk-Inventor-for-Linux issue #10, winum PR
+#1), written with Claude and cross-reviewed by Codex
+(docs/wine-repro/cross-review-2026-11-12-inventor-reference-model.md).
 
 Windows (measured, Windows 10 22H2, 2026-11-11): OleCreateFromFileEx on a
 file whose class is not an OLE embedding server (.htm, .txt, an unknown
