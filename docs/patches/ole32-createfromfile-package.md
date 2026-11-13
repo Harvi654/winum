@@ -33,7 +33,7 @@ Inventor embeds its translation report (`.htm`) with `OleCreateFromFileEx`. Wine
 
 ## Open points
 
-What Windows does with a path whose ANSI form exceeds MAX_PATH (multibyte code page) is not measured. OLERENDER_FORMAT stores no cache on Windows either; the patch accepts it with a FIXME.
+What Windows does with a path whose ANSI form exceeds MAX_PATH (multibyte code page) is not measured. OLERENDER_FORMAT stores no cache on Windows either; the patch accepts it with a FIXME. Other render options (OLERENDER_DRAW, OLERENDER_ASIS) and an advise sink are not handled for a Package and report a FIXME (v6); what Windows does with them is not measured.
 
 ## Notes for a Wine bug report
 
@@ -47,3 +47,4 @@ Microsoft binaries.
 - 2026-11-12: promoted into `patches/series` for winum-11.20-2 after the maintainer's L1, L2 and L4.
 
 - v2-v5 2026-11-11/12: see the vN paragraphs in the patch header.
+- v6 2026-11-13 (follow-up to the maintainer's review of winum PR #1): FIXMEs for the render options and the advise sink a Package leaves out, `WideCharToMultiByte` results checked in `create_package`. Tests unchanged; passed again on Windows 10 x86_64 and i686 (ole2 3271, storage32 19119, stg_prop 304, oleobj 93, 0 failures) and under Wine; the series still applies with `--fuzz=0`.

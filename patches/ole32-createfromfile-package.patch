@@ -66,9 +66,17 @@ which Windows loads with the same limit (pkgprobe part O, x64 and x86).
 Temporary directory names carry the tick count as well. Passed on Windows
 10 x86_64 and i686.
 
+v6 (2026-11-13, after the maintainer's review of winum PR #1): the
+Package path says what it leaves out - a FIXME for render options other
+than NONE and FORMAT (OLERENDER_DRAW, OLERENDER_ASIS) and for an advise
+sink, which it does not connect - and create_package checks the results
+of WideCharToMultiByte (a failure returns the conversion's error instead
+of writing an empty name). No change for the measured paths: the tests
+pass unchanged on Windows 10 x86_64 and i686 and under Wine.
+
 --- a/dlls/ole32/ole2.c
 +++ b/dlls/ole32/ole2.c
-@@ -3010,6 +3010,121 @@
+@@ -3010,6 +3010,126 @@
      return hr;
  }
  
@@ -118,6 +126,7 @@ Temporary directory names carry the tick count as well. Passed on Windows
 +    if (path_len >= MAX_PATH) return STG_E_FILENOTFOUND;
 +    patha_len = WideCharToMultiByte( CP_ACP, 0, filename, -1, NULL, 0, NULL, NULL );
 +    labela_len = WideCharToMultiByte( CP_ACP, 0, label, -1, NULL, 0, NULL, NULL );
++    if (!patha_len || !labela_len) return HRESULT_FROM_WIN32( GetLastError() );
 +
 +    file = CreateFileW( filename, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL );
 +    if (file == INVALID_HANDLE_VALUE)
@@ -144,8 +153,12 @@ Temporary directory names carry the tick count as well. Passed on Windows
 +        hr = E_OUTOFMEMORY;
 +        goto done;
 +    }
-+    WideCharToMultiByte( CP_ACP, 0, label, -1, labela, labela_len, NULL, NULL );
-+    WideCharToMultiByte( CP_ACP, 0, filename, -1, patha, patha_len, NULL, NULL );
++    if (!WideCharToMultiByte( CP_ACP, 0, label, -1, labela, labela_len, NULL, NULL ) ||
++        !WideCharToMultiByte( CP_ACP, 0, filename, -1, patha, patha_len, NULL, NULL ))
++    {
++        hr = HRESULT_FROM_WIN32( GetLastError() );
++        goto done;
++    }
 +
 +    hr = IStorage_CreateStream( stg, L"\1Ole10Native", STGM_CREATE | STGM_WRITE | STGM_SHARE_EXCLUSIVE, 0, 0, &stm );
 +    if (FAILED(hr)) goto done;
@@ -190,7 +203,7 @@ Temporary directory names carry the tick count as well. Passed on Windows
  /******************************************************************************
   *              OleCreateFromFileEx        [OLE32.@]
   */
-@@ -3030,6 +3145,23 @@
+@@ -3030,6 +3150,25 @@
      for (i = 0; i < num_fmts; i++)
          TRACE("\t%ld: fmt %s adv flags %ld\n", i, debugstr_formatetc(fmts + i), adv_flags[i]);
  
@@ -199,6 +212,8 @@ Temporary directory names carry the tick count as well. Passed on Windows
 +    if (!embed_by_class( filename ))
 +    {
 +        if (renderopt == OLERENDER_FORMAT) FIXME( "caching formats of a package is not supported\n" );
++        else if (renderopt != OLERENDER_NONE) FIXME( "render option %lu for a package is not supported\n", renderopt );
++        if (sink) FIXME( "advise sink %p for a package is not used\n", sink );
 +        hr = create_package( filename, stg );
 +        if (SUCCEEDED(hr)) hr = OleLoad( stg, &IID_IUnknown, client_site, (void**)&unk );
 +        if (FAILED(hr))
