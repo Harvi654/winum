@@ -83,3 +83,5 @@ ole32-createfromfile-package.patch
 ole32-storage-localdocs.patch
 ole32-propset-null-strings.patch
 packager-save-view-advise.patch
+# test build on topic/wldap32-winsock-cleanup only: not merged before L1, L2 and cross review
+wldap32-winsock-cleanup.patch

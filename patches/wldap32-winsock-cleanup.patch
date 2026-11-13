@@ -1,0 +1,131 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] wldap32: Only release the WinSock reference libldap took.
+
+AI-assisted (Claude), original code. Not submitted upstream.
+License: the libs/ldap/libldap/init.c change is under the OpenLDAP Public
+License 2.8, like the file it changes (libs/ldap/LICENSE); the test in
+dlls/ws2_32/tests/sock.c is LGPL-2.1-or-later.
+
+Wine's wldap32 is built on the bundled OpenLDAP libldap. Its library
+destructor, ldap_int_destroy_global_options(), runs when wldap32.dll is
+unloaded and always calls WSACleanup(), while ldap_int_initialize() calls
+WSAStartup() only when LDAP is actually initialised. A process that loads
+and unloads wldap32 without using LDAP therefore loses one of its own
+WinSock references per unload.
+
+Seen with AutoCAD 2027 (winum-11.20-2, +pid,+relay,+loaddll,+winsock):
+its main thread loads and unloads wldap32.dll eight times; each unload
+calls WSACleanup() from wldap32, which never called WSAStartup(). The
+process count drops to 0 and every later socket() from AutoCAD's sign-in
+component fails with WSANOTINITIALISED (10093), so AutoCAD reports "The
+License manager is not functioning" before any sign-in.
+
+The destructor now calls WSACleanup() only after ldap_int_initialize()
+had a successful WSAStartup() of its own. Nothing else changes: LDAP
+initialisation, its WSAStartup() and the rest of the destructor are as
+before.
+
+The test in dlls/ws2_32/tests/sock.c takes one WinSock reference, loads
+and unloads wldap32 three times and expects socket() to succeed. It is in
+ws2_32's tests because wldap32's own test executable imports wldap32, so
+the DLL could never be unloaded there. Expected value: not yet measured on
+Windows 10 (L1 pending); the test is written to what a Windows DLL that
+does not take WinSock references must do, and the L1 run decides.
+
+diff --git a/libs/ldap/libldap/init.c b/libs/ldap/libldap/init.c
+--- a/libs/ldap/libldap/init.c
++++ b/libs/ldap/libldap/init.c
+@@ -497,6 +497,12 @@ static void openldap_ldap_init_w_env(
+ 	}
+ }
+ 
++#if defined(HAVE_WINSOCK) || defined(HAVE_WINSOCK2)
++/* Set once ldap_int_initialize() has a WinSock reference of its own, so the
++ * destructor only gives back what this library took. */
++static int ldap_int_wsa_started;
++#endif
++
+ #if defined(__GNUC__) || defined(__clang__)
+ /* Declare this function as a destructor so that it will automatically be
+  * invoked either at program exit (if libldap is a static library) or
+@@ -529,7 +535,10 @@ ldap_int_destroy_global_options(void)
+ 	}
+ 
+ #if defined(HAVE_WINSOCK) || defined(HAVE_WINSOCK2)
+-	WSACleanup( );
++	if ( ldap_int_wsa_started ) {
++		ldap_int_wsa_started = 0;
++		WSACleanup( );
++	}
+ #endif
+ 
+ #if defined(HAVE_TLS) || defined(HAVE_CYRUS_SASL)
+@@ -679,12 +688,14 @@ void ldap_int_initialize( struct ldapoptions *gopts, int *dbglvl )
+ 	    WSACleanup( );
+ 	    goto done;
+ 	}
++	ldap_int_wsa_started = 1;
+ }	/* The WinSock DLL is acceptable. Proceed. */
+ #elif defined(HAVE_WINSOCK)
+ {	WSADATA wsaData;
+ 	if ( WSAStartup( 0x0101, &wsaData ) != 0 ) {
+ 	    goto done;
+ 	}
++	ldap_int_wsa_started = 1;
+ }
+ #endif
+ 
+diff --git a/dlls/ws2_32/tests/sock.c b/dlls/ws2_32/tests/sock.c
+--- a/dlls/ws2_32/tests/sock.c
++++ b/dlls/ws2_32/tests/sock.c
+@@ -1001,6 +1001,42 @@ static void test_WithoutWSAStartup(void)
+     ok(err == WSANOTINITIALISED, "Expected 10093, received %ld\n", err);
+ }
+ 
++/* Loading and unloading another system DLL must not give back WinSock
++ * references the process took itself (AutoCAD 2027 loads and unloads
++ * wldap32 several times while it starts). */
++static void test_WSAStartup_dll_unload(void)
++{
++    WSADATA data;
++    HMODULE module;
++    SOCKET s;
++    int i, res;
++
++    if (GetModuleHandleA( "wldap32.dll" ))
++    {
++        skip( "wldap32 is already loaded\n" );
++        return;
++    }
++
++    res = WSAStartup( MAKEWORD( 2, 2 ), &data );
++    ok( !res, "WSAStartup failed: %d\n", res );
++
++    for (i = 0; i < 3; i++)
++    {
++        module = LoadLibraryA( "wldap32.dll" );
++        ok( module != NULL, "LoadLibrary failed: %lu\n", GetLastError() );
++        if (!module) break;
++        FreeLibrary( module );
++    }
++    trace( "wldap32 %s after FreeLibrary\n", GetModuleHandleA( "wldap32.dll" ) ? "still loaded" : "unloaded" );
++
++    WSASetLastError( 0xdeadbeef );
++    s = socket( AF_INET, SOCK_STREAM, IPPROTO_TCP );
++    ok( s != INVALID_SOCKET, "socket failed: %d\n", WSAGetLastError() );
++    if (s != INVALID_SOCKET) closesocket( s );
++
++    WSACleanup();
++}
++
+ static void test_WithWSAStartup(void)
+ {
+     WSADATA data;
+@@ -15073,6 +15109,7 @@ START_TEST( sock )
+  * called, which is done by Init() below. */
+     test_WithoutWSAStartup();
+     test_WithWSAStartup();
++    test_WSAStartup_dll_unload();
+ 
+     Init();
+ 
