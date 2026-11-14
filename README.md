@@ -30,8 +30,9 @@ and published as versioned releases.
 - SOLIDWORKS 2026 on Linux (not public yet, currently in development, public release planned)
 
 The projects download a pinned winum release and check its SHA-256. One
-Wine for both programs: a patch that changes a DLL both of them use is
-tested in both before it is released.
+Wine for all of them: a patch that changes a DLL several of them use is
+tested in each before it is released (or its test there is recorded as
+deferred, see AGENTS.md).
 
 winum is not affiliated with WineHQ, Autodesk or Dassault Systèmes. Wine is
 a trademark of the Wine project; Autodesk, Inventor and SOLIDWORKS are
