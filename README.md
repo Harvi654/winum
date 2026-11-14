@@ -16,7 +16,9 @@ and published as versioned releases.
 
 ## Who uses it
 
-- [Autodesk Inventor on Linux](https://github.com/Harvi654/Autodesk-Inventor-for-Linux)
+- [Autodesk Inventor on Linux](https://github.com/Harvi654/Autodesk-Inventor-for-Linux) (2026, 2027)
+- Autodesk AutoCAD (2027) (not public yet, currently in development, public release planned)
+- Autodesk Revit (2027) (not public yet, currently in development, public release planned)
 - SOLIDWORKS 2026 on Linux (not public yet, currently in development, public release planned)
 
 Both projects download a pinned winum release and check its SHA-256. One
