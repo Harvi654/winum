@@ -9,10 +9,18 @@ and published as versioned releases.
 
 *Winum* is how the Romans pronounced *vinum*, wine.
 
-> **Status: being set up (November 2026).** `patches/series` holds the 27
-> patches of the Inventor project's `wine-11.20-6`, unchanged, so the first
-> release `winum-11.20-1` changes nothing for Inventor. The SOLIDWORKS
-> patches follow one by one, each with its test and its write-up.
+> **Status (14 November 2026).** Current release:
+> [`winum-11.20-2`](docs/release/winum-11.20-2.md) - Wine 11.20 with 66
+> patches: the Inventor project's former `wine-11.20-6` series, the
+> SOLIDWORKS fixes, 17 MSI feature-selection fixes, and four patches for
+> Inventor's Import CAD (contributed by @krokosik). Every patch in
+> `patches/series` has a Wine test that passed on Windows 10 (L1) or a
+> recorded reason why not; `scripts/check-series.sh` checks it.
+> On `main` since that release: v6 of `ole32-createfromfile-package`
+> (winum PR #2), for the next build. Next: the move to Wine 11.22 - the
+> series applies to it with `--fuzz=0` except one test hunk - and the
+> candidate `wldap32-winsock-cleanup` (L0 and L2 done, L1 and cross review
+> open).
 
 ## Who uses it
 
@@ -21,7 +29,7 @@ and published as versioned releases.
 - Autodesk Revit (2027) (not public yet, currently in development, public release planned)
 - SOLIDWORKS 2026 on Linux (not public yet, currently in development, public release planned)
 
-Both projects download a pinned winum release and check its SHA-256. One
+The projects download a pinned winum release and check its SHA-256. One
 Wine for both programs: a patch that changes a DLL both of them use is
 tested in both before it is released.
 
