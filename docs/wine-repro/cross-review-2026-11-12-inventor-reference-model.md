@@ -137,3 +137,28 @@ surrounding Wine 11.20 code; the new tests and the measurement program
 reviewed; the full series plus v5 applies with `--fuzz=0`. No new cleanup,
 refcount, bounds or architecture issues. The recorded L1, paired L2 and
 Inventor L4 support promotion (not rerun by the reviewer).
+
+## Follow-up - v6 (winum PR #2)
+
+Date: 2026-11-14. Reviewer: Claude (Opus 5.5), a different session from the
+one that wrote the patches; not a second model. Read in full: the four
+commits of PR #2 (seven files), the v6 diff of
+`ole32-createfromfile-package` against v5, and the changed code in context
+after applying the whole series to the official Wine 11.20 tree with
+`--fuzz=0` (66 patches, all applied; `scripts/check-series.sh`: 66 with L1,
+0 without).
+
+- `create_package`: the size queries of `WideCharToMultiByte` are checked
+  before any resource is taken (an early return leaks nothing), and the
+  two conversions after the allocations go to `done`, which frees them -
+  correct. A conversion of a valid UTF-16 path to CP_ACP does not fail in
+  practice, so the measured paths do not change.
+- `OleCreateFromFileEx`: the FIXMEs only report (`renderopt` is a DWORD,
+  `%lu` matches); behaviour is the same as v5, which the measurements
+  cover.
+- Header credit lines name the contributor by handle, as the rules ask.
+
+Verdict: no defect; v6 is accepted. Not done by this reviewer: a build or
+a rerun of the tests (the PR reports them unchanged and passing on Windows
+10 x86_64/i686 and under Wine). Before the next release: `WINUM_BUILD`
+raised, L0 and the paired L2 of ole32/packager for the series with v6.
