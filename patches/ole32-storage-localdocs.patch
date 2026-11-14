@@ -3,6 +3,9 @@ Subject: [PATCH] ole32: Return STG_E_INVALIDNAME and STG_E_PATHNOTFOUND, and do 
 
 AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
 upstream.
+Contributed by krokosik (Autodesk-Inventor-for-Linux issue #10, winum PR
+#1), written with Claude and cross-reviewed by Codex
+(docs/wine-repro/cross-review-2026-11-12-inventor-reference-model.md).
 
 Windows (measured, Windows 10 22H2, 2026-11-11): StgCreateDocfile and
 StgOpenStorage return STG_E_INVALIDNAME for a name CreateFile rejects with
