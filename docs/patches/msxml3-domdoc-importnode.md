@@ -40,3 +40,10 @@ Its Wine test was never run on Windows.
 
 Autodesk-Inventor-for-Linux [`docs/arch-hyprland.md`](https://github.com/Harvi654/Autodesk-Inventor-for-Linux/blob/main/docs/arch-hyprland.md) (search for the patch name).
 
+
+## History
+
+- 2026-11-15, v2 (branch `topic/wine-11.22`): rebased on Wine 11.22. Only
+  the context of the test hunk changed (upstream added tests before
+  `START_TEST`); the code and the test are unchanged. 11.22 still has
+  `domdoc_importNode` as a stub.

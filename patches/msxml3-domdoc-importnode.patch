@@ -11,6 +11,10 @@ Header added on 2026-11-11, before winum-11.20-1 (the patch body is
 unchanged). Problem, cause, Windows behaviour and validation:
 docs/patches/msxml3-domdoc-importnode.md.
 
+v2 (2026-11-15): rebased on Wine 11.22 - only the context of the
+test hunk changed (new tests before START_TEST upstream); code and
+test are the same.
+
 diff --git a/dlls/msxml3/domdoc.c b/dlls/msxml3/domdoc.c
 index 678e00e..ed85d30 100644
 --- a/dlls/msxml3/domdoc.c
@@ -92,8 +96,8 @@ diff --git a/dlls/msxml3/tests/domdoc.c b/dlls/msxml3/tests/domdoc.c
 index 295a610..9531f75 100644
 --- a/dlls/msxml3/tests/domdoc.c
 +++ b/dlls/msxml3/tests/domdoc.c
-@@ -19037,6 +19037,72 @@ static void test_document_stream(void)
-     IXMLDOMDocument_Release(doc);
+@@ -19439,6 +19439,72 @@ if (hr == S_OK)
+     free_bstrs();
  }
  
 +static void test_importNode(void)
@@ -165,7 +169,7 @@ index 295a610..9531f75 100644
  START_TEST(domdoc)
  {
      HRESULT hr;
-@@ -19073,6 +19139,7 @@ START_TEST(domdoc)
+@@ -19475,6 +19541,7 @@ START_TEST(domdoc)
      test_XPath();
      test_XSLPattern();
      test_cloneNode();
