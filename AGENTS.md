@@ -117,6 +117,12 @@ Their own AGENTS.md / HANDOFF.md cover the programs; this file covers Wine.
 - **L5** a week of normal use.
 
 ## Clean room
+- The maintainer's Windows VM: measurements (L1 tests, MEASURE programs,
+  reference installs, captures) run offline, from snapshots that never had
+  network, so the Windows build and the installed packages stay fixed and
+  nothing leaves the VM. Checks of a program's behaviour that need sign-in
+  or network run in a separate online snapshot, which is never used for
+  measurements afterwards (maintainer, 2026-11-16).
 - Allowed: observing behaviour from outside - Wine debug channels
   (`+relay`, `+seh`, ...), also with native Microsoft components, and
   stack addresses at a crash. Say so in the docs when a native component
