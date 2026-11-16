@@ -9,18 +9,21 @@ and published as versioned releases.
 
 *Winum* is how the Romans pronounced *vinum*, wine.
 
-> **Status (14 November 2026).** Current release:
-> [`winum-11.20-2`](docs/release/winum-11.20-2.md) - Wine 11.20 with 66
-> patches: the Inventor project's former `wine-11.20-6` series, the
-> SOLIDWORKS fixes, 17 MSI feature-selection fixes, and four patches for
-> Inventor's Import CAD (contributed by @krokosik). Every patch in
-> `patches/series` has a Wine test that passed on Windows 10 (L1) or a
-> recorded reason why not; `scripts/check-series.sh` checks it.
-> On `main` since that release: v6 of `ole32-createfromfile-package`
-> (winum PR #2), for the next build. Next: the move to Wine 11.22 - the
-> series applies to it with `--fuzz=0` except one test hunk - and the
-> candidate `wldap32-winsock-cleanup` (L0 and L2 done, L1 and cross review
-> open).
+> **Status (16 November 2026).** Current release:
+> [`winum-11.22-1`](docs/release/winum-11.22-1.md) - Wine 11.22 with 66
+> patches: the series of
+> [`winum-11.20-2`](docs/release/winum-11.20-2.md) (the Inventor project's
+> former `wine-11.20-6` series, the SOLIDWORKS fixes, 17 MSI
+> feature-selection fixes, four patches for Inventor's Import CAD
+> contributed by @krokosik, with v6 of `ole32-createfromfile-package`)
+> moved to Wine 11.22. Validation of 11.22: L0 both architectures with
+> `--fuzz=0`; L2 paired against vanilla 11.22 with only known flaky
+> failures; L4 in Inventor 2027 (import, parts, assemblies); SOLIDWORKS
+> and AutoCAD L4 deferred. Every patch in `patches/series` has a Wine test
+> that passed on Windows 10 (L1) or a recorded reason why not;
+> `scripts/check-series.sh` checks it. The Inventor project moves to
+> 11.22 after its own v0.4 release. Next: the candidate
+> `wldap32-winsock-cleanup` (L0 and L2 done, L1 and cross review open).
 
 ## Who uses it
 

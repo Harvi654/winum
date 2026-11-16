@@ -43,6 +43,15 @@ reused: P2-2. v3 never uses short handles as the cache key.
 | L4 | NVIDIA RTX 5080 (user report, PR #3, 2026-11-07): GPU ray tracing works with v3. Inventor 2027, RX 6400 (2026-11-06): GPU ray tracing option available and Aurora starts (without the patch: greyed out); rendering then stops in vkd3d-proton, outside Wine. Inventor 2027 normal smoke on the RX 580 (part, assembly, save, reopen): OK (2026-11-06). v3 (2026-11-06, RX 6400, GLX, with the vkd3d-proton ray payload fix): GPU ray tracing option available, renders on the GPU; part, assembly, save OK. SOLIDWORKS (OpenGL viewport) open |
 | cross review | v3 OK (Codex, 2026-11-06, section "v3 check"; after P2-1 in v1 and P2-2 in v2). v3 x64 EGL suite paired: 64 failures without, 0 with; GLX/i686 full suites incomplete in Codex's container |
 
+### winum-11.22-1 (Wine 11.22)
+
+| Level | Result | Date |
+| --- | --- | --- |
+| L0 | the whole series on the official Wine 11.22 archive, both architectures, `--fuzz=0` ([run 43703211594](https://github.com/Harvi654/winum/actions/runs/43703211594)) | 2026-11-15 |
+| L1 | unchanged from winum-11.20-2: the patch and its test are the same, and Windows did not change | - |
+| L2 | [run 43703213332](https://github.com/Harvi654/winum/actions/runs/43703213332), group g3 re-run [43739605851](https://github.com/Harvi654/winum/actions/runs/43739605851), paired against vanilla Wine 11.22: only the known flaky failures (ntdll threadpool, ntdll time, urlmon `url.c:3535` not repeated in the re-run); the workflow shows "failure" because of these | 2026-11-15 |
+| L4 | Inventor 2027 on a copy of the maintainer's prefix: import, parts, assemblies (maintainer) - a smoke test of the build, not a retest of this patch's own feature. SOLIDWORKS and AutoCAD: deferred (not being worked on since 2026-11-09, AGENTS.md) | 2026-11-15 |
+
 Note for SOLIDWORKS: it draws with OpenGL, so the formats it is offered
 change (24 -> 32 for formats without alpha, and a request for colour 24
 may now get a format with alpha, as on Windows). L4 there is required.

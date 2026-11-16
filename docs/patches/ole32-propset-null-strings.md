@@ -31,6 +31,15 @@ Inventor writes a VT_LPWSTR property whose pointer is NULL. Windows stores it wi
 | L4 | Inventor 2027.1 on NixOS, v5 (2026-11-12): Import CAD Reference Model import, place, save, restart, reopen with the part resolved; Convert Model with the report embedded, saved with the Package inside the part. SOLIDWORKS: deferred (not worked on since 2026-11-09); maintainer, Arch, Inventor 2027.2, the Wine build of `topic/inventor-reference-model` (run 43233586580), 2026-11-12: Import CAD of a STEP file into an assembly with Reference and with Convert Model, save, restart, reopen; File -> Open of a STEP without "Could not Insert Object" |
 | Cross review | Codex: v5 approved, 2026-11-12 (reviews of v2-v4 the same day) |
 
+### winum-11.22-1 (Wine 11.22)
+
+| Level | Result | Date |
+| --- | --- | --- |
+| L0 | the whole series on the official Wine 11.22 archive, both architectures, `--fuzz=0` ([run 43703211594](https://github.com/Harvi654/winum/actions/runs/43703211594)) | 2026-11-15 |
+| L1 | unchanged from winum-11.20-2: the patch and its test are the same, and Windows did not change | - |
+| L2 | [run 43703213332](https://github.com/Harvi654/winum/actions/runs/43703213332), group g3 re-run [43739605851](https://github.com/Harvi654/winum/actions/runs/43739605851), paired against vanilla Wine 11.22: only the known flaky failures (ntdll threadpool, ntdll time, urlmon `url.c:3535` not repeated in the re-run); the workflow shows "failure" because of these | 2026-11-15 |
+| L4 | Inventor 2027 on a copy of the maintainer's prefix: import, parts, assemblies (maintainer) - a smoke test of the build, not a retest of this patch's own feature. SOLIDWORKS and AutoCAD: deferred (not being worked on since 2026-11-09, AGENTS.md) | 2026-11-15 |
+
 ## Open points
 
 Zero-length vector elements share the reader change but have no own measurement.
