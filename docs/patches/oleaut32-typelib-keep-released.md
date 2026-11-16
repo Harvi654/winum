@@ -58,6 +58,15 @@ Still open for v2.2: i686 L2, full L0, SOLIDWORKS L4.
 | L4 | Inventor 2027.2 3D PDF: part 15 s, assembly 20 s, PRC model present (2026-11-03); SOLIDWORKS open |
 | cross review | v2.2 OK (Codex, 2026-11-06, after two P2 in v1 and one in v2.1) |
 
+### winum-11.22-1 (Wine 11.22)
+
+| Level | Result | Date |
+| --- | --- | --- |
+| L0 | the whole series on the official Wine 11.22 archive, both architectures, `--fuzz=0` ([run 43703211594](https://github.com/Harvi654/winum/actions/runs/43703211594)) | 2026-11-15 |
+| L1 | unchanged from winum-11.20-2: the patch and its test are the same, and Windows did not change | - |
+| L2 | [run 43703213332](https://github.com/Harvi654/winum/actions/runs/43703213332), group g3 re-run [43739605851](https://github.com/Harvi654/winum/actions/runs/43739605851), paired against vanilla Wine 11.22: only the known flaky failures (ntdll threadpool, ntdll time, urlmon `url.c:3535` not repeated in the re-run); the workflow shows "failure" because of these | 2026-11-15 |
+| L4 | Inventor 2027 on a copy of the maintainer's prefix: import, parts, assemblies (maintainer) - a smoke test of the build, not a retest of this patch's own feature. SOLIDWORKS and AutoCAD: deferred (not being worked on since 2026-11-09, AGENTS.md) | 2026-11-15 |
+
 The test passes on vanilla Wine too: it guards correctness (refcounts,
 reloading, a changed file is read anew); the speed is shown by the MEASURE
 program. On Windows it also tells whether Windows keeps the file open
