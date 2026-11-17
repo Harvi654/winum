@@ -155,3 +155,23 @@ Checks so far (local, x86_64 only, container without IPv6):
   architectures, test patch alone vs. candidate), cross review by a
   second assistant, L4 in RobotStudio (CodeMeter's event server) and a
   smoke test in Inventor (ws2_32, ntdll and the server are shared).
+
+## CI, run 44009624034 (2026-11-17, commit e50aea0)
+
+Both architectures, patches/series + test patch alone (`tests`) vs. the
+whole candidate (`candidate`), same workflow; failures per unit (the
+exit code of the test program):
+
+| Unit | tests | candidate |
+| --- | --- | --- |
+| ws2_32 afd, x86_64 / i386 | 0 / 0 | 0 / 0 |
+| ws2_32 protocol, x86_64 / i386 | 0 / 0 | 0 / 0 |
+| ws2_32 sock, x86_64 / i386 | 5 / 5 | 5 / 5 |
+| ntdll file, x86_64 / i386 | 8 / 8 | 8 / 8 |
+| kernel32 file, x86_64 / i386 | 7 / 7 | 7 / 7 |
+
+No unit has more failures with the fix; in the candidate run the AF_UNIX
+tests are not skipped but run, and add none. (The run's summary lines
+were not parsed, because Wine prefixes them with a process id; the
+script now lists the failing lines per variant too.) The artifact
+`afunix-candidate` holds `winum-11.22-1-afunix-x86_64.tar.xz` for L4.

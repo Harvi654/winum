@@ -64,6 +64,7 @@ export DISPLAY=":$(tr -d '\n' < "$WORK/display")"
 ./server/wineserver -w 2>/dev/null || true
 mkdir -p "$OUTDIR/logs"
 : > "$OUTDIR/summary-$VARIANT.tsv"
+: > "$OUTDIR/failures-$VARIANT.txt"
 for spec in $UNITS; do
     t="${spec%%:*}"; want="${spec#*:}"
     for arch in x86_64 i386; do
@@ -74,12 +75,16 @@ for spec in $UNITS; do
         for u in $units; do
             log="$OUTDIR/logs/$t.$arch.$u.log"
             timeout -k 10 "$UNIT_TIMEOUT" ./wine "$exe" "$u" > "$log" 2>&1 || echo "exit=$?" >> "$log"
-            line="$(grep -a -E "^$u: [0-9]+ tests executed" "$log" | tail -1 || true)"
+            # Wine prefixes the summary with the process id ("00d8:afd: ...")
+            line="$(grep -a -E "^([0-9a-f]+:)?$u: [0-9]+ tests executed" "$log" | tail -1 | sed -E 's/^[0-9a-f]+://' || true)"
             printf '%s\t%s\t%s\t%s\n' "$t" "$arch" "$u" "${line:-no summary ($(tail -1 "$log"))}" >> "$OUTDIR/summary-$VARIANT.tsv"
+            grep -a 'Test failed' "$log" | sed -E 's/^[0-9a-f]+://; s/^([^:]+:[0-9]+).*/\1/' | sort -u \
+                | sed "s/^/$t $arch $u /" >> "$OUTDIR/failures-$VARIANT.txt" || true
         done
     done
 done
 cat "$OUTDIR/summary-$VARIANT.tsv"
+echo "failing lines ($VARIANT):"; cat "$OUTDIR/failures-$VARIANT.txt"
 ./server/wineserver -k 2>/dev/null || true
 
 if [ "$VARIANT" = candidate ]; then
