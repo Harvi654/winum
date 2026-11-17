@@ -219,4 +219,16 @@ workflow adds `advapi32:security` to its paired run.
   397 and 10 without: the AF_UNIX tests run instead of skipping. The
   job packed `winum-11.22-1-afunix-x86_64` (CANDIDATE.txt names 818bba9)
   for L4.
-- Next: L4 of v2 in RobotStudio (CodeMeter), then cross review.
+- **L4 of v2 in RobotStudio** (maintainer's machine, 2026-11-17, artifact
+  of run 44062842130): CodeMeter 9.10's event server binds its socket and
+  the service log has no error any more ("Server ready"); before the
+  candidate it logged 10047, with v1 `SetNamedSecurityInfoA failed`. The
+  socket file has mode `srwxrwxr-x`. RobotStudio itself still exits with
+  103 (CodeMeter-protected start), so the candidate fixes CodeMeter's
+  event server but not, alone, the program's start. AGENTS.md: a patch
+  that does not fix the user's problem is not added - the candidate stays
+  here until the cause of 103 is known and shows whether the event server
+  is needed for it (Harvi654/ABB-RobotStudio-on-Linux,
+  `docs/robotstudio-2026-first-try.md`).
+- Still open before any promotion: cross review; L4 in Inventor (smoke
+  test, the server and ntdll parts touch every file open).
