@@ -77,3 +77,45 @@ a known project before it goes further.
   (`docs/wine-repro/ws2_32-afunix/l1-windows10-19045-2026-11-17/`).
 - L0/L2 (the test inside a Wine build, paired run): with the fix.
 - Next: the fix (step 3 of the plan).
+
+## Design of the fix (draft, before code)
+
+Where Wine 11.22 handles a socket: `ws2_32` (PE) turns calls into AFD
+ioctls on `\Device\Afd`; `ntdll/unix/socket.c` handles the data ioctls;
+`server/sock.c` creates the Unix socket (`init_socket`), binds, connects,
+accepts and converts addresses (`sockaddr_to_unix`, `sockaddr_from_unix`).
+The server cannot turn a Windows path into a Unix path (drive mapping and
+case folding live in ntdll's `nt_to_unix_file_name`). So:
+
+1. **Family**: `server/sock.c` maps `WS_AF_UNIX` to `AF_UNIX` for
+   `SOCK_STREAM`, protocol 0 only (datagram stays `WSAEAFNOSUPPORT`,
+   `IPPROTO_TCP` becomes `WSAEPROTONOSUPPORT`, as measured).
+2. **Path translation in ntdll**: for `IOCTL_AFD_BIND` and the connect
+   ioctl on an AF_UNIX socket, `ntdll/unix/socket.c` resolves the
+   Windows path (relative to the current directory, `/` and `\` alike)
+   to the Unix path of the prefix and hands the server both: the Unix
+   path for `bind()`/`connect()`, the Windows address as given for
+   `getsockname`/`getpeername`. Family-only and abstract names: autobind
+   / Linux abstract namespace.
+3. **Addresses**: the server keeps the Windows address of a bound socket
+   and of a connect target; `accept`, the client's `getsockname` and the
+   accepted socket's `getpeername` return the family with an empty path
+   and length `sizeof(SOCKADDR_UN)` (110), as measured; AcceptEx's
+   addresses the same way.
+4. **Errors**: `EADDRINUSE` -> `WSAEADDRINUSE` (also for an existing file,
+   which Linux reports as `EADDRINUSE`), `ENOENT`/`ECONNREFUSED` on connect
+   -> `WSAECONNREFUSED`, `ENOENT` on bind (missing directory) ->
+   `WSAENETDOWN` (measured, unusual but what Windows returns).
+5. **The socket file**: Linux leaves the socket inode after close, as
+   Windows leaves its file. ntdll reports an inode with `S_ISSOCK` as a
+   reparse point with `IO_REPARSE_TAG_AF_UNIX`, attributes archive +
+   reparse point, size 0 (`FindFirstFile`, `GetFileAttributes`), so no
+   extra data is stored. `DeleteFile` already unlinks it.
+6. **Catalogue**: one `WSAPROTOCOL_INFOW` entry for AF_UNIX in `ws2_32`
+   (`dwServiceFlags1` 0x20026, `dwProviderFlags` 0x8, address 2..110,
+   version 2, name `AF_UNIX`), also returned by `SO_PROTOCOL_INFOW`.
+
+Probably more than one patch (server, ntdll, ws2_32), each with its part
+of the test's todo_wine removed. Built and checked in GitHub Actions on
+this topic branch (a workflow like `build-statusbar-v2.yml`: L0 build and
+the ws2_32 tests), then L2 on a `test-run/` branch.
