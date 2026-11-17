@@ -83,3 +83,6 @@ ole32-createfromfile-package.patch
 ole32-storage-localdocs.patch
 ole32-propset-null-strings.patch
 packager-save-view-advise.patch
+
+shell32-parentrelativeforui-tests.patch
+shell32-parentrelativeforui.patch
