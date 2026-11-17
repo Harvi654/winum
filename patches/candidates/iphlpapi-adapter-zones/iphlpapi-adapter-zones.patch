@@ -1,0 +1,63 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] iphlpapi: Fill Ipv6IfIndex and ZoneIndices in GetAdaptersAddresses().
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 sets Ipv6IfIndex to the interface index for an adapter with
+an IPv6 interface and fills ZoneIndices like GetIpInterfaceEntry(),
+whatever family is asked for (measured,
+docs/wine-repro/iphlpapi-adapters). Wine left both 0. They are now taken
+from the IP interface tables of both families. CodeMeter's service (ABB
+RobotStudio) lists its local addresses from GetAdaptersAddresses().
+
+--- a/dlls/iphlpapi/iphlpapi_main.c
++++ b/dlls/iphlpapi/iphlpapi_main.c
+@@ -1248,6 +1248,37 @@
+     return ERROR_SUCCESS;
+ }
+ 
++/* The IPv6 interface index and the zone indices come from the IP interface tables,
++ * for both families whatever family was asked for. */
++static DWORD ip_interface_info_alloc( IP_ADAPTER_ADDRESSES *aa )
++{
++    static const ULONG families[] = { AF_INET6, AF_INET };
++    struct nsi_ip_interface_key *keys;
++    struct nsi_ip_interface_rw *rw;
++    IP_ADAPTER_ADDRESSES *cur;
++    DWORD err, count, i, f;
++
++    for (f = 0; f < ARRAY_SIZE(families); f++)
++    {
++        err = NsiAllocateAndGetTable( 1, ip_module_id( families[f] ), NSI_IP_INTERFACE_TABLE, (void **)&keys,
++                                      sizeof(*keys), (void **)&rw, sizeof(*rw), NULL, 0, NULL, 0, &count, 0 );
++        if (err) continue;
++        for (cur = aa; cur; cur = cur->Next)
++        {
++            for (i = 0; i < count; i++)
++            {
++                if (keys[i].luid.Value != cur->Luid.Value) continue;
++                if (families[f] == AF_INET6) cur->Ipv6IfIndex = cur->IfIndex;
++                if (!cur->ZoneIndices[ScopeLevelLink])
++                    memcpy( cur->ZoneIndices, rw[i].zone_indices, sizeof(cur->ZoneIndices) );
++                break;
++            }
++        }
++        NsiFreeTable( keys, rw, NULL, NULL );
++    }
++    return ERROR_SUCCESS;
++}
++
+ static DWORD adapters_addresses_alloc( ULONG family, ULONG flags, IP_ADAPTER_ADDRESSES **info, ULONG *count )
+ {
+     IP_ADAPTER_ADDRESSES *aa = NULL;
+@@ -1321,6 +1352,9 @@
+     err = dns_info_alloc( aa, family, flags );
+     if (err) goto err;
+ 
++    err = ip_interface_info_alloc( aa );
++    if (err) goto err;
++
+ err:
+     NsiFreeTable( luids, rw, dyn, stat );
+     if (!err) *info = aa;

@@ -141,3 +141,23 @@ build script, same privacy rules; results go to new folders
 
 Wine in the build sandbox (2026-11-17): all zones 0 in both functions,
 `Ipv6IfIndex` 0; `GetIpInterfaceEntry(AF_INET6)` 1168 (no IPv6 there).
+
+Results of format 2, 2026-11-17:
+[`windows10-19045-format2-2026-11-17/`](windows10-19045-format2-2026-11-17/)
+(exit 0, x86_64 and i686 alike) and
+[`wine-11.22-maintainer-format2-2026-11-17/`](wine-11.22-maintainer-format2-2026-11-17/).
+
+| | Windows 10 | Wine 11.22 |
+| --- | --- | --- |
+| `ZoneIndices` 0-3 (interface, link, subnet) | the interface index | 0 |
+| `ZoneIndices` 4-13, 15 | 1 | 0 |
+| `ZoneIndices` 14 (global) | 0 | 0 |
+| the same in `GetIpInterfaceEntry()` (`AF_INET` and `AF_INET6`) | yes, identical to `GetAdaptersAddresses()` | all 0 |
+| `Ipv6IfIndex` | the interface index (both adapters have IPv6), also for an `AF_INET` query | 0 |
+
+(On the loopback, interface index 1, every level but the global one
+reads 1, consistent with the rule.) Candidate:
+`patches/candidates/iphlpapi-adapter-zones/` - nsiproxy fills the zone
+indices of the IP interface table, GetAdaptersAddresses() takes
+`Ipv6IfIndex` and `ZoneIndices` from the IP interface tables. Under the
+fixed build the MEASURE's loopback lines match Windows.
