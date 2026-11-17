@@ -44,7 +44,8 @@ done < <(sed -e 's/#.*//' -e 's/[[:space:]]//g' -e '/^$/d' "$CAND/series")
 
 say "Configuring with tests"
 mkdir -p "$SRC/build" && cd "$SRC/build"
-../configure --enable-archs=x86_64,i386 --enable-tests --with-x \
+../configure --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc \
+    --enable-archs=x86_64,i386 --enable-tests --with-x \
     > "$WORK/configure.log" 2>&1 || { tail -40 "$WORK/configure.log"; exit 1; }
 say "Building with $JOBS jobs"
 make -j"$JOBS" > "$WORK/build.log" 2>&1 || { grep -E 'error' "$WORK/build.log" | head -40; tail -40 "$WORK/build.log"; exit 1; }
@@ -79,4 +80,20 @@ for spec in $UNITS; do
     done
 done
 cat "$OUTDIR/summary-$VARIANT.tsv"
+./server/wineserver -k 2>/dev/null || true
+
+if [ "$VARIANT" = candidate ]; then
+    # a runnable build for L4 in RobotStudio and Inventor (not a release;
+    # unpacked like a winum release, e.g. next to winum-11.22-1-x86_64)
+    NAME="winum-$WINE_VERSION-$WINUM_BUILD-afunix-x86_64"
+    say "Packing $NAME for L4"
+    rm -rf "$WORK/stage" "$WORK/$NAME"
+    make install DESTDIR="$WORK/stage" > "$WORK/install.log" 2>&1 || { tail -40 "$WORK/install.log"; exit 1; }
+    mv "$WORK/stage/usr" "$WORK/$NAME"
+    cp "$SRC/PATCHES.txt" "$WORK/$NAME/" 2>/dev/null || true
+    printf 'winum %s + candidate ws2_32-af-unix (%s), built by test-afunix.sh. Not a release.\n' \
+        "$WINE_VERSION-$WINUM_BUILD" "$(git -C "$HERE" rev-parse --short HEAD)" > "$WORK/$NAME/CANDIDATE.txt"
+    tar -C "$WORK" -cJf "$OUTDIR/$NAME.tar.xz" "$NAME"
+    (cd "$OUTDIR" && sha256sum "$NAME.tar.xz" > "$NAME.tar.xz.sha256")
+fi
 say "Done: $OUTDIR"
