@@ -1,0 +1,37 @@
+measure ws2_32-afunix-del format=1 arch=x86_64
+deletefile ret=1 err=0
+deletefile_after exists=0 attrs=0 err=2
+disposition_reparse open=1 err=0
+disposition_reparse_set ret=1 err=0
+disposition_reparse_after exists=0 attrs=0 err=2
+disposition_ex_reparse open=1 err=0
+disposition_ex_reparse_set ret=1 err=0
+disposition_ex_reparse_after exists=0 attrs=0 err=2
+delete_on_close_reparse open=1 err=0
+delete_on_close_reparse_after exists=0 attrs=0 err=2
+open_delete_backup open=0 err=1920
+open_delete_backup_after exists=1 attrs=0x420 err=0
+open_delete_plain open=0 err=1920
+open_delete_plain_after exists=1 attrs=0x420 err=0
+movefile ret=1 err=0
+movefile_target exists=1 attrs=0x420
+movefile_after exists=0 attrs=0 err=2
+deletefile_listening ret=1 err=0
+deletefile_listening_after exists=0 attrs=0 err=2
+disposition_reparse_listening open=1 err=0
+disposition_reparse_listening_set ret=1 err=0
+disposition_reparse_listening_after exists=0 attrs=0 err=2
+disposition_ex_reparse_listening open=1 err=0
+disposition_ex_reparse_listening_set ret=1 err=0
+disposition_ex_reparse_listening_after exists=0 attrs=0 err=2
+delete_on_close_reparse_listening open=1 err=0
+delete_on_close_reparse_listening_after exists=0 attrs=0 err=2
+open_delete_backup_listening open=0 err=1920
+open_delete_backup_listening_after exists=1 attrs=0x420 err=0
+open_delete_plain_listening open=0 err=1920
+open_delete_plain_listening_after exists=1 attrs=0x420 err=0
+movefile_listening ret=1 err=0
+movefile_listening_target exists=1 attrs=0x420
+movefile_listening_after exists=0 attrs=0 err=2
+cleanup remove_dir=1
+complete 1

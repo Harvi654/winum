@@ -37,6 +37,13 @@ through /proc/self/fd (Linux). Wine keeps it as mode bits only, since a
 socket inode takes no xattr. Found in L4: CodeMeter calls
 SetNamedSecurityInfoA right after bind.
 
+v3 (2026-11-17): a socket file can be deleted through its handle
+(FileDispositionInfo, FileDispositionInfoEx): set_fd_disposition
+accepted only regular files and directories and answered
+STATUS_INVALID_PARAMETER. Measured on Windows 10: both work, with and
+without a listener. Found in L4: CodeMeter removes the socket file of
+its previous run that way before it binds again.
+
 --- a/include/wine/afd.h
 +++ b/include/wine/afd.h
 @@ -321,6 +321,25 @@ struct afd_connect_params
@@ -120,6 +127,15 @@ SetNamedSecurityInfoA right after bind.
      if (fd->unix_name[strlen( fd->unix_name ) - 1] != '?')
      {
          set_error( STATUS_NOT_A_REPARSE_POINT );
+@@ -2823,7 +2851,7 @@ static void set_fd_disposition( struct fd *fd, unsigned int flags )
+                 return;
+             }
+         }
+-        else  /* can't unlink special files */
++        else if (!S_ISSOCK( st.st_mode ))  /* can't unlink special files; an AF_UNIX socket file is a reparse point */
+         {
+             set_error( STATUS_INVALID_PARAMETER );
+             return;
 --- a/server/file.c
 +++ b/server/file.c
 @@ -506,8 +506,17 @@ static int file_set_sd( struct object *obj, const struct security_descriptor *sd

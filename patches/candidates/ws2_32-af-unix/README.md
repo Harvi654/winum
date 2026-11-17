@@ -232,3 +232,25 @@ workflow adds `advapi32:security` to its paired run.
   `docs/robotstudio-2026-first-try.md`).
 - Still open before any promotion: cross review; L4 in Inventor (smoke
   test, the server and ntdll parts touch every file open).
+
+## Fix v3 (2026-11-17)
+
+L4 of v2 showed a second problem on every start after the first:
+CodeMeter removes the socket file of its previous run before it binds,
+and that failed ("remove: Invalid parameter"), so its event server
+stopped. MEASURE 3 (`measure-del.c`): on Windows `DeleteFile`,
+`FileDispositionInfo`, `FileDispositionInfoEx` and delete-on-close all
+remove a socket file, with or without a listener, and `MoveFileEx`
+renames it; under v2 the two disposition calls failed with
+`ERROR_INVALID_PARAMETER` because `set_fd_disposition()` in
+`server/fd.c` refuses anything but regular files and directories.
+
+- test patch v3: `test_afunix_delete` with the measured values;
+- server patch v3: `set_fd_disposition` also deletes a socket file
+  (`S_ISSOCK`), which is unlinked on close as a regular file is.
+
+Local checks (x86_64): the series applies with `--fuzz=0`; without the
+server change `test_afunix_delete` fails 7 times (error 87, the file
+stays), with it the AF_UNIX tests pass (`ws2_32 sock` keeps its 328
+failures outside AF_UNIX in this sandbox, as before). Next: the paired
+CI run, L1 of the new test, L4 (every start, not only the first).

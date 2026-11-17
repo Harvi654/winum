@@ -4,6 +4,10 @@
  * Wine's test.h: on Windows todo_wine changes nothing; under Wine a
  * failing check inside todo_wine counts as todo and a passing one as a
  * failure ("test succeeded inside todo block"). */
+/* Windows 10 1607 headers, as Wine's: FileDispositionInfoEx (test_afunix_delete) */
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0A000002
+#endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <mswsock.h>

@@ -566,6 +566,85 @@ static void test_afunix_security(void)
     ok(DeleteFileA(path), "DeleteFileA failed, error %lu\n", GetLastError());
 }
 
+static void afunix_check_gone(const char *path, const char *what)
+{
+    DWORD attrs;
+
+    SetLastError(0xdeadbeef);
+    attrs = GetFileAttributesA(path);
+    ok(attrs == INVALID_FILE_ATTRIBUTES && GetLastError() == ERROR_FILE_NOT_FOUND,
+       "%s: attributes %#lx, error %lu\n", what, attrs, GetLastError());
+}
+
+static void test_afunix_delete(void)
+{
+    char path[MAX_PATH], target[MAX_PATH];
+    FILE_DISPOSITION_INFO info;
+    struct { DWORD Flags; } info_ex;
+    SOCKET listener;
+    SOCKADDR_UN addr;
+    HANDLE file;
+    DWORD attrs;
+    BOOL ret;
+
+    listener = afunix_socket();
+    if (listener == INVALID_SOCKET)
+    {
+        skip("AF_UNIX sockets are not supported\n");
+        return;
+    }
+    afunix_path(path, "s-del");
+    afunix_path(target, "s-moved");
+    afunix_set(&addr, path);
+    ok(!bind(listener, (struct sockaddr *)&addr, afunix_len(path)), "bind failed, error %d\n", WSAGetLastError());
+    ok(!listen(listener, 5), "listen failed, error %d\n", WSAGetLastError());
+    closesocket(listener);
+
+    /* a socket file left behind can be removed through its handle, as a C runtime's remove() does */
+    SetLastError(0xdeadbeef);
+    file = CreateFileA(path, DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+                       OPEN_EXISTING, 0, NULL);
+    ok(file == INVALID_HANDLE_VALUE && GetLastError() == ERROR_CANT_ACCESS_FILE,
+       "open without the reparse flag: handle %p, error %lu\n", file, GetLastError());
+    if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
+
+    file = CreateFileA(path, DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+                       OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    ok(file != INVALID_HANDLE_VALUE, "CreateFileA failed, error %lu\n", GetLastError());
+    info.DeleteFile = TRUE;
+    ret = SetFileInformationByHandle(file, FileDispositionInfo, &info, sizeof(info));
+    ok(ret, "FileDispositionInfo failed, error %lu\n", GetLastError());
+    CloseHandle(file);
+    afunix_check_gone(path, "after FileDispositionInfo");
+
+    /* the same while a socket listens on it, with POSIX semantics */
+    listener = afunix_socket();
+    ok(!bind(listener, (struct sockaddr *)&addr, afunix_len(path)), "bind again failed, error %d\n",
+       WSAGetLastError());
+    ok(!listen(listener, 5), "listen failed, error %d\n", WSAGetLastError());
+    file = CreateFileA(path, DELETE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+                       OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    ok(file != INVALID_HANDLE_VALUE, "CreateFileA failed, error %lu\n", GetLastError());
+    info_ex.Flags = 0x13; /* delete, POSIX semantics, ignore the read-only attribute */
+    ret = SetFileInformationByHandle(file, FileDispositionInfoEx, &info_ex, sizeof(info_ex));
+    ok(ret, "FileDispositionInfoEx failed, error %lu\n", GetLastError());
+    CloseHandle(file);
+    afunix_check_gone(path, "after FileDispositionInfoEx");
+    closesocket(listener);
+
+    /* renaming keeps the reparse point */
+    listener = afunix_socket();
+    ok(!bind(listener, (struct sockaddr *)&addr, afunix_len(path)), "bind again failed, error %d\n",
+       WSAGetLastError());
+    closesocket(listener);
+    ret = MoveFileExA(path, target, 0);
+    ok(ret, "MoveFileExA failed, error %lu\n", GetLastError());
+    attrs = GetFileAttributesA(target);
+    ok(attrs == (FILE_ATTRIBUTE_ARCHIVE | FILE_ATTRIBUTE_REPARSE_POINT), "moved file attributes %#lx\n", attrs);
+    afunix_check_gone(path, "after MoveFileExA");
+    ok(DeleteFileA(target), "DeleteFileA failed, error %lu\n", GetLastError());
+}
+
 static void test_afunix_winum(void)
 {
     if (!afunix_make_dir())
@@ -579,5 +658,6 @@ static void test_afunix_winum(void)
     test_afunix_nonblocking();
     test_afunix_extensions();
     test_afunix_security();
+    test_afunix_delete();
     ok(RemoveDirectoryA(afunix_dir), "RemoveDirectoryA failed, error %lu\n", GetLastError());
 }

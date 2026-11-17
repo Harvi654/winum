@@ -155,6 +155,9 @@ that. They are not used.)
   Windows 10 22H2 (19045), offline VM, 2026-11-17:
   `checks=150 failures=0 todos=0 skipped=0`, exit 0, x86_64 and i686
   ([`l1-v2-windows10-19045-2026-11-17/`](l1-v2-windows10-19045-2026-11-17/)).
+- Test body of fix v3 with `test_afunix_delete`: pending (169 checks
+  expected; `l1.c` now builds with Windows 10 1607 headers for
+  `FileDispositionInfoEx`).
 
 ## MEASURE 3: deleting and renaming the socket file (`measure-del.c`)
 
@@ -186,4 +189,18 @@ Under fix v2 (local x86_64 build, 2026-11-17,
 parameter" CodeMeter logs. Cause: `set_fd_disposition()` in
 `server/fd.c` accepts only regular files and directories ("can't unlink
 special files"). The open without the reparse flag fails with 1920 as
-in MEASURE 2. Windows values: pending (offline VM).
+in MEASURE 2.
+
+Windows 10 22H2 (19045), 2026-11-17
+([`windows10-19045-del-2026-11-17/`](windows10-19045-del-2026-11-17/), all
+six programs of the bundle exit 0, x86_64 and i686 identical). This run
+was in the maintainer's experiment VM, which had network for the
+RobotStudio reference (maintainer, 2026-11-17: an experiment); its
+MEASURE 1 and 2 results in the same run are identical to the offline
+ones above. Windows: every way works - `DeleteFileA`, both
+`SetFileInformationByHandle` disposition calls and delete-on-close
+(with the reparse flag) remove the file, with and without a listener;
+`MoveFileExA` moves it and the target is still a reparse point (0x420);
+without the reparse flag the open fails with 1920. The only difference
+from fix v2 is the two disposition calls; fix v3 lets
+`set_fd_disposition` delete a socket file.
