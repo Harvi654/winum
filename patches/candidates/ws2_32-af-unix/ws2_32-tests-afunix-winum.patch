@@ -1,0 +1,558 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ws2_32/tests: Test more of AF_UNIX stream sockets.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Test only, no fix yet (test first). Expected values were measured on
+Windows 10 22H2 (19045), x86_64 and i686, with
+docs/wine-repro/ws2_32-afunix/measure.c, 2026-11-17: the AF_UNIX
+catalogue entry, the socket kinds and options, the socket file (a
+reparse point with IO_REPARSE_TAG_AF_UNIX that stays after close), the
+addresses getsockname/getpeername/accept/AcceptEx return, the error
+codes, the address forms (family only, abstract, full length, no NUL,
+forward slashes, relative), non-blocking connect/accept, AcceptEx and
+ConnectEx. Wine 11.22 creates no AF_UNIX socket (WSAEAFNOSUPPORT), so
+the socket creation and catalogue checks are todo_wine and the rest is
+skipped; the upstream test_afunix covers the basic connection and is
+left unchanged.
+
+CodeMeter's runtime (ABB RobotStudio) listens on an AF_UNIX stream
+socket with overlapped I/O, at a path with mixed separators; that is why
+AcceptEx and the address forms are tested.
+
+--- a/dlls/ws2_32/tests/sock.c
++++ b/dlls/ws2_32/tests/sock.c
+@@ -15065,6 +15065,524 @@ static void test_afunix(void)
+     test_afunix_path( path );
+ }
+ 
++static char afunix_dir[MAX_PATH];
++
++static BOOL afunix_make_dir(void)
++{
++    char tmp[MAX_PATH];
++    DWORD len = GetTempPathA(ARRAY_SIZE(tmp), tmp);
++
++    if (!len || len > 64) return FALSE;
++    sprintf(afunix_dir, "%.64swinum_afunix_%lu", tmp, GetCurrentProcessId());
++    return CreateDirectoryA(afunix_dir, NULL);
++}
++
++static void afunix_path(char *buffer, const char *name)
++{
++    sprintf(buffer, "%.100s\\%.32s", afunix_dir, name);
++}
++
++static void afunix_set(SOCKADDR_UN *addr, const char *path)
++{
++    memset(addr, 0, sizeof(*addr));
++    addr->sun_family = AF_UNIX;
++    memcpy(addr->sun_path, path, strlen(path));
++}
++
++static int afunix_len(const char *path)
++{
++    return offsetof(SOCKADDR_UN, sun_path) + strlen(path) + 1;
++}
++
++static SOCKET afunix_socket(void)
++{
++    SOCKET s = socket(AF_UNIX, SOCK_STREAM, 0);
++    todo_wine ok(s != INVALID_SOCKET, "socket failed, error %d\n", WSAGetLastError());
++    return s;
++}
++
++static void afunix_check_file(const char *path, const char *what)
++{
++    WIN32_FIND_DATAA data;
++    HANDLE find = FindFirstFileA(path, &data);
++
++    ok(find != INVALID_HANDLE_VALUE, "%s: no socket file, error %lu\n", what, GetLastError());
++    if (find == INVALID_HANDLE_VALUE) return;
++    FindClose(find);
++    ok(data.dwFileAttributes == (FILE_ATTRIBUTE_ARCHIVE | FILE_ATTRIBUTE_REPARSE_POINT),
++       "%s: attributes %#lx\n", what, data.dwFileAttributes);
++    ok(data.dwReserved0 == IO_REPARSE_TAG_AF_UNIX, "%s: reparse tag %#lx\n", what, data.dwReserved0);
++    ok(!data.nFileSizeLow && !data.nFileSizeHigh, "%s: size %lu\n", what, data.nFileSizeLow);
++}
++
++static void afunix_check_name(int ret, const SOCKADDR_UN *addr, int len, const char *path, const char *what)
++{
++    ok(!ret, "%s: failed, error %d\n", what, WSAGetLastError());
++    ok(addr->sun_family == AF_UNIX, "%s: family %u\n", what, addr->sun_family);
++    if (path)
++    {
++        ok(len == afunix_len(path), "%s: length %d\n", what, len);
++        ok(!strcmp(addr->sun_path, path), "%s: path %s\n", what, debugstr_a(addr->sun_path));
++    }
++    else
++    {
++        ok(len == (int)sizeof(SOCKADDR_UN), "%s: length %d\n", what, len);
++        ok(!addr->sun_path[0], "%s: path %s\n", what, debugstr_a(addr->sun_path));
++    }
++}
++
++static void test_afunix_catalogue(void)
++{
++    WSAPROTOCOL_INFOW *info;
++    DWORD size = 0;
++    int i, count, found = 0;
++    SOCKET s;
++    int type, len, ret;
++    WSAPROTOCOL_INFOW pi;
++
++    count = WSAEnumProtocolsW(NULL, NULL, &size);
++    ok(count == SOCKET_ERROR && WSAGetLastError() == WSAENOBUFS, "got %d, error %d\n", count, WSAGetLastError());
++    info = malloc(size);
++    count = WSAEnumProtocolsW(NULL, info, &size);
++    ok(count > 0, "got %d, error %d\n", count, WSAGetLastError());
++    for (i = 0; i < count; i++)
++    {
++        if (info[i].iAddressFamily != AF_UNIX) continue;
++        found++;
++        ok(info[i].iSocketType == SOCK_STREAM, "type %d\n", info[i].iSocketType);
++        ok(!info[i].iProtocol, "protocol %d\n", info[i].iProtocol);
++        ok(info[i].dwServiceFlags1 == 0x20026, "service flags %#lx\n", info[i].dwServiceFlags1);
++        ok(info[i].dwProviderFlags == 0x8, "provider flags %#lx\n", info[i].dwProviderFlags);
++        ok(info[i].iMaxSockAddr == 110, "max address %d\n", info[i].iMaxSockAddr);
++        ok(info[i].iMinSockAddr == 2, "min address %d\n", info[i].iMinSockAddr);
++        ok(info[i].iVersion == 2, "version %d\n", info[i].iVersion);
++        ok(!wcscmp(info[i].szProtocol, L"AF_UNIX"), "name %s\n", debugstr_w(info[i].szProtocol));
++    }
++    todo_wine ok(found == 1, "found %d AF_UNIX entries\n", found);
++    free(info);
++
++    s = socket(AF_UNIX, SOCK_DGRAM, 0);
++    ok(s == INVALID_SOCKET && WSAGetLastError() == WSAEAFNOSUPPORT, "datagram: error %d\n", WSAGetLastError());
++    s = socket(AF_UNIX, SOCK_SEQPACKET, 0);
++    ok(s == INVALID_SOCKET && WSAGetLastError() == WSAESOCKTNOSUPPORT, "seqpacket: error %d\n", WSAGetLastError());
++    s = socket(AF_UNIX, SOCK_STREAM, IPPROTO_TCP);
++    todo_wine ok(s == INVALID_SOCKET && WSAGetLastError() == WSAEPROTONOSUPPORT, "stream/tcp: error %d\n",
++                 WSAGetLastError());
++
++    s = WSASocketW(AF_UNIX, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
++    todo_wine ok(s != INVALID_SOCKET, "WSASocketW failed, error %d\n", WSAGetLastError());
++    if (s == INVALID_SOCKET)
++    {
++        skip("AF_UNIX sockets are not supported\n");
++        return;
++    }
++    len = sizeof(type);
++    ret = getsockopt(s, SOL_SOCKET, SO_TYPE, (char *)&type, &len);
++    ok(!ret && type == SOCK_STREAM && len == sizeof(type), "SO_TYPE: %d, %d, %d\n", ret, type, len);
++    len = sizeof(pi);
++    memset(&pi, 0, sizeof(pi));
++    ret = getsockopt(s, SOL_SOCKET, SO_PROTOCOL_INFOW, (char *)&pi, &len);
++    ok(!ret, "SO_PROTOCOL_INFOW failed, error %d\n", WSAGetLastError());
++    ok(pi.iAddressFamily == AF_UNIX && pi.iSocketType == SOCK_STREAM && !pi.iProtocol,
++       "family %d, type %d, protocol %d\n", pi.iAddressFamily, pi.iSocketType, pi.iProtocol);
++    ok(pi.dwServiceFlags1 == 0x20026 && pi.iMaxSockAddr == 110 && pi.iMinSockAddr == 2,
++       "flags %#lx, max %d, min %d\n", pi.dwServiceFlags1, pi.iMaxSockAddr, pi.iMinSockAddr);
++    {
++        SOCKADDR_UN addr;
++        len = sizeof(addr);
++        ret = getsockname(s, (struct sockaddr *)&addr, &len);
++        ok(ret == SOCKET_ERROR && WSAGetLastError() == WSAEINVAL, "unbound getsockname: %d, error %d\n",
++           ret, WSAGetLastError());
++    }
++    closesocket(s);
++}
++
++static void test_afunix_connect(void)
++{
++    char path[MAX_PATH], regular[MAX_PATH], buffer[16];
++    SOCKET listener, client, server, other;
++    SOCKADDR_UN addr;
++    int ret, len;
++    fd_set set;
++    struct timeval timeout = { 5, 0 };
++    HANDLE file;
++
++    listener = afunix_socket();
++    if (listener == INVALID_SOCKET)
++    {
++        skip("AF_UNIX sockets are not supported\n");
++        return;
++    }
++    afunix_path(path, "s1");
++    afunix_set(&addr, path);
++    ret = bind(listener, (struct sockaddr *)&addr, afunix_len(path));
++    ok(!ret, "bind failed, error %d\n", WSAGetLastError());
++    afunix_check_file(path, "after bind");
++
++    len = sizeof(addr);
++    memset(&addr, 0xcc, sizeof(addr));
++    ret = getsockname(listener, (struct sockaddr *)&addr, &len);
++    afunix_check_name(ret, &addr, len, path, "bound getsockname");
++
++    other = socket(AF_UNIX, SOCK_STREAM, 0);
++    afunix_set(&addr, path);
++    ret = bind(other, (struct sockaddr *)&addr, afunix_len(path));
++    ok(ret == SOCKET_ERROR && WSAGetLastError() == WSAEADDRINUSE, "bind same path: %d, error %d\n",
++       ret, WSAGetLastError());
++    closesocket(other);
++
++    client = socket(AF_UNIX, SOCK_STREAM, 0);
++    ret = connect(client, (struct sockaddr *)&addr, afunix_len(path));
++    ok(ret == SOCKET_ERROR && WSAGetLastError() == WSAECONNREFUSED, "connect before listen: %d, error %d\n",
++       ret, WSAGetLastError());
++    closesocket(client);
++
++    ret = listen(listener, 5);
++    ok(!ret, "listen failed, error %d\n", WSAGetLastError());
++    client = socket(AF_UNIX, SOCK_STREAM, 0);
++    ret = connect(client, (struct sockaddr *)&addr, afunix_len(path));
++    ok(!ret, "connect failed, error %d\n", WSAGetLastError());
++
++    FD_ZERO(&set);
++    FD_SET(listener, &set);
++    ret = select(0, &set, NULL, NULL, &timeout);
++    ok(ret == 1 && FD_ISSET(listener, &set), "select on the listener: %d\n", ret);
++
++    len = sizeof(addr);
++    memset(&addr, 0xcc, sizeof(addr));
++    server = accept(listener, (struct sockaddr *)&addr, &len);
++    ok(server != INVALID_SOCKET, "accept failed, error %d\n", WSAGetLastError());
++    afunix_check_name(server == INVALID_SOCKET, &addr, len, NULL, "accept");
++
++    len = sizeof(addr);
++    memset(&addr, 0xcc, sizeof(addr));
++    ret = getpeername(client, (struct sockaddr *)&addr, &len);
++    afunix_check_name(ret, &addr, len, path, "client getpeername");
++    len = sizeof(addr);
++    memset(&addr, 0xcc, sizeof(addr));
++    ret = getsockname(client, (struct sockaddr *)&addr, &len);
++    afunix_check_name(ret, &addr, len, NULL, "client getsockname");
++    len = sizeof(addr);
++    memset(&addr, 0xcc, sizeof(addr));
++    ret = getpeername(server, (struct sockaddr *)&addr, &len);
++    afunix_check_name(ret, &addr, len, NULL, "server getpeername");
++    len = sizeof(addr);
++    memset(&addr, 0xcc, sizeof(addr));
++    ret = getsockname(server, (struct sockaddr *)&addr, &len);
++    afunix_check_name(ret, &addr, len, path, "server getsockname");
++
++    ret = send(client, "ping", 4, 0);
++    ok(ret == 4, "send: %d, error %d\n", ret, WSAGetLastError());
++    memset(buffer, 0, sizeof(buffer));
++    ret = recv(server, buffer, sizeof(buffer), 0);
++    ok(ret == 4 && !memcmp(buffer, "ping", 4), "recv: %d\n", ret);
++    ret = send(server, "pong!", 5, 0);
++    ok(ret == 5, "send back: %d, error %d\n", ret, WSAGetLastError());
++    memset(buffer, 0, sizeof(buffer));
++    ret = recv(client, buffer, sizeof(buffer), 0);
++    ok(ret == 5 && !memcmp(buffer, "pong!", 5), "recv back: %d\n", ret);
++    ret = shutdown(client, SD_SEND);
++    ok(!ret, "shutdown failed, error %d\n", WSAGetLastError());
++    ret = recv(server, buffer, sizeof(buffer), 0);
++    ok(!ret, "recv after shutdown: %d, error %d\n", ret, WSAGetLastError());
++
++    closesocket(server);
++    closesocket(client);
++    closesocket(listener);
++    afunix_check_file(path, "after close");
++
++    client = socket(AF_UNIX, SOCK_STREAM, 0);
++    afunix_set(&addr, path);
++    ret = connect(client, (struct sockaddr *)&addr, afunix_len(path));
++    ok(ret == SOCKET_ERROR && WSAGetLastError() == WSAECONNREFUSED, "connect after close: %d, error %d\n",
++       ret, WSAGetLastError());
++    closesocket(client);
++    other = socket(AF_UNIX, SOCK_STREAM, 0);
++    ret = bind(other, (struct sockaddr *)&addr, afunix_len(path));
++    ok(ret == SOCKET_ERROR && WSAGetLastError() == WSAEADDRINUSE, "bind old path: %d, error %d\n",
++       ret, WSAGetLastError());
++    closesocket(other);
++    ret = DeleteFileA(path);
++    ok(ret, "DeleteFileA failed, error %lu\n", GetLastError());
++    ok(GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES, "socket file still there\n");
++
++    afunix_path(path, "missing");
++    afunix_set(&addr, path);
++    client = socket(AF_UNIX, SOCK_STREAM, 0);
++    ret = connect(client, (struct sockaddr *)&addr, afunix_len(path));
++    ok(ret == SOCKET_ERROR && WSAGetLastError() == WSAECONNREFUSED, "connect missing: %d, error %d\n",
++       ret, WSAGetLastError());
++    closesocket(client);
++
++    afunix_path(regular, "regular");
++    file = CreateFileA(regular, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
++    ok(file != INVALID_HANDLE_VALUE, "CreateFileA failed, error %lu\n", GetLastError());
++    CloseHandle(file);
++    afunix_set(&addr, regular);
++    client = socket(AF_UNIX, SOCK_STREAM, 0);
++    ret = connect(client, (struct sockaddr *)&addr, afunix_len(regular));
++    ok(ret == SOCKET_ERROR && WSAGetLastError() == WSAECONNREFUSED, "connect regular file: %d, error %d\n",
++       ret, WSAGetLastError());
++    closesocket(client);
++    other = socket(AF_UNIX, SOCK_STREAM, 0);
++    ret = bind(other, (struct sockaddr *)&addr, afunix_len(regular));
++    ok(ret == SOCKET_ERROR && WSAGetLastError() == WSAEADDRINUSE, "bind regular file: %d, error %d\n",
++       ret, WSAGetLastError());
++    closesocket(other);
++    DeleteFileA(regular);
++
++    afunix_path(path, "no_such_dir\\s");
++    afunix_set(&addr, path);
++    other = socket(AF_UNIX, SOCK_STREAM, 0);
++    ret = bind(other, (struct sockaddr *)&addr, afunix_len(path));
++    ok(ret == SOCKET_ERROR && WSAGetLastError() == WSAENETDOWN, "bind in missing directory: %d, error %d\n",
++       ret, WSAGetLastError());
++    closesocket(other);
++}
++
++static void test_afunix_address_forms(void)
++{
++    char path[MAX_PATH], mixed[MAX_PATH], cwd[MAX_PATH];
++    SOCKADDR_UN addr;
++    SOCKET s;
++    int ret, len;
++    char *p;
++
++    s = afunix_socket();
++    if (s == INVALID_SOCKET)
++    {
++        skip("AF_UNIX sockets are not supported\n");
++        return;
++    }
++    afunix_set(&addr, "");
++    ret = bind(s, (struct sockaddr *)&addr, offsetof(SOCKADDR_UN, sun_path));
++    ok(!ret, "bind family only failed, error %d\n", WSAGetLastError());
++    len = sizeof(addr);
++    memset(&addr, 0xcc, sizeof(addr));
++    ret = getsockname(s, (struct sockaddr *)&addr, &len);
++    afunix_check_name(ret, &addr, len, NULL, "family only getsockname");
++    closesocket(s);
++
++    s = socket(AF_UNIX, SOCK_STREAM, 0);
++    afunix_set(&addr, "");
++    memcpy(addr.sun_path + 1, "winum-abstract", 14);
++    ret = bind(s, (struct sockaddr *)&addr, offsetof(SOCKADDR_UN, sun_path) + 15);
++    ok(!ret, "bind abstract name failed, error %d\n", WSAGetLastError());
++    closesocket(s);
++
++    afunix_path(path, "s-full");
++    s = socket(AF_UNIX, SOCK_STREAM, 0);
++    afunix_set(&addr, path);
++    ret = bind(s, (struct sockaddr *)&addr, sizeof(addr));
++    ok(!ret, "bind with full length failed, error %d\n", WSAGetLastError());
++    len = sizeof(addr);
++    memset(&addr, 0xcc, sizeof(addr));
++    ret = getsockname(s, (struct sockaddr *)&addr, &len);
++    afunix_check_name(ret, &addr, len, path, "full length getsockname");
++    closesocket(s);
++    DeleteFileA(path);
++
++    afunix_path(path, "s-nonul");
++    s = socket(AF_UNIX, SOCK_STREAM, 0);
++    afunix_set(&addr, path);
++    ret = bind(s, (struct sockaddr *)&addr, afunix_len(path) - 1);
++    ok(!ret, "bind without NUL failed, error %d\n", WSAGetLastError());
++    afunix_check_file(path, "without NUL");
++    closesocket(s);
++    DeleteFileA(path);
++
++    afunix_path(path, "s-mixed");
++    strcpy(mixed, path);
++    p = strrchr(mixed, '\\');
++    *p = '/';
++    s = socket(AF_UNIX, SOCK_STREAM, 0);
++    afunix_set(&addr, mixed);
++    ret = bind(s, (struct sockaddr *)&addr, afunix_len(mixed));
++    ok(!ret, "bind with a forward slash failed, error %d\n", WSAGetLastError());
++    afunix_check_file(path, "forward slash");
++    len = sizeof(addr);
++    memset(&addr, 0xcc, sizeof(addr));
++    ret = getsockname(s, (struct sockaddr *)&addr, &len);
++    afunix_check_name(ret, &addr, len, mixed, "forward slash getsockname");
++    closesocket(s);
++    DeleteFileA(path);
++
++    GetCurrentDirectoryA(ARRAY_SIZE(cwd), cwd);
++    ret = SetCurrentDirectoryA(afunix_dir);
++    ok(ret, "SetCurrentDirectoryA failed, error %lu\n", GetLastError());
++    s = socket(AF_UNIX, SOCK_STREAM, 0);
++    afunix_set(&addr, "s-rel");
++    ret = bind(s, (struct sockaddr *)&addr, afunix_len("s-rel"));
++    ok(!ret, "bind relative path failed, error %d\n", WSAGetLastError());
++    afunix_path(path, "s-rel");
++    afunix_check_file(path, "relative");
++    len = sizeof(addr);
++    memset(&addr, 0xcc, sizeof(addr));
++    ret = getsockname(s, (struct sockaddr *)&addr, &len);
++    afunix_check_name(ret, &addr, len, "s-rel", "relative getsockname");
++    closesocket(s);
++    DeleteFileA(path);
++    SetCurrentDirectoryA(cwd);
++}
++
++static void test_afunix_nonblocking(void)
++{
++    char path[MAX_PATH];
++    SOCKET listener, client, server;
++    SOCKADDR_UN addr;
++    u_long one = 1;
++    int ret;
++    fd_set set;
++    struct timeval timeout = { 5, 0 };
++
++    listener = afunix_socket();
++    if (listener == INVALID_SOCKET)
++    {
++        skip("AF_UNIX sockets are not supported\n");
++        return;
++    }
++    afunix_path(path, "s-nb");
++    afunix_set(&addr, path);
++    ret = bind(listener, (struct sockaddr *)&addr, afunix_len(path));
++    ok(!ret, "bind failed, error %d\n", WSAGetLastError());
++    ret = listen(listener, 5);
++    ok(!ret, "listen failed, error %d\n", WSAGetLastError());
++    ioctlsocket(listener, FIONBIO, &one);
++    server = accept(listener, NULL, NULL);
++    ok(server == INVALID_SOCKET && WSAGetLastError() == WSAEWOULDBLOCK, "accept, nothing pending: error %d\n",
++       WSAGetLastError());
++
++    client = socket(AF_UNIX, SOCK_STREAM, 0);
++    ioctlsocket(client, FIONBIO, &one);
++    ret = connect(client, (struct sockaddr *)&addr, afunix_len(path));
++    ok(ret == SOCKET_ERROR && WSAGetLastError() == WSAEWOULDBLOCK, "non-blocking connect: %d, error %d\n",
++       ret, WSAGetLastError());
++    FD_ZERO(&set);
++    FD_SET(client, &set);
++    ret = select(0, NULL, &set, NULL, &timeout);
++    ok(ret == 1 && FD_ISSET(client, &set), "select for writing: %d\n", ret);
++    FD_ZERO(&set);
++    FD_SET(listener, &set);
++    ret = select(0, &set, NULL, NULL, &timeout);
++    ok(ret == 1, "select on the listener: %d\n", ret);
++    server = accept(listener, NULL, NULL);
++    ok(server != INVALID_SOCKET, "accept failed, error %d\n", WSAGetLastError());
++    closesocket(server);
++    closesocket(client);
++    closesocket(listener);
++    DeleteFileA(path);
++}
++
++static void test_afunix_extensions(void)
++{
++    GUID acceptex_guid = WSAID_ACCEPTEX, sockaddrs_guid = WSAID_GETACCEPTEXSOCKADDRS;
++    GUID connectex_guid = WSAID_CONNECTEX;
++    LPFN_ACCEPTEX acceptex = NULL;
++    LPFN_GETACCEPTEXSOCKADDRS sockaddrs = NULL;
++    LPFN_CONNECTEX connectex = NULL;
++    char path[MAX_PATH], buffer[2 * (sizeof(SOCKADDR_UN) + 16)];
++    struct sockaddr *local, *remote;
++    int local_len, remote_len, ret;
++    SOCKET listener, server, client;
++    OVERLAPPED overlapped;
++    SOCKADDR_UN addr;
++    DWORD size, flags;
++
++    listener = WSASocketW(AF_UNIX, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
++    todo_wine ok(listener != INVALID_SOCKET, "WSASocketW failed, error %d\n", WSAGetLastError());
++    if (listener == INVALID_SOCKET)
++    {
++        skip("AF_UNIX sockets are not supported\n");
++        return;
++    }
++    afunix_path(path, "s-ex");
++    afunix_set(&addr, path);
++    ret = bind(listener, (struct sockaddr *)&addr, afunix_len(path));
++    ok(!ret, "bind failed, error %d\n", WSAGetLastError());
++    ret = listen(listener, 5);
++    ok(!ret, "listen failed, error %d\n", WSAGetLastError());
++
++    ret = WSAIoctl(listener, SIO_GET_EXTENSION_FUNCTION_POINTER, &acceptex_guid, sizeof(acceptex_guid),
++                   &acceptex, sizeof(acceptex), &size, NULL, NULL);
++    ok(!ret && acceptex, "AcceptEx: %d, error %d\n", ret, WSAGetLastError());
++    ret = WSAIoctl(listener, SIO_GET_EXTENSION_FUNCTION_POINTER, &sockaddrs_guid, sizeof(sockaddrs_guid),
++                   &sockaddrs, sizeof(sockaddrs), &size, NULL, NULL);
++    ok(!ret && sockaddrs, "GetAcceptExSockaddrs: %d, error %d\n", ret, WSAGetLastError());
++    ret = WSAIoctl(listener, SIO_GET_EXTENSION_FUNCTION_POINTER, &connectex_guid, sizeof(connectex_guid),
++                   &connectex, sizeof(connectex), &size, NULL, NULL);
++    ok(!ret && connectex, "ConnectEx: %d, error %d\n", ret, WSAGetLastError());
++
++    if (acceptex && sockaddrs)
++    {
++        server = WSASocketW(AF_UNIX, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
++        memset(&overlapped, 0, sizeof(overlapped));
++        overlapped.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
++        ret = acceptex(listener, server, buffer, 0, sizeof(SOCKADDR_UN) + 16, sizeof(SOCKADDR_UN) + 16,
++                       &size, &overlapped);
++        ok(!ret && WSAGetLastError() == ERROR_IO_PENDING, "AcceptEx: %d, error %d\n", ret, WSAGetLastError());
++
++        client = socket(AF_UNIX, SOCK_STREAM, 0);
++        ret = connect(client, (struct sockaddr *)&addr, afunix_len(path));
++        ok(!ret, "connect failed, error %d\n", WSAGetLastError());
++        ret = WaitForSingleObject(overlapped.hEvent, 5000);
++        ok(!ret, "wait: %d\n", ret);
++        size = 0xdeadbeef;
++        ret = WSAGetOverlappedResult(listener, &overlapped, &size, FALSE, &flags);
++        ok(ret && !size, "AcceptEx result: %d, %lu, error %d\n", ret, size, WSAGetLastError());
++        ret = setsockopt(server, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, (char *)&listener, sizeof(listener));
++        ok(!ret, "SO_UPDATE_ACCEPT_CONTEXT failed, error %d\n", WSAGetLastError());
++
++        local = remote = NULL;
++        local_len = remote_len = 0;
++        sockaddrs(buffer, 0, sizeof(SOCKADDR_UN) + 16, sizeof(SOCKADDR_UN) + 16,
++                  &local, &local_len, &remote, &remote_len);
++        ok(local && local_len == (int)sizeof(SOCKADDR_UN), "local length %d\n", local_len);
++        if (local)
++            ok(local->sa_family == AF_UNIX && !strcmp(((SOCKADDR_UN *)local)->sun_path, path),
++               "local %u %s\n", local->sa_family, debugstr_a(((SOCKADDR_UN *)local)->sun_path));
++        ok(remote && remote_len == (int)sizeof(SOCKADDR_UN), "remote length %d\n", remote_len);
++        if (remote)
++            ok(remote->sa_family == AF_UNIX && !((SOCKADDR_UN *)remote)->sun_path[0],
++               "remote %u %s\n", remote->sa_family, debugstr_a(((SOCKADDR_UN *)remote)->sun_path));
++
++        ret = send(client, "x", 1, 0);
++        ok(ret == 1, "send: %d\n", ret);
++        ret = recv(server, buffer, 1, 0);
++        ok(ret == 1, "recv on the accepted socket: %d\n", ret);
++        closesocket(client);
++        closesocket(server);
++        CloseHandle(overlapped.hEvent);
++    }
++
++    if (connectex)
++    {
++        client = WSASocketW(AF_UNIX, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
++        memset(&overlapped, 0, sizeof(overlapped));
++        overlapped.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
++        ret = connectex(client, (struct sockaddr *)&addr, afunix_len(path), NULL, 0, NULL, &overlapped);
++        ok(!ret && WSAGetLastError() == WSAEINVAL, "ConnectEx unbound: %d, error %d\n", ret, WSAGetLastError());
++        closesocket(client);
++        CloseHandle(overlapped.hEvent);
++    }
++    closesocket(listener);
++    DeleteFileA(path);
++}
++
++static void test_afunix_winum(void)
++{
++    if (!afunix_make_dir())
++    {
++        skip("cannot create a short temporary folder\n");
++        return;
++    }
++    test_afunix_catalogue();
++    test_afunix_connect();
++    test_afunix_address_forms();
++    test_afunix_nonblocking();
++    test_afunix_extensions();
++    ok(RemoveDirectoryA(afunix_dir), "RemoveDirectoryA failed, error %lu\n", GetLastError());
++}
++
+ START_TEST( sock )
+ {
+     int i;
+@@ -15154,6 +15672,7 @@ START_TEST( sock )
+     test_send_buffering();
+     test_valid_handle();
+     test_afunix();
++    test_afunix_winum();
+ 
+     /* There is apparently an obscure interaction between this test and
+      * test_WSAGetOverlappedResult().

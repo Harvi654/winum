@@ -1,6 +1,7 @@
 # Candidate: AF_UNIX stream sockets (ws2_32, server)
 
-Work in progress, not in a normal build. `series` is empty: test first.
+Work in progress, not in a normal build. `series` has the test patch
+only (`ws2_32-tests-afunix-winum.patch`): test first, no fix yet.
 
 ## Problem as the user sees it
 
@@ -56,3 +57,19 @@ Original code (AI-assisted, Claude); not derived from earlier upstream
 AF_UNIX implementation work, which was not merged (only the tests were,
 2025-10-30). A second model will be asked whether it resembles
 a known project before it goes further.
+
+## State (2026-11-17)
+
+- `ws2_32-tests-afunix-winum.patch` adds `test_afunix_winum()` to
+  `dlls/ws2_32/tests/sock.c` (after the upstream `test_afunix`, which is
+  unchanged). It applies to Wine 11.22 with `--fuzz=0` (checked against
+  `dlls/ws2_32/tests/sock.c` of winum-11.22-1's source archive). The
+  same code is `docs/wine-repro/ws2_32-afunix/test-body.h`;
+  `scripts/build-l1-ws2_32-afunix.sh` checks that both are identical and
+  builds `l1.c` (a native harness with Wine's ok/skip/todo_wine
+  semantics) for x86_64 and i686.
+- Under unpatched winum-11.22-1 the native build gives
+  `checks=12 failures=0 todos=7 skipped=5` on both architectures: the
+  socket and catalogue checks are todo, the rest skips.
+- L1 on Windows 10: pending. L0/L2 (the test inside a Wine build, paired
+  run): after L1.

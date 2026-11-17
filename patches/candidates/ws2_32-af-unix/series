@@ -1,1 +1,2 @@
-# AF_UNIX stream sockets - no patch yet (test first)
+# AF_UNIX stream sockets - test first; no fix yet
+ws2_32-tests-afunix-winum.patch
