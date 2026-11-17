@@ -203,7 +203,7 @@ int main(void)
     GetTempPathA(sizeof(tmp), tmp);
     ret = snprintf(dir, sizeof(dir), "%.200safunix-sd-%lu", tmp, GetCurrentProcessId());
     if (ret < 0 || ret >= MAX_PATH - 16 || !CreateDirectoryA(dir, NULL)) return 2;
-    snprintf(path, sizeof(path), "%s\\s", dir);
+    snprintf(path, sizeof(path), "%.240s\\s", dir);
 
     listener = bound_socket(path);
     out("bind_listen", "ok=%d err=%d", listener != INVALID_SOCKET, listener == INVALID_SOCKET ? WSAGetLastError() : 0);
