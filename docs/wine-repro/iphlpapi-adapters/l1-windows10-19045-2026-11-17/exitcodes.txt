@@ -1,0 +1,2 @@
+iphlpapi-dns-family-l1 x86_64=0
+iphlpapi-dns-family-l1 i686=0

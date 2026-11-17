@@ -36,9 +36,11 @@ the whole call. The fix keeps the adapter's server list empty for
   shows the same failing lines with and without (66 pre-existing in
   this sandbox). The native L1 harness under the fixed build:
   `checks=21 failures=0`.
-- L1 (Windows 10, `scripts/build-l1-iphlpapi-adapters-dns-family.sh`):
-  pending.
-- L1: the maintainer reports the VM run done (results to come).
+- **L1 passed** on Windows 10 22H2 (19045), 2026-11-17:
+  `checks=15 failures=0 skipped=0`, exit 0, x86_64 and i686
+  (`docs/wine-repro/iphlpapi-adapters/l1-windows10-19045-2026-11-17/`).
+  15 checks there against 21 under Wine because the VM has two adapters
+  and the Linux machine four (one length check per adapter and family).
 - L4 approximation (2026-11-17, maintainer): the same condition reached
   from the host side (`nameserver ::1` in `/etc/resolv.conf` for one
   run) makes `GetAdaptersAddresses(AF_INET6, 0)` succeed, but CodeMeter
