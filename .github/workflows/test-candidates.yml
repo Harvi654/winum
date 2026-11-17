@@ -1,0 +1,56 @@
+name: Test candidates (test-run)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['test-run/**']
+    paths:
+      - 'test-run.list'
+      - 'patches/candidates/**'
+      - 'scripts/test-candidates.sh'
+      - '.github/workflows/test-candidates.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-run-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [tests, candidate]
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 300
+    steps:
+      - name: Dependencies (official Arch repositories)
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed git python mingw-w64-gcc xorg-server-xvfb xorg-xauth \
+            alsa-lib libpulse gnutls krb5 dbus fontconfig freetype2 ttf-dejavu \
+            libx11 libxext libxi libxrandr libxrender libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
+            wayland mesa libglvnd vulkan-icd-loader vulkan-headers \
+            gst-plugins-base-libs sdl2 libcups libgphoto2 sane libpcap v4l-utils pcsclite unixodbc ocl-icd opencl-headers \
+            giflib
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Build and test (${{ matrix.variant }})
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          export JOBS="$(nproc)"
+          export WORK=/tmp/work
+          bash scripts/test-candidates.sh ${{ matrix.variant }} out
+      - name: Build log on failure
+        if: failure()
+        run: tail -n 80 /tmp/work/*.log || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: test-run-${{ matrix.variant }}
+          path: out/
+          retention-days: 30

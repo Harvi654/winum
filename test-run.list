@@ -1,0 +1,8 @@
+# test-run/robotstudio-codemeter: winum-11.22-1 plus the candidates that
+# CodeMeter's runtime (ABB RobotStudio) needs, for the paired test run
+# (L2) and a runnable build for L4. Never merged; kept as the record.
+name = robotstudio
+candidate = ws2_32-af-unix
+candidate = iphlpapi-adapters-dns-family
+candidate = iphlpapi-adapter-zones
+units = ws2_32: ntdll:file kernel32:file advapi32:security iphlpapi: nsi:
