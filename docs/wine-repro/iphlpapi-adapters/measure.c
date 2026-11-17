@@ -26,6 +26,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
+#include <netioapi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -72,6 +73,43 @@ static unsigned int count_anycast(IP_ADAPTER_ANYCAST_ADDRESS *a) { unsigned int 
 static unsigned int count_multicast(IP_ADAPTER_MULTICAST_ADDRESS *m) { unsigned int n = 0; for (; m; m = m->Next) n++; return n; }
 static unsigned int count_dns(IP_ADAPTER_DNS_SERVER_ADDRESS *d) { unsigned int n = 0; for (; d; d = d->Next) n++; return n; }
 static unsigned int count_gateway(IP_ADAPTER_GATEWAY_ADDRESS_LH *g) { unsigned int n = 0; for (; g; g = g->Next) n++; return n; }
+
+/* each zone index as "if" (equal to the interface index), its value otherwise */
+static void print_zones(const char *key, unsigned int i, const char *what, ULONG if_index, const ULONG *zones)
+{
+    unsigned int z;
+
+    printf("%s adapter %u %s", key, i, what);
+    for (z = 0; z < 16; z++)
+    {
+        if (if_index && zones[z] == if_index) printf(" %u=if", z);
+        else printf(" %u=%lu", z, zones[z]);
+    }
+    printf("\n");
+}
+
+static void print_ip_interface(const char *key, unsigned int i, ADDRESS_FAMILY family, const NET_LUID *luid,
+                               ULONG if_index)
+{
+    MIB_IPINTERFACE_ROW row;
+    char what[32];
+    DWORD ret;
+
+    memset(&row, 0, sizeof(row));
+    row.Family = family;
+    row.InterfaceLuid = *luid;
+    ret = GetIpInterfaceEntry(&row);
+    printf("%s adapter %u ipif_%s ret=%lu", key, i, family == AF_INET ? "v4" : "v6", ret);
+    if (ret)
+    {
+        printf("\n");
+        return;
+    }
+    printf(" index_is_if=%d metric=%lu nlmtu=%lu connected=%d site_prefix=%lu\n",
+           row.InterfaceIndex == if_index, row.Metric, row.NlMtu, row.Connected, row.SitePrefixLength);
+    snprintf(what, sizeof(what), "ipif_%s_zones", family == AF_INET ? "v4" : "v6");
+    print_zones(key, i, what, if_index, row.ZoneIndices);
+}
 
 static void measure_adapters(const char *key, ULONG family, ULONG flags)
 {
@@ -123,6 +161,10 @@ static void measure_adapters(const char *key, ULONG family, ULONG flags)
                count_unicast(a->FirstUnicastAddress), count_anycast(a->FirstAnycastAddress),
                count_multicast(a->FirstMulticastAddress), count_dns(a->FirstDnsServerAddress),
                count_gateway(a->FirstGatewayAddress));
+        print_zones(key, i, "aa_zones", a->IfIndex, a->ZoneIndices);
+        printf("%s adapter %u indexes if=%lu ipv6if=%lu\n", key, i, a->IfIndex, a->Ipv6IfIndex);
+        print_ip_interface(key, i, AF_INET, &a->Luid, a->IfIndex);
+        print_ip_interface(key, i, AF_INET6, &a->Luid, a->IfIndex);
         for (p = a->FirstPrefix; p; p = p->Next)
         {
             char desc[64];
@@ -185,7 +227,7 @@ int main(void)
 {
     WSADATA wsa;
 
-    printf("measure iphlpapi-adapters format=1 arch=%s\n", sizeof(void *) == 8 ? "x86_64" : "i686");
+    printf("measure iphlpapi-adapters format=2 arch=%s\n", sizeof(void *) == 8 ? "x86_64" : "i686");
     if (WSAStartup(MAKEWORD(2, 2), &wsa)) return 2;
     /* the calls CodeMeter's service makes at its start (Wine +iphlpapi trace) */
     measure_adapters("gaa_unspec_0", AF_UNSPEC, 0);

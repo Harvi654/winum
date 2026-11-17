@@ -122,3 +122,22 @@ succeeds. CodeMeter's service makes the failing call twice at its start.
 Candidate: `patches/candidates/iphlpapi-adapters-dns-family/` (test and
 fix). The value differences stay noted here; one of them is taken up
 only if L4 shows the failure fix is not enough (one task at a time).
+
+## MEASURE 2 (format=2): interface indexes and zone indices
+
+The first run showed that Windows fills `Ipv6IfIndex` (equal to
+`IfIndex`) and `ZoneIndices` (link = the interface index, site = 1) and
+Wine leaves them 0. In Wine's source `GetAdaptersAddresses()`
+(`dlls/iphlpapi/iphlpapi_main.c`) sets neither field, and
+`GetIpInterfaceEntry()` copies `ZoneIndices` from the NSI interface
+table, which `nsiproxy.sys` does not fill. Before a test, format 2 adds
+for every adapter: all 16 `ZoneIndices` of `GetAdaptersAddresses` (each
+as `if` when equal to the interface index, else its value), `IfIndex`
+and `Ipv6IfIndex` as numbers, and `GetIpInterfaceEntry()` for `AF_INET`
+and `AF_INET6` (return code, whether `InterfaceIndex` is the adapter's,
+metric, `NlMtu`, connected, site prefix length, the 16 zones). Same
+build script, same privacy rules; results go to new folders
+(`*-format2-*`).
+
+Wine in the build sandbox (2026-11-17): all zones 0 in both functions,
+`Ipv6IfIndex` 0; `GetIpInterfaceEntry(AF_INET6)` 1168 (no IPv6 there).
