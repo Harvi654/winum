@@ -71,5 +71,9 @@ a known project before it goes further.
 - Under unpatched winum-11.22-1 the native build gives
   `checks=12 failures=0 todos=7 skipped=5` on both architectures: the
   socket and catalogue checks are todo, the rest skips.
-- L1 on Windows 10: pending. L0/L2 (the test inside a Wine build, paired
-  run): after L1.
+- **L1 passed** on Windows 10 22H2 (19045), offline VM, 2026-11-17, with
+  the bundle of commit 1d030a4: `checks=138 failures=0 todos=0
+  skipped=0`, exit 0, x86_64 and i686
+  (`docs/wine-repro/ws2_32-afunix/l1-windows10-19045-2026-11-17/`).
+- L0/L2 (the test inside a Wine build, paired run): with the fix.
+- Next: the fix (step 3 of the plan).
