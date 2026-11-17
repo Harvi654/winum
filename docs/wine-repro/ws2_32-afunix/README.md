@@ -155,3 +155,35 @@ that. They are not used.)
   Windows 10 22H2 (19045), offline VM, 2026-11-17:
   `checks=150 failures=0 todos=0 skipped=0`, exit 0, x86_64 and i686
   ([`l1-v2-windows10-19045-2026-11-17/`](l1-v2-windows10-19045-2026-11-17/)).
+
+## MEASURE 3: deleting and renaming the socket file (`measure-del.c`)
+
+L4 of fix v2 in RobotStudio (2026-11-17): on the first start of a prefix
+CodeMeter's event server binds and the service log is clean. On every
+later start the socket file from the earlier run is still there, and
+CodeMeter logs "The event network server stopped with an unexpected
+error. Internal details: remove: Invalid parameter.:
+C:\ProgramData\CodeMeter/Sockets/wibu-codemeter-runtime-events". On
+Windows the file also stays after the socket is closed (MEASURE 1), so a
+program has to remove it before it binds again.
+
+`measure-del.c` creates the socket file (once with the listener closed,
+once while it listens) and removes or renames it each way a program can:
+`DeleteFileA`; `CreateFile(DELETE)` with `FILE_FLAG_OPEN_REPARSE_POINT |
+FILE_FLAG_BACKUP_SEMANTICS` and then `SetFileInformationByHandle` with
+`FileDispositionInfo` or `FileDispositionInfoEx` (delete, POSIX
+semantics, ignore read-only - the calls a C/C++ runtime's `remove` can
+use); the same open with `FILE_FLAG_DELETE_ON_CLOSE`; the open without
+the reparse flag (backup semantics only, and plain); `MoveFileExA` to a
+new name. After each it prints whether the file still exists. Built into
+the same bundle; returns `result-del-x86_64.txt`, `result-del-i686.txt`.
+
+Under fix v2 (local x86_64 build, 2026-11-17,
+[`wine-afunix-v2-2026-11-17/result-del-x86_64.txt`](wine-afunix-v2-2026-11-17/result-del-x86_64.txt)):
+`DeleteFileA`, delete-on-close and `MoveFileExA` work, but both
+`SetFileInformationByHandle` disposition calls fail with 87
+(`ERROR_INVALID_PARAMETER`) and the file stays - the "Invalid
+parameter" CodeMeter logs. Cause: `set_fd_disposition()` in
+`server/fd.c` accepts only regular files and directories ("can't unlink
+special files"). The open without the reparse flag fails with 1920 as
+in MEASURE 2. Windows values: pending (offline VM).
