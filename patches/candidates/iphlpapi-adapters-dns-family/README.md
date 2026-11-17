@@ -49,5 +49,24 @@ the whole call. The fix keeps the adapter's server list empty for
   alone, fix the program: it stays a candidate (AGENTS.md). Next
   differences from the MEASURE table: `Ipv6IfIndex` and `ZoneIndices`,
   then the loopback addresses' origins and lifetimes.
-- L2 paired run in CI: pending.
+- **L2 paired CI run** (winum `test-run/robotstudio-codemeter`, run
+  44113630473, commit 1cbd224, both architectures, with the AF_UNIX
+  candidate): the test-only build fails `iphlpapi.c` 4174 (DNS family)
+  and 4222, 4227, 4232 (zones) in addition to the lines that fail in CI
+  anyway (3725-3913, network of the CI container); the build with all
+  candidates fails only those pre-existing lines. `nsi`, `ws2_32`,
+  `ntdll file`, `kernel32 file`, `advapi32 security`: no new failure.
+- **L4** (maintainer, 2026-11-17, `winum-11.22-1-robotstudio-x86_64`
+  from that run, prefix `try-11-winmgmt`): CodeMeter still lists no
+  address at a normal prefix start. A relay trace showed why: its first
+  `GetAdaptersAddresses()` fails with `ERROR_FILE_NOT_FOUND` because the
+  NSI device does not exist yet - Wine's `services.exe` starts the
+  `nsiproxy` driver and CodeMeter (both automatic) in no defined order
+  (load order groups are ignored). With CodeMeter's start delayed
+  (`DelayedAutostart`) it lists its IPv4 and IPv6 addresses as on
+  Windows. RobotStudio still exits with 103: the Windows CodeMeter
+  service under Wine answers local clients with error 302 (see
+  Harvi654/ABB-RobotStudio-on-Linux, steps 13-16). So this candidate
+  corrects a measured difference but does not make the program work; it
+  stays a candidate.
 - Cross review: pending.

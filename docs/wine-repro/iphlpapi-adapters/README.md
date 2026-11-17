@@ -184,3 +184,24 @@ Wine in the build sandbox (no IPv6), 2026-11-17, only to check the
 program: loopback type 24, `127.0.0.1` with prefix/suffix origin 1 and
 lifetime 60000, routes `127.0.0.0/8` and `127.0.0.1/32` with metric
 0xffffffff.
+
+## Further findings (not candidates yet)
+
+- **Service start order.** At a prefix start Wine's `services.exe`
+  (`scmdatabase_autostart_services()`, `compare_service()` in
+  `programs/services/services.c`) orders automatic services by start
+  type and tag only; load order groups (`nsiproxy` is in "System Bus
+  Extender") and `ServiceGroupOrder` are ignored. A Win32 service such
+  as CodeMeter can therefore run before the `nsiproxy` driver has
+  created `\\.\Nsi`, and every iphlpapi call then fails
+  (`NsiAllocateAndGetTable` -> `ERROR_FILE_NOT_FOUND`). On Windows
+  network drivers are loaded before automatic Win32 services. To be
+  measured on Windows (order of a driver and a service with the same
+  start type) before a test and a fix.
+- **CodeMeter error 302.** With addresses listed, the Windows CodeMeter
+  service 9.10 under Wine still answers its own local clients (`cmu
+  --list-server`, RobotStudio) with error 302, "en-/decryption of the
+  communication failed"; Wibu's Linux runtime serves the same Wine-side
+  `cmu.exe` correctly. Not traced further (CodeMeter's protocol); the
+  loopback differences of MEASURE 3 remain the candidates on Wine's
+  side.
