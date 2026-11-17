@@ -77,4 +77,33 @@ files behind.
   [`wine-11.22-1-2026-11-17/`](wine-11.22-1-2026-11-17/) - no AF_UNIX
   catalogue entry, every AF_UNIX `socket()`/`WSASocketW()` fails with
   10047 (seqpacket 10044), so nothing after it can be measured; exit 2.
-- Windows 10: pending.
+- Windows 10 22H2 (10.0.19045), offline VM, 2026-11-17:
+  [`windows10-19045-2026-11-17/`](windows10-19045-2026-11-17/) - complete
+  (exit 0 for x86_64 and i686), both architectures give the same values.
+
+### Windows 10 in short
+
+| Observation | Windows 10 |
+| --- | --- |
+| catalogue | one AF_UNIX entry: `SOCK_STREAM`, protocol 0, `dwServiceFlags1` 0x20026, `dwProviderFlags` 0x8, `iMaxSockAddr` 110, `iMinSockAddr` 2, version 2, name `AF_UNIX` |
+| socket kinds | stream ok (also `WSASocketW` overlapped); datagram 10047 (`WSAEAFNOSUPPORT`); seqpacket 10044; stream + `IPPROTO_TCP` 10043 (`WSAEPROTONOSUPPORT`) |
+| options | `SO_TYPE` 1; `SO_PROTOCOL_INFOW` as the catalogue entry |
+| `getsockname` before bind | -1, 10022 (`WSAEINVAL`) |
+| bind | creates the file: attributes 0x420 (archive + reparse point), reparse tag 0x80000023 (`IO_REPARSE_TAG_AF_UNIX`), size 0 |
+| `getsockname` after bind | length 2 + strlen + 1, the path as passed (`/` kept, relative kept) |
+| bind again on the same path | 10048 (`WSAEADDRINUSE`), also after the listener is closed and on a regular file |
+| connect | before listen, after close, to a missing path, to a regular file: 10061 (`WSAECONNREFUSED`) |
+| bind in a missing directory | 10050 (`WSAENETDOWN`) |
+| accept | address length 110, empty path; client `getsockname` 110/empty, client `getpeername` the server path; accepted socket: `getpeername` 110/empty, `getsockname` the server path |
+| data | send/recv both ways; recv after the peer's `shutdown(SD_SEND)` 0 |
+| file after close | stays (same reparse point); `DeleteFile` removes it |
+| address forms | family only (length 2) ok, `getsockname` 110/empty; abstract (leading NUL) ok; full struct length ok (`getsockname` still strlen-based); length without NUL ok; forward slashes ok (file at the backslash path); relative to the current directory ok |
+| non-blocking | accept with nothing pending 10035; connect -1/10035 (`WSAEWOULDBLOCK`), then `select` writable; accept succeeds |
+| AcceptEx | pointer available; call pending (997), completes when a client connects, 0 bytes; `SO_UPDATE_ACCEPT_CONTEXT` ok; local address length 110 with the path, remote 110 empty |
+| ConnectEx | pointer available; on an unbound socket fails with 10022 |
+
+Wine 11.22 also already has upstream tests for AF_UNIX
+(`dlls/ws2_32/tests/sock.c`, `test_afunix` and `test_afunix_path`, added
+upstream on 2025-10-30 as "ws2_32/tests: Add some tests for AF_UNIX
+sockets"); they `todo_wine win_skip` when the socket cannot be created,
+so the implementation is the missing part upstream as well.

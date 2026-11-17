@@ -26,14 +26,20 @@ in the Winsock catalogue (`WSAEnumProtocols`).
 
 ## Plan
 
-1. **Measure Windows** (now): `docs/wine-repro/ws2_32-afunix/` - catalogue
+1. **Measure Windows** (done 2026-11-17, Windows 10 22H2, complete; see
+   the table in `docs/wine-repro/ws2_32-afunix/README.md`): `docs/wine-repro/ws2_32-afunix/` - catalogue
    entry, socket kinds, bind/connect/accept, the socket file, addresses
    returned, error codes, address forms, non-blocking, AcceptEx/ConnectEx
    (CodeMeter's server looks like a Boost.Asio local stream acceptor on
    IOCP, i.e. AcceptEx).
-2. **Wine test** `dlls/ws2_32/tests/afunix.c` (or a section of
-   `sock.c`) with the measured values, `todo_wine` where Wine fails;
-   L1 on Windows 10 x86_64 and i686.
+2. **Wine test**: Wine 11.22 already has upstream AF_UNIX tests in
+   `dlls/ws2_32/tests/sock.c` (`test_afunix`, `test_afunix_path`, added
+   2025-10-30), which skip with `todo_wine` while Wine has no AF_UNIX.
+   The candidate adds what they do not cover and what CodeMeter uses,
+   with the measured values: the catalogue entry, socket kinds and
+   options, the error codes, the address forms (mixed `/` and `\`),
+   non-blocking connect/accept, AcceptEx and ConnectEx; `todo_wine` where
+   Wine fails; L1 on Windows 10 x86_64 and i686.
 3. **Fix**, as small as the test allows: the family and `sockaddr_un`
    translation (Windows path -> Unix path of the prefix through the
    server's/ntdll's DOS-to-Unix name translation, which a socket address
@@ -46,6 +52,7 @@ in the Winsock catalogue (`WSAEnumProtocols`).
    event server starts, and whether exit 103 goes) and a smoke test in
    Inventor (ws2_32 is shared).
 
-Original code (AI-assisted, Claude); not derived from earlier unmerged
-upstream AF_UNIX work. A second model will be asked whether it resembles
+Original code (AI-assisted, Claude); not derived from earlier upstream
+AF_UNIX implementation work, which was not merged (only the tests were,
+2025-10-30). A second model will be asked whether it resembles
 a known project before it goes further.
