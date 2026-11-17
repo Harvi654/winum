@@ -501,6 +501,71 @@ static void test_afunix_extensions(void)
     DeleteFileA(path);
 }
 
+#ifndef PROTECTED_DACL_SECURITY_INFORMATION
+#define PROTECTED_DACL_SECURITY_INFORMATION 0x80000000
+#endif
+
+static void test_afunix_security(void)
+{
+    char path[MAX_PATH], sid_buffer[SECURITY_MAX_SID_SIZE];
+    DWORD sid_size = sizeof(sid_buffer), err;
+    PSECURITY_DESCRIPTOR sd = NULL;
+    PACL dacl = NULL, new_dacl = NULL;
+    EXPLICIT_ACCESSA access;
+    SOCKET listener, client;
+    SOCKADDR_UN addr;
+    int ret;
+
+    listener = afunix_socket();
+    if (listener == INVALID_SOCKET)
+    {
+        skip("AF_UNIX sockets are not supported\n");
+        return;
+    }
+    afunix_path(path, "s-sd");
+    afunix_set(&addr, path);
+    ret = bind(listener, (struct sockaddr *)&addr, afunix_len(path));
+    ok(!ret, "bind failed, error %d\n", WSAGetLastError());
+    ret = listen(listener, 5);
+    ok(!ret, "listen failed, error %d\n", WSAGetLastError());
+
+    /* the socket file's security is that of the reparse point itself */
+    err = GetNamedSecurityInfoA(path, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, &dacl, NULL, &sd);
+    ok(!err, "GetNamedSecurityInfoA failed, error %lu\n", err);
+    ok(dacl != NULL, "no DACL\n");
+    LocalFree(sd);
+
+    ret = CreateWellKnownSid(WinWorldSid, NULL, sid_buffer, &sid_size);
+    ok(ret, "CreateWellKnownSid failed, error %lu\n", GetLastError());
+    memset(&access, 0, sizeof(access));
+    access.grfAccessPermissions = GENERIC_ALL;
+    access.grfAccessMode = SET_ACCESS;
+    access.grfInheritance = NO_INHERITANCE;
+    access.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    access.Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+    access.Trustee.ptstrName = sid_buffer;
+    err = SetEntriesInAclA(1, &access, NULL, &new_dacl);
+    ok(!err, "SetEntriesInAclA failed, error %lu\n", err);
+    err = SetNamedSecurityInfoA(path, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+                                NULL, NULL, new_dacl, NULL);
+    ok(!err, "SetNamedSecurityInfoA failed, error %lu\n", err);
+    LocalFree(new_dacl);
+
+    dacl = NULL;
+    sd = NULL;
+    err = GetNamedSecurityInfoA(path, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, &dacl, NULL, &sd);
+    ok(!err, "GetNamedSecurityInfoA after setting failed, error %lu\n", err);
+    ok(dacl && dacl->AceCount == 1, "DACL %p with %u ACEs\n", dacl, dacl ? dacl->AceCount : 0);
+    LocalFree(sd);
+
+    client = socket(AF_UNIX, SOCK_STREAM, 0);
+    ret = connect(client, (struct sockaddr *)&addr, afunix_len(path));
+    ok(!ret, "connect after setting the DACL failed, error %d\n", WSAGetLastError());
+    closesocket(client);
+    closesocket(listener);
+    ok(DeleteFileA(path), "DeleteFileA failed, error %lu\n", GetLastError());
+}
+
 static void test_afunix_winum(void)
 {
     if (!afunix_make_dir())
@@ -513,5 +578,6 @@ static void test_afunix_winum(void)
     test_afunix_address_forms();
     test_afunix_nonblocking();
     test_afunix_extensions();
+    test_afunix_security();
     ok(RemoveDirectoryA(afunix_dir), "RemoveDirectoryA failed, error %lu\n", GetLastError());
 }

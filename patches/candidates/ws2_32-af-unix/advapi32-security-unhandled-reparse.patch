@@ -1,0 +1,36 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] advapi32: Open an unhandled reparse point itself for its security.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Get/SetNamedSecurityInfo on an AF_UNIX socket file work on Windows 10
+22H2 (measured with docs/wine-repro/ws2_32-afunix/measure-sd.c,
+2026-11-17: GetNamedSecurityInfoA returns its DACL, SetNamedSecurityInfoA
+sets one, a client still connects), although CreateFile without
+FILE_FLAG_OPEN_REPARSE_POINT fails on it for every access mask with
+ERROR_CANT_ACCESS_FILE. So the security functions reach the reparse
+point itself. get_security_file opened the file without
+FILE_OPEN_REPARSE_POINT and failed with ERROR_CANT_ACCESS_FILE; CodeMeter
+(ABB RobotStudio) stops its event server on that.
+
+Limited to what was measured: only when the normal open fails with
+STATUS_IO_REPARSE_TAG_NOT_HANDLED is the file opened again with
+FILE_OPEN_REPARSE_POINT; symbolic links and mount points, which Wine
+follows, behave as before.
+
+--- a/dlls/advapi32/security.c
++++ b/dlls/advapi32/security.c
+@@ -180,6 +180,12 @@ static inline DWORD get_security_file( LPCWSTR full_file_name, DWORD access, HAN
+     status = NtCreateFile( file, access|SYNCHRONIZE, &attr, &io, NULL, FILE_FLAG_BACKUP_SEMANTICS,
+                            FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, FILE_OPEN,
+                            FILE_OPEN_FOR_BACKUP_INTENT, NULL, 0 );
++    /* the security of a reparse point that is not followed, such as an
++     * AF_UNIX socket file, is that of the reparse point itself */
++    if (status == STATUS_IO_REPARSE_TAG_NOT_HANDLED)
++        status = NtCreateFile( file, access|SYNCHRONIZE, &attr, &io, NULL, FILE_FLAG_BACKUP_SEMANTICS,
++                               FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, FILE_OPEN,
++                               FILE_OPEN_FOR_BACKUP_INTENT | FILE_OPEN_REPARSE_POINT, NULL, 0 );
+     RtlFreeUnicodeString( &file_nameW );
+     return RtlNtStatusToDosError( status );
+ }

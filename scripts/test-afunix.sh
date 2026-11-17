@@ -21,7 +21,7 @@ WORK="${WORK:-${XDG_CACHE_HOME:-$HOME/.cache}/winum/afunix-$VARIANT}"
 JOBS="${JOBS:-$(nproc)}"
 UNIT_TIMEOUT="${UNIT_TIMEOUT:-300}"
 # test program, units ("" = all)
-UNITS="ws2_32: ntdll:file kernel32:file"
+UNITS="ws2_32: ntdll:file kernel32:file advapi32:security"
 say() { printf '\n==> %s\n' "$*"; }
 
 mkdir -p "$WORK"

@@ -8,6 +8,7 @@
 #include <ws2tcpip.h>
 #include <mswsock.h>
 #include <afunix.h>
+#include <aclapi.h>
 #include <windows.h>
 #include <stddef.h>
 #include <stdarg.h>

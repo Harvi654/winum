@@ -175,3 +175,31 @@ tests are not skipped but run, and add none. (The run's summary lines
 were not parsed, because Wine prefixes them with a process id; the
 script now lists the failing lines per variant too.) The artifact
 `afunix-candidate` holds `winum-11.22-1-afunix-x86_64.tar.xz` for L4.
+
+## Fix v2 (2026-11-17)
+
+L4 of v1 in RobotStudio: CodeMeter's socket binds, then
+`SetNamedSecurityInfoA` on the socket file fails (1920). Measured on
+Windows (MEASURE 2): `CreateFile` without the reparse flag fails there
+too, but Get/SetNamedSecurityInfo work on the socket file. v2:
+
+- new `advapi32-security-unhandled-reparse.patch`: `get_security_file`
+  opens the file again with `FILE_OPEN_REPARSE_POINT` when the normal
+  open fails with `STATUS_IO_REPARSE_TAG_NOT_HANDLED` (symbolic links
+  and mount points unchanged);
+- server patch v2: `file_set_sd` changes the mode of a socket file open
+  with O_PATH through `/proc/self/fd` (fchmod rejects O_PATH);
+- test patch v2: `test_afunix_security` (Get/SetNamedSecurityInfoA,
+  connect afterwards) with the measured values; `advapi32` imported;
+- ws2_32 patch v2: one `todo_wine` - Wine reports 3 ACEs after setting
+  a 1-ACE DACL, because it keeps a socket file's DACL as mode bits (no
+  xattr on a socket inode); the access CodeMeter grants (Everyone, full)
+  becomes mode 0777, which is what connecting needs.
+
+Local checks (x86_64): the series applies with `--fuzz=0` to
+winum-11.22-1's source; `ws2_32 sock` has no failure in the AF_UNIX
+tests (328 pre-existing elsewhere, as before), one todo more;
+`advapi32 security` has the same 6 failing lines with and without the
+advapi32 patch; `ntdll file` 8 and `kernel32 file` 7 as before. The
+workflow adds `advapi32:security` to its paired run. L1 of the new test
+function: pending (bundle of this commit).

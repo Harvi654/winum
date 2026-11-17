@@ -1,5 +1,6 @@
-# AF_UNIX stream sockets: the test first, then the fix in three parts
+# AF_UNIX stream sockets: the test first, then the fix in four parts
 ws2_32-tests-afunix-winum.patch
 server-afunix-stream-sockets.patch
 ntdll-afunix-paths-reparse.patch
+advapi32-security-unhandled-reparse.patch
 ws2_32-afunix-stream-sockets.patch

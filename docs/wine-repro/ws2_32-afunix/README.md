@@ -131,3 +131,17 @@ Under fix v1 (local x86_64 build, 2026-11-17,
 every open without the reparse flag fails with 1920
 (`ERROR_CANT_ACCESS_FILE`), with it succeeds; `Get/SetNamedSecurityInfoA`
 fail with 1920; connect works.
+
+Windows 10 22H2, offline VM, 2026-11-17
+([`windows10-19045-sd-2026-11-17/`](windows10-19045-sd-2026-11-17/), exit 0,
+x86_64 and i686 identical): every `CreateFile` on the socket file
+without `FILE_FLAG_OPEN_REPARSE_POINT` fails with 1920 for all eight
+access masks, with it succeeds - exactly fix v1. But
+`GetNamedSecurityInfoA` returns its DACL (3 ACEs, inherited),
+`SetNamedSecurityInfoA` succeeds (also with
+`PROTECTED_DACL_SECURITY_INFORMATION`), afterwards the DACL has 1 ACE,
+and a client still connects: the security functions reach the reparse
+point itself. (The `ntcreatefile_*` rows are `STATUS_INVALID_PARAMETER`
+because the program passed `FILE_FLAG_BACKUP_SEMANTICS` as file
+attributes, copied from Wine's `get_security_file`; Windows rejects
+that. They are not used.)

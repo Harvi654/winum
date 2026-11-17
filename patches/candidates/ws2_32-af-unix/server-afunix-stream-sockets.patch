@@ -31,6 +31,12 @@ path longer than sun_path is reached through its directory
 (/proc/self/fd/N/name, Linux only). Unnamed (autobind) and abstract
 names pass through as before.
 
+v2 (2026-11-17): the security of a socket file can be set: it is open
+with O_PATH, which fchmod rejects, so file_set_sd changes the mode
+through /proc/self/fd (Linux). Wine keeps it as mode bits only, since a
+socket inode takes no xattr. Found in L4: CodeMeter calls
+SetNamedSecurityInfoA right after bind.
+
 --- a/include/wine/afd.h
 +++ b/include/wine/afd.h
 @@ -321,6 +321,25 @@ struct afd_connect_params
@@ -114,6 +120,28 @@ names pass through as before.
      if (fd->unix_name[strlen( fd->unix_name ) - 1] != '?')
      {
          set_error( STATUS_NOT_A_REPARSE_POINT );
+--- a/server/file.c
++++ b/server/file.c
+@@ -506,8 +506,17 @@ static int file_set_sd( struct object *obj, const struct security_descriptor *sd
+ 
+         if (((st.st_mode ^ mode) & (S_IRWXU|S_IRWXG|S_IRWXO)) && fchmod( unix_fd, mode ) == -1)
+         {
+-            file_set_error();
+-            return 0;
++#ifdef __linux__
++            /* an AF_UNIX socket file is open with O_PATH, which fchmod rejects */
++            char path[32];
++
++            snprintf( path, sizeof(path), "/proc/self/fd/%d", unix_fd );
++            if (errno != EBADF || !S_ISSOCK( st.st_mode ) || chmod( path, mode ) == -1)
++#endif
++            {
++                file_set_error();
++                return 0;
++            }
+         }
+     }
+     return 1;
 --- a/server/sock.c
 +++ b/server/sock.c
 @@ -49,6 +49,7 @@

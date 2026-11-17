@@ -20,7 +20,7 @@ if unit != body:
 PY
 list="$(mktemp)"
 trap 'rm -f -- "$list"' EXIT
-printf '%s\n' 'afunix-l1 | docs/wine-repro/ws2_32-afunix/l1.c | -Wextra -lws2_32 -lmswsock -static' > "$list"
+printf '%s\n' 'afunix-l1 | docs/wine-repro/ws2_32-afunix/l1.c | -Wextra -lws2_32 -lmswsock -ladvapi32 -static' > "$list"
 bash "$here/scripts/build-measure-bundle.sh" "$1" "$list"
 cp "$here/docs/wine-repro/ws2_32-afunix/"{l1.c,test-body.h} "$here/LICENSE" "$1/"
 (cd "$1" && sha256sum ./*.exe ./*.c ./*.h LICENSE README.txt run-measure.bat measure.manifest > SHA256SUMS)

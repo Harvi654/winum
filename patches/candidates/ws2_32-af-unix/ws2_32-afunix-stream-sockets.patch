@@ -18,6 +18,10 @@ cut to it.
 The todo_wine of test_afunix_winum go; the upstream test_afunix and
 test_afunix_path run and pass as well.
 
+v2 (2026-11-17): with the advapi32 patch, test_afunix_security passes but
+for the number of ACEs after setting a DACL (todo_wine: Wine keeps a
+socket file's DACL as mode bits).
+
 --- a/dlls/ws2_32/socket.c
 +++ b/dlls/ws2_32/socket.c
 @@ -182,8 +182,67 @@ static const WSAPROTOCOL_INFOW supported_protocols[] =
@@ -198,7 +202,7 @@ test_afunix_path run and pass as well.
      status = NtDeviceIoControlFile( SOCKET2HANDLE(s), overlapped->hEvent, NULL, cvalue,
 --- a/dlls/ws2_32/tests/sock.c
 +++ b/dlls/ws2_32/tests/sock.c
-@@ -15097,7 +15097,7 @@ static int afunix_len(const char *path)
+@@ -15098,7 +15098,7 @@ static int afunix_len(const char *path)
  static SOCKET afunix_socket(void)
  {
      SOCKET s = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -207,7 +211,7 @@ test_afunix_path run and pass as well.
      return s;
  }
  
-@@ -15158,7 +15158,7 @@ static void test_afunix_catalogue(void)
+@@ -15159,7 +15159,7 @@ static void test_afunix_catalogue(void)
          ok(info[i].iVersion == 2, "version %d\n", info[i].iVersion);
          ok(!wcscmp(info[i].szProtocol, L"AF_UNIX"), "name %s\n", debugstr_w(info[i].szProtocol));
      }
@@ -216,14 +220,13 @@ test_afunix_path run and pass as well.
      free(info);
  
      s = socket(AF_UNIX, SOCK_DGRAM, 0);
-@@ -15166,11 +15166,11 @@ static void test_afunix_catalogue(void)
+@@ -15167,11 +15167,11 @@ static void test_afunix_catalogue(void)
      s = socket(AF_UNIX, SOCK_SEQPACKET, 0);
      ok(s == INVALID_SOCKET && WSAGetLastError() == WSAESOCKTNOSUPPORT, "seqpacket: error %d\n", WSAGetLastError());
      s = socket(AF_UNIX, SOCK_STREAM, IPPROTO_TCP);
 -    todo_wine ok(s == INVALID_SOCKET && WSAGetLastError() == WSAEPROTONOSUPPORT, "stream/tcp: error %d\n",
--                 WSAGetLastError());
 +    ok(s == INVALID_SOCKET && WSAGetLastError() == WSAEPROTONOSUPPORT, "stream/tcp: error %d\n",
-+       WSAGetLastError());
+                  WSAGetLastError());
  
      s = WSASocketW(AF_UNIX, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 -    todo_wine ok(s != INVALID_SOCKET, "WSASocketW failed, error %d\n", WSAGetLastError());
@@ -231,7 +234,7 @@ test_afunix_path run and pass as well.
      if (s == INVALID_SOCKET)
      {
          skip("AF_UNIX sockets are not supported\n");
-@@ -15489,7 +15489,7 @@ static void test_afunix_extensions(void)
+@@ -15490,7 +15490,7 @@ static void test_afunix_extensions(void)
      DWORD size, flags;
  
      listener = WSASocketW(AF_UNIX, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
@@ -240,6 +243,16 @@ test_afunix_path run and pass as well.
      if (listener == INVALID_SOCKET)
      {
          skip("AF_UNIX sockets are not supported\n");
+@@ -15623,7 +15623,8 @@ static void test_afunix_security(void)
+     sd = NULL;
+     err = GetNamedSecurityInfoA(path, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, &dacl, NULL, &sd);
+     ok(!err, "GetNamedSecurityInfoA after setting failed, error %lu\n", err);
+-    ok(dacl && dacl->AceCount == 1, "DACL %p with %u ACEs\n", dacl, dacl ? dacl->AceCount : 0);
++    /* Wine keeps a socket file's DACL only as mode bits (no xattr on a socket inode) */
++    todo_wine ok(dacl && dacl->AceCount == 1, "DACL %p with %u ACEs\n", dacl, dacl ? dacl->AceCount : 0);
+     LocalFree(sd);
+ 
+     client = socket(AF_UNIX, SOCK_STREAM, 0);
 --- a/dlls/ws2_32/ws2_32_private.h
 +++ b/dlls/ws2_32/ws2_32_private.h
 @@ -46,6 +46,8 @@

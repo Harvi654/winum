@@ -12,18 +12,40 @@ reparse point with IO_REPARSE_TAG_AF_UNIX that stays after close), the
 addresses getsockname/getpeername/accept/AcceptEx return, the error
 codes, the address forms (family only, abstract, full length, no NUL,
 forward slashes, relative), non-blocking connect/accept, AcceptEx and
-ConnectEx. Wine 11.22 creates no AF_UNIX socket (WSAEAFNOSUPPORT), so
-the socket creation and catalogue checks are todo_wine and the rest is
-skipped; the upstream test_afunix covers the basic connection and is
+ConnectEx, and getting and setting the socket file's DACL (measured with
+docs/wine-repro/ws2_32-afunix/measure-sd.c: the security is that of the
+reparse point itself). Wine 11.22 creates no AF_UNIX socket
+(WSAEAFNOSUPPORT), so the socket creation and catalogue checks are
+todo_wine and the rest is skipped; the upstream test_afunix covers the basic connection and is
 left unchanged.
 
 CodeMeter's runtime (ABB RobotStudio) listens on an AF_UNIX stream
 socket with overlapped I/O, at a path with mixed separators; that is why
 AcceptEx and the address forms are tested.
 
+v2 (2026-11-17): test_afunix_security added (Get/SetNamedSecurityInfoA on
+the socket file, CodeMeter's next call after bind); advapi32 imported.
+
+--- a/dlls/ws2_32/tests/Makefile.in
++++ b/dlls/ws2_32/tests/Makefile.in
+@@ -1,5 +1,5 @@
+ TESTDLL   = ws2_32.dll
+-IMPORTS   = iphlpapi ws2_32 user32
++IMPORTS   = advapi32 iphlpapi ws2_32 user32
+ 
+ SOURCES = \
+ 	afd.c \
 --- a/dlls/ws2_32/tests/sock.c
 +++ b/dlls/ws2_32/tests/sock.c
-@@ -15065,6 +15065,524 @@ static void test_afunix(void)
+@@ -32,6 +32,7 @@
+ #include <ws2tcpip.h>
+ #include <wsipx.h>
+ #include <afunix.h>
++#include <aclapi.h>
+ #include <wsnwlink.h>
+ #include <mswsock.h>
+ #include <mstcpip.h>
+@@ -15065,6 +15066,590 @@ static void test_afunix(void)
      test_afunix_path( path );
  }
  
@@ -530,6 +552,71 @@ AcceptEx and the address forms are tested.
 +    DeleteFileA(path);
 +}
 +
++#ifndef PROTECTED_DACL_SECURITY_INFORMATION
++#define PROTECTED_DACL_SECURITY_INFORMATION 0x80000000
++#endif
++
++static void test_afunix_security(void)
++{
++    char path[MAX_PATH], sid_buffer[SECURITY_MAX_SID_SIZE];
++    DWORD sid_size = sizeof(sid_buffer), err;
++    PSECURITY_DESCRIPTOR sd = NULL;
++    PACL dacl = NULL, new_dacl = NULL;
++    EXPLICIT_ACCESSA access;
++    SOCKET listener, client;
++    SOCKADDR_UN addr;
++    int ret;
++
++    listener = afunix_socket();
++    if (listener == INVALID_SOCKET)
++    {
++        skip("AF_UNIX sockets are not supported\n");
++        return;
++    }
++    afunix_path(path, "s-sd");
++    afunix_set(&addr, path);
++    ret = bind(listener, (struct sockaddr *)&addr, afunix_len(path));
++    ok(!ret, "bind failed, error %d\n", WSAGetLastError());
++    ret = listen(listener, 5);
++    ok(!ret, "listen failed, error %d\n", WSAGetLastError());
++
++    /* the socket file's security is that of the reparse point itself */
++    err = GetNamedSecurityInfoA(path, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, &dacl, NULL, &sd);
++    ok(!err, "GetNamedSecurityInfoA failed, error %lu\n", err);
++    ok(dacl != NULL, "no DACL\n");
++    LocalFree(sd);
++
++    ret = CreateWellKnownSid(WinWorldSid, NULL, sid_buffer, &sid_size);
++    ok(ret, "CreateWellKnownSid failed, error %lu\n", GetLastError());
++    memset(&access, 0, sizeof(access));
++    access.grfAccessPermissions = GENERIC_ALL;
++    access.grfAccessMode = SET_ACCESS;
++    access.grfInheritance = NO_INHERITANCE;
++    access.Trustee.TrusteeForm = TRUSTEE_IS_SID;
++    access.Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
++    access.Trustee.ptstrName = sid_buffer;
++    err = SetEntriesInAclA(1, &access, NULL, &new_dacl);
++    ok(!err, "SetEntriesInAclA failed, error %lu\n", err);
++    err = SetNamedSecurityInfoA(path, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
++                                NULL, NULL, new_dacl, NULL);
++    ok(!err, "SetNamedSecurityInfoA failed, error %lu\n", err);
++    LocalFree(new_dacl);
++
++    dacl = NULL;
++    sd = NULL;
++    err = GetNamedSecurityInfoA(path, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, &dacl, NULL, &sd);
++    ok(!err, "GetNamedSecurityInfoA after setting failed, error %lu\n", err);
++    ok(dacl && dacl->AceCount == 1, "DACL %p with %u ACEs\n", dacl, dacl ? dacl->AceCount : 0);
++    LocalFree(sd);
++
++    client = socket(AF_UNIX, SOCK_STREAM, 0);
++    ret = connect(client, (struct sockaddr *)&addr, afunix_len(path));
++    ok(!ret, "connect after setting the DACL failed, error %d\n", WSAGetLastError());
++    closesocket(client);
++    closesocket(listener);
++    ok(DeleteFileA(path), "DeleteFileA failed, error %lu\n", GetLastError());
++}
++
 +static void test_afunix_winum(void)
 +{
 +    if (!afunix_make_dir())
@@ -542,13 +629,14 @@ AcceptEx and the address forms are tested.
 +    test_afunix_address_forms();
 +    test_afunix_nonblocking();
 +    test_afunix_extensions();
++    test_afunix_security();
 +    ok(RemoveDirectoryA(afunix_dir), "RemoveDirectoryA failed, error %lu\n", GetLastError());
 +}
 +
  START_TEST( sock )
  {
      int i;
-@@ -15154,6 +15672,7 @@ START_TEST( sock )
+@@ -15154,6 +15739,7 @@ START_TEST( sock )
      test_send_buffering();
      test_valid_handle();
      test_afunix();
