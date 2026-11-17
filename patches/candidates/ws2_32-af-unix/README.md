@@ -275,3 +275,9 @@ failures outside AF_UNIX in this sandbox, as before).
   maintainer decides).
 - Open: cross review of the five patches by a second assistant; L4 in
   Inventor (the server and ntdll parts touch every file open).
+- Also part of the combined build of `test-run/robotstudio-codemeter`
+  (run 44113630473, with the two iphlpapi candidates): no new failure in
+  the paired run. With that build RobotStudio connects to the Windows
+  CmLogger's AF_UNIX event socket and exchanges messages with it
+  (2026-11-17); it still exits with 103 for reasons outside this
+  candidate (Harvi654/ABB-RobotStudio-on-Linux, steps 13-16).
