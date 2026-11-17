@@ -1,0 +1,39 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] nsiproxy.sys: Report the zone indices of IP interfaces.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 reports, for each IP interface of both families, the
+interface index as the zone of the interface, link and subnet levels
+(and index 0), 0 for the global level and 1 for every other level
+(measured, docs/wine-repro/iphlpapi-adapters). Wine left the zone indices
+of the IP interface table 0, so GetIpInterfaceEntry() returned 0 for
+all of them. A Linux host has no administrative zones, so the measured
+defaults are used.
+
+--- a/dlls/nsiproxy.sys/ip.c
++++ b/dlls/nsiproxy.sys/ip.c
+@@ -828,7 +828,7 @@
+     unsigned int addr_scopes_size = 0;
+     struct nsi_ip_interface_rw *rw = rw_data;
+     struct ifaddrs *addrs, *entry, *entry2;
+-    UINT num = 0, scope_id = 0xffffffff;
++    UINT num = 0, scope_id = 0xffffffff, i;
+     NET_LUID luid;
+ 
+     if (getifaddrs( &addrs )) return STATUS_NO_MORE_ENTRIES;
+@@ -921,6 +921,13 @@
+                 rw->path_mtu_discovery_timeout = 600000;
+                 rw->link_local_address_behavior = (fam == AF_INET6) ? LinkLocalAlwaysOn : LinkLocalDelayed;
+                 rw->link_local_address_timeout = (fam == AF_INET6) ? 0 : 6500;
++                /* as on Windows: the interface's own index up to the subnet level, 0 for the
++                 * global level and 1 for every other level */
++                for (i = 0; i < ARRAY_SIZE(rw->zone_indices); i++)
++                {
++                    if (i <= ScopeLevelSubnet) rw->zone_indices[i] = iface_static.if_index;
++                    else rw->zone_indices[i] = (i == ScopeLevelGlobal) ? 0 : 1;
++                }
+             }
+             if (dyn)
+             {

@@ -1,0 +1,5 @@
+# Zone indices and the IPv6 interface index: the test first, then the fix in two parts.
+# Applies after patches/candidates/iphlpapi-adapters-dns-family/series.
+iphlpapi-tests-adapter-zones.patch
+nsiproxy-ip-interface-zones.patch
+iphlpapi-adapter-zones.patch

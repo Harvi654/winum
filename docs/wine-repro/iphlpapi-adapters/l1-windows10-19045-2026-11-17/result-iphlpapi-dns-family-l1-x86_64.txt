@@ -1,0 +1,2 @@
+L1 topic=iphlpapi_adapters_dns_family bits=64
+SUMMARY checks=15 failures=0 skipped=0

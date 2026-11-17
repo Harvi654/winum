@@ -1,0 +1,32 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] iphlpapi: Keep an empty DNS server list when there is no server of the family.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 returns the adapters from GetAdaptersAddresses(AF_INET6, 0)
+with an empty FirstDnsServerAddress where there is no IPv6 DNS server
+(measured, docs/wine-repro/iphlpapi-adapters). Wine asked dnsapi for the
+servers of the requested family and returned its error for the whole
+call, so on a Linux host whose resolver lists only IPv4 servers every
+GetAdaptersAddresses(AF_INET6, ...) without GAA_FLAG_SKIP_DNS_SERVER
+failed with DNS_ERROR_NO_DNS_SERVERS. CodeMeter's service (ABB
+RobotStudio) makes that call at its start and then lists no local
+address.
+
+dns_info_alloc() now treats DNS_ERROR_NO_DNS_SERVERS as an empty list;
+other errors still fail the call as before.
+
+--- a/dlls/iphlpapi/iphlpapi_main.c
++++ b/dlls/iphlpapi/iphlpapi_main.c
+@@ -1199,7 +1199,9 @@ static DWORD dns_info_alloc( IP_ADAPTER_ADDRESSES *aa, ULONG family, ULONG flags
+                     break;
+                 }
+             }
+-            if (!err)
++            /* no DNS server of this family: the adapter's list stays empty */
++            if (err == DNS_ERROR_NO_DNS_SERVERS) err = ERROR_SUCCESS;
++            else if (!err)
+             {
+                 next = &aa->FirstDnsServerAddress;
+                 for (i = 0; i < servers->AddrCount; i++)
