@@ -262,6 +262,16 @@ failures outside AF_UNIX in this sandbox, as before).
   for L4.
 - **L1 passed** for the v3 test body: `checks=169 failures=0`, x86_64
   and i686 (`docs/wine-repro/ws2_32-afunix/l1-v3-windows10-19045-2026-11-17/`).
-- Next: L4 of v3 (two
-  starts of a prefix in a row; CodeMeter must reach "Server ready" with
-  its event server both times), cross review.
+- **L4 of v3** (maintainer's machine, 2026-11-17, artifact of run
+  44080539901, RobotStudio prefix `try-11-winmgmt`): two prefix starts in
+  a row with the wineserver kept alive (`wineserver -p`), without
+  removing the socket file in between. Both times CodeMeter 9.10 creates
+  a new socket file (16:13:03, then 16:13:44 - the old one is removed,
+  as on Windows) and logs "Server ready" with no error. CodeMeter's event
+  server works at every start. RobotStudio itself still exits with 103
+  for another reason (Harvi654/ABB-RobotStudio-on-Linux, steps 9-12), so
+  the user's problem is not solved by this candidate alone (AGENTS.md:
+  it stays a candidate until the program needs nothing else, or the
+  maintainer decides).
+- Open: cross review of the five patches by a second assistant; L4 in
+  Inventor (the server and ntdll parts touch every file open).
