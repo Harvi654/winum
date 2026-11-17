@@ -161,3 +161,26 @@ reads 1, consistent with the rule.) Candidate:
 indices of the IP interface table, GetAdaptersAddresses() takes
 `Ipv6IfIndex` and `ZoneIndices` from the IP interface tables. Under the
 fixed build the MEASURE's loopback lines match Windows.
+
+## MEASURE 3: the loopback's rows in the IP helper tables (`measure-tables.c`)
+
+With the addresses listed, a local CodeMeter client still fails under
+Wine: `cmu --list-server` connects to `::1`, sends three requests (16 +
+209 bytes) and gets 16 + 32 bytes back each time, then reports "CodeMeter
+Service not running. (E302)", and `cmu --list-network` "The
+en-/decryption of the communication failed"; on Windows both work
+("CodeMeter is bound to the following IP addresses: ..., ::1"). For
+every connection the service reads, through NSI, the IPv4/IPv6 unicast
+tables, the interface table (index and interface GUID), the IP interface
+tables and the IPv6 route table. `measure-tables.c` prints what the
+documented functions over the same tables return for the loopback
+interface: `GetIfEntry2`, `GetIpInterfaceEntry` (both families),
+`GetUnicastIpAddressTable` and `GetIpForwardTable2` (rows of the loopback
+interface and of loopback, unspecified and multicast prefixes; other
+rows only counted). Built into the same bundle
+(`result-tables-*.txt`).
+
+Wine in the build sandbox (no IPv6), 2026-11-17, only to check the
+program: loopback type 24, `127.0.0.1` with prefix/suffix origin 1 and
+lifetime 60000, routes `127.0.0.0/8` and `127.0.0.1/32` with metric
+0xffffffff.

@@ -18,13 +18,17 @@ work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
 for arch in x86_64 i686; do
     "$arch-w64-mingw32-gcc" -O2 -static -Wall -Wextra -Werror "$src" -o "$work/ia-measure-$arch.exe" -liphlpapi -lws2_32
+    "$arch-w64-mingw32-gcc" -O2 -static -Wall -Wextra -Werror "$(dirname "$src")/measure-tables.c" \
+        -o "$work/lt-measure-$arch.exe" -liphlpapi -lws2_32
 done
 mkdir -p -- "$output"
-cp "$work/"*.exe "$src" "$here/LICENSE" "$output/"
+cp "$work/"*.exe "$src" "$(dirname "$src")/measure-tables.c" "$here/LICENSE" "$output/"
 printf '%s\r\n' '@echo off' 'cd /d "%~dp0"' \
     'if exist exitcodes.txt (echo already run - use a fresh copy & exit /b 2)' \
     'ia-measure-x86_64.exe > result-x86_64.txt 2>&1' '>>exitcodes.txt echo x86_64=%ERRORLEVEL%' \
     'ia-measure-i686.exe > result-i686.txt 2>&1' '>>exitcodes.txt echo i686=%ERRORLEVEL%' \
+    'lt-measure-x86_64.exe > result-tables-x86_64.txt 2>&1' '>>exitcodes.txt echo tables-x86_64=%ERRORLEVEL%' \
+    'lt-measure-i686.exe > result-tables-i686.txt 2>&1' '>>exitcodes.txt echo tables-i686=%ERRORLEVEL%' \
     'pause' > "$output/run-measure.bat"
 cat > "$output/README.txt" <<'INFO'
 MEASURE for winum (iphlpapi: GetAdaptersAddresses, GetIpAddrTable).
