@@ -1,0 +1,2 @@
+L1 topic=iphlpapi_adapter_zones bits=32
+SUMMARY checks=100 failures=0 skipped=0

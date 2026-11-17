@@ -1,0 +1,2 @@
+iphlpapi-zones-l1 x86_64=0
+iphlpapi-zones-l1 i686=0

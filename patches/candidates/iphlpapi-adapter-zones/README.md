@@ -37,7 +37,10 @@ link-local address with a scope needs them.
   times, with it passes; `iphlpapi` keeps its 66 pre-existing sandbox
   failures, `nsi` its 8 (no IPv6), with and without. Native L1 harness
   under the fixed build: `checks=68 failures=0`.
-- L1 (Windows 10, `scripts/build-l1-iphlpapi-adapter-zones.sh`):
-  pending. L2 paired CI: pending. L4 (CodeMeter's "Found ... address",
+- **L1 passed** on Windows 10 22H2 (19045), 2026-11-17:
+  `checks=100 failures=0 skipped=0`, exit 0, x86_64 and i686
+  (`docs/wine-repro/iphlpapi-adapters/l1-zones-windows10-19045-2026-11-17/`;
+  two adapters with both families: 2 x (16 + 16 + 1 + 16) + 2 checks).
+- L2 paired CI: pending. L4 (CodeMeter's "Found ... address",
   RobotStudio): pending, with a build of all candidates.
 - Cross review: pending.
