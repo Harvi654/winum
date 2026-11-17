@@ -32,7 +32,7 @@ struct m_sockaddr_un
 };
 
 static int incomplete;
-static char dir[MAX_PATH];
+static char dir[MAX_PATH + 32];
 
 static void out(const char *key, const char *fmt, ...)
 {
@@ -47,14 +47,14 @@ static void out(const char *key, const char *fmt, ...)
 
 static const char *rel(const char *path)
 {
-    static char buf[2][MAX_PATH + 16];
+    static char buf[2][2 * MAX_PATH];
     static int n;
     char *b = buf[n++ & 1];
     size_t len = strlen(dir);
     if (!_strnicmp(path, dir, len))
-        snprintf(b, MAX_PATH + 16, "<dir>%s", path + len);
+        snprintf(b, 2 * MAX_PATH, "<dir>%.*s", MAX_PATH, path + len);
     else
-        snprintf(b, MAX_PATH + 16, "%s", path);
+        snprintf(b, 2 * MAX_PATH, "%.*s", MAX_PATH, path);
     return b;
 }
 
@@ -72,7 +72,8 @@ static int addr_len(const char *path)
 
 static void path_in_dir(char *buf, const char *name)
 {
-    snprintf(buf, MAX_PATH, "%s\\%s", dir, name);
+    int n = snprintf(buf, MAX_PATH, "%s\\%s", dir, name);
+    if (n < 0 || n >= MAX_PATH) incomplete = 1;
 }
 
 static void file_info(const char *key, const char *path)
@@ -658,7 +659,12 @@ int main(void)
     if (ret) return 2;
 
     GetTempPathA(sizeof(tmp), tmp);
-    snprintf(dir, sizeof(dir), "%safunix-measure-%lu", tmp, GetCurrentProcessId());
+    ret = snprintf(dir, sizeof(dir), "%safunix-measure-%lu", tmp, GetCurrentProcessId());
+    if (ret < 0 || ret >= MAX_PATH - 32)
+    {
+        out("tempdir", "path too long");
+        return 2;
+    }
     if (dir[strlen(dir) - 1] == '\\') dir[strlen(dir) - 1] = 0;
     if (!CreateDirectoryA(dir, NULL))
     {
