@@ -201,5 +201,22 @@ winum-11.22-1's source; `ws2_32 sock` has no failure in the AF_UNIX
 tests (328 pre-existing elsewhere, as before), one todo more;
 `advapi32 security` has the same 6 failing lines with and without the
 advapi32 patch; `ntdll file` 8 and `kernel32 file` 7 as before. The
-workflow adds `advapi32:security` to its paired run. L1 of the new test
-function: pending (bundle of this commit).
+workflow adds `advapi32:security` to its paired run.
+
+- **L1 passed** for the v2 test body (commit 8abb414), Windows 10 22H2
+  (19045), offline VM, 2026-11-17: `checks=150 failures=0 todos=0
+  skipped=0`, exit 0, x86_64 and i686
+  (`docs/wine-repro/ws2_32-afunix/l1-v2-windows10-19045-2026-11-17/`).
+- **Paired CI run of v2** (run 44062842130, commit 818bba9, both
+  architectures): the candidate fails exactly the lines the test-only
+  build fails - `ws2_32 sock` 13774, 13777, 14270, 14338, 14622;
+  `ntdll file` 5041, 5045, 6049, 6064, 6068, 6073; `kernel32 file` 371,
+  4297, 4299, 4315, 4326, 6323, 6324; `advapi32 security` 3999, 4008,
+  4018, 4051 - none of them in AF_UNIX code. The test-only build also
+  failed `sock.c` 4597 and 4598 on x86_64 (`test_select`, a TCP pair
+  after filling the send buffer; timing, not AF_UNIX), the candidate did
+  not. `ws2_32 sock` runs 389 todos and skips 4 with the fix against
+  397 and 10 without: the AF_UNIX tests run instead of skipping. The
+  job packed `winum-11.22-1-afunix-x86_64` (CANDIDATE.txt names 818bba9)
+  for L4.
+- Next: L4 of v2 in RobotStudio (CodeMeter), then cross review.
