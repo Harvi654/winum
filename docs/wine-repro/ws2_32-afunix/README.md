@@ -155,9 +155,11 @@ that. They are not used.)
   Windows 10 22H2 (19045), offline VM, 2026-11-17:
   `checks=150 failures=0 todos=0 skipped=0`, exit 0, x86_64 and i686
   ([`l1-v2-windows10-19045-2026-11-17/`](l1-v2-windows10-19045-2026-11-17/)).
-- Test body of fix v3 with `test_afunix_delete`: pending (169 checks
-  expected; `l1.c` now builds with Windows 10 1607 headers for
-  `FileDispositionInfoEx`).
+- Test body of fix v3 with `test_afunix_delete` (commit c11a4f8; `l1.c`
+  builds with Windows 10 1607 headers for `FileDispositionInfoEx`),
+  Windows 10 22H2 (19045), 2026-11-17: `checks=169 failures=0 todos=0
+  skipped=0`, exit 0, x86_64 and i686
+  ([`l1-v3-windows10-19045-2026-11-17/`](l1-v3-windows10-19045-2026-11-17/)).
 
 ## MEASURE 3: deleting and renaming the socket file (`measure-del.c`)
 

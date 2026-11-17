@@ -260,6 +260,8 @@ failures outside AF_UNIX in this sandbox, as before).
   file` 6, `kernel32 file` 7, `advapi32 security` 4 lines, as in v2).
   Artifact `afunix-candidate` 14330808278 (CANDIDATE.txt names c11a4f8)
   for L4.
-- Next: L1 of the v3 test body (169 checks expected), L4 of v3 (two
+- **L1 passed** for the v3 test body: `checks=169 failures=0`, x86_64
+  and i686 (`docs/wine-repro/ws2_32-afunix/l1-v3-windows10-19045-2026-11-17/`).
+- Next: L4 of v3 (two
   starts of a prefix in a row; CodeMeter must reach "Server ready" with
   its event server both times), cross review.
