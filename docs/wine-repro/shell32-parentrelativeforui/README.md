@@ -79,5 +79,23 @@ between `NULL`, `""` and a nonempty string.
 
 ## Windows results
 
-Pending. Append the Windows build, date and the masked text results for
-x86_64 and i686 in this section after the offline measurement.
+Recorded 2026-11-18 from the maintainer's offline Windows 10 VM
+(build `10.0.19045.6466`). The x86_64 and i686 results differed only in
+the architecture line. All four calls to `SHCreateItemFromIDList` and
+every name query returned `S_OK` (`0x00000000`). Each cell records the
+string returned by both `SHGetNameFromIDList` and
+`IShellItem::GetDisplayName` on both architectures.
+
+| Item | `NORMALDISPLAY` | `PARENTRELATIVE` | `PARENTRELATIVEFORADDRESSBAR` | `PARENTRELATIVEFORUI` |
+| --- | --- | --- | --- | --- |
+| Folder | `"BreadcrumbSample"` | `"BreadcrumbSample"` | `"BreadcrumbSample"` | `"BreadcrumbSample"` |
+| Drive root | `"Local Disk (C:)"` | `"Local Disk (C:)"` | `"C:"` | `"Local Disk (C:)"` |
+| Documents | `"Documents"` | `"Documents"` | `"Documents"` | `"Documents"` |
+| This PC | `"This PC"` | `"This PC"` | `"This PC"` | `"This PC"` |
+
+For the measured items, `PARENTRELATIVEFORUI` matched `PARENTRELATIVE`
+and `NORMALDISPLAY`. The drive root distinguishes it from
+`PARENTRELATIVEFORADDRESSBAR`. Windows returned a nonempty string for
+every `PARENTRELATIVEFORUI` query. This establishes the API behavior for
+these cases. Confirming that the change restores Inventor's breadcrumb
+requires a run with the candidate fix.
