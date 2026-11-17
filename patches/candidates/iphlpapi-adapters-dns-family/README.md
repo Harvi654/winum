@@ -38,6 +38,14 @@ the whole call. The fix keeps the adapter's server list empty for
   `checks=21 failures=0`.
 - L1 (Windows 10, `scripts/build-l1-iphlpapi-adapters-dns-family.sh`):
   pending.
-- L2 paired run in CI: pending. L4 in RobotStudio (does CodeMeter log
-  "Found ... address", and RobotStudio's access?): pending.
+- L1: the maintainer reports the VM run done (results to come).
+- L4 approximation (2026-11-17, maintainer): the same condition reached
+  from the host side (`nameserver ::1` in `/etc/resolv.conf` for one
+  run) makes `GetAdaptersAddresses(AF_INET6, 0)` succeed, but CodeMeter
+  still logs no "Found ... address" and no access, and RobotStudio still
+  exits with 103. The fix corrects a measured difference but does not,
+  alone, fix the program: it stays a candidate (AGENTS.md). Next
+  differences from the MEASURE table: `Ipv6IfIndex` and `ZoneIndices`,
+  then the loopback addresses' origins and lifetimes.
+- L2 paired run in CI: pending.
 - Cross review: pending.
