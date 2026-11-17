@@ -252,5 +252,14 @@ renames it; under v2 the two disposition calls failed with
 Local checks (x86_64): the series applies with `--fuzz=0`; without the
 server change `test_afunix_delete` fails 7 times (error 87, the file
 stays), with it the AF_UNIX tests pass (`ws2_32 sock` keeps its 328
-failures outside AF_UNIX in this sandbox, as before). Next: the paired
-CI run, L1 of the new test, L4 (every start, not only the first).
+failures outside AF_UNIX in this sandbox, as before).
+
+- **Paired CI run of v3** (run 44080539901, commit c11a4f8, both
+  architectures): the candidate fails exactly the lines the test-only
+  build fails (`ws2_32 sock` 13774, 13777, 14270, 14338, 14622; `ntdll
+  file` 6, `kernel32 file` 7, `advapi32 security` 4 lines, as in v2).
+  Artifact `afunix-candidate` 14330808278 (CANDIDATE.txt names c11a4f8)
+  for L4.
+- Next: L1 of the v3 test body (169 checks expected), L4 of v3 (two
+  starts of a prefix in a row; CodeMeter must reach "Server ready" with
+  its event server both times), cross review.
