@@ -1,0 +1,76 @@
+measure ws2_32-afunix format=1 arch=x86_64
+windows 10.0.19045
+wsastartup ret=0
+enum_protocols_size_query ret=-1 err=10055
+enum_protocols ret=12
+enum_protocols_unix type=1 protocol=0 flags1=0x20026 provider_flags=0x8 max_addr=110 min_addr=2 version=2 name=AF_UNIX
+enum_protocols_unix_count 1
+socket_stream_0 valid=1 err=0
+socket_dgram_0 valid=0 err=10047
+socket_seqpacket_0 valid=0 err=10044
+socket_stream_tcp valid=0 err=10043
+wsasocket_stream_overlapped valid=1 err=0
+sockopt_type ret=0 type=1 len=4
+sockopt_protocol_info ret=0 family=1 type=1 protocol=0 flags1=0x20026 max_addr=110 min_addr=2
+getsockname_unbound ret=-1 err=10022
+path_length 57
+file_before_bind attrs=0xffffffff err=2 find=none
+bind ret=0 err=0
+file_after_bind attrs=0x420 err=0 find_attrs=0x420 reparse_tag=0x80000023 size=0
+getsockname_bound ret=0 len=60 family=1 path_strlen=57 path=<dir>\s1 first=0x43
+bind_existing_socket_path ret=-1 err=10048
+connect_before_listen ret=-1 err=10061
+listen ret=0 err=0
+connect ret=0 err=0
+select_listener_readable ret=1 set=1
+accept_addr ret=0 len=110 family=1 path_strlen=0 path= first=0
+getpeername_client ret=0 len=60 family=1 path_strlen=57 path=<dir>\s1 first=0x43
+getsockname_client ret=0 len=110 family=1 path_strlen=0 path= first=0
+getpeername_accepted ret=0 len=110 family=1 path_strlen=0 path= first=0
+getsockname_accepted ret=0 len=60 family=1 path_strlen=57 path=<dir>\s1 first=0x43
+send_client ret=4 err=0
+recv_accepted ret=4 data_ok=1
+send_accepted ret=5
+recv_client ret=5 data_ok=1
+shutdown_client_send ret=0
+recv_after_shutdown ret=0 err=0
+file_after_close attrs=0x420 err=0 find_attrs=0x420 reparse_tag=0x80000023 size=0
+connect_after_listener_closed ret=-1 err=10061
+bind_after_close_same_path ret=-1 err=10048
+delete_socket_file ret=1 err=0
+file_after_delete attrs=0xffffffff err=2 find=none
+connect_missing_path ret=-1 err=10061
+connect_regular_file ret=-1 err=10061
+bind_regular_file ret=-1 err=10048
+bind_family_only ret=0 err=0
+getsockname_family_only ret=0 len=110 family=1 path_strlen=0 path= first=0
+bind_abstract ret=0 err=0
+bind_full_struct_len ret=0 err=0
+getsockname_full_struct_len ret=0 len=64 family=1 path_strlen=61 path=<dir>\s-full first=0x43
+bind_len_without_nul ret=0 err=0
+file_len_without_nul attrs=0x420 err=0 find_attrs=0x420 reparse_tag=0x80000023 size=0
+bind_forward_slash ret=0 err=0
+file_forward_slash attrs=0x420 err=0 find_attrs=0x420 reparse_tag=0x80000023 size=0
+getsockname_forward_slash ret=0 len=65 family=1 path_strlen=62 path=<dir>/s-mixed first=0x43
+bind_relative ret=0 err=0
+file_relative attrs=0x420 err=0 find_attrs=0x420 reparse_tag=0x80000023 size=0
+getsockname_relative ret=0 len=8 family=1 path_strlen=5 path=s-rel first=0x73
+bind_missing_directory ret=-1 err=10050
+accept_nonblocking_empty valid=0 err=10035
+connect_nonblocking ret=-1 err=10035
+select_nonblocking_writable ret=1 set=1
+accept_nonblocking_pending valid=1 err=0
+acceptex_pointer ret=0 err=0 have=1
+getacceptexsockaddrs_pointer ret=0 err=0 have=1
+connectex_pointer ret=0 err=0 have=1
+acceptex_call ret=0 err=997
+acceptex_client_connect ret=0 err=0
+acceptex_wait ret=0
+acceptex_result ret=1 err=0 bytes=0
+acceptex_update_context ret=0 err=0
+acceptex_local ret=0 len=110 family=1 path_strlen=59 path=<dir>\s-ex first=0x43
+acceptex_remote ret=0 len=110 family=1 path_strlen=0 path= first=0
+acceptex_data ret=1
+connectex_unbound ret=0 err=10022
+cleanup remove_dir=1 err=0
+complete 1

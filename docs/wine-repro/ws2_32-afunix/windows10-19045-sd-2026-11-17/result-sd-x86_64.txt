@@ -1,0 +1,45 @@
+measure ws2_32-afunix-sd format=1 arch=x86_64
+bind_listen ok=1 err=0
+createfile_none_0 ok=0 err=1920
+createfile_none_backup ok=0 err=1920
+createfile_none_reparse ok=1 err=0
+createfile_none_backup_reparse ok=1 err=0
+createfile_read_control_0 ok=0 err=1920
+createfile_read_control_backup ok=0 err=1920
+createfile_read_control_reparse ok=1 err=0
+createfile_read_control_backup_reparse ok=1 err=0
+createfile_write_dac_0 ok=0 err=1920
+createfile_write_dac_backup ok=0 err=1920
+createfile_write_dac_reparse ok=1 err=0
+createfile_write_dac_backup_reparse ok=1 err=0
+createfile_read_control_write_dac_0 ok=0 err=1920
+createfile_read_control_write_dac_backup ok=0 err=1920
+createfile_read_control_write_dac_reparse ok=1 err=0
+createfile_read_control_write_dac_backup_reparse ok=1 err=0
+createfile_read_attributes_0 ok=0 err=1920
+createfile_read_attributes_backup ok=0 err=1920
+createfile_read_attributes_reparse ok=1 err=0
+createfile_read_attributes_backup_reparse ok=1 err=0
+createfile_write_attributes_0 ok=0 err=1920
+createfile_write_attributes_backup ok=0 err=1920
+createfile_write_attributes_reparse ok=1 err=0
+createfile_write_attributes_backup_reparse ok=1 err=0
+createfile_generic_read_0 ok=0 err=1920
+createfile_generic_read_backup ok=0 err=1920
+createfile_generic_read_reparse ok=1 err=0
+createfile_generic_read_backup_reparse ok=1 err=0
+createfile_delete_0 ok=0 err=1920
+createfile_delete_backup ok=0 err=1920
+createfile_delete_reparse ok=1 err=0
+createfile_delete_backup_reparse ok=1 err=0
+ntcreatefile_dac_backup_intent status=0xc000000d
+ntcreatefile_dac_backup_intent_reparse status=0xc000000d
+ntcreatefile_dac_none status=0xc000000d
+getnamedsecurityinfo_dacl ret=0 dacl=1 aces=3
+setnamedsecurityinfo_dacl ret=0
+setnamedsecurityinfo_protected_dacl ret=0
+getnamedsecurityinfo_after ret=0 dacl=1 aces=1
+connect_after_setsecurity ret=0 err=0
+delete ret=1 err=0
+cleanup remove_dir=1
+complete 1

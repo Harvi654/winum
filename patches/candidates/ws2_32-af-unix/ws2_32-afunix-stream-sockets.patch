@@ -1,0 +1,266 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ws2_32: Support AF_UNIX stream sockets.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Part of AF_UNIX stream socket support (see the server patch). Add the
+AF_UNIX entry to the protocol catalogue with the values measured on
+Windows 10 22H2 (stream, protocol 0, service flags 0x20026, provider
+flags 0x8, address 2..110 bytes, version 2, "AF_UNIX"; the provider id
+is Wine's own). bind, connect and ConnectEx turn an AF_UNIX address with
+a path (UTF-8, relative to the current directory or an NT path "\??\...")
+into struct afd_unix_addr with the NT path, which ntdll resolves to the
+Unix path; unnamed and abstract names pass as given. A bind address
+shorter than the family is WSAEFAULT, a longer one than SOCKADDR_UN is
+cut to it.
+
+The todo_wine of test_afunix_winum go; the upstream test_afunix and
+test_afunix_path run and pass as well.
+
+v2 (2026-11-17): with the advapi32 patch, test_afunix_security passes but
+for the number of ACEs after setting a DACL (todo_wine: Wine keeps a
+socket file's DACL as mode bits).
+
+--- a/dlls/ws2_32/socket.c
++++ b/dlls/ws2_32/socket.c
+@@ -182,8 +182,67 @@ static const WSAPROTOCOL_INFOW supported_protocols[] =
+         .iProtocol = BTHPROTO_RFCOMM,
+         .szProtocol = L"MSAFD RfComm [Bluetooth]",
+     },
++    {
++        /* values as measured on Windows 10; the provider id is Wine's own */
++        .dwServiceFlags1 = XP1_IFS_HANDLES | XP1_GRACEFUL_CLOSE | XP1_GUARANTEED_ORDER | XP1_GUARANTEED_DELIVERY,
++        .dwProviderFlags = PFL_MATCHES_PROTOCOL_ZERO,
++        .ProviderId = {0x5c3a1b2e, 0x8d47, 0x4f61, {0x9a, 0x0c, 0x3e, 0x71, 0xd2, 0x58, 0xa4, 0x96}},
++        .dwCatalogEntryId = 1050,
++        .ProtocolChain.ChainLen = 1,
++        .iVersion = 2,
++        .iAddressFamily = AF_UNIX,
++        .iMinSockAddr = offsetof(SOCKADDR_UN, sun_path),
++        .iMaxSockAddr = sizeof(SOCKADDR_UN),
++        .iSocketType = SOCK_STREAM,
++        .iProtocol = 0,
++        .szProtocol = L"AF_UNIX",
++    },
+ };
+ 
++/* An AF_UNIX address with a path becomes a struct afd_unix_addr with the NT
++ * path (relative paths against the current directory, '/' and '\\' alike);
++ * ntdll turns that into the Unix path. NULL for any other address. */
++static struct afd_unix_addr *afunix_path_addr( const struct sockaddr *addr, int *len )
++{
++    const SOCKADDR_UN *un = (const SOCKADDR_UN *)addr;
++    int path_len = *len - (int)offsetof(SOCKADDR_UN, sun_path);
++    char path[sizeof(un->sun_path) + 1];
++    struct afd_unix_addr *ret;
++    UNICODE_STRING nt_name;
++    WCHAR *dos;
++    int count;
++
++    if (!addr || addr->sa_family != AF_UNIX || path_len <= 0 || !un->sun_path[0]) return NULL;
++    if (path_len > (int)sizeof(un->sun_path)) path_len = sizeof(un->sun_path);
++    memcpy( path, un->sun_path, path_len );
++    path[path_len] = 0;
++
++    count = MultiByteToWideChar( CP_UTF8, 0, path, -1, NULL, 0 );
++    if (!(dos = malloc( count * sizeof(WCHAR) ))) return NULL;
++    MultiByteToWideChar( CP_UTF8, 0, path, -1, dos, count );
++    if (!wcsncmp( dos, L"\\??\\", 4 ))
++        RtlCreateUnicodeString( &nt_name, dos );
++    else if (RtlDosPathNameToNtPathName_U_WithStatus( dos, &nt_name, NULL, NULL ))
++        nt_name.Buffer = NULL;
++    free( dos );
++    if (!nt_name.Buffer) return NULL;
++
++    if ((ret = malloc( sizeof(*ret) + nt_name.Length + sizeof(WCHAR) )))
++    {
++        ret->family = AF_UNIX;
++        ret->win_len = *len < (int)sizeof(SOCKADDR_UN) ? *len : sizeof(SOCKADDR_UN);
++        ret->flags = AFD_UNIX_ADDR_NT_PATH;
++        ret->path_len = nt_name.Length + sizeof(WCHAR);
++        memset( ret->win, 0, sizeof(ret->win) );
++        memcpy( ret->win, addr, ret->win_len );
++        memcpy( ret + 1, nt_name.Buffer, nt_name.Length );
++        ((WCHAR *)(ret + 1))[nt_name.Length / sizeof(WCHAR)] = 0;
++        *len = sizeof(*ret) + ret->path_len;
++    }
++    RtlFreeUnicodeString( &nt_name );
++    return ret;
++}
++
+ DECLARE_CRITICAL_SECTION(cs_socket_list);
+ 
+ static SOCKET *socket_list;
+@@ -1246,6 +1305,7 @@ static int WINAPI WS2_WSARecvMsg( SOCKET s, LPWSAMSG msg, LPDWORD lpNumberOfByte
+  */
+ int WINAPI bind( SOCKET s, const struct sockaddr *addr, int len )
+ {
++    struct afd_unix_addr *unix_addr = NULL;
+     struct afd_bind_params *params;
+     struct sockaddr *ret_addr;
+     IO_STATUS_BLOCK io;
+@@ -1300,13 +1360,26 @@ int WINAPI bind( SOCKET s, const struct sockaddr *addr, int len )
+                 return -1;
+             }
+             break;
++        case AF_UNIX:
++            if (len < offsetof(SOCKADDR_UN, sun_path))
++            {
++                SetLastError( WSAEFAULT );
++                return -1;
++            }
++            if (len > (int)sizeof(SOCKADDR_UN)) len = sizeof(SOCKADDR_UN);
++            if ((unix_addr = afunix_path_addr( addr, &len ))) addr = (const struct sockaddr *)unix_addr;
++            break;
+         default:
+             FIXME( "unknown protocol %u\n", addr->sa_family );
+             SetLastError( WSAEAFNOSUPPORT );
+             return -1;
+     }
+ 
+-    if (!(sync_event = get_sync_event())) return -1;
++    if (!(sync_event = get_sync_event()))
++    {
++        free( unix_addr );
++        return -1;
++    }
+ 
+     params = malloc( sizeof(int) + len );
+     ret_addr = malloc( len );
+@@ -1314,6 +1387,7 @@ int WINAPI bind( SOCKET s, const struct sockaddr *addr, int len )
+     {
+         free( params );
+         free( ret_addr );
++        free( unix_addr );
+         SetLastError( WSAENOBUFS );
+         return -1;
+     }
+@@ -1334,6 +1408,7 @@ int WINAPI bind( SOCKET s, const struct sockaddr *addr, int len )
+ 
+     free( params );
+     free( ret_addr );
++    free( unix_addr );
+ 
+     SetLastError( NtStatusToWSAError( status ) );
+     return status ? -1 : 0;
+@@ -1370,6 +1445,7 @@ int WINAPI closesocket( SOCKET s )
+ int WINAPI connect( SOCKET s, const struct sockaddr *addr, int len )
+ {
+     struct afd_connect_params *params;
++    struct afd_unix_addr *unix_addr;
+     IO_STATUS_BLOCK io;
+     HANDLE sync_event;
+     NTSTATUS status;
+@@ -1378,14 +1454,19 @@ int WINAPI connect( SOCKET s, const struct sockaddr *addr, int len )
+ 
+     if (!(sync_event = get_sync_event())) return -1;
+ 
++    if (addr && len > (int)sizeof(SOCKADDR_UN) && addr->sa_family == AF_UNIX) len = sizeof(SOCKADDR_UN);
++    if ((unix_addr = afunix_path_addr( addr, &len ))) addr = (const struct sockaddr *)unix_addr;
++
+     if (!(params = malloc( sizeof(*params) + len )))
+     {
++        free( unix_addr );
+         SetLastError( ERROR_NOT_ENOUGH_MEMORY );
+         return -1;
+     }
+     params->addr_len = len;
+     params->synchronous = TRUE;
+     memcpy( params + 1, addr, len );
++    free( unix_addr );
+ 
+     status = NtDeviceIoControlFile( (HANDLE)s, sync_event, NULL, NULL, &io, IOCTL_AFD_WINE_CONNECT,
+                                     params, sizeof(*params) + len, NULL, 0 );
+@@ -1423,6 +1504,7 @@ static BOOL WINAPI WS2_ConnectEx( SOCKET s, const struct sockaddr *name, int nam
+                                   void *send_buffer, DWORD send_len, DWORD *ret_len, OVERLAPPED *overlapped )
+ {
+     struct afd_connect_params *params;
++    struct afd_unix_addr *unix_addr;
+     void *cvalue = NULL;
+     NTSTATUS status;
+ 
+@@ -1439,14 +1521,19 @@ static BOOL WINAPI WS2_ConnectEx( SOCKET s, const struct sockaddr *name, int nam
+     overlapped->Internal = STATUS_PENDING;
+     overlapped->InternalHigh = 0;
+ 
++    if (name && namelen > (int)sizeof(SOCKADDR_UN) && name->sa_family == AF_UNIX) namelen = sizeof(SOCKADDR_UN);
++    if ((unix_addr = afunix_path_addr( name, &namelen ))) name = (const struct sockaddr *)unix_addr;
++
+     if (!(params = malloc( sizeof(*params) + namelen + send_len )))
+     {
++        free( unix_addr );
+         SetLastError( ERROR_NOT_ENOUGH_MEMORY );
+         return SOCKET_ERROR;
+     }
+     params->addr_len = namelen;
+     params->synchronous = FALSE;
+     memcpy( params + 1, name, namelen );
++    free( unix_addr );
+     memcpy( (char *)(params + 1) + namelen, send_buffer, send_len );
+ 
+     status = NtDeviceIoControlFile( SOCKET2HANDLE(s), overlapped->hEvent, NULL, cvalue,
+--- a/dlls/ws2_32/tests/sock.c
++++ b/dlls/ws2_32/tests/sock.c
+@@ -15098,7 +15098,7 @@ static int afunix_len(const char *path)
+ static SOCKET afunix_socket(void)
+ {
+     SOCKET s = socket(AF_UNIX, SOCK_STREAM, 0);
+-    todo_wine ok(s != INVALID_SOCKET, "socket failed, error %d\n", WSAGetLastError());
++    ok(s != INVALID_SOCKET, "socket failed, error %d\n", WSAGetLastError());
+     return s;
+ }
+ 
+@@ -15159,7 +15159,7 @@ static void test_afunix_catalogue(void)
+         ok(info[i].iVersion == 2, "version %d\n", info[i].iVersion);
+         ok(!wcscmp(info[i].szProtocol, L"AF_UNIX"), "name %s\n", debugstr_w(info[i].szProtocol));
+     }
+-    todo_wine ok(found == 1, "found %d AF_UNIX entries\n", found);
++    ok(found == 1, "found %d AF_UNIX entries\n", found);
+     free(info);
+ 
+     s = socket(AF_UNIX, SOCK_DGRAM, 0);
+@@ -15167,11 +15167,11 @@ static void test_afunix_catalogue(void)
+     s = socket(AF_UNIX, SOCK_SEQPACKET, 0);
+     ok(s == INVALID_SOCKET && WSAGetLastError() == WSAESOCKTNOSUPPORT, "seqpacket: error %d\n", WSAGetLastError());
+     s = socket(AF_UNIX, SOCK_STREAM, IPPROTO_TCP);
+-    todo_wine ok(s == INVALID_SOCKET && WSAGetLastError() == WSAEPROTONOSUPPORT, "stream/tcp: error %d\n",
++    ok(s == INVALID_SOCKET && WSAGetLastError() == WSAEPROTONOSUPPORT, "stream/tcp: error %d\n",
+                  WSAGetLastError());
+ 
+     s = WSASocketW(AF_UNIX, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+-    todo_wine ok(s != INVALID_SOCKET, "WSASocketW failed, error %d\n", WSAGetLastError());
++    ok(s != INVALID_SOCKET, "WSASocketW failed, error %d\n", WSAGetLastError());
+     if (s == INVALID_SOCKET)
+     {
+         skip("AF_UNIX sockets are not supported\n");
+@@ -15490,7 +15490,7 @@ static void test_afunix_extensions(void)
+     DWORD size, flags;
+ 
+     listener = WSASocketW(AF_UNIX, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+-    todo_wine ok(listener != INVALID_SOCKET, "WSASocketW failed, error %d\n", WSAGetLastError());
++    ok(listener != INVALID_SOCKET, "WSASocketW failed, error %d\n", WSAGetLastError());
+     if (listener == INVALID_SOCKET)
+     {
+         skip("AF_UNIX sockets are not supported\n");
+@@ -15623,7 +15623,8 @@ static void test_afunix_security(void)
+     sd = NULL;
+     err = GetNamedSecurityInfoA(path, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION, NULL, NULL, &dacl, NULL, &sd);
+     ok(!err, "GetNamedSecurityInfoA after setting failed, error %lu\n", err);
+-    ok(dacl && dacl->AceCount == 1, "DACL %p with %u ACEs\n", dacl, dacl ? dacl->AceCount : 0);
++    /* Wine keeps a socket file's DACL only as mode bits (no xattr on a socket inode) */
++    todo_wine ok(dacl && dacl->AceCount == 1, "DACL %p with %u ACEs\n", dacl, dacl ? dacl->AceCount : 0);
+     LocalFree(sd);
+ 
+     client = socket(AF_UNIX, SOCK_STREAM, 0);
+--- a/dlls/ws2_32/ws2_32_private.h
++++ b/dlls/ws2_32/ws2_32_private.h
+@@ -46,6 +46,8 @@
+ #include "mstcpip.h"
+ #include "af_irda.h"
+ #include "winnt.h"
++#include "winternl.h"
++#include "afunix.h"
+ #define USE_WC_PREFIX   /* For CMSG_DATA */
+ #include "iphlpapi.h"
+ #include "ip2string.h"

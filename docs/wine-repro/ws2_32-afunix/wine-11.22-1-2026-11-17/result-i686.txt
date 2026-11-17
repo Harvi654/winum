@@ -1,0 +1,24 @@
+measure ws2_32-afunix format=1 arch=i686
+windows 10.0.19045
+wsastartup ret=0
+enum_protocols_size_query ret=-1 err=10055
+enum_protocols ret=8
+enum_protocols_unix_count 0
+socket_stream_0 valid=0 err=10047
+socket_dgram_0 valid=0 err=10047
+socket_seqpacket_0 valid=0 err=10044
+socket_stream_tcp valid=0 err=10047
+wsasocket_stream_overlapped valid=0 err=10047
+path_length 54
+file_before_bind attrs=0xffffffff err=2 find=none
+bind_socket socket failed err=10047
+bind_empty_socket socket failed err=10047
+bind_abstract_socket socket failed err=10047
+bind_full_len_socket socket failed err=10047
+bind_nonul_socket socket failed err=10047
+bind_mixed_socket socket failed err=10047
+bind_relative_socket socket failed err=10047
+bind_nodir_socket socket failed err=10047
+nonblocking_listener socket failed err=10047
+cleanup remove_dir=1 err=0
+complete 0

@@ -1,0 +1,217 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ntdll: Translate AF_UNIX socket paths and report socket files as reparse points.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Part of AF_UNIX stream socket support (see the server patch). For
+IOCTL_AFD_BIND and IOCTL_AFD_WINE_CONNECT with an AF_UNIX path address
+(struct afd_unix_addr with an NT path from ws2_32), work out the Unix
+path of the prefix (the last element need not exist; a missing directory
+gives STATUS_OBJECT_PATH_NOT_FOUND, which Windows reports as
+WSAENETDOWN) and pass the address on to the server with that path;
+server_ioctl_file becomes visible for that.
+
+A socket inode is reported as Windows reports an AF_UNIX socket file
+(measured on Windows 10 22H2): attributes archive + reparse point, tag
+IO_REPARSE_TAG_AF_UNIX (directory listings, FindFirstFile), and
+NtQueryAttributesFile/NtQueryFullAttributesFile and the file information
+classes accept it like a file.
+
+--- a/dlls/ntdll/unix/file.c
++++ b/dlls/ntdll/unix/file.c
+@@ -1374,6 +1374,12 @@ static int fd_get_file_info( HANDLE handle, int fd, unsigned int options,
+     ret = fstat( fd, st );
+     if (ret == -1) return ret;
+     *attr |= get_file_attributes( st );
++    if (S_ISSOCK( st->st_mode ))
++    {
++        /* an AF_UNIX socket file is a reparse point on Windows */
++        *attr |= FILE_ATTRIBUTE_REPARSE_POINT;
++        if (reparse_tag) *reparse_tag = IO_REPARSE_TAG_AF_UNIX;
++    }
+     if (reparse_tag) *reparse_tag = 0;
+     /* consider mount points to be reparse points (IO_REPARSE_TAG_MOUNT_POINT) */
+     if (options & FILE_OPEN_REPARSE_POINT)
+@@ -1501,6 +1507,12 @@ static int get_file_info( const char *path, struct stat *st, ULONG *attr, ULONG
+         free( parent_path );
+     }
+     *attr |= get_file_attributes( st );
++    if (S_ISSOCK( st->st_mode ))
++    {
++        /* an AF_UNIX socket file is a reparse point on Windows */
++        *attr |= FILE_ATTRIBUTE_REPARSE_POINT;
++        if (reparse_tag) *reparse_tag = IO_REPARSE_TAG_AF_UNIX;
++    }
+ 
+     attr_len = xattr_get( path, XATTR_REPARSE, buffer, sizeof(buffer) );
+     if (attr_len >= 0 && attr_len >= sizeof(ULONG))
+@@ -4571,7 +4583,7 @@ NTSTATUS WINAPI NtQueryFullAttributesFile( const OBJECT_ATTRIBUTES *attr,
+ 
+         if (get_file_info( unix_name, &st, &attributes, NULL ) == -1)
+             status = errno_to_status( errno );
+-        else if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode))
++        else if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode) && !S_ISSOCK(st.st_mode))
+             status = STATUS_INVALID_INFO_CLASS;
+         else
+             fill_file_info( &st, attributes, info, FileNetworkOpenInformation );
+@@ -4600,7 +4612,7 @@ NTSTATUS WINAPI NtQueryAttributesFile( const OBJECT_ATTRIBUTES *attr, FILE_BASIC
+ 
+         if (get_file_info( unix_name, &st, &attributes, NULL ) == -1)
+             status = errno_to_status( errno );
+-        else if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode))
++        else if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode) && !S_ISSOCK(st.st_mode))
+             status = STATUS_INVALID_INFO_CLASS;
+         else
+             status = fill_file_info( &st, attributes, info, FileBasicInformation );
+@@ -4730,7 +4742,7 @@ NTSTATUS WINAPI NtQueryInformationFile( HANDLE handle, IO_STATUS_BLOCK *io,
+     case FileBasicInformation:
+         if (fd_get_file_info( handle, fd, options, &st, &attr, NULL ) == -1)
+             status = errno_to_status( errno );
+-        else if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode))
++        else if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode) && !S_ISSOCK(st.st_mode))
+             status = STATUS_INVALID_INFO_CLASS;
+         else
+             fill_file_info( &st, attr, ptr, class );
+@@ -4837,7 +4849,7 @@ NTSTATUS WINAPI NtQueryInformationFile( HANDLE handle, IO_STATUS_BLOCK *io,
+     case FileStatInformation:
+         if (fd_get_file_info( handle, fd, options, &st, &attr, &reparse_tag ) == -1)
+             status = errno_to_status( errno );
+-        else if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode))
++        else if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode) && !S_ISSOCK(st.st_mode))
+             status = STATUS_INVALID_INFO_CLASS;
+         else
+         {
+@@ -5614,7 +5626,7 @@ static NTSTATUS ioctl_scsi_pass_through_direct( HANDLE handle, HANDLE event,
+ }
+ 
+ /* do an ioctl call through the server */
+-static NTSTATUS server_ioctl_file( HANDLE handle, HANDLE event,
++NTSTATUS server_ioctl_file( HANDLE handle, HANDLE event,
+                                    PIO_APC_ROUTINE apc, PVOID apc_context,
+                                    IO_STATUS_BLOCK *io, UINT code,
+                                    const void *in_buffer, UINT in_size,
+--- a/dlls/ntdll/unix/socket.c
++++ b/dlls/ntdll/unix/socket.c
+@@ -78,6 +78,7 @@
+ #include "ws2tcpip.h"
+ #include "wsipx.h"
+ #include "af_irda.h"
++#include "afunix.h"
+ #include "wine/afd.h"
+ 
+ #include "unix_private.h"
+@@ -1611,6 +1612,74 @@ static int get_sock_type( HANDLE handle )
+ }
+ 
+ 
++/* An AF_UNIX path address comes from ws2_32 with an NT path (struct
++ * afd_unix_addr); the server needs the Unix path, which only ntdll can work
++ * out. Rewrite the input of IOCTL_AFD_BIND or IOCTL_AFD_WINE_CONNECT with
++ * the Unix path and pass it on to the server. */
++static NTSTATUS afunix_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc_user,
++                              IO_STATUS_BLOCK *io, UINT code, const char *in_buffer, UINT in_size,
++                              UINT addr_offset, UINT addr_len, void *out_buffer, UINT out_size )
++{
++    const struct afd_unix_addr *ua = (const struct afd_unix_addr *)(in_buffer + addr_offset);
++    UINT tail = in_size - addr_offset - addr_len, path_len, new_size, i;
++    struct afd_unix_addr *new_addr;
++    OBJECT_ATTRIBUTES attr;
++    UNICODE_STRING name, nt_name;
++    char *unix_name, *new_buffer;
++    const WCHAR *path;
++    NTSTATUS status;
++
++    if (addr_len < sizeof(*ua) + sizeof(WCHAR) || ua->flags != AFD_UNIX_ADDR_NT_PATH
++            || ua->path_len > addr_len - sizeof(*ua) || ua->path_len % sizeof(WCHAR))
++        return STATUS_INVALID_ADDRESS;
++    path = (const WCHAR *)(ua + 1);
++    for (i = 0; i < ua->path_len / sizeof(WCHAR) && path[i]; i++) ;
++    if (!i) return STATUS_INVALID_ADDRESS;
++    name.Buffer = (WCHAR *)path;
++    name.Length = name.MaximumLength = i * sizeof(WCHAR);
++    InitializeObjectAttributes( &attr, &name, OBJ_CASE_INSENSITIVE, 0, NULL );
++
++    /* the last element does not have to exist; a missing directory is
++     * STATUS_OBJECT_PATH_NOT_FOUND, which ws2_32 reports as WSAENETDOWN */
++    status = get_nt_and_unix_names( &attr, &nt_name, &unix_name, FILE_OPEN_IF, TRUE );
++    free( nt_name.Buffer );
++    if (status == STATUS_NO_SUCH_FILE) status = STATUS_SUCCESS;
++    if (status)
++    {
++        free( unix_name );
++        return status;
++    }
++    TRACE( "%s -> %s\n", debugstr_us(&name), debugstr_a(unix_name) );
++
++    path_len = strlen( unix_name ) + 1;
++    new_size = addr_offset + sizeof(*new_addr) + path_len + tail;
++    if (path_len > 0xffff || !(new_buffer = malloc( new_size )))
++    {
++        free( unix_name );
++        return STATUS_NO_MEMORY;
++    }
++    memcpy( new_buffer, in_buffer, addr_offset );
++    new_addr = (struct afd_unix_addr *)(new_buffer + addr_offset);
++    *new_addr = *ua;
++    new_addr->flags = AFD_UNIX_ADDR_UNIX_PATH;
++    new_addr->path_len = path_len;
++    memcpy( new_addr + 1, unix_name, path_len );
++    memcpy( (char *)(new_addr + 1) + path_len, in_buffer + addr_offset + addr_len, tail );
++    if (code == IOCTL_AFD_WINE_CONNECT)
++        ((struct afd_connect_params *)new_buffer)->addr_len = sizeof(*new_addr) + path_len;
++    free( unix_name );
++
++    status = server_ioctl_file( handle, event, apc, apc_user, io, code, new_buffer, new_size,
++                                out_buffer, out_size );
++    free( new_buffer );
++    return status;
++}
++
++static BOOL is_afunix_path_addr( const void *addr, UINT addr_len )
++{
++    return addr_len > sizeof(struct WS_sockaddr_un) && ((const struct WS_sockaddr *)addr)->sa_family == WS_AF_UNIX;
++}
++
+ NTSTATUS sock_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc_user, IO_STATUS_BLOCK *io,
+                      UINT code, void *in_buffer, UINT in_size, void *out_buffer, UINT out_size )
+ {
+@@ -1633,6 +1702,26 @@ NTSTATUS sock_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc
+ 
+             if (params->unknown) FIXME( "bind: got unknown %#x\n", params->unknown );
+ 
++            if (in_size > offsetof(struct afd_bind_params, addr)
++                    && is_afunix_path_addr( &params->addr, in_size - offsetof(struct afd_bind_params, addr) ))
++                return afunix_ioctl( handle, event, apc, apc_user, io, code, in_buffer, in_size,
++                                     offsetof(struct afd_bind_params, addr),
++                                     in_size - offsetof(struct afd_bind_params, addr), out_buffer, out_size );
++
++            status = STATUS_BAD_DEVICE_TYPE;
++            break;
++        }
++
++        case IOCTL_AFD_WINE_CONNECT:
++        {
++            const struct afd_connect_params *params = in_buffer;
++
++            if (in_size >= sizeof(*params) && params->addr_len > 0
++                    && params->addr_len <= in_size - sizeof(*params)
++                    && is_afunix_path_addr( params + 1, params->addr_len ))
++                return afunix_ioctl( handle, event, apc, apc_user, io, code, in_buffer, in_size,
++                                     sizeof(*params), params->addr_len, out_buffer, out_size );
++
+             status = STATUS_BAD_DEVICE_TYPE;
+             break;
+         }
+--- a/dlls/ntdll/unix/unix_private.h
++++ b/dlls/ntdll/unix/unix_private.h
+@@ -372,6 +372,9 @@ extern NTSTATUS serial_DeviceIoControl( HANDLE device, HANDLE event, PIO_APC_ROU
+                                         IO_STATUS_BLOCK *io, UINT code, void *in_buffer,
+                                         UINT in_size, void *out_buffer, UINT out_size );
+ extern NTSTATUS serial_FlushBuffersFile( int fd );
++extern NTSTATUS server_ioctl_file( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, PVOID apc_context,
++                                  IO_STATUS_BLOCK *io, UINT code, const void *in_buffer, UINT in_size,
++                                  PVOID out_buffer, UINT out_size );
+ extern NTSTATUS sock_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc_user, IO_STATUS_BLOCK *io,
+                             UINT code, void *in_buffer, UINT in_size, void *out_buffer, UINT out_size );
+ extern NTSTATUS sock_read( HANDLE handle, int fd, HANDLE event, PIO_APC_ROUTINE apc, void *apc_user,
