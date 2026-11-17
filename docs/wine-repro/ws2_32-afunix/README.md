@@ -107,3 +107,27 @@ Wine 11.22 also already has upstream tests for AF_UNIX
 upstream on 2025-10-30 as "ws2_32/tests: Add some tests for AF_UNIX
 sockets"); they `todo_wine win_skip` when the socket cannot be created,
 so the implementation is the missing part upstream as well.
+
+## MEASURE 2: opening and securing the socket file (`measure-sd.c`)
+
+L4 with fix v1 in RobotStudio (2026-11-17): CodeMeter's event server now
+binds (the socket file appears), and then logs "The event network server
+could not accept an incoming connection. Internal details:
+SetNamedSecurityInfoA failed". Wine's advapi32 opens the file for
+`SetNamedSecurityInfo` with `NtCreateFile(WRITE_DAC | READ_CONTROL,
+FILE_OPEN_FOR_BACKUP_INTENT)`, without `FILE_OPEN_REPARSE_POINT`, and fix
+v1 refuses that for a socket file (as Windows refuses `GENERIC_READ`,
+upstream `test_afunix_path`). How Windows opens the socket file for
+other access rights, and whether its `SetNamedSecurityInfo` works on it,
+is measured, not assumed: `CreateFile` with eight access masks x four
+flag sets, `NtCreateFile(WRITE_DAC | READ_CONTROL)` with and without
+`FILE_OPEN_REPARSE_POINT`, `Get/SetNamedSecurityInfoA` (DACL, also
+protected), and a connect afterwards. Built into the same bundle by
+`scripts/build-measure-ws2_32-afunix.sh`; returns `result-sd-x86_64.txt`,
+`result-sd-i686.txt` (and `exitcodes.txt`).
+
+Under fix v1 (local x86_64 build, 2026-11-17,
+[`wine-afunix-v1-2026-11-17/result-sd-x86_64.txt`](wine-afunix-v1-2026-11-17/result-sd-x86_64.txt)):
+every open without the reparse flag fails with 1920
+(`ERROR_CANT_ACCESS_FILE`), with it succeeds; `Get/SetNamedSecurityInfoA`
+fail with 1920; connect works.
