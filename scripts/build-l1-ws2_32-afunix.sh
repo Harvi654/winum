@@ -11,8 +11,9 @@ from pathlib import Path
 import sys
 root = Path(sys.argv[1])
 patch = (root / 'patches/candidates/ws2_32-af-unix/ws2_32-tests-afunix-winum.patch').read_text()
-added = [l[1:] for l in patch.splitlines() if l.startswith('+') and not l.startswith('+++')]
-added = [l for l in added if l != '    test_afunix_winum();']
+sock = patch[patch.index('--- a/dlls/ws2_32/tests/sock.c'):]
+added = [l[1:] for l in sock.splitlines() if l.startswith('+') and not l.startswith('+++')]
+added = [l for l in added if l not in ('    test_afunix_winum();', '#include <aclapi.h>')]
 unit = '\n'.join(added).strip('\n') + '\n'
 body = (root / 'docs/wine-repro/ws2_32-afunix/test-body.h').read_text()
 if unit != body:
