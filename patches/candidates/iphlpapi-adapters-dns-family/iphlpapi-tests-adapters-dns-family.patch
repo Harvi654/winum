@@ -1,0 +1,64 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] iphlpapi/tests: Test GetAdaptersAddresses() with no DNS server of the family.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Measured on Windows 10 22H2 (docs/wine-repro/iphlpapi-adapters,
+2026-11-17): GetAdaptersAddresses(AF_INET6, 0) succeeds and returns the
+adapters, some with no DNS server. Under Wine it fails with
+DNS_ERROR_NO_DNS_SERVERS (9852) on a host whose resolver has no IPv6
+server, while the same call with GAA_FLAG_SKIP_DNS_SERVER succeeds. The
+test checks, for AF_UNSPEC, AF_INET and AF_INET6, that the call returns
+the same as with GAA_FLAG_SKIP_DNS_SERVER and that the full call
+succeeds. It fails on such a host (as in CI) without the fix.
+
+--- a/dlls/iphlpapi/tests/iphlpapi.c
++++ b/dlls/iphlpapi/tests/iphlpapi.c
+@@ -4153,6 +4153,38 @@ done:
+     FreeMibTable( table );
+ }
+ 
++/* An adapter without DNS servers of the requested family keeps an empty
++ * list; the call itself does not fail (Windows 10: GetAdaptersAddresses
++ * (AF_INET6, 0) succeeds with adapters whose FirstDnsServerAddress is
++ * NULL, docs/wine-repro/iphlpapi-adapters). */
++static void test_GetAdaptersAddresses_dns_family(void)
++{
++    static const ULONG families[] = { AF_UNSPEC, AF_INET, AF_INET6 };
++    IP_ADAPTER_ADDRESSES *list, *aa;
++    ULONG i, ret, ret_skip, size, size_skip;
++
++    for (i = 0; i < ARRAY_SIZE(families); i++)
++    {
++        size_skip = 0;
++        ret_skip = GetAdaptersAddresses(families[i], GAA_FLAG_SKIP_DNS_SERVER, NULL, NULL, &size_skip);
++        ok(ret_skip == ERROR_BUFFER_OVERFLOW || ret_skip == ERROR_NO_DATA,
++           "family %lu, no DNS servers: got %lu\n", families[i], ret_skip);
++        size = 0;
++        ret = GetAdaptersAddresses(families[i], 0, NULL, NULL, &size);
++        ok(ret == ret_skip, "family %lu: got %lu, without DNS servers %lu\n", families[i], ret, ret_skip);
++        if (ret != ERROR_BUFFER_OVERFLOW) continue;
++
++        list = malloc(size);
++        ret = GetAdaptersAddresses(families[i], 0, NULL, list, &size);
++        ok(!ret, "family %lu: got %lu\n", families[i], ret);
++        if (!ret)
++            for (aa = list; aa; aa = aa->Next)
++                ok(aa->Length >= sizeof(IP_ADAPTER_ADDRESSES_LH), "family %lu: length %lu\n",
++                   families[i], aa->Length);
++        free(list);
++    }
++}
++
+ START_TEST(iphlpapi)
+ {
+   WSADATA wsa_data;
+@@ -4172,6 +4204,7 @@ START_TEST(iphlpapi)
+ 
+     testWin2KFunctions();
+     test_GetAdaptersAddresses();
++    test_GetAdaptersAddresses_dns_family();
+     test_GetExtendedTcpTable();
+     test_GetExtendedTcpTable_owner(AF_INET);
+     test_GetExtendedTcpTable_owner(AF_INET6);

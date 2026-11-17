@@ -86,5 +86,39 @@ counts is the loopback adapter and the fields of its addresses.
   are 0xffffffff; whether Windows differs is the measurement.
   `GetAdaptersAddresses(AF_INET6)` returns 9852 there (no IPv6 in the
   sandbox kernel; not used).
-- Windows 10: pending.
-- Wine on the maintainer's machine (try-11-winmgmt): pending.
+- Windows 10 22H2 (19045), 2026-11-17
+  ([`windows10-19045-2026-11-17/`](windows10-19045-2026-11-17/), exit 0,
+  x86_64 and i686 the same apart from structure lengths): two adapters,
+  Ethernet and the loopback pseudo-interface; every call succeeds.
+- Wine 11.22 (winum-11.22-1 with the AF_UNIX candidate) on the
+  maintainer's machine, `try-11-winmgmt`, 2026-11-17
+  ([`wine-11.22-maintainer-2026-11-17/`](wine-11.22-maintainer-2026-11-17/),
+  exit 0): four adapters (the Linux interfaces), loopback with `::1` and
+  `127.0.0.1`.
+
+### Differences
+
+| | Windows 10 | Wine 11.22 |
+| --- | --- | --- |
+| `GetAdaptersAddresses(AF_INET6, 0)` | `ERROR_BUFFER_OVERFLOW`, then 0, both adapters (loopback with `::1`) | **9852 (`DNS_ERROR_NO_DNS_SERVERS`)**, no list |
+| loopback `Ipv6IfIndex` | set, equal to `IfIndex` | 0 (all adapters) |
+| `ZoneIndices` link / site | interface index / 1 | 0 / 0 |
+| loopback addresses: prefix/suffix origin | 2/2 (well-known) | 1/1 (manual) |
+| loopback addresses: valid/preferred lifetime | infinite | finite |
+| link-local: prefix/suffix origin, lifetimes | 2/4 (well-known/link-layer), infinite | 3/3 (DHCP), finite |
+| loopback `Mtu` | 0xffffffff | 65536 |
+| metrics | 25 (Ethernet), 75 (loopback) | 256/100, 0xffffffff on most |
+| `Flags` | DDNS (0x1), DHCP on Ethernet | no DDNS, no DHCP |
+| loopback DNS servers (`AF_INET6`) | 3 | - |
+| `GetIpAddrTable` `wType` of the LAN row | 0x5 (primary, dynamic) | 0x1 (primary) |
+
+The first row is a failure, the others are values. Cause of the first:
+`dns_info_alloc()` in `dlls/iphlpapi/iphlpapi_main.c` asks dnsapi for
+the DNS servers of the requested family for each adapter and returns
+its error for the whole call; Linux's resolver on the maintainer's
+machine (and in CI) lists only IPv4 servers, so the IPv6 query answers
+`DNS_ERROR_NO_DNS_SERVERS`. With `GAA_FLAG_SKIP_DNS_SERVER` the call
+succeeds. CodeMeter's service makes the failing call twice at its start.
+Candidate: `patches/candidates/iphlpapi-adapters-dns-family/` (test and
+fix). The value differences stay noted here; one of them is taken up
+only if L4 shows the failure fix is not enough (one task at a time).

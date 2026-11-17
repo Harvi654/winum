@@ -1,0 +1,3 @@
+# GetAdaptersAddresses with no DNS server of the family: the test first, then the fix
+iphlpapi-tests-adapters-dns-family.patch
+iphlpapi-adapters-dns-family.patch

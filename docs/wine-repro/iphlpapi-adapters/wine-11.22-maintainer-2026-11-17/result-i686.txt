@@ -1,0 +1,75 @@
+measure iphlpapi-adapters format=1 arch=i686
+gaa_unspec_0 size_query ret=111 size_nonzero=1
+gaa_unspec_0 call ret=0
+gaa_unspec_0 adapter 0 length=376 iftype=6 oper=1 flags=0x180 ddns=0 register_suffix=0 dhcp=0 receive_only=0 no_multicast=0 ipv4=1 ipv6=1
+gaa_unspec_0 adapter 0 ifindex_nonzero=1 ipv6ifindex_nonzero=0 same_index=0 mtu=1500 phys_len=6 tunnel=0 connection=1 luid_iftype=6 ipv4_metric=256 ipv6_metric=100
+gaa_unspec_0 adapter 0 zone_link=0 zone_site=0 name_set=1 friendly_set=1 description_set=1 dns_suffix_set=1 unicast=3 anycast=0 multicast=0 dns=2 gateways=0
+gaa_unspec_0 adapter 0 unicast 0 v6 other-v6 scope 0 sockaddr_len=28 length=48 flags=0x1 prefix_origin=3 suffix_origin=3 dad=4 onlink_prefix=64 valid=finite preferred=finite lease=finite
+gaa_unspec_0 adapter 0 unicast 1 v6 link-local scope 2 sockaddr_len=28 length=48 flags=0 prefix_origin=3 suffix_origin=3 dad=4 onlink_prefix=64 valid=finite preferred=finite lease=finite
+gaa_unspec_0 adapter 0 unicast 2 v4 other-v4 sockaddr_len=16 length=48 flags=0x1 prefix_origin=3 suffix_origin=3 dad=4 onlink_prefix=22 valid=finite preferred=finite lease=finite
+gaa_unspec_0 adapter 1 length=376 iftype=6 oper=1 flags=0x100 ddns=0 register_suffix=0 dhcp=0 receive_only=0 no_multicast=0 ipv4=0 ipv6=1
+gaa_unspec_0 adapter 1 ifindex_nonzero=1 ipv6ifindex_nonzero=0 same_index=0 mtu=1500 phys_len=6 tunnel=0 connection=1 luid_iftype=6 ipv4_metric=4294967295 ipv6_metric=256
+gaa_unspec_0 adapter 1 zone_link=0 zone_site=0 name_set=1 friendly_set=1 description_set=1 dns_suffix_set=1 unicast=1 anycast=0 multicast=0 dns=2 gateways=0
+gaa_unspec_0 adapter 1 unicast 0 v6 link-local scope 5 sockaddr_len=28 length=48 flags=0 prefix_origin=3 suffix_origin=3 dad=4 onlink_prefix=64 valid=finite preferred=finite lease=finite
+gaa_unspec_0 adapter 2 length=376 iftype=6 oper=1 flags=0x80 ddns=0 register_suffix=0 dhcp=0 receive_only=0 no_multicast=0 ipv4=1 ipv6=0
+gaa_unspec_0 adapter 2 ifindex_nonzero=1 ipv6ifindex_nonzero=0 same_index=0 mtu=1500 phys_len=6 tunnel=0 connection=1 luid_iftype=6 ipv4_metric=4294967295 ipv6_metric=4294967295
+gaa_unspec_0 adapter 2 zone_link=0 zone_site=0 name_set=1 friendly_set=1 description_set=1 dns_suffix_set=1 unicast=1 anycast=0 multicast=0 dns=2 gateways=0
+gaa_unspec_0 adapter 2 unicast 0 v4 other-v4 sockaddr_len=16 length=48 flags=0x1 prefix_origin=3 suffix_origin=3 dad=4 onlink_prefix=24 valid=finite preferred=finite lease=finite
+gaa_unspec_0 adapter 3 length=376 iftype=24 oper=1 flags=0x180 ddns=0 register_suffix=0 dhcp=0 receive_only=0 no_multicast=0 ipv4=1 ipv6=1
+gaa_unspec_0 adapter 3 ifindex_nonzero=1 ipv6ifindex_nonzero=0 same_index=0 mtu=65536 phys_len=0 tunnel=0 connection=1 luid_iftype=24 ipv4_metric=4294967295 ipv6_metric=4294967295
+gaa_unspec_0 adapter 3 zone_link=0 zone_site=0 name_set=1 friendly_set=1 description_set=1 dns_suffix_set=1 unicast=2 anycast=0 multicast=0 dns=2 gateways=0
+gaa_unspec_0 adapter 3 unicast 0 v6 loopback ::1 scope 0 sockaddr_len=28 length=48 flags=0 prefix_origin=1 suffix_origin=1 dad=4 onlink_prefix=128 valid=finite preferred=finite lease=finite
+gaa_unspec_0 adapter 3 unicast 1 v4 loopback 127.0.0.1 sockaddr_len=16 length=48 flags=0 prefix_origin=1 suffix_origin=1 dad=4 onlink_prefix=8 valid=finite preferred=finite lease=finite
+gaa_unspec_0 adapters 4
+gaa_unspec_2e size_query ret=111 size_nonzero=1
+gaa_unspec_2e call ret=0
+gaa_unspec_2e adapter 0 length=376 iftype=6 oper=1 flags=0x180 ddns=0 register_suffix=0 dhcp=0 receive_only=0 no_multicast=0 ipv4=1 ipv6=1
+gaa_unspec_2e adapter 0 ifindex_nonzero=1 ipv6ifindex_nonzero=0 same_index=0 mtu=1500 phys_len=6 tunnel=0 connection=1 luid_iftype=6 ipv4_metric=256 ipv6_metric=100
+gaa_unspec_2e adapter 0 zone_link=0 zone_site=0 name_set=1 friendly_set=1 description_set=1 dns_suffix_set=1 unicast=3 anycast=0 multicast=0 dns=0 gateways=0
+gaa_unspec_2e adapter 0 unicast 0 v6 other-v6 scope 0 sockaddr_len=28 length=48 flags=0x1 prefix_origin=3 suffix_origin=3 dad=4 onlink_prefix=64 valid=finite preferred=finite lease=finite
+gaa_unspec_2e adapter 0 unicast 1 v6 link-local scope 2 sockaddr_len=28 length=48 flags=0 prefix_origin=3 suffix_origin=3 dad=4 onlink_prefix=64 valid=finite preferred=finite lease=finite
+gaa_unspec_2e adapter 0 unicast 2 v4 other-v4 sockaddr_len=16 length=48 flags=0x1 prefix_origin=3 suffix_origin=3 dad=4 onlink_prefix=22 valid=finite preferred=finite lease=finite
+gaa_unspec_2e adapter 1 length=376 iftype=6 oper=1 flags=0x100 ddns=0 register_suffix=0 dhcp=0 receive_only=0 no_multicast=0 ipv4=0 ipv6=1
+gaa_unspec_2e adapter 1 ifindex_nonzero=1 ipv6ifindex_nonzero=0 same_index=0 mtu=1500 phys_len=6 tunnel=0 connection=1 luid_iftype=6 ipv4_metric=4294967295 ipv6_metric=256
+gaa_unspec_2e adapter 1 zone_link=0 zone_site=0 name_set=1 friendly_set=1 description_set=1 dns_suffix_set=1 unicast=1 anycast=0 multicast=0 dns=0 gateways=0
+gaa_unspec_2e adapter 1 unicast 0 v6 link-local scope 5 sockaddr_len=28 length=48 flags=0 prefix_origin=3 suffix_origin=3 dad=4 onlink_prefix=64 valid=finite preferred=finite lease=finite
+gaa_unspec_2e adapter 2 length=376 iftype=6 oper=1 flags=0x80 ddns=0 register_suffix=0 dhcp=0 receive_only=0 no_multicast=0 ipv4=1 ipv6=0
+gaa_unspec_2e adapter 2 ifindex_nonzero=1 ipv6ifindex_nonzero=0 same_index=0 mtu=1500 phys_len=6 tunnel=0 connection=1 luid_iftype=6 ipv4_metric=4294967295 ipv6_metric=4294967295
+gaa_unspec_2e adapter 2 zone_link=0 zone_site=0 name_set=1 friendly_set=1 description_set=1 dns_suffix_set=1 unicast=1 anycast=0 multicast=0 dns=0 gateways=0
+gaa_unspec_2e adapter 2 unicast 0 v4 other-v4 sockaddr_len=16 length=48 flags=0x1 prefix_origin=3 suffix_origin=3 dad=4 onlink_prefix=24 valid=finite preferred=finite lease=finite
+gaa_unspec_2e adapter 3 length=376 iftype=24 oper=1 flags=0x180 ddns=0 register_suffix=0 dhcp=0 receive_only=0 no_multicast=0 ipv4=1 ipv6=1
+gaa_unspec_2e adapter 3 ifindex_nonzero=1 ipv6ifindex_nonzero=0 same_index=0 mtu=65536 phys_len=0 tunnel=0 connection=1 luid_iftype=24 ipv4_metric=4294967295 ipv6_metric=4294967295
+gaa_unspec_2e adapter 3 zone_link=0 zone_site=0 name_set=1 friendly_set=1 description_set=1 dns_suffix_set=1 unicast=2 anycast=0 multicast=0 dns=0 gateways=0
+gaa_unspec_2e adapter 3 unicast 0 v6 loopback ::1 scope 0 sockaddr_len=28 length=48 flags=0 prefix_origin=1 suffix_origin=1 dad=4 onlink_prefix=128 valid=finite preferred=finite lease=finite
+gaa_unspec_2e adapter 3 unicast 1 v4 loopback 127.0.0.1 sockaddr_len=16 length=48 flags=0 prefix_origin=1 suffix_origin=1 dad=4 onlink_prefix=8 valid=finite preferred=finite lease=finite
+gaa_unspec_2e adapters 4
+gaa_inet6_0 size_query ret=9852 size_nonzero=0
+gaa_inet_0 size_query ret=111 size_nonzero=1
+gaa_inet_0 call ret=0
+gaa_inet_0 adapter 0 length=376 iftype=6 oper=1 flags=0x80 ddns=0 register_suffix=0 dhcp=0 receive_only=0 no_multicast=0 ipv4=1 ipv6=0
+gaa_inet_0 adapter 0 ifindex_nonzero=1 ipv6ifindex_nonzero=0 same_index=0 mtu=1500 phys_len=6 tunnel=0 connection=1 luid_iftype=6 ipv4_metric=256 ipv6_metric=0
+gaa_inet_0 adapter 0 zone_link=0 zone_site=0 name_set=1 friendly_set=1 description_set=1 dns_suffix_set=1 unicast=1 anycast=0 multicast=0 dns=2 gateways=0
+gaa_inet_0 adapter 0 unicast 0 v4 other-v4 sockaddr_len=16 length=48 flags=0x1 prefix_origin=3 suffix_origin=3 dad=4 onlink_prefix=22 valid=finite preferred=finite lease=finite
+gaa_inet_0 adapter 1 length=376 iftype=6 oper=1 flags=0x80 ddns=0 register_suffix=0 dhcp=0 receive_only=0 no_multicast=0 ipv4=1 ipv6=0
+gaa_inet_0 adapter 1 ifindex_nonzero=1 ipv6ifindex_nonzero=0 same_index=0 mtu=1500 phys_len=6 tunnel=0 connection=1 luid_iftype=6 ipv4_metric=4294967295 ipv6_metric=0
+gaa_inet_0 adapter 1 zone_link=0 zone_site=0 name_set=1 friendly_set=1 description_set=1 dns_suffix_set=1 unicast=1 anycast=0 multicast=0 dns=2 gateways=0
+gaa_inet_0 adapter 1 unicast 0 v4 other-v4 sockaddr_len=16 length=48 flags=0x1 prefix_origin=3 suffix_origin=3 dad=4 onlink_prefix=24 valid=finite preferred=finite lease=finite
+gaa_inet_0 adapter 2 length=376 iftype=6 oper=1 flags=0 ddns=0 register_suffix=0 dhcp=0 receive_only=0 no_multicast=0 ipv4=0 ipv6=0
+gaa_inet_0 adapter 2 ifindex_nonzero=1 ipv6ifindex_nonzero=0 same_index=0 mtu=1500 phys_len=6 tunnel=0 connection=1 luid_iftype=6 ipv4_metric=4294967295 ipv6_metric=0
+gaa_inet_0 adapter 2 zone_link=0 zone_site=0 name_set=1 friendly_set=1 description_set=1 dns_suffix_set=1 unicast=0 anycast=0 multicast=0 dns=2 gateways=0
+gaa_inet_0 adapter 3 length=376 iftype=24 oper=1 flags=0x80 ddns=0 register_suffix=0 dhcp=0 receive_only=0 no_multicast=0 ipv4=1 ipv6=0
+gaa_inet_0 adapter 3 ifindex_nonzero=1 ipv6ifindex_nonzero=0 same_index=0 mtu=65536 phys_len=0 tunnel=0 connection=1 luid_iftype=24 ipv4_metric=4294967295 ipv6_metric=0
+gaa_inet_0 adapter 3 zone_link=0 zone_site=0 name_set=1 friendly_set=1 description_set=1 dns_suffix_set=1 unicast=1 anycast=0 multicast=0 dns=2 gateways=0
+gaa_inet_0 adapter 3 unicast 0 v4 loopback 127.0.0.1 sockaddr_len=16 length=48 flags=0 prefix_origin=1 suffix_origin=1 dad=4 onlink_prefix=8 valid=finite preferred=finite lease=finite
+gaa_inet_0 adapters 4
+ipaddrtable_unsorted size_query ret=122 size_nonzero=1
+ipaddrtable_unsorted call ret=0 entries=3
+ipaddrtable_unsorted row 0 v4 other-v4 mask_bits=22 mask_contiguous=1 index_nonzero=1 bcast=1 reasm=65535 type=0x1
+ipaddrtable_unsorted row 1 v4 other-v4 mask_bits=24 mask_contiguous=1 index_nonzero=1 bcast=1 reasm=65535 type=0x1
+ipaddrtable_unsorted row 2 v4 loopback 127.0.0.1 mask_bits=8 mask_contiguous=1 index_nonzero=1 bcast=1 reasm=65535 type=0x1
+ipaddrtable_sorted size_query ret=122 size_nonzero=1
+ipaddrtable_sorted call ret=0 entries=3
+ipaddrtable_sorted row 0 v4 other-v4 mask_bits=22 mask_contiguous=1 index_nonzero=1 bcast=1 reasm=65535 type=0x1
+ipaddrtable_sorted row 1 v4 loopback 127.0.0.1 mask_bits=8 mask_contiguous=1 index_nonzero=1 bcast=1 reasm=65535 type=0x1
+ipaddrtable_sorted row 2 v4 other-v4 mask_bits=24 mask_contiguous=1 index_nonzero=1 bcast=1 reasm=65535 type=0x1
+complete 1
