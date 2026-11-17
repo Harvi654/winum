@@ -1,0 +1,24 @@
+measure iphlpapi-loopback-tables format=1 arch=x86_64
+iftable ret=0
+iftable rows=4 loopback_found=1
+if ret=0 index=1 type=24 tunnel=0 media=0 phys_medium=0 access=1 direction=0 oper=1 admin=1 media_conn=1 conn_type=1 guid_set=1 net_guid_set=0 hw=0 filter=0 conn_present=0 mtu=65536 phys_len=0
+ipif_v4 ret=0 forwarding=0 weak_send=0 weak_recv=0 advertising=0 use_auto_metric=1 use_nud=1 managed=0 other_stateful=0 router_discovery=0 dad_transmits=0 reachable=30000 retransmit=1000 pmtu_timeout=600000 ll_behavior=1 ll_timeout=6500 metric=0 nlmtu=65536 connected=1 wakeup=0 site_prefix=64 support_ll=1 disable_default_routes=0
+ipif_v6 ret=0 forwarding=0 weak_send=0 weak_recv=0 advertising=0 use_auto_metric=1 use_nud=1 managed=0 other_stateful=0 router_discovery=0 dad_transmits=0 reachable=30000 retransmit=1000 pmtu_timeout=600000 ll_behavior=2 ll_timeout=0 metric=0 nlmtu=65536 connected=1 wakeup=0 site_prefix=64 support_ll=1 disable_default_routes=0
+unicast_v4 ret=0
+unicast_v4 v4 127.0.0.1 prefix_origin=1 suffix_origin=1 valid=60000 preferred=60000 onlink=8 skip_as_source=0 dad=4 scope_level=0 scope_zone=0 index_is_lo=1
+unicast_v4 other_interfaces_rows=2
+unicast_v6 ret=0
+unicast_v6 v6 ::1 scope 0 prefix_origin=1 suffix_origin=1 valid=60000 preferred=60000 onlink=128 skip_as_source=0 dad=4 scope_level=0 scope_zone=0 index_is_lo=1
+unicast_v6 other_interfaces_rows=3
+routes_v4 ret=0
+routes_v4 v4 127.0.0.0/8 on_lo=1 hop=v4 0.0.0.0 metric=4294967295 protocol=2 origin=0 loopback=1 autoconf=1 publish=0 immortal=1 valid=4294967295
+routes_v4 v4 127.0.0.1/32 on_lo=1 hop=v4 0.0.0.0 metric=4294967295 protocol=2 origin=0 loopback=1 autoconf=1 publish=0 immortal=1 valid=4294967295
+routes_v4 v4 0.0.0.0/0 on_lo=0 hop=v4 other metric=256 protocol=3 origin=0 loopback=0 autoconf=1 publish=0 immortal=1 valid=4294967295
+routes_v4 other_rows=2 lo_rows_with_other_prefix=0
+routes_v6 ret=0
+routes_v6 v6 ::/0 on_lo=0 hop=v6 link-local metric=100 protocol=3 origin=0 loopback=0 autoconf=1 publish=0 immortal=1 valid=4294967295
+routes_v6 v6 ::1 scope 0/128 on_lo=1 hop=v6 :: metric=0 protocol=2 origin=0 loopback=1 autoconf=1 publish=0 immortal=1 valid=4294967295
+routes_v6 v6 multicast ff00/8 on_lo=0 hop=v6 :: metric=256 protocol=2 origin=0 loopback=0 autoconf=1 publish=0 immortal=1 valid=4294967295
+routes_v6 v6 multicast ff00/8 on_lo=0 hop=v6 :: metric=256 protocol=2 origin=0 loopback=0 autoconf=1 publish=0 immortal=1 valid=4294967295
+routes_v6 other_rows=6 lo_rows_with_other_prefix=0
+complete 1
