@@ -1,0 +1,75 @@
+From: Lukas10999 <38700149+Lukas10999@users.noreply.github.com>
+Subject: [PATCH] winex11: Let a window that was never mapped become unmanaged.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted upstream.
+CANDIDATE: not in series. Reproducer: docs/wine-repro/winex11-unmanaged-menus.
+
+An overlapped window always gets WS_CAPTION at creation, so
+create_whole_window() makes its X window managed. DevExpress menus (Vault
+Explorer 2027, dark theme) then replace the style while the window is still
+hidden (0x04c00000 -> WS_POPUP | WS_CLIPSIBLINGS, 0x94000000) and show it
+with SWP_SHOWWINDOW | SWP_NOACTIVATE. is_window_managed() now returns FALSE,
+but winex11 only ever switches a window to managed, so the menu is mapped
+as a managed window. KWin stacks it below its own override-redirect shadow
+window: the menus open, but stay invisible behind their shadow.
+
+While a window has never been mapped, switching it to override-redirect is
+safe (ICCCM allows changing override_redirect on a withdrawn window, and no
+WM_STATE change can be pending). X11DRV_WindowPosChanged therefore decides
+again on SWP_SHOWWINDOW for such windows. A was_mapped flag, set on the first
+map request in window_set_wm_state(), limits this to never-mapped windows: a
+window that was shown before keeps its managed state, as before. The desktop
+window, embedded windows and Managed=N (where the desktop window is forced
+managed) are excluded. The ERR for changing a mapped window to unmanaged is
+unchanged.
+
+No conformance test: nothing visible to Win32 changes, only the X window's
+override-redirect attribute, which user32 tests cannot see. The reproducer
+checks it from the X side.
+
+v2 (2026-11-07): after Claude's cross review, a was_mapped flag replaces the
+check of wm_state_serial and the pending/current WM_STATE (which also matched
+a window that had been shown, hidden and withdrawn), the desktop window,
+embedded windows and Managed=N are excluded, and window_set_managed() keeps
+its original ERR text.
+--- a/dlls/winex11.drv/window.c
++++ b/dlls/winex11.drv/window.c
+@@ -1601,6 +1601,7 @@ static void window_set_wm_state( struct x11drv_win_data *data, UINT new_state, B
+     {
+     case MAKELONG(WithdrawnState, IconicState):
+     case MAKELONG(WithdrawnState, NormalState):
++        data->was_mapped = 1;
+         remove_startup_notification( data );
+         set_wm_hints( data );
+         update_net_wm_states( data );
+@@ -1657,7 +1658,7 @@ static void window_set_managed( struct x11drv_win_data *data, BOOL new_managed )
+ 
+     if (!data->whole_window) return; /* no window, nothing to update */
+     if (old_managed == new_managed) return; /* states are the same, nothing to update */
+-    if (!new_managed)
++    if (!new_managed && data->was_mapped)
+     {
+         ERR( "Changing window to unmanaged is not supported\n" );
+         return;
+@@ -3274,6 +3275,11 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, HWND owner_hint, UIN
+ 
+     if (!(data = get_win_data( hwnd ))) return;
+     if (is_managed) window_set_managed( data, TRUE );
++    /* The style may have changed since the window was created (an overlapped window always gets
++     * WS_CAPTION); decide again before it is mapped for the first time. */
++    else if (data->managed && !data->was_mapped && !data->embedded && managed_mode &&
++             (swp_flags & SWP_SHOWWINDOW) && hwnd != NtUserGetDesktopWindow())
++        window_set_managed( data, FALSE );
+ 
+     old_rects = data->rects;
+     was_fullscreen = data->is_fullscreen;
+--- a/dlls/winex11.drv/x11drv.h
++++ b/dlls/winex11.drv/x11drv.h
+@@ -695,6 +695,7 @@ struct x11drv_win_data
+     UINT        parent_invalid : 1; /* is the parent host window possibly invalid */
+     UINT        reparenting : 1; /* window is being reparented, likely from a decoration change */
+     UINT        is_resizable : 1; /* window is allowed to be resized by the window manager */
++    UINT        was_mapped : 1;   /* has the window been mapped at least once? */
+     Window      embedder;       /* window id of embedder */
+     Pixmap         icon_pixmap;
+     Pixmap         icon_mask;
