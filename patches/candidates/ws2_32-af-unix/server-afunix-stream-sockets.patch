@@ -1,0 +1,433 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] server: Support AF_UNIX stream sockets.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 (1803+) and 11 have AF_UNIX stream sockets in Winsock; Wine
+answered every AF_UNIX socket with WSAEAFNOSUPPORT. CodeMeter's runtime
+(ABB RobotStudio) listens on one and fails to start its event server.
+
+Measured on Windows 10 22H2 (docs/wine-repro/ws2_32-afunix, 2026-11-17)
+and implemented here: stream sockets only (datagram WSAEAFNOSUPPORT,
+IPPROTO_TCP WSAEPROTONOSUPPORT); bind creates the socket file and the
+name is the path as given, with the length of the string; the peer of a
+connect is the address as given; every other name (accept, a client's
+own name, an accepted socket's peer, AcceptEx's remote address) is
+unnamed with the length of SOCKADDR_UN; an accepted socket and AcceptEx's
+local address carry the listener's name; a connection to a path that is
+not a socket is refused (WSAECONNREFUSED), a bind in a missing directory
+is STATUS_OBJECT_PATH_NOT_FOUND (WSAENETDOWN); a non-blocking connect is
+reported as pending (WSAEWOULDBLOCK) though a local one completes at
+once. The socket file is a reparse point with IO_REPARSE_TAG_AF_UNIX: it
+can only be opened with FILE_OPEN_REPARSE_POINT (otherwise
+STATUS_IO_REPARSE_TAG_NOT_HANDLED), so that DeleteFile works, and
+FSCTL_GET_REPARSE_POINT returns the tag with no data.
+
+The server cannot turn a Windows path into a Unix path, so a path
+address reaches it as struct afd_unix_addr (include/wine/afd.h) with
+the Unix path ntdll worked out and the Windows address as given. A Unix
+path longer than sun_path is reached through its directory
+(/proc/self/fd/N/name, Linux only). Unnamed (autobind) and abstract
+names pass through as before.
+
+--- a/include/wine/afd.h
++++ b/include/wine/afd.h
+@@ -321,6 +321,25 @@ struct afd_connect_params
+ };
+ C_ASSERT( sizeof(struct afd_connect_params) == 8 );
+ 
++/* An AF_UNIX address with a path, as IOCTL_AFD_BIND and IOCTL_AFD_WINE_CONNECT
++ * pass it inside Wine: ws2_32 resolves the Windows path to an NT path, ntdll
++ * the NT path to a Unix path; the server binds or connects to the Unix path
++ * and reports the Windows address. Longer than a SOCKADDR_UN, so it cannot be
++ * mistaken for one. */
++#define AFD_UNIX_ADDR_NT_PATH   1  /* path is an NT path, WCHAR */
++#define AFD_UNIX_ADDR_UNIX_PATH 2  /* path is a Unix path, char */
++
++struct afd_unix_addr
++{
++    unsigned short family;    /* WS_AF_UNIX */
++    unsigned short win_len;   /* length of the Windows address in win */
++    unsigned short flags;     /* AFD_UNIX_ADDR_* */
++    unsigned short path_len;  /* size in bytes of the path that follows, terminator included */
++    char win[110];            /* the Windows address (SOCKADDR_UN) as given */
++    /* VARARG(path, ...); */
++};
++C_ASSERT( sizeof(struct afd_unix_addr) == 118 );
++
+ struct afd_recvmsg_params
+ {
+     ULONGLONG control_ptr; /* WSABUF */
+--- a/server/fd.c
++++ b/server/fd.c
+@@ -1971,6 +1971,20 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
+         }
+     }
+ 
++#ifdef O_PATH
++    /* an AF_UNIX socket file is a reparse point (IO_REPARSE_TAG_AF_UNIX):
++     * like on Windows it can only be opened as such, e.g. to delete it */
++    if (fd->unix_fd == -1 && errno == ENXIO && !stat( name, &st ) && S_ISSOCK( st.st_mode ))
++    {
++        if (!(options & FILE_OPEN_REPARSE_POINT))
++        {
++            set_error( STATUS_IO_REPARSE_TAG_NOT_HANDLED );
++            goto error;
++        }
++        fd->unix_fd = open( name, O_PATH );
++    }
++#endif
++
+     if (fd->unix_fd == -1)
+     {
+         /* check for trailing slash on file path */
+@@ -1986,8 +2000,8 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
+     fstat( fd->unix_fd, &st );
+     *mode = st.st_mode;
+ 
+-    /* only bother with an inode for normal files and directories */
+-    if (S_ISREG(st.st_mode) || S_ISDIR(st.st_mode))
++    /* only bother with an inode for normal files, directories and socket files */
++    if (S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISSOCK(st.st_mode))
+     {
+         unsigned int err;
+         struct inode *inode = get_inode( st.st_dev, st.st_ino, fd->unix_fd );
+@@ -2494,6 +2508,20 @@ static void get_reparse_point( struct fd *fd, struct async *async )
+         return;
+     }
+ 
++    {
++        struct stat st;
++
++        /* an AF_UNIX socket file: a reparse point with the tag only, as on Windows */
++        if (!fstat( fd->unix_fd, &st ) && S_ISSOCK( st.st_mode ))
++        {
++            struct { unsigned int tag; unsigned short len, reserved; } data = { IO_REPARSE_TAG_AF_UNIX };
++
++            if (get_reply_max_size() < sizeof(data)) set_error( STATUS_BUFFER_TOO_SMALL );
++            else set_reply_data( &data, sizeof(data) );
++            return;
++        }
++    }
++
+     if (fd->unix_name[strlen( fd->unix_name ) - 1] != '?')
+     {
+         set_error( STATUS_NOT_A_REPARSE_POINT );
+--- a/server/sock.c
++++ b/server/sock.c
+@@ -49,6 +49,7 @@
+ #include <sys/time.h>
+ #include <sys/types.h>
+ #include <sys/socket.h>
++#include <sys/un.h>
+ #include <sys/ioctl.h>
+ #ifdef HAVE_SYS_FILIO_H
+ # include <sys/filio.h>
+@@ -109,6 +110,7 @@
+ #include "bluetoothapis.h"
+ #include "bthdef.h"
+ #include "ws2bth.h"
++#include "afunix.h"
+ #include "wine/afd.h"
+ #include "wine/rbtree.h"
+ 
+@@ -146,11 +148,13 @@ union win_sockaddr
+     struct WS_sockaddr_in6 in6;
+     struct WS_sockaddr_ipx ipx;
+     SOCKADDR_IRDA irda;
++    struct WS_sockaddr_un un;
+ };
+ 
+ union unix_sockaddr
+ {
+     struct sockaddr addr;
++    struct sockaddr_un un;
+     struct sockaddr_in in;
+     struct sockaddr_in6 in6;
+ #ifdef HAS_IPX
+@@ -581,6 +585,19 @@ static int sockaddr_from_unix( const union unix_sockaddr *uaddr, struct WS_socka
+         return sizeof(win);
+     }
+ #endif
++    case AF_UNIX:
++    {
++        struct WS_sockaddr_un win = {0};
++
++        /* a Unix name is not a Windows path: the Windows name of a bound
++         * socket and of a connect target is kept separately (afunix_*),
++         * every other name is reported as unnamed, as Windows does */
++        if (wsaddrlen < sizeof(win)) return -1;
++        win.sun_family = WS_AF_UNIX;
++        memcpy( wsaddr, &win, sizeof(win) );
++        return sizeof(win);
++    }
++
+     case AF_UNSPEC:
+         return 0;
+ 
+@@ -596,6 +613,21 @@ static socklen_t sockaddr_to_unix( const struct WS_sockaddr *wsaddr, int wsaddrl
+ 
+     switch (wsaddr->sa_family)
+     {
++    case WS_AF_UNIX:
++    {
++        const struct WS_sockaddr_un *win = (const struct WS_sockaddr_un *)wsaddr;
++        int len = wsaddrlen - (int)offsetof( struct WS_sockaddr_un, sun_path );
++
++        /* only unnamed (autobind) and abstract names come this way; a path
++         * comes as struct afd_unix_addr with the Unix path from ntdll */
++        uaddr->un.sun_family = AF_UNIX;
++        if (len <= 0) return offsetof( struct sockaddr_un, sun_path );
++        if (wsaddrlen > sizeof(*win) || win->sun_path[0]) return 0;
++        if (len > sizeof(uaddr->un.sun_path)) len = sizeof(uaddr->un.sun_path);
++        memcpy( uaddr->un.sun_path, win->sun_path, len );
++        return offsetof( struct sockaddr_un, sun_path ) + len;
++    }
++
+     case WS_AF_INET:
+     {
+         struct WS_sockaddr_in win = {0};
+@@ -977,6 +1009,8 @@ static void fill_accept_output( struct accept_req *req )
+             free( out_data );
+             return;
+         }
++        if (req->sock->family == WS_AF_UNIX && req->sock->addr_len <= win_len)
++            memcpy( win_addr, &req->sock->addr, req->sock->addr_len );
+         memcpy( out_data + req->recv_len, &win_len, sizeof(int) );
+     }
+ 
+@@ -1828,6 +1862,7 @@ static int get_unix_family( int family )
+ #ifdef AF_BLUETOOTH
+         case WS_AF_BTH: return AF_BLUETOOTH;
+ #endif
++        case WS_AF_UNIX: return AF_UNIX;
+         case WS_AF_UNSPEC: return AF_UNSPEC;
+         default: return -1;
+     }
+@@ -1899,6 +1934,80 @@ static void set_dont_fragment( int fd, int level, int value )
+     setsockopt( fd, level, optname, &value, sizeof(value) );
+ }
+ 
++/* Validate an AF_UNIX path address (struct afd_unix_addr with a Unix path,
++ * from ntdll) and fill a sockaddr_un for it. A path too long for sun_path
++ * is reached through its directory, opened in *dir_fd. */
++static socklen_t afunix_sockaddr( const struct WS_sockaddr *addr, data_size_t len,
++                                  struct sockaddr_un *un, int *dir_fd )
++{
++    const struct afd_unix_addr *ua = (const struct afd_unix_addr *)addr;
++    const char *path = (const char *)(ua + 1);
++    size_t path_len;
++
++    *dir_fd = -1;
++    if (len < sizeof(*ua) + 2 || ua->family != WS_AF_UNIX || ua->flags != AFD_UNIX_ADDR_UNIX_PATH
++            || ua->path_len > len - sizeof(*ua) || ua->win_len < 3 || ua->win_len > sizeof(ua->win))
++    {
++        set_error( STATUS_INVALID_ADDRESS );
++        return 0;
++    }
++    path_len = strnlen( path, ua->path_len );
++    if (!path_len || path_len == ua->path_len)
++    {
++        set_error( STATUS_INVALID_ADDRESS );
++        return 0;
++    }
++
++    memset( un, 0, sizeof(*un) );
++    un->sun_family = AF_UNIX;
++    if (path_len < sizeof(un->sun_path))
++    {
++        memcpy( un->sun_path, path, path_len );
++        return offsetof( struct sockaddr_un, sun_path ) + path_len + 1;
++    }
++#ifdef __linux__
++    {
++        const char *name = strrchr( path, '/' );
++        char *dir;
++
++        if (name && name != path && (dir = mem_alloc( name - path + 1 )))
++        {
++            memcpy( dir, path, name - path );
++            dir[name - path] = 0;
++            *dir_fd = open( dir, O_RDONLY | O_DIRECTORY );
++            free( dir );
++            if (*dir_fd != -1 && snprintf( un->sun_path, sizeof(un->sun_path), "/proc/self/fd/%d/%s",
++                                           *dir_fd, name + 1 ) < sizeof(un->sun_path))
++                return offsetof( struct sockaddr_un, sun_path ) + strlen( un->sun_path ) + 1;
++            if (*dir_fd != -1) close( *dir_fd );
++            *dir_fd = -1;
++        }
++    }
++#endif
++    set_error( STATUS_NAME_TOO_LONG );
++    return 0;
++}
++
++/* The Windows name of an AF_UNIX path address as given (connect target). */
++static int afunix_win_addr( const struct WS_sockaddr *addr, union win_sockaddr *win )
++{
++    const struct afd_unix_addr *ua = (const struct afd_unix_addr *)addr;
++
++    memset( win, 0, sizeof(*win) );
++    memcpy( &win->un, ua->win, ua->win_len );
++    win->un.sun_family = WS_AF_UNIX;
++    return ua->win_len;
++}
++
++/* The name of a socket bound to an AF_UNIX path: the path as given, its
++ * length that of the string, whatever length the caller passed. */
++static int afunix_bound_addr( const struct WS_sockaddr *addr, union win_sockaddr *win )
++{
++    afunix_win_addr( addr, win );
++    win->un.sun_path[sizeof(win->un.sun_path) - 1] = 0;
++    return offsetof( struct WS_sockaddr_un, sun_path ) + strlen( win->un.sun_path ) + 1;
++}
++
+ static int init_socket( struct sock *sock, int family, int type, int protocol )
+ {
+     unsigned int options = 0;
+@@ -1909,6 +2018,13 @@ static int init_socket( struct sock *sock, int family, int type, int protocol )
+     unix_type = get_unix_type( type );
+     unix_protocol = get_unix_protocol( family, protocol );
+ 
++    /* Windows has AF_UNIX stream sockets only */
++    if (family == WS_AF_UNIX && type == WS_SOCK_DGRAM)
++    {
++        set_win32_error( WSAEAFNOSUPPORT );
++        return -1;
++    }
++
+     if (unix_protocol < 0)
+     {
+         if (family && unix_family < 0)
+@@ -2127,6 +2243,11 @@ static struct sock *accept_socket( struct sock *sock )
+                                                                 &acceptsock->peer_addr.addr,
+                                                                 sizeof(acceptsock->peer_addr) );
+         }
++        if (sock->family == WS_AF_UNIX)
++        {
++            acceptsock->addr = sock->addr;
++            acceptsock->addr_len = sock->addr_len;
++        }
+     }
+ 
+     clear_error();
+@@ -2191,6 +2312,11 @@ static int accept_into_socket( struct sock *sock, struct sock *acceptsock )
+                                                             &acceptsock->peer_addr.addr,
+                                                             sizeof(acceptsock->peer_addr) );
+     }
++    if (sock->family == WS_AF_UNIX)
++    {
++        acceptsock->addr = sock->addr;
++        acceptsock->addr_len = sock->addr_len;
++    }
+ 
+     clear_error();
+     sock->pending_events &= ~AFD_POLL_ACCEPT;
+@@ -2668,7 +2794,7 @@ static void sock_ioctl( struct fd *fd, ioctl_code_t code, struct async *async )
+         union unix_sockaddr unix_addr, peer_addr;
+         struct connect_req *req;
+         socklen_t unix_len;
+-        int send_len, ret;
++        int send_len, ret, dir_fd = -1;
+ 
+         if (get_req_data_size() < sizeof(*params) ||
+             get_req_data_size() - sizeof(*params) < params->addr_len)
+@@ -2718,8 +2844,11 @@ static void sock_ioctl( struct fd *fd, ioctl_code_t code, struct async *async )
+                 break;
+         }
+ 
+-        unix_len = sockaddr_to_unix( addr, params->addr_len, &unix_addr );
+-        if (!unix_len)
++        if (sock->family == WS_AF_UNIX && params->addr_len > sizeof(struct WS_sockaddr_un))
++        {
++            if (!(unix_len = afunix_sockaddr( addr, params->addr_len, &unix_addr.un, &dir_fd ))) return;
++        }
++        else if (!(unix_len = sockaddr_to_unix( addr, params->addr_len, &unix_addr )))
+         {
+             set_error( STATUS_INVALID_ADDRESS );
+             return;
+@@ -2764,9 +2893,14 @@ static void sock_ioctl( struct fd *fd, ioctl_code_t code, struct async *async )
+             }
+         }
+ 
++        if (dir_fd != -1) close( dir_fd );
+         if (ret < 0 && errno != EINPROGRESS)
+         {
+-            set_error( sock_get_ntstatus( errno ) );
++            /* Windows refuses a connection to a path that is not a socket */
++            if (sock->family == WS_AF_UNIX && (errno == ENOENT || errno == ENOTDIR))
++                set_error( STATUS_CONNECTION_REFUSED );
++            else
++                set_error( sock_get_ntstatus( errno ) );
+             return;
+         }
+ 
+@@ -2777,9 +2911,17 @@ static void sock_ioctl( struct fd *fd, ioctl_code_t code, struct async *async )
+         getsockname( unix_fd, &unix_addr.addr, &unix_len );
+         sock->addr_len = sockaddr_from_unix( &unix_addr, &sock->addr.addr, sizeof(sock->addr) );
+         sock->peer_addr_len = sockaddr_from_unix( &peer_addr, &sock->peer_addr.addr, sizeof(sock->peer_addr));
++        /* the peer of an AF_UNIX connection is the address as given */
++        if (sock->family == WS_AF_UNIX && params->addr_len > sizeof(struct WS_sockaddr_un))
++            sock->peer_addr_len = afunix_win_addr( addr, &sock->peer_addr );
+ 
+         sock->bound = 1;
+ 
++        /* a local connection completes at once, but Windows reports a
++         * non-blocking AF_UNIX connect as pending, like a TCP one */
++        if (!ret && sock->family == WS_AF_UNIX && params->synchronous && sock->nonblocking)
++            ret = -1;
++
+         if (!ret)
+         {
+             if (sock->type != WS_SOCK_DGRAM)
+@@ -3029,7 +3171,7 @@ static void sock_ioctl( struct fd *fd, ioctl_code_t code, struct async *async )
+         }
+         in_size = get_req_data_size() - get_reply_max_size();
+         if (in_size < offsetof(struct afd_bind_params, addr.sa_data)
+-                || get_reply_max_size() < in_size - sizeof(int))
++                || (sock->family != WS_AF_UNIX && get_reply_max_size() < in_size - sizeof(int)))
+         {
+             set_error( STATUS_INVALID_PARAMETER );
+             return;
+@@ -3041,6 +3183,40 @@ static void sock_ioctl( struct fd *fd, ioctl_code_t code, struct async *async )
+             return;
+         }
+ 
++        if (sock->family == WS_AF_UNIX)
++        {
++            data_size_t addr_len = in_size - sizeof(int);
++            int dir_fd = -1, ret;
++
++            if (addr_len > sizeof(struct WS_sockaddr_un))
++                unix_len = afunix_sockaddr( &params->addr, addr_len, &unix_addr.un, &dir_fd );
++            else if (!(unix_len = sockaddr_to_unix( &params->addr, addr_len, &unix_addr )))
++                set_error( STATUS_INVALID_ADDRESS );
++            if (!unix_len) return;
++
++            ret = bind( unix_fd, &unix_addr.addr, unix_len );
++            if (dir_fd != -1) close( dir_fd );
++            if (ret < 0)
++            {
++                /* a missing directory; ntdll normally finds it first */
++                if (errno == ENOENT || errno == ENOTDIR) set_error( STATUS_OBJECT_PATH_NOT_FOUND );
++                else set_error( sock_get_ntstatus( errno ) );
++                return;
++            }
++            sock->bound = 1;
++            if (addr_len > sizeof(struct WS_sockaddr_un))
++                sock->addr_len = afunix_bound_addr( &params->addr, &sock->addr );
++            else
++            {
++                memset( &sock->addr, 0, sizeof(sock->addr) );
++                sock->addr.un.sun_family = WS_AF_UNIX;
++                sock->addr_len = sizeof(sock->addr.un);
++            }
++            if (get_reply_max_size() >= sock->addr_len)
++                set_reply_data( &sock->addr, sock->addr_len );
++            return;
++        }
++
+         unix_len = sockaddr_to_unix( &params->addr, in_size - sizeof(int), &unix_addr );
+         if (!unix_len)
+         {

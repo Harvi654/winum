@@ -1,7 +1,7 @@
 # Candidate: AF_UNIX stream sockets (ws2_32, server)
 
-Work in progress, not in a normal build. `series` has the test patch
-only (`ws2_32-tests-afunix-winum.patch`): test first, no fix yet.
+Work in progress, not in a normal build. `series`: the test patch, then
+the fix in three parts (server, ntdll, ws2_32).
 
 ## Problem as the user sees it
 
@@ -119,3 +119,39 @@ Probably more than one patch (server, ntdll, ws2_32), each with its part
 of the test's todo_wine removed. Built and checked in GitHub Actions on
 this topic branch (a workflow like `build-statusbar-v2.yml`: L0 build and
 the ws2_32 tests), then L2 on a `test-run/` branch.
+
+## Fix v1 (2026-11-17)
+
+- `server-afunix-stream-sockets.patch` - `server/sock.c`, `server/fd.c`,
+  `include/wine/afd.h` (`struct afd_unix_addr`).
+- `ntdll-afunix-paths-reparse.patch` - NT path -> Unix path for bind and
+  connect; socket inodes reported as `IO_REPARSE_TAG_AF_UNIX` reparse
+  points.
+- `ws2_32-afunix-stream-sockets.patch` - catalogue entry; bind, connect
+  and ConnectEx pass path addresses as NT paths; the test's todo_wine go.
+
+Differences from the draft design: no new ioctl; a path address travels
+as `struct afd_unix_addr` (longer than a SOCKADDR_UN, so it cannot be
+taken for one), the NT path is worked out in ws2_32 (current directory
+of the PE side, also under WoW64), the Unix path in ntdll. The socket
+file needs no stored data: a socket inode is the reparse point; it opens
+only with `FILE_OPEN_REPARSE_POINT` (O_PATH on Linux), which is what
+`DeleteFile` uses.
+
+Checks so far (local, x86_64 only, container without IPv6):
+
+- L0-ish: server, ntdll.so, ws2_32 build without warnings; the whole
+  series applies to winum-11.22-1's source with `--fuzz=0`.
+- `ws2_32_test sock`: `test_afunix_winum` and the upstream `test_afunix`
+  / `test_afunix_path` (relative, absolute and `\??\` NT paths, socket
+  file attributes, `CreateFile` with and without
+  `FILE_FLAG_OPEN_REPARSE_POINT`, `FSCTL_GET_REPARSE_POINT`, `DeleteFile`)
+  pass with no failures.
+- Paired run, test patch alone vs. whole candidate, same build tree:
+  `ws2_32_test sock`, `afd`, `protocol`, `ntdll_test file`,
+  `kernel32_test file` have identical failing lines (all pre-existing,
+  IPv6/ICMP/network in the container); `sock` has 8 todos fewer.
+- Next: the workflow `test-afunix.yml` on this branch (both
+  architectures, test patch alone vs. candidate), cross review by a
+  second assistant, L4 in RobotStudio (CodeMeter's event server) and a
+  smoke test in Inventor (ws2_32, ntdll and the server are shared).
