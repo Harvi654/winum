@@ -145,3 +145,13 @@ point itself. (The `ntcreatefile_*` rows are `STATUS_INVALID_PARAMETER`
 because the program passed `FILE_FLAG_BACKUP_SEMANTICS` as file
 attributes, copied from Wine's `get_security_file`; Windows rejects
 that. They are not used.)
+
+## L1 of the Wine test
+
+- Test body of fix v1 (commit 1d030a4), Windows 10 22H2 (19045), offline
+  VM, 2026-11-17: `checks=138 failures=0 todos=0 skipped=0`, exit 0,
+  x86_64 and i686 ([`l1-windows10-19045-2026-11-17/`](l1-windows10-19045-2026-11-17/)).
+- Test body of fix v2 with `test_afunix_security` (commit 8abb414),
+  Windows 10 22H2 (19045), offline VM, 2026-11-17:
+  `checks=150 failures=0 todos=0 skipped=0`, exit 0, x86_64 and i686
+  ([`l1-v2-windows10-19045-2026-11-17/`](l1-v2-windows10-19045-2026-11-17/)).
