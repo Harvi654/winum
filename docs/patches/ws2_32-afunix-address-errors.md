@@ -1,5 +1,7 @@
 # AF_UNIX address translation errors
 
+<!-- winum-test: l1 -->
+
 The AF_UNIX measurement on Windows 10 19045.6466 found `WSAEFAULT`
 for bind and connect given a valid backing buffer and a declared
 length of 0 or 1. Wine v3 already returned that value for bind and
@@ -20,7 +22,7 @@ does not inject allocation failures.
 | Level | State |
 | --- | --- |
 | L0 | Applied without fuzz to the verified Wine 11.22 source and base series. Both-architecture build pending |
-| L1 | Both test binaries built. Offline Windows 10 run pending |
+| L1 | Passed on Windows 10 offline VM, 2026-11-18, `c3fc029`. 225 checks, zero failures, x86_64 and i686 |
 | L2 | Paired Wine v3/v4 run pending |
 | L4 | Pending SpaceMouse integration and maintainer checks |
 

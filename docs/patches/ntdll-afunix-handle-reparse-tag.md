@@ -1,5 +1,7 @@
 # AF_UNIX reparse tag in file-handle queries
 
+<!-- winum-test: l1 -->
+
 Programs can query metadata on a bound socket's file opened with
 `FILE_FLAG_OPEN_REPARSE_POINT`. On Windows 10 19045.6466,
 `FileAttributeTagInfo` and `FileStatInformation` both return attributes
@@ -18,7 +20,7 @@ both assertions to the shared AF_UNIX test and the native L1 bundle.
 | Level | State |
 | --- | --- |
 | L0 | Applied without fuzz to the verified Wine 11.22 source and base series. Both-architecture build pending |
-| L1 | Both test binaries built. Offline Windows 10 run pending |
+| L1 | Passed on Windows 10 offline VM, 2026-11-18, `c3fc029`. 225 checks, zero failures, x86_64 and i686 |
 | L2 | Paired Wine v3/v4 run pending |
 | L4 | Pending maintainer checks of the combined candidate |
 

@@ -309,5 +309,11 @@ assertions stay todo pending a design that associates the name with
 the actual peer. The unbound host-client probe for SpaceMouse uses a
 different path and passes on v3. Repeat it with v4 before hardware L4.
 
-The v3 L1 above applies to v3. v4 needs its own L1, paired L2, L4,
-and cross review. The candidate is outside the production series.
+**L1 passed** for v4 (commit `c3fc029`, Windows 10 offline VM,
+2026-11-18). Both x86_64 and i686 ran 225 checks with zero failures,
+skips or todos and exit 0. See the [L1 record and bundle](../../../docs/wine-repro/ws2_32-afunix/v4.md#l1-on-the-offline-windows-10-vm-2026-11-18).
+
+Wine 11.22 L0, paired L2 and native host transport are tracked in
+[run 44398256194](https://github.com/Harvi654/winum/actions/runs/44398256194)
+on `test-run/ws2_32-af-unix-v4-1`. L4 and independent review are open.
+The candidate is outside the production series.
