@@ -42,20 +42,20 @@ bash scripts/build-measure-shell32-background-menu.sh "$MEASURE_OUT"
 
 ## Offline Windows 10 run
 
-Copy only the two test executables into the offline Windows 10
-snapshot. From their directory in `cmd.exe`:
+Download and extract the `shell32-background-menu-measure` artifact
+from the branch's Build shell32 background menu MEASURE workflow.
+Verify `SHA256SUMS` on Linux. Copy `run-measure.bat` and both EXEs
+into a fresh folder in the offline Windows 10 snapshot, then
+double-click `run-measure.bat`.
 
-```bat
-mkdir C:\winum-measure-background-menu
-ver
-measure-x86_64.exe C:\winum-measure-background-menu > result-x86_64.txt
-measure-i686.exe C:\winum-measure-background-menu > result-i686.txt
-findstr /B /C:"arch=" /C:"SHParseDisplayName " /C:"SHGetDesktopFolder " /C:"BindToObject " /C:"range " /C:"CreateViewObject " /C:"QueryContextMenu " /C:"item depth=0 " /C:"item depth=1 " result-x86_64.txt result-i686.txt
-```
+The batch file creates an empty temporary folder, runs both
+architectures and removes the empty sample folder. It saves the
+Windows build and process exit codes to `exitcodes.txt` and each
+program's measurement text to `result-x86_64.txt` and
+`result-i686.txt`. Use a fresh copy for a repeat measurement.
 
-Return the Windows build and the filtered measurement text. Mask
-personal paths or user names if present. Keep menu captions, IDs, depth
-and HRESULTs.
+Return only these three text files. Mask personal paths or user
+names if present. Keep menu captions, IDs, depth and HRESULTs.
 
 ## Results
 

@@ -20,5 +20,6 @@ done
 mkdir -p -- "$(dirname -- "$output")"
 mkdir -- "$output"
 cp "$work/"*.exe "$src/measure.c" "$src/README.md" "$here/LICENSE" "$output/"
-(cd "$output" && sha256sum ./*.exe measure.c README.md LICENSE > SHA256SUMS)
+sed 's/$/\r/' "$src/run-measure.bat" > "$output/run-measure.bat"
+(cd "$output" && sha256sum ./*.exe measure.c README.md LICENSE run-measure.bat > SHA256SUMS)
 echo "MEASURE bundle: $output"

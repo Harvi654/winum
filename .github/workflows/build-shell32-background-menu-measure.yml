@@ -1,0 +1,32 @@
+name: Build shell32 background menu MEASURE
+
+on:
+  push:
+    branches: ['topic/shell32-background-menu']
+    paths:
+      - 'docs/wine-repro/shell32-background-menu/**'
+      - 'scripts/build-measure-shell32-background-menu.sh'
+      - '.github/workflows/build-shell32-background-menu-measure.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    steps:
+      - name: MinGW (official Arch repositories)
+        run: pacman -Syu --noconfirm --needed git mingw-w64-gcc
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build
+        run: |
+          bash scripts/build-measure-shell32-background-menu.sh out
+          cd out
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: shell32-background-menu-measure
+          path: out/
+          retention-days: 30
