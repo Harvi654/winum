@@ -21,8 +21,8 @@ different address-bar name.
 Route this SIGDN through the existing parent-relative name path.
 `IShellItem::GetDisplayName` already delegates to `SHGetNameFromIDList`.
 The change is limited to this SIGDN because only this missing name form
-was identified in the trace. The connection to the missing labels is
-still a hypothesis.
+was identified in the trace. The maintainer confirmed that the candidate restores the drive and folder
+labels in the Inventor 2027 Open dialog.
 
 ## Wine test
 
@@ -35,8 +35,8 @@ See the [trace and Windows results](../wine-repro/shell32-parentrelativeforui/RE
 
 | Level | Result |
 | --- | --- |
-| L0 | Candidate build requested on `test-run/shell32-parentrelativeforui-1` |
-| Initial consumer check | Pending in Inventor 2027 |
+| L0 | Passed, Wine 11.22 x86_64 and i386 with `--fuzz=0`, [build 44203957500](https://github.com/Harvi654/winum/actions/runs/44203957500) |
+| Initial consumer check | Passed, Inventor 2027 on Arch/KDE, candidate `9cd7d88` (2026-11-18) |
 | L1 | MEASURE completed on x86_64 and i686; Wine test on Windows pending |
 | L2 | Paired shell32 suites pending |
 | L3 | No separate sequence or fuzz test planned for this branch |
