@@ -57,7 +57,7 @@ before changing either the label edit control or the dialog handling.
 | Level | Result |
 | --- | --- |
 | L0 | Passed on Wine 11.22 x86_64 and i386 with `--fuzz=0` ([build 44339967795](https://github.com/Harvi654/winum/actions/runs/44339967795)) |
-| L1 | MEASURE passed on x86_64 and i686. Windows regression test pending. |
+| L1 | Passed on offline Windows 10, x86_64 and i386. The shlfolder unit reported 3915 checks and 0 failures on x86_64, and 2128 checks and 3 failures on i386. The i386 failures were all in the existing file timestamp check at shlfolder.c:1976. |
 | L2 | Passed, paired shell32 suites with and without the fix ([run 44339967832](https://github.com/Harvi654/winum/actions/runs/44339967832)) |
 | L4 | Inventor 2027 can create a folder through New. Keyboard confirmation and the remaining smoke checks are pending. |
 | L5 | Pending |
