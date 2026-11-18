@@ -51,4 +51,16 @@ bash scripts/build-measure-shell32-label-edit-enter.sh "$MEASURE_OUT"
 
 ## Results
 
-Pending from the offline Windows 10 VM.
+Recorded 2026-11-18 on offline Windows 10 build `10.0.19045.6466`.
+Both executables returned exit code zero and agreed apart from the
+architecture line. The focused control was an Edit child of the view.
+
+```text
+before original=1 renamed=0 editor_alive=1 editor_focused=1
+TranslateAccelerator VK_RETURN hr=0x00000000
+after_translate original=0 renamed=1 editor_alive=0 editor_focused=0
+```
+
+The application did not dispatch the key again in the measurement.
+The accelerator call itself returned `S_OK`, committed the rename
+and closed the inline editor on both architectures.
