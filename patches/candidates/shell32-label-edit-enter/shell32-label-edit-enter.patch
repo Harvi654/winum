@@ -1,0 +1,82 @@
+From 30542c3c896bd717b6d1fee7a3201cf0fdd379f8 Mon Sep 17 00:00:00 2001
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Date: Wed, 18 Nov 2026 18:32:05 +0100
+Subject: [PATCH] shell32: Handle Enter in the focused shell view label editor
+
+Inventor delegates Enter to the shell view and opens the selected folder after the Wine stub returns S_FALSE. Windows 10 build 19045.6466 consumes this message, commits the label and closes the editor on x86_64 and i686.
+
+Dispatch only WM_KEYDOWN VK_RETURN addressed to the focused inline editor. Reuse the existing list-view end-edit behavior and leave the other keys and targets on the unhandled path.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+---
+ dlls/shell32/shlview.c        | 27 +++++++++++++++------------
+ dlls/shell32/tests/ebrowser.c | 10 +++++-----
+ 2 files changed, 20 insertions(+), 17 deletions(-)
+
+diff --git a/dlls/shell32/shlview.c b/dlls/shell32/shlview.c
+index af09787..dd02679 100644
+--- a/dlls/shell32/shlview.c
++++ b/dlls/shell32/shlview.c
+@@ -1915,23 +1915,26 @@ static HRESULT WINAPI IShellView_fnContextSensitiveHelp(IShellView3 *iface, BOOL
+ 
+ /**********************************************************
+ * IShellView_TranslateAccelerator
+-*
+-* FIXME:
+-*  use the accel functions
+ */
+ static HRESULT WINAPI IShellView_fnTranslateAccelerator(IShellView3 *iface, MSG *lpmsg)
+ {
+-#if 0
+-	IShellViewImpl *This = (IShellViewImpl *)iface;
++    IShellViewImpl *This = impl_from_IShellView3(iface);
++    HWND edit;
+ 
+-	FIXME("(%p)->(%p: hwnd=%x msg=%x lp=%x wp=%x) stub\n",This,lpmsg, lpmsg->hwnd, lpmsg->message, lpmsg->lParam, lpmsg->wParam);
+-#endif
++    if (lpmsg->message >= WM_KEYFIRST && lpmsg->message <= WM_KEYLAST)
++        TRACE("key %#Ix in message %#x targeting %p\n", lpmsg->wParam, lpmsg->message, lpmsg->hwnd);
+ 
+-	if ((lpmsg->message>=WM_KEYFIRST) && (lpmsg->message<=WM_KEYLAST))
+-	{
+-	  TRACE("-- key=0x04%Ix\n",lpmsg->wParam) ;
+-	}
+-	return S_FALSE; /* not handled */
++    if (This->hWndList && lpmsg->message == WM_KEYDOWN && lpmsg->wParam == VK_RETURN)
++    {
++        edit = (HWND)SendMessageW(This->hWndList, LVM_GETEDITCONTROL, 0, 0);
++        if (edit && lpmsg->hwnd == edit && GetFocus() == edit)
++        {
++            DispatchMessageW(lpmsg);
++            return S_OK;
++        }
++    }
++
++    return S_FALSE;
+ }
+ 
+ static HRESULT WINAPI IShellView_fnEnableModeless(IShellView3 *iface, BOOL fEnable)
+diff --git a/dlls/shell32/tests/ebrowser.c b/dlls/shell32/tests/ebrowser.c
+index e9d76e8..8e28ce5 100644
+--- a/dlls/shell32/tests/ebrowser.c
++++ b/dlls/shell32/tests/ebrowser.c
+@@ -1846,14 +1846,14 @@ static void test_label_edit_enter(void)
+     msg.lParam = 0x001c0001;
+     msg.time = GetTickCount();
+     hr = IShellView_TranslateAccelerator(view, &msg);
+-    todo_wine ok(hr == S_OK, "Enter accelerator returned %#lx.\n", hr);
++    ok(hr == S_OK, "Enter accelerator returned %#lx.\n", hr);
+     process_msgs();
+ 
+-    todo_wine ok(GetFileAttributesW(original) == INVALID_FILE_ATTRIBUTES, "Original name still exists.\n");
++    ok(GetFileAttributesW(original) == INVALID_FILE_ATTRIBUTES, "Original name still exists.\n");
+     len = GetFileAttributesW(renamed);
+-    todo_wine ok(len != INVALID_FILE_ATTRIBUTES && (len & FILE_ATTRIBUTE_DIRECTORY),
+-                 "Expected the renamed folder, got attributes %#lx.\n", len);
+-    todo_wine ok(!IsWindow(edit), "The inline editor is still open.\n");
++    ok(len != INVALID_FILE_ATTRIBUTES && (len & FILE_ATTRIBUTE_DIRECTORY),
++       "Expected the renamed folder, got attributes %#lx.\n", len);
++    ok(!IsWindow(edit), "The inline editor is still open.\n");
+ 
+ cleanup:
+     if (view) IShellView_Release(view);
