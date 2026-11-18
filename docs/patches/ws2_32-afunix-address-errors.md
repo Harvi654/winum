@@ -21,9 +21,9 @@ does not inject allocation failures.
 
 | Level | State |
 | --- | --- |
-| L0 | Applied without fuzz to the verified Wine 11.22 source and base series. Both-architecture build pending |
+| L0 | Passed on Wine 11.22, x86_64 and i386, `36b088f`, 2026-11-19. Applied without fuzz |
 | L1 | Passed on Windows 10 offline VM, 2026-11-18, `c3fc029`. 225 checks, zero failures, x86_64 and i686 |
-| L2 | Paired Wine v3/v4 run pending |
+| L2 | Zero new hard failures against v3 and the test-only baseline. [Run 44406951061](https://github.com/Harvi654/winum/actions/runs/44406951061) |
 | L4 | Pending SpaceMouse integration and maintainer checks |
 
 v4 (2026-11-18) adds length guards and reports named-address

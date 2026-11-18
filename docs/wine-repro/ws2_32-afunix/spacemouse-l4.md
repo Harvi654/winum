@@ -10,8 +10,8 @@ isolated drive mapping.
 
 ## Get the runtime
 
-Use the `afunix-candidate` artifact once it appears in
-[run 44406951061](https://github.com/Harvi654/winum/actions/runs/44406951061).
+Use the available [afunix-candidate artifact](https://github.com/Harvi654/winum/actions/runs/44406951061/artifacts/14478932428)
+of run 44406951061 (`36b088f`).
 For an initial direct-transport smoke test, run 44398256194 already
 has a candidate built from `c3fc029`. Its synchronous connect path
 is the same as the revised candidate for this test. Set the run and
@@ -156,6 +156,8 @@ and run:
     export SPACEMOUSE_LOG="$INV_PREFIX/drive_c/${INV_LOGDIR##*/}.log"
 
     test -f "$INV_PREFIX/drive_c/Program Files/Autodesk/Inventor 2027/Bin/Inventor.exe"
+    export WINUM_CANDIDATE_COMMIT="${WINUM_CANDIDATE_COMMIT:-36b088f}"
+    grep -F "($WINUM_CANDIDATE_COMMIT)" "$WINUM_ROOT/CANDIDATE.txt"
     "$WINE" --version
     git -C "$WINUM_REPO" fetch origin topic/ws2_32-af-unix-v4
     for file in spacemouse-pr25-mock.patch spacemouse-motion.py; do

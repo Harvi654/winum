@@ -319,7 +319,7 @@ Wine 11.22 L0 and the native PING/PONG transport probe passed on
 on `test-run/ws2_32-af-unix-v4-1`. The paired comparison flagged two
 new failures at i386 `sock.c:4597` and `sock.c:4598`. Both are TCP
 writability assertions in the existing select test. The revised run
-below is needed before recording L2. The candidate is outside the
+below provides the L2 result. The candidate is outside the
 production series.
 
 Independent cross review of `c3fc029` (2026-11-18) found that the
@@ -335,6 +335,17 @@ timing, and any partial drop in test coverage needs review. The L1
 test body and its Windows expectations are unchanged. The follow-up
 is pinned to `36b088f` in [run 44406951061](https://github.com/Harvi654/winum/actions/runs/44406951061)
 on `test-run/ws2_32-af-unix-v4-2`.
+
+**L0/L2 passed** on 2026-11-19 for `36b088f` on Wine 11.22-1.
+The full candidate applied without fuzz and built both architectures.
+The strict comparison reported zero new hard failures across 12 units
+against v3 and across 12 units against the test-only baseline.
+The v3 and candidate sock units retained the same five existing failure
+locations per architecture and four skips. They differed in the number
+of assertions executed. The two TCP select assertions flagged in the
+first v4 run also occurred on the test-only baseline of the revised run.
+Both PE clients passed the Linux PING/PONG and immediate-close ConnectEx
+probes. See the [v4 result](../../../docs/wine-repro/ws2_32-afunix/v4.md#wine-1122-with-revised-af_unix-v4-2026-11-19).
 
 For SpaceMouse L4, see the [local Inventor PR #25 trial](../../../docs/wine-repro/ws2_32-afunix/spacemouse-l4.md).
 It uses a separate checkout and prefix copy with an explicit direct
