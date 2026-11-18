@@ -43,7 +43,19 @@ None in the patch.
 
 ## Open points
 
-None recorded.
+- **2026-11-18: does not work in SOLIDWORKS 2026 on the winum-11.22-1
+  release.** The maintainer started SOLIDWORKS on a copy of the working
+  prefix (`clean-g6`, updated with `wineboot -u`, GLX for `SLDWORKS.exe`):
+  the small PropertyManager checkmark and red X again do not react to
+  mouse clicks - the problem this patch fixed. The L4 that showed the fix
+  was made with the earlier `buttoncapture` runtime; the series holds v2
+  (changed for L1), and its SOLIDWORKS L4 has been deferred since
+  2026-11-09. Not analysed yet. To do when SOLIDWORKS is picked up again:
+  diff the L4-tested version against v2; check whether another patch of
+  the series or a change between Wine 11.20 and 11.22 interferes
+  (`--trace-confirmation` in Solidworks-for-Linux,
+  `docs/wine-repro/confirmation-input/`); fix, then a real SOLIDWORKS L4.
+  Meanwhile: Enter or the right-click menu confirms.
 
 ## Evidence
 
