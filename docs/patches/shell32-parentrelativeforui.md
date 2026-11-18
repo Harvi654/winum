@@ -40,9 +40,19 @@ See the [trace and Windows results](../wine-repro/shell32-parentrelativeforui/RE
 | L1 | Passed for the new checks on x86_64 and i386 in the offline Windows 10 VM. The full shlfolder unit reported 3903 checks / 0 failures on x86_64 and 2116 checks / 3 failures on i386. All three i386 failures are in the pre-existing file timestamp check at shlfolder.c:1974. |
 | L2 | Passed, paired winum-11.22-1 shell32 suites with and without the fix, x86_64 and i386 ([run 44210344999](https://github.com/Harvi654/winum/actions/runs/44210344999)) |
 | L3 | No separate sequence or fuzz test planned for this branch |
-| L4 | Breadcrumb check passed in both versions. Remaining smoke checks pending. |
+| L4 | Passed in Inventor 2027 and 2026 on Arch/KDE, candidate `9cd7d88` (maintainer, 2026-11-18). The Open breadcrumb works in both versions and the maintainer reported no regression in the L4 smoke test. |
 | L5 | Pending |
 | Cross review | Pending |
+
+## Inventor 2027 Stress Analysis smoke check
+
+The maintainer solved a static cantilever on three meshes on Linux. The
+steel beam was 300 mm long, with a 20 mm by 10 mm cross section, a fixed
+end and a 20 N transverse force at the free end. The free end displacement
+was 0.5124, 0.5125 and 0.5126 mm for 2516, 18306 and 153324 elements.
+The beam formula gives 0.5143 mm with a Young's modulus of about 210 GPa.
+The two finer meshes reported 9.17 MPa von Mises stress at the same probe
+near midspan. This check exercises mesh generation and the static solver.
 
 ## STEP import observation
 
