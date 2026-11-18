@@ -1,0 +1,214 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ws2_32: Propagate AF_UNIX path conversion failures.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 19045.6466 rejects a zero- or one-byte AF_UNIX address
+with WSAEFAULT. Wine v3 inspected the family even for a short address
+and sent the original path bytes on allocation or conversion failure.
+
+v4 (2026-11-18): Separate successful pass-through and conversion
+errors. Avoid inspecting truncated addresses and return FALSE when
+ConnectEx cannot allocate its request. The server patch handles the
+measured connect error after identifying the socket family.
+
+--- a/dlls/ws2_32/socket.c
++++ b/dlls/ws2_32/socket.c
+@@ -200,47 +200,52 @@
+ };
+ 
+ /* An AF_UNIX address with a path becomes a struct afd_unix_addr with the NT
+- * path (relative paths against the current directory, '/' and '\\' alike);
+- * ntdll turns that into the Unix path. NULL for any other address. */
+-static struct afd_unix_addr *afunix_path_addr( const struct sockaddr *addr, int *len )
++ * path; ntdll turns that into the Unix path. Other addresses pass through. */
++static DWORD afunix_path_addr( const struct sockaddr *addr, int *len, struct afd_unix_addr **out )
+ {
+     const SOCKADDR_UN *un = (const SOCKADDR_UN *)addr;
+-    int path_len = *len - (int)offsetof(SOCKADDR_UN, sun_path);
+     char path[sizeof(un->sun_path) + 1];
++    WCHAR dos[ARRAY_SIZE(path)];
+     struct afd_unix_addr *ret;
+     UNICODE_STRING nt_name;
+-    WCHAR *dos;
+-    int count;
+-
+-    if (!addr || addr->sa_family != AF_UNIX || path_len <= 0 || !un->sun_path[0]) return NULL;
+-    if (path_len > (int)sizeof(un->sun_path)) path_len = sizeof(un->sun_path);
++    NTSTATUS status;
++    int path_len;
++
++    *out = NULL;
++    if (*len <= (int)offsetof(SOCKADDR_UN, sun_path) || addr->sa_family != AF_UNIX) return 0;
++    if (*len > (int)sizeof(SOCKADDR_UN)) *len = sizeof(SOCKADDR_UN);
++    if (!un->sun_path[0]) return 0;
++
++    path_len = *len - offsetof(SOCKADDR_UN, sun_path);
+     memcpy( path, un->sun_path, path_len );
+     path[path_len] = 0;
+ 
+-    count = MultiByteToWideChar( CP_UTF8, 0, path, -1, NULL, 0 );
+-    if (!(dos = malloc( count * sizeof(WCHAR) ))) return NULL;
+-    MultiByteToWideChar( CP_UTF8, 0, path, -1, dos, count );
++    if (!MultiByteToWideChar( CP_UTF8, 0, path, -1, dos, ARRAY_SIZE(dos) )) return WSAEADDRNOTAVAIL;
+     if (!wcsncmp( dos, L"\\??\\", 4 ))
+-        RtlCreateUnicodeString( &nt_name, dos );
+-    else if (RtlDosPathNameToNtPathName_U_WithStatus( dos, &nt_name, NULL, NULL ))
+-        nt_name.Buffer = NULL;
+-    free( dos );
+-    if (!nt_name.Buffer) return NULL;
+-
+-    if ((ret = malloc( sizeof(*ret) + nt_name.Length + sizeof(WCHAR) )))
+-    {
+-        ret->family = AF_UNIX;
+-        ret->win_len = *len < (int)sizeof(SOCKADDR_UN) ? *len : sizeof(SOCKADDR_UN);
+-        ret->flags = AFD_UNIX_ADDR_NT_PATH;
+-        ret->path_len = nt_name.Length + sizeof(WCHAR);
+-        memset( ret->win, 0, sizeof(ret->win) );
+-        memcpy( ret->win, addr, ret->win_len );
+-        memcpy( ret + 1, nt_name.Buffer, nt_name.Length );
+-        ((WCHAR *)(ret + 1))[nt_name.Length / sizeof(WCHAR)] = 0;
+-        *len = sizeof(*ret) + ret->path_len;
+-    }
++    {
++        if (!RtlCreateUnicodeString( &nt_name, dos )) return WSAENOBUFS;
++    }
++    else if ((status = RtlDosPathNameToNtPathName_U_WithStatus( dos, &nt_name, NULL, NULL )))
++        return status == STATUS_NO_MEMORY ? WSAENOBUFS : WSAEADDRNOTAVAIL;
++
++    if (!(ret = malloc( sizeof(*ret) + nt_name.Length + sizeof(WCHAR) )))
++    {
++        RtlFreeUnicodeString( &nt_name );
++        return WSAENOBUFS;
++    }
++
++    ret->family = AF_UNIX;
++    ret->win_len = *len;
++    ret->flags = AFD_UNIX_ADDR_NT_PATH;
++    ret->path_len = nt_name.Length + sizeof(WCHAR);
++    memset( ret->win, 0, sizeof(ret->win) );
++    memcpy( ret->win, addr, ret->win_len );
++    memcpy( ret + 1, nt_name.Buffer, nt_name.Length );
++    ((WCHAR *)(ret + 1))[nt_name.Length / sizeof(WCHAR)] = 0;
+     RtlFreeUnicodeString( &nt_name );
+-    return ret;
++    *len = sizeof(*ret) + ret->path_len;
++    *out = ret;
++    return 0;
+ }
+ 
+ DECLARE_CRITICAL_SECTION(cs_socket_list);
+@@ -1311,14 +1316,15 @@
+     IO_STATUS_BLOCK io;
+     HANDLE sync_event;
+     NTSTATUS status;
+-
+-    TRACE( "socket %#Ix, addr %s, len %d\n", s, debugstr_sockaddr(addr), len );
+-
+-    if (!addr)
++    DWORD error;
++
++    if (!addr || len < (int)sizeof(addr->sa_family))
+     {
+         SetLastError( WSAEFAULT );
+         return -1;
+     }
++
++    TRACE( "socket %#Ix, addr %s, len %d\n", s, debugstr_sockaddr(addr), len );
+ 
+     switch (addr->sa_family)
+     {
+@@ -1361,13 +1367,12 @@
+             }
+             break;
+         case AF_UNIX:
+-            if (len < offsetof(SOCKADDR_UN, sun_path))
+-            {
+-                SetLastError( WSAEFAULT );
++            if ((error = afunix_path_addr( addr, &len, &unix_addr )))
++            {
++                SetLastError( error );
+                 return -1;
+             }
+-            if (len > (int)sizeof(SOCKADDR_UN)) len = sizeof(SOCKADDR_UN);
+-            if ((unix_addr = afunix_path_addr( addr, &len ))) addr = (const struct sockaddr *)unix_addr;
++            if (unix_addr) addr = (const struct sockaddr *)unix_addr;
+             break;
+         default:
+             FIXME( "unknown protocol %u\n", addr->sa_family );
+@@ -1449,13 +1454,24 @@
+     IO_STATUS_BLOCK io;
+     HANDLE sync_event;
+     NTSTATUS status;
+-
+-    TRACE( "socket %#Ix, addr %s, len %d\n", s, debugstr_sockaddr(addr), len );
++    DWORD error;
++
++    TRACE( "socket %#Ix, addr %p, len %d\n", s, addr, len );
++
++    if (!addr || len < 0)
++    {
++        SetLastError( WSAEFAULT );
++        return -1;
++    }
+ 
+     if (!(sync_event = get_sync_event())) return -1;
+ 
+-    if (addr && len > (int)sizeof(SOCKADDR_UN) && addr->sa_family == AF_UNIX) len = sizeof(SOCKADDR_UN);
+-    if ((unix_addr = afunix_path_addr( addr, &len ))) addr = (const struct sockaddr *)unix_addr;
++    if ((error = afunix_path_addr( addr, &len, &unix_addr )))
++    {
++        SetLastError( error );
++        return -1;
++    }
++    if (unix_addr) addr = (const struct sockaddr *)unix_addr;
+ 
+     if (!(params = malloc( sizeof(*params) + len )))
+     {
+@@ -1507,28 +1523,38 @@
+     struct afd_unix_addr *unix_addr;
+     void *cvalue = NULL;
+     NTSTATUS status;
+-
+-    TRACE( "socket %#Ix, ptr %p %s, length %d, send_buffer %p, send_len %lu, overlapped %p\n",
+-           s, name, debugstr_sockaddr(name), namelen, send_buffer, send_len, overlapped );
++    DWORD error;
++
++    TRACE( "socket %#Ix, ptr %p, length %d, send_buffer %p, send_len %lu, overlapped %p\n",
++           s, name, namelen, send_buffer, send_len, overlapped );
+ 
+     if (!overlapped)
+     {
+         SetLastError( WSA_INVALID_PARAMETER );
+         return FALSE;
+     }
++
++    if (!name || namelen < 0)
++    {
++        SetLastError( WSAEFAULT );
++        return FALSE;
++    }
++    if ((error = afunix_path_addr( name, &namelen, &unix_addr )))
++    {
++        SetLastError( error );
++        return FALSE;
++    }
++    if (unix_addr) name = (const struct sockaddr *)unix_addr;
+ 
+     if (!((ULONG_PTR)overlapped->hEvent & 1)) cvalue = overlapped;
+     overlapped->Internal = STATUS_PENDING;
+     overlapped->InternalHigh = 0;
+ 
+-    if (name && namelen > (int)sizeof(SOCKADDR_UN) && name->sa_family == AF_UNIX) namelen = sizeof(SOCKADDR_UN);
+-    if ((unix_addr = afunix_path_addr( name, &namelen ))) name = (const struct sockaddr *)unix_addr;
+-
+     if (!(params = malloc( sizeof(*params) + namelen + send_len )))
+     {
+         free( unix_addr );
+         SetLastError( ERROR_NOT_ENOUGH_MEMORY );
+-        return SOCKET_ERROR;
++        return FALSE;
+     }
+     params->addr_len = namelen;
+     params->synchronous = FALSE;

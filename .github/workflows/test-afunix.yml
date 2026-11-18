@@ -3,10 +3,12 @@ name: Test AF_UNIX candidate
 on:
   workflow_dispatch:
   push:
-    branches: ['topic/ws2_32-af-unix']
+    branches: ['topic/ws2_32-af-unix', 'test-run/ws2_32-af-unix-v4-*']
     paths:
       - 'patches/candidates/ws2_32-af-unix/**'
       - 'scripts/test-afunix.sh'
+      - 'scripts/build-l1-ws2_32-afunix.sh'
+      - 'docs/wine-repro/ws2_32-afunix/**'
       - '.github/workflows/test-afunix.yml'
 
 permissions:
@@ -21,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [tests, candidate]
+        variant: ${{ fromJSON(startsWith(github.ref_name, 'test-run/ws2_32-af-unix-v4-') && '["tests", "v3", "candidate"]' || '["tests", "candidate"]') }}
     runs-on: ubuntu-24.04
     container: archlinux:base-devel
     timeout-minutes: 300
@@ -53,3 +55,55 @@ jobs:
           name: afunix-${{ matrix.variant }}
           path: out/
           retention-days: 30
+
+  offline-l1:
+    if: startsWith(github.ref_name, 'test-run/ws2_32-af-unix-v4-')
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    steps:
+      - name: MinGW (official Arch repositories)
+        run: pacman -Syu --noconfirm --needed git python mingw-w64-gcc
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build and verify the offline test bundle
+        run: |
+          bash scripts/build-l1-ws2_32-afunix.sh out
+          cd out
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: afunix-v4-l1
+          path: out/
+          retention-days: 30
+
+  compare-v4:
+    if: startsWith(github.ref_name, 'test-run/ws2_32-af-unix-v4-')
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: afunix-v3
+          path: out/afunix-v3
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: afunix-candidate
+          path: out/afunix-candidate
+      - name: Compare v3 and v4 test summaries
+        run: |
+          set -euo pipefail
+          for variant in v3 candidate; do
+            summary="out/afunix-$variant/summary-$variant.tsv"
+            test -s "$summary"
+            if grep -F 'no summary' "$summary"; then exit 1; fi
+            for arch in x86_64 i386; do
+              for unit in ws2_32:sock ws2_32:afd ws2_32:protocol ntdll:file kernel32:file advapi32:security; do
+                grep -qF "$(printf '%s\t%s\t%s\t' "${unit%:*}" "$arch" "${unit#*:}")" "$summary"
+              done
+            done
+          done
+          diff -u <(cut -f1-3 out/afunix-v3/summary-v3.tsv | sort) \
+                  <(cut -f1-3 out/afunix-candidate/summary-candidate.tsv | sort)
+          comm -13 <(sort -u out/afunix-v3/failures-v3.txt) \
+                   <(sort -u out/afunix-candidate/failures-candidate.txt) > new-failures.txt
+          cat new-failures.txt
+          test ! -s new-failures.txt

@@ -1,0 +1,32 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ntdll: Keep the AF_UNIX reparse tag in file information.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 19045.6466 returns the AF_UNIX reparse tag from both
+FileAttributeTagInfo and FileStatInformation on a bound socket file.
+Wine v3 set the tag for sockets and then cleared it alongside the
+default initialization. Set the default before populating attributes.
+
+v4 (2026-11-18): Covers file information queried by handle. Keep the
+existing mount-point and extended-attribute handling.
+
+--- a/dlls/ntdll/unix/file.c
++++ b/dlls/ntdll/unix/file.c
+@@ -1371,6 +1371,7 @@
+     int attr_len, ret;
+ 
+     *attr = 0;
++    if (reparse_tag) *reparse_tag = 0;
+     ret = fstat( fd, st );
+     if (ret == -1) return ret;
+     *attr |= get_file_attributes( st );
+@@ -1380,7 +1381,6 @@
+         *attr |= FILE_ATTRIBUTE_REPARSE_POINT;
+         if (reparse_tag) *reparse_tag = IO_REPARSE_TAG_AF_UNIX;
+     }
+-    if (reparse_tag) *reparse_tag = 0;
+     /* consider mount points to be reparse points (IO_REPARSE_TAG_MOUNT_POINT) */
+     if (options & FILE_OPEN_REPARSE_POINT)
+     {

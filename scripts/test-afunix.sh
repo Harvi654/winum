@@ -3,14 +3,15 @@
 # Build Wine with patches/series plus the AF_UNIX candidate and run the tests
 # it touches. Variants:
 #   tests      patches/series + the candidate's test patch only (the baseline)
+#   v3         patches/series + v3 runtime and v4 measurement assertions
 #   candidate  patches/series + the whole candidate series
-#   test-afunix.sh tests|candidate OUTDIR
+#   test-afunix.sh tests|v3|candidate OUTDIR
 # Never changes the production series; results are text logs in OUTDIR.
 set -euo pipefail
 HERE="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
-VARIANT="${1:?tests or candidate}"
+VARIANT="${1:?tests, v3 or candidate}"
 OUTDIR="$(mkdir -p "${2:?OUTDIR}" && cd "$2" && pwd)"
-case "$VARIANT" in tests|candidate) ;; *) echo "variant: tests or candidate" >&2; exit 2 ;; esac
+case "$VARIANT" in tests|v3|candidate) ;; *) echo "variant: tests, v3 or candidate" >&2; exit 2 ;; esac
 CAND="$HERE/patches/candidates/ws2_32-af-unix"
 TEST_PATCH=ws2_32-tests-afunix-winum.patch
 source "$HERE/wine/version.env"
@@ -37,7 +38,8 @@ say "Applying patches/series"
 wine_apply_patches "$SRC" "$HERE/patches" "$HERE" HEAD
 say "Applying the AF_UNIX candidate ($VARIANT)"
 while IFS= read -r p; do
-    [ "$VARIANT" = candidate ] || [ "$p" = "$TEST_PATCH" ] || continue
+    if [ "$VARIANT" = tests ] && [ "$p" != "$TEST_PATCH" ]; then continue; fi
+    if [ "$VARIANT" = v3 ] && [ "$p" = ntdll-afunix-handle-reparse-tag.patch ]; then break; fi
     echo "  $p"
     patch -d "$SRC" -p1 -s --fuzz=0 < "$CAND/$p" || { echo "$p does not apply" >&2; exit 1; }
 done < <(sed -e 's/#.*//' -e 's/[[:space:]]//g' -e '/^$/d' "$CAND/series")
@@ -91,6 +93,9 @@ if [ "$VARIANT" = candidate ]; then
     # a runnable build for L4 in RobotStudio and Inventor (not a release;
     # unpacked like a winum release, e.g. next to winum-11.22-1-x86_64)
     NAME="winum-$WINE_VERSION-$WINUM_BUILD-afunix-x86_64"
+    if [ -f "$CAND/server-afunix-client-address.patch" ]; then
+        NAME="winum-$WINE_VERSION-$WINUM_BUILD-afunix-v4-x86_64"
+    fi
     say "Packing $NAME for L4"
     rm -rf "$WORK/stage" "$WORK/$NAME"
     make install DESTDIR="$WORK/stage" > "$WORK/install.log" 2>&1 || { tail -40 "$WORK/install.log"; exit 1; }
@@ -98,6 +103,13 @@ if [ "$VARIANT" = candidate ]; then
     cp "$SRC/PATCHES.txt" "$WORK/$NAME/" 2>/dev/null || true
     printf 'winum %s + candidate ws2_32-af-unix (%s), built by test-afunix.sh. Not a release.\n' \
         "$WINE_VERSION-$WINUM_BUILD" "$(git -C "$HERE" rev-parse --short HEAD)" > "$WORK/$NAME/CANDIDATE.txt"
+    if [ -f "$CAND/server-afunix-client-address.patch" ]; then
+        say "Testing the direct Linux host connection and repeating the measurements"
+        bash "$HERE/scripts/build-measure-ws2_32-afunix-v4.sh" "$WORK/host-peer"
+        (cd "$WORK/host-peer" && sha256sum -c SHA256SUMS)
+        python3 "$WORK/host-peer/run-host-peer.py" --measure "$WORK/$NAME/bin/wine" "$WORK/host-peer" \
+            | tee "$OUTDIR/result-wine-v4.txt"
+    fi
     tar -C "$WORK" -cJf "$OUTDIR/$NAME.tar.xz" "$NAME"
     (cd "$OUTDIR" && sha256sum "$NAME.tar.xz" > "$NAME.tar.xz.sha256")
 fi

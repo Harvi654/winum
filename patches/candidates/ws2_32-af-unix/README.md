@@ -281,3 +281,33 @@ failures outside AF_UNIX in this sandbox, as before).
   CmLogger's AF_UNIX event socket and exchanges messages with it
   (2026-11-17); it still exits with 103 for reasons outside this
   candidate (Harvi654/ABB-RobotStudio-on-Linux, steps 13-16).
+
+## v4 review (2026-11-18)
+
+The [Windows measurements](../../../docs/wine-repro/ws2_32-afunix/v4.md)
+use Windows 10 19045.6466 in the offline VM on x86_64 and i686.
+The first v4 revision makes three changes:
+
+- Preserve the AF_UNIX reparse tag in handle metadata in ntdll.
+- Keep named-path conversion errors distinct from raw address
+  pass-through in ws2_32.
+- Validate short AF_UNIX connect addresses in the server, preserve
+  the client's local bind, and complete ConnectEx through the pending
+  path with a full-sized peer address.
+
+The security fallback is unchanged because named DACL operations on
+the private synthetic tag succeeded on both Windows and v3. Wine
+still represents a socket inode's DACL through its POSIX mode.
+
+Incoming connections from explicitly bound clients still return an
+unnamed peer to the listener. Windows returns the original client
+spelling, including a relative path, for both accept and getpeername.
+Linux can report the resolved path used at bind, which may be a
+temporary /proc/self/fd path. A lookup by pathname alone can also
+select the wrong socket when a name is unlinked and reused. Both
+assertions stay todo pending a design that associates the name with
+the actual peer. The unbound host-client probe for SpaceMouse uses a
+different path and passes on v3. Repeat it with v4 before hardware L4.
+
+The v3 L1 above applies to v3. v4 needs its own L1, paired L2, L4,
+and cross review. The candidate is outside the production series.

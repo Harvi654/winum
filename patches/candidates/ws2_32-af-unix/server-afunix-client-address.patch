@@ -1,0 +1,65 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] server: Preserve an AF_UNIX client bind across connect.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 19045.6466 retains the explicitly bound client name
+after connect and ConnectEx. Bound ConnectEx reports pending and
+returns a full-length peer address after completion. AF_UNIX connect
+rejects address lengths 0 and 1 with WSAEFAULT.
+
+v4 (2026-11-18): Preserve the local address Wine already stored at
+bind, use the queued completion path for ConnectEx, and return the
+full peer address for that call. Leave incoming peer name handling
+to a follow-up. Keep short-length error selection specific to
+synchronous AF_UNIX connect.
+
+--- a/server/sock.c
++++ b/server/sock.c
+@@ -2844,6 +2844,12 @@
+                 break;
+         }
+ 
++        if (params->addr_len < sizeof(addr->sa_family))
++        {
++            set_error( sock->family == WS_AF_UNIX && params->synchronous
++                       ? STATUS_BUFFER_TOO_SMALL : STATUS_INVALID_PARAMETER );
++            return;
++        }
+         if (sock->family == WS_AF_UNIX && params->addr_len > sizeof(struct WS_sockaddr_un))
+         {
+             if (!(unix_len = afunix_sockaddr( addr, params->addr_len, &unix_addr.un, &dir_fd ))) return;
+@@ -2907,19 +2913,25 @@
+         /* a connected or connecting socket can no longer be accepted into */
+         allow_fd_caching( sock->fd );
+ 
+-        unix_len = sizeof(unix_addr);
+-        getsockname( unix_fd, &unix_addr.addr, &unix_len );
+-        sock->addr_len = sockaddr_from_unix( &unix_addr, &sock->addr.addr, sizeof(sock->addr) );
++        if (sock->family != WS_AF_UNIX || !sock->bound)
++        {
++            unix_len = sizeof(unix_addr);
++            if (!getsockname( unix_fd, &unix_addr.addr, &unix_len ))
++                sock->addr_len = sockaddr_from_unix( &unix_addr, &sock->addr.addr, sizeof(sock->addr) );
++        }
+         sock->peer_addr_len = sockaddr_from_unix( &peer_addr, &sock->peer_addr.addr, sizeof(sock->peer_addr));
+-        /* the peer of an AF_UNIX connection is the address as given */
++        /* The peer of an AF_UNIX connection is the address as given. */
+         if (sock->family == WS_AF_UNIX && params->addr_len > sizeof(struct WS_sockaddr_un))
++        {
+             sock->peer_addr_len = afunix_win_addr( addr, &sock->peer_addr );
++            if (!params->synchronous) sock->peer_addr_len = sizeof(sock->peer_addr.un);
++        }
+ 
+         sock->bound = 1;
+ 
+-        /* a local connection completes at once, but Windows reports a
+-         * non-blocking AF_UNIX connect as pending, like a TCP one */
+-        if (!ret && sock->family == WS_AF_UNIX && params->synchronous && sock->nonblocking)
++        /* AF_UNIX connects can complete immediately on the host. Windows
++         * reports nonblocking connect and overlapped ConnectEx as pending. */
++        if (!ret && sock->family == WS_AF_UNIX && (!params->synchronous || sock->nonblocking))
+             ret = -1;
+ 
+         if (!ret)

@@ -1,0 +1,73 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ws2_32/tests: Enable assertions covered by the AF_UNIX v4 fixes.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 19045.6466 supplies the expected values for the tests.
+Remove todo markers for the corrected short lengths, reparse tags,
+client names and ConnectEx behavior. Keep the incoming bound peer
+name and DACL representation assertions marked todo.
+
+v4 (2026-11-18): This test patch follows the runtime fixes. The
+paired v3 baseline retains the new assertions as expected failures.
+
+--- a/dlls/ws2_32/tests/sock.c
++++ b/dlls/ws2_32/tests/sock.c
+@@ -15734,7 +15734,7 @@
+     if (ret)
+     {
+         ok(tag.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT, "attributes %#lx\n", tag.FileAttributes);
+-        todo_wine ok(tag.ReparseTag == IO_REPARSE_TAG_AF_UNIX, "tag %#lx\n", tag.ReparseTag);
++        ok(tag.ReparseTag == IO_REPARSE_TAG_AF_UNIX, "tag %#lx\n", tag.ReparseTag);
+     }
+ 
+     query = (void *)(ULONG_PTR)GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQueryInformationFile");
+@@ -15743,7 +15743,7 @@
+     if (!status)
+     {
+         ok(stat.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT, "attributes %#lx\n", stat.FileAttributes);
+-        todo_wine ok(stat.ReparseTag == IO_REPARSE_TAG_AF_UNIX, "stat tag %#lx\n", stat.ReparseTag);
++        ok(stat.ReparseTag == IO_REPARSE_TAG_AF_UNIX, "stat tag %#lx\n", stat.ReparseTag);
+     }
+     CloseHandle(file);
+ }
+@@ -15764,8 +15764,8 @@
+         ok(ret == SOCKET_ERROR && error == WSAEFAULT, "bind length %d returned %d, error %d\n", len, ret, error);
+         ret = connect(s, (struct sockaddr *)&addr, len);
+         error = WSAGetLastError();
+-        todo_wine ok(ret == SOCKET_ERROR && error == WSAEFAULT,
+-                     "connect length %d returned %d, error %d\n", len, ret, error);
++        ok(ret == SOCKET_ERROR && error == WSAEFAULT,
++           "connect length %d returned %d, error %d\n", len, ret, error);
+     }
+     closesocket(s);
+ }
+@@ -15803,7 +15803,7 @@
+         connected = connectex(client, (struct sockaddr *)&target, afunix_len(server_path),
+                               NULL, 0, &count, &overlapped);
+         error = connected ? 0 : WSAGetLastError();
+-        todo_wine ok(!connected && error == WSA_IO_PENDING, "ConnectEx returned %d, error %d\n", connected, error);
++        ok(!connected && error == WSA_IO_PENDING, "ConnectEx returned %d, error %d\n", connected, error);
+         if (!connected && error == WSA_IO_PENDING)
+         {
+             wait = WaitForSingleObject(overlapped.hEvent, 2000);
+@@ -15828,15 +15828,15 @@
+     len = sizeof(addr);
+     ret = getsockname(client, (struct sockaddr *)&addr, &len);
+     ok(!ret && addr.sun_family == AF_UNIX, "client getsockname returned %d, family %u\n", ret, addr.sun_family);
+-    todo_wine ok(len == afunix_len(client_path) && !memcmp(addr.sun_path, client_path, sizeof(client_path)),
+-                 "client getsockname length %d, path %s\n", len, debugstr_a(addr.sun_path));
++    ok(len == afunix_len(client_path) && !memcmp(addr.sun_path, client_path, sizeof(client_path)),
++       "client getsockname length %d, path %s\n", len, debugstr_a(addr.sun_path));
+     memset(&addr, 0, sizeof(addr));
+     len = sizeof(addr);
+     ret = getpeername(client, (struct sockaddr *)&addr, &len);
+     ok(!ret && addr.sun_family == AF_UNIX && !memcmp(addr.sun_path, server_path, sizeof(server_path)),
+        "client getpeername returned %d, family %u, path %s\n", ret, addr.sun_family, debugstr_a(addr.sun_path));
+     if (extended)
+-        todo_wine ok(len == sizeof(addr), "ConnectEx client getpeername length %d\n", len);
++        ok(len == sizeof(addr), "ConnectEx client getpeername length %d\n", len);
+     else
+         ok(len == afunix_len(server_path), "connect client getpeername length %d\n", len);
+ 
