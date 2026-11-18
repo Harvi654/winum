@@ -37,9 +37,9 @@ and filesystem state. See the
 
 | Level | Result |
 | --- | --- |
-| L0 | Candidate build on `test-run/shell32-label-edit-enter-1` pending |
-| L1 | MEASURE passed on x86_64 and i686. Wine test on Windows pending. |
-| L2 | Paired shell32 suites pending |
-| L4 | Inventor checks pending |
+| L0 | Passed on Wine 11.22 x86_64 and i386 with `--fuzz=0` ([build 44359884019](https://github.com/Harvi654/winum/actions/runs/44359884019)) |
+| L1 | Passed on offline Windows 10. The ebrowser unit completed 688 checks with zero failures or skips on both x86_64 and i386. |
+| L2 | Passed on x86_64 and i386 ([run 44359884168](https://github.com/Harvi654/winum/actions/runs/44359884168)). The four new assertions are expected failures without the patch and pass with it. |
+| L4 | Passed on candidate `c440f0e` (maintainer, 2026-11-18). Enter commits the name in the Open dialog. SOLIDWORKS and AutoCAD deferred under AGENTS.md. |
 | L5 | Pending |
 | Cross review | Pending |
