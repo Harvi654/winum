@@ -1,0 +1,93 @@
+Subject: [TEST PATCH] Allow a private socket for the Inventor SpaceMouse trial
+Applies-after: spacemouse-pr25-direct.patch
+
+Original AI-assisted (Codex) changes, MIT as the Inventor project.
+Allow the hardware-free trial to choose a private AF_UNIX socket.
+Keep the system spacenavd path as the default.
+
+diff --git a/scripts/install-spacemouse.sh b/scripts/install-spacemouse.sh
+index c7b6c4d..64fc709 100644
+--- a/scripts/install-spacemouse.sh
++++ b/scripts/install-spacemouse.sh
+@@ -42,8 +42,13 @@ mkdir -p "$WINEPREFIX/.inventor-on-linux"
+ sha256sum "$PROJECT_DIR/spacenav/siappdll.c" | cut -d' ' -f1 > "$WINEPREFIX/.inventor-on-linux/siappdll-source"
+ ok "siappdll.dll -> $DLL"
+ 
+-[ -S /run/spnav.sock ] && ok "spacenavd is running" \
+-    || warn "spacenavd is not running: sudo pacman -S --needed spacenavd && sudo systemctl enable --now spacenavd"
++if [ "${SIAPPDLL_TRANSPORT:-}" = afunix ] && [ -n "${SIAPPDLL_SOCKET:-}" ]; then
++    [ -S "$SIAPPDLL_SOCKET" ] && ok "AF_UNIX test socket is ready" \
++        || warn "AF_UNIX test socket is missing"
++else
++    [ -S /run/spnav.sock ] && ok "spacenavd is running" \
++        || warn "spacenavd is not running: sudo pacman -S --needed spacenavd && sudo systemctl enable --now spacenavd"
++fi
+ if [ "${SIAPPDLL_TRANSPORT:-}" != afunix ]; then
+     command -v socat >/dev/null && ok "socat found" || warn "socat missing (the launcher relays spacenavd with it): sudo pacman -S --needed socat"
+ fi
+diff --git a/scripts/launch-inventor.sh b/scripts/launch-inventor.sh
+index 592335f..44ce542 100755
+--- a/scripts/launch-inventor.sh
++++ b/scripts/launch-inventor.sh
+@@ -162,10 +162,14 @@ rm -f "$ICONREG"
+ 
+ # Set SIAPPDLL_TRANSPORT=afunix for a direct test with the winum candidate.
+ # The default transport relays the same native socket over loopback TCP.
+-if [ -S /run/spnav.sock ] && [ -f "$P_C/windows/system32/siappdll.dll" ] &&
++SPNAV_SOCKET=/run/spnav.sock
++if [ "${SIAPPDLL_TRANSPORT:-}" = afunix ]; then
++    SPNAV_SOCKET="${SIAPPDLL_SOCKET:-$SPNAV_SOCKET}"
++fi
++if [ -S "$SPNAV_SOCKET" ] && [ -f "$P_C/windows/system32/siappdll.dll" ] &&
+    { [ "${SIAPPDLL_TRANSPORT:-}" = afunix ] || command -v socat >/dev/null; }; then
+     if [ "${SIAPPDLL_TRANSPORT:-}" = afunix ]; then
+-        info "SpaceMouse direct transport: AF_UNIX /run/spnav.sock"
++        info "SpaceMouse direct transport: AF_UNIX"
+     else
+         socat "TCP-LISTEN:${SIAPPDLL_PORT:-17462},bind=127.0.0.1,reuseaddr,fork" UNIX-CONNECT:/run/spnav.sock 2>/dev/null &
+         SPNAV_RELAY=$!
+diff --git a/spacenav/siappdll.c b/spacenav/siappdll.c
+index b5339b6..4df4f1e 100644
+--- a/spacenav/siappdll.c
++++ b/spacenav/siappdll.c
+@@ -24,6 +24,7 @@
+  *
+  * Environment (Windows side; Wine passes the Linux environment through):
+  *   SIAPPDLL_TRANSPORT  afunix for the candidate's direct transport
++ *   SIAPPDLL_SOCKET     absolute Linux socket path (default /run/spnav.sock)
+  *   SIAPPDLL_PORT     relay port on 127.0.0.1 (default 17462)
+  *   SIAPPDLL_LOG      write a log to this Windows path
+  *   SIAPPDLL_CONFIG   button file (default %APPDATA%\inventor-on-linux\spacemouse.ini;
+@@ -239,7 +240,7 @@ static void handle_packet(const int *p)
+ 
+ static DWORD WINAPI reader_proc(void *arg)
+ {
+-    static const SOCKADDR_UN unix_addr = { .sun_family = AF_UNIX, .sun_path = "\\\\?\\unix\\run\\spnav.sock" };
++    SOCKADDR_UN unix_addr = { .sun_family = AF_UNIX, .sun_path = "\\\\?\\unix\\run\\spnav.sock" };
+     struct sockaddr_in tcp_addr = { AF_INET };
+     char transport[sizeof("afunix")], portbuf[16];
+     unsigned short port = 17462;
+@@ -251,6 +252,23 @@ static DWORD WINAPI reader_proc(void *arg)
+              sizeof("afunix") - 1 && !strcmp(transport, "afunix");
+     if (direct)
+     {
++        const char prefix[] = "\\\\?\\unix";
++        char endpoint[sizeof(unix_addr.sun_path)];
++        DWORD length = GetEnvironmentVariableA("SIAPPDLL_SOCKET", endpoint, sizeof(endpoint));
++        unsigned int i;
++
++        if (length)
++        {
++            if (length > sizeof(unix_addr.sun_path) - sizeof(prefix) || endpoint[0] != '/')
++            {
++                trace("invalid SIAPPDLL_SOCKET\n");
++                return 1;
++            }
++            memcpy(unix_addr.sun_path, prefix, sizeof(prefix) - 1);
++            for (i = 0; i < length; ++i)
++                unix_addr.sun_path[sizeof(prefix) - 1 + i] = endpoint[i] == '/' ? '\\' : endpoint[i];
++            unix_addr.sun_path[sizeof(prefix) - 1 + length] = 0;
++        }
+         family = AF_UNIX;
+         target = (const struct sockaddr *)&unix_addr;
+         target_len = offsetof(SOCKADDR_UN, sun_path) + strlen(unix_addr.sun_path) + 1;

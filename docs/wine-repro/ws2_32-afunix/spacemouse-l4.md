@@ -123,3 +123,73 @@ The patch applied cleanly to the pinned PR. The x64 DLL compiled with
 the PR's MinGW flags. A launcher check with a disposable Linux socket
 confirmed AF_UNIX mode skips the relay and TCP mode starts it, both
 with the supplied configuration. The hardware check is pending.
+
+## Trial with no 3D mouse
+
+Use the same checked-out PR, direct transport patch, verified winum
+runtime and 2027 trace prefix. The supplemental patch accepts a private
+socket. The Python fixture binds it before starting Inventor and sends
+motion packets on request. It needs neither the system spacenavd service
+nor a device. It exercises the same AF_UNIX connection and Inventor
+message delivery as the direct trial. Hardware input and the real
+spacenavd endpoint still need a hardware test.
+
+In the Bash session that prepared the build and checkout, close Inventor
+and run:
+
+```bash
+(
+    set -eu
+    umask 077
+    export INV_YEAR=2027
+    export INV_PREFIX="$HOME/.wine-inventor2027.trace-A"
+    export INV_LOGDIR="$(mktemp -d "$HOME/.inventor-spacemouse-mock.XXXXXXXX")"
+    export INV_DATA_DIR="$INV_LOGDIR/cad"
+    export INV_WINE=system
+    export PATH="$WINUM_ROOT/bin:$PATH"
+    export WINE="$WINUM_ROOT/bin/wine"
+    export WINELOADER="$WINUM_ROOT/bin/wine"
+    export WINESERVER="$WINUM_ROOT/bin/wineserver"
+    export SIAPPDLL_CONFIG="C:\\${INV_LOGDIR##*/}.ini"
+    export SIAPPDLL_LOG="C:\\${INV_LOGDIR##*/}.log"
+    export SPACEMOUSE_LOG="$INV_PREFIX/drive_c/${INV_LOGDIR##*/}.log"
+
+    test -f "$INV_PREFIX/drive_c/Program Files/Autodesk/Inventor 2027/Bin/Inventor.exe"
+    "$WINE" --version
+    git -C "$WINUM_REPO" fetch origin topic/ws2_32-af-unix-v4
+    for file in spacemouse-pr25-mock.patch spacemouse-motion.py; do
+        git -C "$WINUM_REPO" show "FETCH_HEAD:docs/wine-repro/ws2_32-afunix/$file" > "$INV_LOGDIR/$file"
+    done
+    cd "$INVENTOR_TEST"
+    if git apply --check "$INV_LOGDIR/spacemouse-pr25-mock.patch"; then
+        git apply "$INV_LOGDIR/spacemouse-pr25-mock.patch"
+    else
+        git apply --reverse --check "$INV_LOGDIR/spacemouse-pr25-mock.patch"
+    fi
+    mkdir -- "$INV_DATA_DIR"
+    install -m 600 spacenav/spacemouse.ini "$INV_PREFIX/drive_c/${INV_LOGDIR##*/}.ini"
+
+    trial_status=0
+    python3 -I "$INV_LOGDIR/spacemouse-motion.py" "$INV_LOGDIR/launcher.log" \
+        bash -c 'bash scripts/install-spacemouse.sh && exec bash scripts/launch-inventor.sh' || trial_status=$?
+    printf 'Trial exit=%s\n' "$trial_status"
+    if [ -f "$SPACEMOUSE_LOG" ]; then
+        grep -aoE 'connected directly to spacenavd \(AF_UNIX\)|AF_UNIX (motion received|connection failed, error [0-9]+)|invalid SIAPPDLL_SOCKET' \
+            "$SPACEMOUSE_LOG" | sort | uniq -c || true
+    else
+        grep -aoE 'AF_UNIX test socket is ready|SpaceMouse direct transport: AF_UNIX|Inventor is already running|updating the prefix stopped|version mismatch' \
+            "$INV_LOGDIR/launcher.log" | sort | uniq -c || true
+    fi
+)
+```
+
+Open or create a solid in Inventor, return to the terminal, press Enter,
+and switch focus back to Inventor within five seconds. Watch for a change
+in the view. After Inventor exits, report the filtered output and whether
+the view moved. The fixture sends three groups of motion with a neutral
+frame after each one. It sends no button commands.
+
+Built the amended DLL as x86_64 PE with the PR's flags and `-Werror`.
+A native test client received all 72 nonzero motion frames and the three
+neutral frames over the private socket. Inventor's response still needs
+the maintainer's test.
