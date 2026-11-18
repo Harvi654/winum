@@ -59,4 +59,20 @@ names if present. Keep menu captions, IDs, depth and HRESULTs.
 
 ## Results
 
-Inventor trace and offline Windows 10 measurements pending.
+Recorded 2026-11-18 on offline Windows 10 build `10.0.19045.6466`.
+Both programs exited with code 0 and produced identical measurements
+apart from the architecture line. All three `CreateViewObject` calls
+returned `S_OK`. Each `QueryContextMenu` returned `0x00000053` with
+five top-level entries, including separators.
+
+| First ID | Last ID | Enabled New popup ID | Initial New child ID |
+| ---: | ---: | ---: | ---: |
+| `0x0` | `0x7fff` | `0x11` | `0x14` |
+| `0x1` | `0x7fff` | `0x12` | `0x15` |
+| `0x7000` | `0x7fff` | `0x7011` | `0x7014` |
+
+The top-level entries with captions were Give access to, New and
+Properties. New was an enabled submenu in all three ranges. These
+results cover the initial menu. They do not measure the entries
+populated when New is opened or the result of invoking New Folder.
+The Inventor trace is pending.
