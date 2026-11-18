@@ -1,7 +1,9 @@
 # shell32-label-edit-enter.patch
 
+<!-- winum-test: l1 -->
+
 - **DLL:** `shell32`
-- **Status:** [candidate](../../patches/candidates/shell32-label-edit-enter/README.md)
+- **Status:** In the winum-11.22-2 series on the topic branch. [Candidate history](../../patches/candidates/shell32-label-edit-enter/README.md)
 - **Target:** winum-11.22-2, pending validation
 
 ## Symptom
@@ -42,4 +44,4 @@ and filesystem state. See the
 | L2 | Passed on x86_64 and i386 ([run 44359884168](https://github.com/Harvi654/winum/actions/runs/44359884168)). The four new assertions are expected failures without the patch and pass with it. |
 | L4 | Passed on candidate `c440f0e` (maintainer, 2026-11-18). Enter commits the name in the Open dialog. SOLIDWORKS and AutoCAD deferred under AGENTS.md. |
 | L5 | Pending |
-| Cross review | Pending |
+| Cross review | Approved by an independent Codex reviewer (2026-11-18). Both candidate diffs were read in full. |

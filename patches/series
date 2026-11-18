@@ -86,3 +86,6 @@ packager-save-view-advise.patch
 
 # Inventor Open breadcrumb labels.
 shell32-parentrelativeforui.patch
+
+# Inventor Open inline folder name confirmation.
+shell32-label-edit-enter.patch

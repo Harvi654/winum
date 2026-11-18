@@ -1,7 +1,7 @@
 # shell32-background-menu.patch
 
 - **DLL:** `shell32`
-- **Status:** [candidate](../../patches/candidates/shell32-background-menu/README.md)
+- **Status:** [v2 candidate](../../patches/candidates/shell32-background-menu-v2/README.md)
 - **Target:** winum-11.22-2 (Wine 11.22), pending validation
 
 ## Symptom
@@ -50,6 +50,14 @@ Only the mouse-confirmed case recorded an end-edit notification and
 `IShellFolder_fnSetNameOf`. No Enter keystroke or `NM_RETURN` appeared
 in that extract. Check the ExplorerBrowser input and navigation traces
 before changing either the label edit control or the dialog handling.
+
+## v2 cross review follow-up
+
+Independent review found that Wine's Recycle Bin exposes the creation
+helper with stub methods. v2 requires a filesystem path as well as
+the helper. It checks the Recycle Bin behavior on Wine and skips the
+English-caption assertion in other UI languages. The validation table
+below refers to v1. v2 validation and follow-up review are pending.
 
 ## Validation
 
