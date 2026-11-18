@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: archlinux:base-devel
     timeout-minutes: 350
+    steps:
       - name: Dependencies (official Arch repositories)
         run: |
           pacman-key --init
