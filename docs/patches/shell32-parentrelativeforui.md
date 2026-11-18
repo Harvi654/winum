@@ -50,5 +50,7 @@ During a separate Inventor 2026 STEP import attempt, a Wine debugger
 reported an execute access fault in `C:\windows\system32\reg.exe`.
 The fault address had no accessible code and the module list for the
 faulting process did not contain shell32. Inventor stayed running after
-the debugger was dismissed. The import outcome and whether the same
-fault occurs on the unpatched winum-11.22-1 build are unconfirmed.
+the debugger was dismissed and the STEP import completed. The maintainer
+then created a new assembly and imported STEP three more times with the
+same candidate. All three attempts succeeded. The follow-up excerpt
+shows no repeat of the reg.exe fault. Its cause remains undetermined.
