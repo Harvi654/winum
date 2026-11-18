@@ -80,6 +80,11 @@ jobs:
     needs: test
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: afunix-tests
+          path: out/afunix-tests
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: afunix-v3
@@ -88,22 +93,7 @@ jobs:
         with:
           name: afunix-candidate
           path: out/afunix-candidate
-      - name: Compare v3 and v4 test summaries
+      - name: Compare Wine tests against v3 and the test-only baseline
         run: |
-          set -euo pipefail
-          for variant in v3 candidate; do
-            summary="out/afunix-$variant/summary-$variant.tsv"
-            test -s "$summary"
-            if grep -F 'no summary' "$summary"; then exit 1; fi
-            for arch in x86_64 i386; do
-              for unit in ws2_32:sock ws2_32:afd ws2_32:protocol ntdll:file kernel32:file advapi32:security; do
-                grep -qF "$(printf '%s\t%s\t%s\t' "${unit%:*}" "$arch" "${unit#*:}")" "$summary"
-              done
-            done
-          done
-          diff -u <(cut -f1-3 out/afunix-v3/summary-v3.tsv | sort) \
-                  <(cut -f1-3 out/afunix-candidate/summary-candidate.tsv | sort)
-          comm -13 <(sort -u out/afunix-v3/failures-v3.txt) \
-                   <(sort -u out/afunix-candidate/failures-candidate.txt) > new-failures.txt
-          cat new-failures.txt
-          test ! -s new-failures.txt
+          python3 scripts/compare-afunix-tests.py out/afunix-v3 out/afunix-candidate
+          python3 scripts/compare-afunix-tests.py out/afunix-tests out/afunix-candidate

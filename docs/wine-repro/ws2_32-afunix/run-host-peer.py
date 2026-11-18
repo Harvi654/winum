@@ -9,24 +9,30 @@ import subprocess
 import tempfile
 
 
-def exchange(listener, wine, client, endpoint, env):
+def exchange(listener, wine, client, endpoint, env, extended=False):
+    args = [wine, client, endpoint]
+    if extended:
+        args.append("--connectex")
+    exchanged = False
     with subprocess.Popen(
-        [wine, client, endpoint], env=env, stdout=subprocess.PIPE,
+        args, env=env, stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT, text=True
     ) as process:
         try:
             with listener.accept()[0] as connection:
                 connection.settimeout(5)
                 request = b""
-                while len(request) < 4:
-                    chunk = connection.recv(4 - len(request))
-                    if not chunk:
-                        break
-                    request += chunk
-                if request == b"PING":
+                if not extended:
+                    while len(request) < 4:
+                        chunk = connection.recv(4 - len(request))
+                        if not chunk:
+                            break
+                        request += chunk
+                if extended or request == b"PING":
                     connection.sendall(b"PONG")
+                    exchanged = True
         except OSError:
-            request = b""
+            pass
 
         try:
             output, _ = process.communicate(timeout=8)
@@ -34,7 +40,8 @@ def exchange(listener, wine, client, endpoint, env):
             process.kill()
             output, _ = process.communicate()
         print(f"{client.name}: {output.strip()}")
-        return request == b"PING" and process.returncode == 0
+        expected = "host_connectex_peer_closed=ok" if extended else "host_exchange=ok"
+        return exchanged and expected in output.splitlines() and process.returncode == 0
 
 
 def main():
@@ -43,6 +50,8 @@ def main():
     parser.add_argument("bundle", type=Path, help="directory containing both host-peer executables")
     parser.add_argument("--measure", action="store_true",
                         help="also run both Windows MEASURE executables under Wine")
+    parser.add_argument("--connectex", action="store_true",
+                        help="also test deferred ConnectEx against a peer that sends and closes immediately")
     args = parser.parse_args()
     wine = args.wine.absolute()
     wineserver = wine.with_name("wineserver")
@@ -74,6 +83,8 @@ def main():
                 listener.settimeout(8)
                 for client in clients:
                     outcomes.append(exchange(listener, wine, client, endpoint, env))
+                    if args.connectex:
+                        outcomes.append(exchange(listener, wine, client, endpoint, env, extended=True))
             if os.path.lexists(dosdevices / "z:"):
                 raise RuntimeError("Wine recreated the Z drive mapping during the host test")
             if args.measure:
