@@ -58,9 +58,16 @@ helper with stub methods. v2 requires a filesystem path as well as
 the helper. It checks the Recycle Bin behavior on Wine and skips the
 English-caption assertion in other UI languages. The validation table
 below refers to v1. The independent Codex reviewer approved both v2
-diffs on 2026-11-18. v2 verification is running in
-[Build Wine](https://github.com/Harvi654/winum/actions/runs/44375516021)
-and the [paired shell32 workflow](https://github.com/Harvi654/winum/actions/runs/44375516288).
+diffs on 2026-11-18.
+
+### v2 validation
+
+| Level | Result |
+| --- | --- |
+| L0 | Passed on Wine 11.22 x86_64 and i386 with `--fuzz=0` ([build 44375516021](https://github.com/Harvi654/winum/actions/runs/44375516021)) |
+| L1 | Passed the New submenu checks on offline Windows 10 x86_64 and i386. The shlfolder unit reported 3915 checks and 0 failures on x86_64, and 2128 checks and 3 failures on i386. The three i386 failures are from the existing file timestamp assertion at shlfolder.c:1976. |
+| L2 | Passed both architectures without new failures ([run 44375516288](https://github.com/Harvi654/winum/actions/runs/44375516288)). The two expected baseline menu failures cleared with v2. |
+| L4 | Pending in Inventor on v2 build `aa3632d` |
 
 ## Validation
 
