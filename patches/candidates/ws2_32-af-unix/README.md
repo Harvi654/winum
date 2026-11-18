@@ -328,4 +328,6 @@ probe, and compares hard failure counts by source line and kind.
 A follow-up review confirmed the connected-state change and the
 failure comparison. The quick-close probe does not control poll
 timing, and any partial drop in test coverage needs review. The L1
-test body and its Windows expectations are unchanged.
+test body and its Windows expectations are unchanged. The follow-up
+is pinned to `36b088f` in [run 44406951061](https://github.com/Harvi654/winum/actions/runs/44406951061)
+on `test-run/ws2_32-af-unix-v4-2`.
