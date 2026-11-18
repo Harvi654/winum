@@ -1,7 +1,9 @@
 # shell32-parentrelativeforui.patch
 
+<!-- winum-test: l1 -->
+
 - **DLL:** `shell32`
-- **Status:** [candidate](../../patches/candidates/shell32-parentrelativeforui/README.md)
+- **Status:** In the winum-11.22-2 series on the topic branch. [Candidate history](../../patches/candidates/shell32-parentrelativeforui/README.md)
 - **Base:** winum-11.22-1 (Wine 11.22)
 
 ## Problem as the user saw it
@@ -40,9 +42,9 @@ See the [trace and Windows results](../wine-repro/shell32-parentrelativeforui/RE
 | L1 | Passed for the new checks on x86_64 and i386 in the offline Windows 10 VM. The full shlfolder unit reported 3903 checks / 0 failures on x86_64 and 2116 checks / 3 failures on i386. All three i386 failures are in the pre-existing file timestamp check at shlfolder.c:1974. |
 | L2 | Passed, paired winum-11.22-1 shell32 suites with and without the fix, x86_64 and i386 ([run 44210344999](https://github.com/Harvi654/winum/actions/runs/44210344999)) |
 | L3 | No separate sequence or fuzz test planned for this branch |
-| L4 | Passed in Inventor 2027 and 2026 on Arch/KDE, candidate `9cd7d88` (maintainer, 2026-11-18). The Open breadcrumb works in both versions and the maintainer reported no regression in the L4 smoke test. |
+| L4 | Passed in Inventor 2027 and 2026 on Arch/KDE, candidate `9cd7d88` (maintainer, 2026-11-18). The Open breadcrumb works in both versions and the maintainer reported no regression in the L4 smoke test. SOLIDWORKS and AutoCAD deferred under AGENTS.md. |
 | L5 | Pending |
-| Cross review | Pending |
+| Cross review | Approved by an independent Codex reviewer (2026-11-18). Both candidate diffs were read in full. |
 
 ## Inventor 2027 Stress Analysis smoke check
 
