@@ -46,6 +46,12 @@ list view instead sends `NM_RETURN`, which the shell view handles
 as the default action. A trace will distinguish a key delivered to
 the list from an edit accepted or canceled before navigation.
 
+The first filtered trace recorded two `LVN_BEGINLABELEDITW` calls.
+Only the mouse-confirmed case recorded an end-edit notification and
+`IShellFolder_fnSetNameOf`. No Enter keystroke or `NM_RETURN` appeared
+in that extract. Check the ExplorerBrowser input and navigation traces
+before changing either the label edit control or the dialog handling.
+
 ## Validation
 
 | Level | Result |
