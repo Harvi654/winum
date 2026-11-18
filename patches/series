@@ -86,3 +86,6 @@ packager-save-view-advise.patch
 
 # Inventor Open breadcrumb labels.
 shell32-parentrelativeforui.patch
+
+shell32-background-menu-tests.patch
+shell32-background-menu.patch
