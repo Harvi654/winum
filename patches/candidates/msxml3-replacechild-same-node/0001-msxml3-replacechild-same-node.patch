@@ -1,0 +1,171 @@
+From: Lukas10999 <38700149+Lukas10999@users.noreply.github.com>
+Subject: [PATCH] msxml3: Keep a child that is replaced with, or inserted before, itself.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted upstream.
+CANDIDATE: not in series. Findings: docs/wine-repro/msxml3-replacechild-same-node.
+
+DWG TrueView 2027, which Inventor starts as its in-place server for DWG and
+DXF previews, rewrites its profile (Profile.aws) through msxml3 on every
+pass. It selects the AcApData element twice (selectSingleNode, two COM
+objects for one node) and calls replaceChild(parent, new, old) with both.
+Wine's node_replace_child inserted the node before itself and then removed
+it: domnode_insert_domnode unlinks the child's list entry and
+list_add_before links it to itself, so the parent's child list runs in a
+cycle. The save that follows never finishes, appends the subtree forever
+(the profile grew to 1.1 GB), and the preview Inventor waits for never
+arrives. The import itself continued only after the viewer was killed.
+
+Every IXMLDOMNode wrapper is created per access (get_item, selectSingleNode,
+...), so two interface pointers may name the same node: compare the
+underlying struct domnode, not the pointers. replaceChild with the same
+node returns S_OK and the node as the removed child, and changes nothing.
+insertBefore of a node before itself leaves it where it is (node_insert_before
+is also used by replaceChild). The W3C DOM asks for exactly this; the
+values Windows returns are still to be measured (L1).
+
+The test takes the last child of the complete4A root through two nodelist
+get_item calls, replaces and then inserts it before itself, and checks
+that the node keeps its parent, stays the last child and that the tree is
+unchanged. Unpatched Wine fails the parent and last-child checks (the node
+is unlinked, "empty" becomes the last child); the list walks run only when
+those checks pass, so unpatched Wine fails instead of hanging.
+
+---
+diff --git a/dlls/msxml3/node.c b/dlls/msxml3/node.c
+index 36e122b..5b74c03 100644
+--- a/dlls/msxml3/node.c
++++ b/dlls/msxml3/node.c
+@@ -650,7 +650,10 @@ HRESULT node_insert_before(struct domnode *node, IXMLDOMNode *new_child, const V
+         return E_FAIL;
+     }
+ 
+-    domnode_insert_domnode(node, child_node, ref_node);
++    /* The node is already where it would go: inserting it before itself
++     * would unlink its list entry and then link it to itself. */
++    if (ref_node != child_node)
++        domnode_insert_domnode(node, child_node, ref_node);
+ 
+     if (ret)
+     {
+@@ -697,6 +700,18 @@ HRESULT node_replace_child(struct domnode *node, IXMLDOMNode *newChild, IXMLDOMN
+         curr = curr->parent;
+     }
+ 
++    /* Replacing a child with itself (two interface pointers to the same
++     * node) changes nothing; it must not remove the child. */
++    if (new_child == old_child)
++    {
++        if (ret)
++        {
++            *ret = oldChild;
++            IXMLDOMNode_AddRef(*ret);
++        }
++        return S_OK;
++    }
++
+     V_VT(&ref) = VT_DISPATCH;
+     V_DISPATCH(&ref) = (IDispatch *)oldChild;
+     if (FAILED(hr = node_insert_before(node, newChild, &ref, NULL)))
+diff --git a/dlls/msxml3/tests/domdoc.c b/dlls/msxml3/tests/domdoc.c
+index 9bbb782..3a0c3c5 100644
+--- a/dlls/msxml3/tests/domdoc.c
++++ b/dlls/msxml3/tests/domdoc.c
+@@ -4343,7 +4343,7 @@ static void test_replaceChild(void)
+     HRESULT hr;
+     VARIANT v;
+     LONG len;
+-    BSTR str;
++    BSTR str, str2;
+ 
+     doc = create_document(&IID_IXMLDOMDocument);
+ 
+@@ -4482,6 +4482,89 @@ static void test_replaceChild(void)
+ 
+     IXMLDOMDocument_Release( doc );
+ 
++    /* The same child through two interface pointers: replacing a child with
++       itself, and inserting it before itself, leaves the tree as it is. */
++    doc = create_document(&IID_IXMLDOMDocument);
++    hr = IXMLDOMDocument_loadXML( doc, _bstr_(complete4A), &b );
++    ok(hr == S_OK, "loadXML failed\n");
++    hr = IXMLDOMDocument_get_documentElement( doc, &element );
++    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++    hr = IXMLDOMElement_get_childNodes( element, &root_list );
++    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++    hr = IXMLDOMNodeList_get_length( root_list, &len );
++    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++    ok( len == 4, "len %ld\n", len );
++    hr = IXMLDOMNodeList_get_item( root_list, 3, &node );
++    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++    hr = IXMLDOMNodeList_get_item( root_list, 3, &node2 );
++    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++    hr = IXMLDOMElement_get_xml( element, &str );
++    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++
++    removed_node = NULL;
++    hr = IXMLDOMElement_replaceChild( element, node, node2, &removed_node );
++    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++    ok( removed_node != NULL, "got NULL\n" );
++    if (removed_node) IXMLDOMNode_Release( removed_node );
++    node3 = NULL;
++    hr = IXMLDOMNode_get_parentNode( node, &node3 );
++    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++    ok( node3 != NULL, "the child lost its parent\n" );
++    if (node3) IXMLDOMNode_Release( node3 );
++    /* The last child is read without walking the list: a broken list
++       would make the walks below loop forever. */
++    hr = IXMLDOMElement_get_lastChild( element, &node3 );
++    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++    hr = IXMLDOMNode_get_nodeName( node3, &str2 );
++    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++    b = !lstrcmpW( str2, L"fo" );
++    ok( b, "last child %s\n", wine_dbgstr_w(str2) );
++    SysFreeString( str2 );
++    IXMLDOMNode_Release( node3 );
++    if (b)
++    {
++        hr = IXMLDOMNodeList_get_length( root_list, &len );
++        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++        ok( len == 4, "len %ld\n", len );
++        hr = IXMLDOMElement_get_xml( element, &str2 );
++        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++        ok( !lstrcmpW( str, str2 ), "xml changed: %s\n", wine_dbgstr_w(str2) );
++        SysFreeString( str2 );
++    }
++
++    V_VT(&v) = VT_DISPATCH;
++    V_DISPATCH(&v) = (IDispatch *)node2;
++    removed_node = NULL;
++    hr = IXMLDOMElement_insertBefore( element, node, v, &removed_node );
++    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++    ok( removed_node != NULL, "got NULL\n" );
++    if (removed_node) IXMLDOMNode_Release( removed_node );
++    hr = IXMLDOMElement_get_lastChild( element, &node3 );
++    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++    hr = IXMLDOMNode_get_nodeName( node3, &str2 );
++    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++    b = !lstrcmpW( str2, L"fo" );
++    ok( b, "last child %s\n", wine_dbgstr_w(str2) );
++    SysFreeString( str2 );
++    IXMLDOMNode_Release( node3 );
++    if (b)
++    {
++        hr = IXMLDOMNodeList_get_length( root_list, &len );
++        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++        ok( len == 4, "len %ld\n", len );
++        hr = IXMLDOMElement_get_xml( element, &str2 );
++        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
++        ok( !lstrcmpW( str, str2 ), "xml changed: %s\n", wine_dbgstr_w(str2) );
++        SysFreeString( str2 );
++    }
++    SysFreeString( str );
++
++    IXMLDOMNode_Release( node2 );
++    IXMLDOMNode_Release( node );
++    IXMLDOMNodeList_Release( root_list );
++    IXMLDOMElement_Release( element );
++    IXMLDOMDocument_Release( doc );
++
+     free_bstrs();
+ }
+ 
