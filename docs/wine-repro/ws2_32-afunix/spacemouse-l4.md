@@ -122,7 +122,8 @@ installed.
 The patch applied cleanly to the pinned PR. The x64 DLL compiled with
 the PR's MinGW flags. A launcher check with a disposable Linux socket
 confirmed AF_UNIX mode skips the relay and TCP mode starts it, both
-with the supplied configuration. The hardware check is pending.
+with the supplied configuration. The hardware check is pending. The
+hardware-free Inventor result is recorded below.
 
 ## Trial with no 3D mouse
 
@@ -191,5 +192,18 @@ frame after each one. It sends no button commands.
 
 Built the amended DLL as x86_64 PE with the PR's flags and `-Werror`.
 A native test client received all 72 nonzero motion frames and the three
-neutral frames over the private socket. Inventor's response still needs
-the maintainer's test.
+neutral frames over the private socket.
+
+### Inventor result (2026-11-18)
+
+The maintainer ran the hardware-free trial in Inventor 2027 on Arch with
+winum 11.22-1 AF_UNIX v4 `c3fc029`, Inventor PR #25 `54f83ec` and the
+synthetic motion patch from winum `be7c13f`. The sender connected, wrote
+all 72 motion frames, and exited 0 after Inventor closed. The DLL trace
+confirmed direct AF_UNIX connection and reception of motion. The visible
+viewport performed the three programmed movements.
+
+This is an application-level pass for synthetic motion on `c3fc029`.
+Physical input, buttons, the running spacenavd service and the complete
+Inventor L4 checklist remain open. The ConnectEx follow-up `36b088f`
+has a separate build and validation run.

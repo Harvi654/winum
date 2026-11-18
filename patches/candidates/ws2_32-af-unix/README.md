@@ -313,10 +313,14 @@ different path and passes on v3. Repeat it with v4 before hardware L4.
 2026-11-18). Both x86_64 and i686 ran 225 checks with zero failures,
 skips or todos and exit 0. See the [L1 record and bundle](../../../docs/wine-repro/ws2_32-afunix/v4.md#l1-on-the-offline-windows-10-vm-2026-11-18).
 
-Wine 11.22 L0, paired L2 and native host transport are tracked in
+Wine 11.22 L0 and the native PING/PONG transport probe passed on
+`c3fc029` for x86_64 and i386 in
 [run 44398256194](https://github.com/Harvi654/winum/actions/runs/44398256194)
-on `test-run/ws2_32-af-unix-v4-1`. The candidate is outside the
-production series. L4 is open.
+on `test-run/ws2_32-af-unix-v4-1`. The paired comparison flagged two
+new failures at i386 `sock.c:4597` and `sock.c:4598`. Both are TCP
+writability assertions in the existing select test. The revised run
+below is needed before recording L2. The candidate is outside the
+production series.
 
 Independent cross review of `c3fc029` (2026-11-18) found that the
 pending ConnectEx path could lose its connected state if a native
@@ -334,4 +338,8 @@ on `test-run/ws2_32-af-unix-v4-2`.
 
 For SpaceMouse L4, see the [local Inventor PR #25 trial](../../../docs/wine-repro/ws2_32-afunix/spacemouse-l4.md).
 It uses a separate checkout and prefix copy with an explicit direct
-transport mode and a filtered connection/motion trace.
+transport mode and a filtered connection/motion trace. On 2026-11-18 the
+maintainer confirmed in Inventor 2027 that all three synthetic motion
+phases reached the viewport over the direct socket with `c3fc029`. The
+trial exited 0. L4 remains open for the revised build, the complete
+Inventor smoke test and a real SpaceMouse with spacenavd.
