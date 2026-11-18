@@ -23,5 +23,7 @@ list="$(mktemp)"
 trap 'rm -f -- "$list"' EXIT
 printf '%s\n' 'afunix-l1 | docs/wine-repro/ws2_32-afunix/l1.c | -Wextra -lws2_32 -lmswsock -ladvapi32 -static' > "$list"
 bash "$here/scripts/build-measure-bundle.sh" "$1" "$list"
+mv "$1/run-measure.bat" "$1/run-tests.bat"
+sed -i "s/run-measure.bat/run-tests.bat/g" "$1/README.txt"
 cp "$here/docs/wine-repro/ws2_32-afunix/"{l1.c,test-body.h} "$here/LICENSE" "$1/"
-(cd "$1" && sha256sum ./*.exe ./*.c ./*.h LICENSE README.txt run-measure.bat measure.manifest > SHA256SUMS)
+(cd "$1" && sha256sum ./*.exe ./*.c ./*.h LICENSE README.txt run-tests.bat measure.manifest > SHA256SUMS)

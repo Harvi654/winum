@@ -14,6 +14,7 @@
 #include <afunix.h>
 #include <aclapi.h>
 #include <windows.h>
+#include <winternl.h>
 #include <stddef.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -26,6 +27,8 @@
 #ifndef IO_REPARSE_TAG_AF_UNIX
 #define IO_REPARSE_TAG_AF_UNIX 0x80000023
 #endif
+/* FileStatInformation ABI for MinGW headers that omit it. */
+#define FileStatInformation ((FILE_INFORMATION_CLASS)68)
 static unsigned int checks, failures, todos, skipped;
 static int on_wine, in_todo;
 static char dbg[4][512];

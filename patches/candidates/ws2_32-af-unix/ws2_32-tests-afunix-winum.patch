@@ -30,6 +30,11 @@ v3 (2026-11-17): test_afunix_delete added (a socket file removed with
 FileDispositionInfo and, while a socket listens, FileDispositionInfoEx;
 renamed with MoveFileExA), from MEASURE 3 (measure-del.c).
 
+v4 (2026-11-18, Codex): Add regressions for short address lengths,
+handle reparse metadata, names after a bound client connects and
+bound ConnectEx. Expected values come from the offline Windows 10
+19045.6466 measurement in docs/wine-repro/ws2_32-afunix/v4.md.
+
 --- a/dlls/ws2_32/tests/Makefile.in
 +++ b/dlls/ws2_32/tests/Makefile.in
 @@ -1,5 +1,5 @@
@@ -49,7 +54,7 @@ renamed with MoveFileExA), from MEASURE 3 (measure-del.c).
  #include <wsnwlink.h>
  #include <mswsock.h>
  #include <mstcpip.h>
-@@ -15065,6 +15066,670 @@ static void test_afunix(void)
+@@ -15065,6 +15066,867 @@ static void test_afunix(void)
      test_afunix_path( path );
  }
  
@@ -700,6 +705,201 @@ renamed with MoveFileExA), from MEASURE 3 (measure-del.c).
 +    ok(DeleteFileA(target), "DeleteFileA failed, error %lu\n", GetLastError());
 +}
 +
++static void test_afunix_handle_tag(void)
++{
++    NTSTATUS (WINAPI *query)(HANDLE, IO_STATUS_BLOCK *, void *, ULONG, FILE_INFORMATION_CLASS);
++    FILE_ATTRIBUTE_TAG_INFO tag = {0};
++    FILE_STAT_INFORMATION stat = {0};
++    IO_STATUS_BLOCK io;
++    NTSTATUS status;
++    HANDLE file;
++    BOOL ret;
++
++    file = CreateFileA("listener", FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
++                       NULL, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, NULL);
++    ok(file != INVALID_HANDLE_VALUE, "opening socket reparse point failed, error %lu\n", GetLastError());
++    if (file == INVALID_HANDLE_VALUE) return;
++
++    ret = GetFileInformationByHandleEx(file, FileAttributeTagInfo, &tag, sizeof(tag));
++    ok(ret, "FileAttributeTagInfo failed, error %lu\n", GetLastError());
++    if (ret)
++    {
++        ok(tag.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT, "attributes %#lx\n", tag.FileAttributes);
++        todo_wine ok(tag.ReparseTag == IO_REPARSE_TAG_AF_UNIX, "tag %#lx\n", tag.ReparseTag);
++    }
++
++    query = (void *)(ULONG_PTR)GetProcAddress(GetModuleHandleA("ntdll.dll"), "NtQueryInformationFile");
++    status = query(file, &io, &stat, sizeof(stat), FileStatInformation);
++    ok(!status, "FileStatInformation returned %#lx\n", (ULONG)status);
++    if (!status)
++    {
++        ok(stat.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT, "attributes %#lx\n", stat.FileAttributes);
++        todo_wine ok(stat.ReparseTag == IO_REPARSE_TAG_AF_UNIX, "stat tag %#lx\n", stat.ReparseTag);
++    }
++    CloseHandle(file);
++}
++
++static void test_afunix_short_address(void)
++{
++    SOCKADDR_UN addr;
++    int len, ret, error;
++    SOCKET s;
++
++    s = afunix_socket();
++    if (s == INVALID_SOCKET) return;
++    afunix_set(&addr, "short-address");
++    for (len = 0; len < (int)offsetof(SOCKADDR_UN, sun_path); ++len)
++    {
++        ret = bind(s, (struct sockaddr *)&addr, len);
++        error = WSAGetLastError();
++        ok(ret == SOCKET_ERROR && error == WSAEFAULT, "bind length %d returned %d, error %d\n", len, ret, error);
++        ret = connect(s, (struct sockaddr *)&addr, len);
++        error = WSAGetLastError();
++        todo_wine ok(ret == SOCKET_ERROR && error == WSAEFAULT,
++                     "connect length %d returned %d, error %d\n", len, ret, error);
++    }
++    closesocket(s);
++}
++
++static void test_afunix_bound_client(SOCKET listener, BOOL extended)
++{
++    const char client_path[] = "bound-client", server_path[] = "listener";
++    GUID connectex_id = WSAID_CONNECTEX;
++    SOCKADDR_UN addr, target;
++    struct timeval timeout = {2, 0};
++    LPFN_CONNECTEX connectex = NULL;
++    OVERLAPPED overlapped = {0};
++    SOCKET client, accepted;
++    DWORD count, flags = 0, wait;
++    BOOL connected;
++    fd_set readfds;
++    int len, ret, error;
++
++    client = afunix_socket();
++    if (client == INVALID_SOCKET) return;
++    afunix_set(&addr, client_path);
++    ret = bind(client, (struct sockaddr *)&addr, afunix_len(client_path));
++    ok(!ret, "client bind returned %d, error %d\n", ret, WSAGetLastError());
++    if (ret) goto done;
++    afunix_set(&target, server_path);
++    if (extended)
++    {
++        ret = WSAIoctl(client, SIO_GET_EXTENSION_FUNCTION_POINTER, &connectex_id, sizeof(connectex_id),
++                       &connectex, sizeof(connectex), &count, NULL, NULL);
++        ok(!ret && connectex, "WSAIoctl returned %d, error %d\n", ret, WSAGetLastError());
++        if (ret || !connectex) goto done;
++        overlapped.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
++        ok(!!overlapped.hEvent, "CreateEventW failed, error %lu\n", GetLastError());
++        if (!overlapped.hEvent) goto done;
++        connected = connectex(client, (struct sockaddr *)&target, afunix_len(server_path),
++                              NULL, 0, &count, &overlapped);
++        error = connected ? 0 : WSAGetLastError();
++        todo_wine ok(!connected && error == WSA_IO_PENDING, "ConnectEx returned %d, error %d\n", connected, error);
++        if (!connected && error == WSA_IO_PENDING)
++        {
++            wait = WaitForSingleObject(overlapped.hEvent, 2000);
++            ok(wait == WAIT_OBJECT_0, "ConnectEx wait returned %lu\n", wait);
++            if (wait != WAIT_OBJECT_0) CancelIoEx((HANDLE)client, &overlapped);
++            connected = WSAGetOverlappedResult(client, &overlapped, &count, TRUE, &flags);
++            ok(connected && !count, "overlapped result %d, error %d, bytes %lu\n",
++               connected, WSAGetLastError(), count);
++        }
++        if (!connected) goto done;
++        ret = setsockopt(client, SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, NULL, 0);
++        ok(!ret, "SO_UPDATE_CONNECT_CONTEXT returned %d, error %d\n", ret, WSAGetLastError());
++    }
++    else
++    {
++        ret = connect(client, (struct sockaddr *)&target, afunix_len(server_path));
++        ok(!ret, "client connect returned %d, error %d\n", ret, WSAGetLastError());
++        if (ret) goto done;
++    }
++
++    memset(&addr, 0, sizeof(addr));
++    len = sizeof(addr);
++    ret = getsockname(client, (struct sockaddr *)&addr, &len);
++    ok(!ret && addr.sun_family == AF_UNIX, "client getsockname returned %d, family %u\n", ret, addr.sun_family);
++    todo_wine ok(len == afunix_len(client_path) && !memcmp(addr.sun_path, client_path, sizeof(client_path)),
++                 "client getsockname length %d, path %s\n", len, debugstr_a(addr.sun_path));
++    memset(&addr, 0, sizeof(addr));
++    len = sizeof(addr);
++    ret = getpeername(client, (struct sockaddr *)&addr, &len);
++    ok(!ret && addr.sun_family == AF_UNIX && !memcmp(addr.sun_path, server_path, sizeof(server_path)),
++       "client getpeername returned %d, family %u, path %s\n", ret, addr.sun_family, debugstr_a(addr.sun_path));
++    if (extended)
++        todo_wine ok(len == sizeof(addr), "ConnectEx client getpeername length %d\n", len);
++    else
++        ok(len == afunix_len(server_path), "connect client getpeername length %d\n", len);
++
++    FD_ZERO(&readfds);
++    FD_SET(listener, &readfds);
++    ret = select(0, &readfds, NULL, NULL, &timeout);
++    ok(ret == 1, "listener select returned %d, error %d\n", ret, WSAGetLastError());
++    if (ret != 1) goto done;
++    memset(&addr, 0, sizeof(addr));
++    len = sizeof(addr);
++    accepted = accept(listener, (struct sockaddr *)&addr, &len);
++    ok(accepted != INVALID_SOCKET, "accept failed, error %d\n", WSAGetLastError());
++    if (accepted == INVALID_SOCKET) goto done;
++    ok(len == sizeof(addr) && addr.sun_family == AF_UNIX, "accept length %d, family %u\n", len, addr.sun_family);
++    todo_wine ok(!memcmp(addr.sun_path, client_path, sizeof(client_path)), "accept path %s\n", debugstr_a(addr.sun_path));
++    memset(&addr, 0, sizeof(addr));
++    len = sizeof(addr);
++    ret = getpeername(accepted, (struct sockaddr *)&addr, &len);
++    ok(!ret && len == sizeof(addr) && addr.sun_family == AF_UNIX,
++       "server getpeername returned %d, length %d, family %u\n", ret, len, addr.sun_family);
++    todo_wine ok(!memcmp(addr.sun_path, client_path, sizeof(client_path)),
++                 "server getpeername path %s\n", debugstr_a(addr.sun_path));
++    memset(&addr, 0, sizeof(addr));
++    len = sizeof(addr);
++    ret = getsockname(accepted, (struct sockaddr *)&addr, &len);
++    afunix_check_name(ret, &addr, len, server_path, "accepted getsockname");
++    closesocket(accepted);
++
++done:
++    if (overlapped.hEvent) CloseHandle(overlapped.hEvent);
++    closesocket(client);
++    DeleteFileA(client_path);
++}
++
++static void test_afunix_bound_names(void)
++{
++    char cwd[MAX_PATH];
++    SOCKADDR_UN addr;
++    SOCKET listener;
++    DWORD len;
++    int ret;
++
++    len = GetCurrentDirectoryA(ARRAY_SIZE(cwd), cwd);
++    ok(len && len < ARRAY_SIZE(cwd), "GetCurrentDirectoryA returned %lu\n", len);
++    if (!len || len >= ARRAY_SIZE(cwd)) return;
++    if (!SetCurrentDirectoryA(afunix_dir))
++    {
++        ok(0, "SetCurrentDirectoryA failed, error %lu\n", GetLastError());
++        return;
++    }
++    listener = afunix_socket();
++    if (listener == INVALID_SOCKET) goto restore_cwd;
++    afunix_set(&addr, "listener");
++    ret = bind(listener, (struct sockaddr *)&addr, afunix_len("listener"));
++    ok(!ret, "listener bind returned %d, error %d\n", ret, WSAGetLastError());
++    if (!ret)
++    {
++        test_afunix_handle_tag();
++        ret = listen(listener, 2);
++        ok(!ret, "listen returned %d, error %d\n", ret, WSAGetLastError());
++        if (!ret)
++        {
++            test_afunix_bound_client(listener, FALSE);
++            test_afunix_bound_client(listener, TRUE);
++        }
++    }
++    closesocket(listener);
++    DeleteFileA("listener");
++restore_cwd:
++    ok(SetCurrentDirectoryA(cwd), "restoring the current directory failed, error %lu\n", GetLastError());
++}
++
 +static void test_afunix_winum(void)
 +{
 +    if (!afunix_make_dir())
@@ -714,13 +914,15 @@ renamed with MoveFileExA), from MEASURE 3 (measure-del.c).
 +    test_afunix_extensions();
 +    test_afunix_security();
 +    test_afunix_delete();
++    test_afunix_short_address();
++    test_afunix_bound_names();
 +    ok(RemoveDirectoryA(afunix_dir), "RemoveDirectoryA failed, error %lu\n", GetLastError());
 +}
 +
  START_TEST( sock )
  {
      int i;
-@@ -15154,6 +15819,7 @@ START_TEST( sock )
+@@ -15154,6 +16016,7 @@ START_TEST( sock )
      test_send_buffering();
      test_valid_handle();
      test_afunix();
