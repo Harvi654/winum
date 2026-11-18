@@ -57,7 +57,10 @@ Independent review found that Wine's Recycle Bin exposes the creation
 helper with stub methods. v2 requires a filesystem path as well as
 the helper. It checks the Recycle Bin behavior on Wine and skips the
 English-caption assertion in other UI languages. The validation table
-below refers to v1. v2 validation and follow-up review are pending.
+below refers to v1. The independent Codex reviewer approved both v2
+diffs on 2026-11-18. v2 verification is running in
+[Build Wine](https://github.com/Harvi654/winum/actions/runs/44375516021)
+and the [paired shell32 workflow](https://github.com/Harvi654/winum/actions/runs/44375516288).
 
 ## Validation
 
