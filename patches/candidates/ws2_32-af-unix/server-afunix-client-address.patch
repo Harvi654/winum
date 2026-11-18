@@ -15,9 +15,43 @@ full peer address for that call. Leave incoming peer name handling
 to a follow-up. Keep short-length error selection specific to
 synchronous AF_UNIX connect.
 
+2026-11-18 cross review: A native peer may send and close before
+polling reports ConnectEx completion. Keep a successful host connect
+in SOCK_CONNECTED while the async completion is queued. In this
+state, poll's hangup is an established connection event.
+
 --- a/server/sock.c
 +++ b/server/sock.c
-@@ -2844,6 +2844,12 @@
+@@ -1306,7 +1306,9 @@
+             complete_async_accept_recv( sock->accept_recv_req );
+     }
+ 
+-    if ((event & POLLOUT) && sock->connect_req && sock->connect_req->iosb->status == STATUS_PENDING)
++    if (sock->connect_req && sock->connect_req->iosb->status == STATUS_PENDING &&
++        ((event & POLLOUT) || ((event & (POLLERR | POLLHUP)) &&
++                              sock->family == WS_AF_UNIX && sock->state == SOCK_CONNECTED)))
+         complete_async_connect( sock );
+ 
+     if ((event & (POLLIN | POLLPRI)) && async_queued( &sock->read_q ))
+@@ -1661,6 +1663,8 @@
+             ev |= POLLOUT;
+         }
+ 
++        if (sock->connect_req && sock->connect_req->iosb->status == STATUS_PENDING)
++            ev |= POLLOUT;
+         break;
+     }
+ 
+@@ -2794,7 +2798,7 @@
+         union unix_sockaddr unix_addr, peer_addr;
+         struct connect_req *req;
+         socklen_t unix_len;
+-        int send_len, ret, dir_fd = -1;
++        int send_len, ret, defer_connected, dir_fd = -1;
+ 
+         if (get_req_data_size() < sizeof(*params) ||
+             get_req_data_size() - sizeof(*params) < params->addr_len)
+@@ -2844,6 +2848,12 @@
                  break;
          }
  
@@ -30,7 +64,7 @@ synchronous AF_UNIX connect.
          if (sock->family == WS_AF_UNIX && params->addr_len > sizeof(struct WS_sockaddr_un))
          {
              if (!(unix_len = afunix_sockaddr( addr, params->addr_len, &unix_addr.un, &dir_fd ))) return;
-@@ -2907,19 +2913,25 @@
+@@ -2907,18 +2917,25 @@
          /* a connected or connecting socket can no longer be accepted into */
          allow_fd_caching( sock->fd );
  
@@ -56,10 +90,27 @@ synchronous AF_UNIX connect.
  
 -        /* a local connection completes at once, but Windows reports a
 -         * non-blocking AF_UNIX connect as pending, like a TCP one */
--        if (!ret && sock->family == WS_AF_UNIX && params->synchronous && sock->nonblocking)
-+        /* AF_UNIX connects can complete immediately on the host. Windows
-+         * reports nonblocking connect and overlapped ConnectEx as pending. */
-+        if (!ret && sock->family == WS_AF_UNIX && (!params->synchronous || sock->nonblocking))
++        /* Queue ConnectEx completion without discarding the connected state.
++         * A peer can close before poll observes that the socket is writable. */
++        defer_connected = !ret && sock->family == WS_AF_UNIX && !params->synchronous;
+         if (!ret && sock->family == WS_AF_UNIX && params->synchronous && sock->nonblocking)
              ret = -1;
  
-         if (!ret)
+@@ -2928,12 +2945,13 @@
+             {
+                 sock->state = SOCK_CONNECTED;
+                 sock->connect_time = current_time;
++                if (defer_connected) sock->errors[AFD_POLL_BIT_CONNECT_ERR] = 0;
+             }
+ 
+-            if (!send_len) return;
+-        }
+-
+-        if (sock->type != WS_SOCK_DGRAM)
++            if (!send_len && !defer_connected) return;
++        }
++
++        if (sock->type != WS_SOCK_DGRAM && !defer_connected)
+             sock->state = SOCK_CONNECTING;
+ 
+         if (params->synchronous && sock->nonblocking)

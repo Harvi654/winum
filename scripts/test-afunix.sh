@@ -107,7 +107,7 @@ if [ "$VARIANT" = candidate ]; then
         say "Testing the direct Linux host connection and repeating the measurements"
         bash "$HERE/scripts/build-measure-ws2_32-afunix-v4.sh" "$WORK/host-peer"
         (cd "$WORK/host-peer" && sha256sum -c SHA256SUMS)
-        python3 "$WORK/host-peer/run-host-peer.py" --measure "$WORK/$NAME/bin/wine" "$WORK/host-peer" \
+        python3 "$WORK/host-peer/run-host-peer.py" --measure --connectex "$WORK/$NAME/bin/wine" "$WORK/host-peer" \
             | tee "$OUTDIR/result-wine-v4.txt"
     fi
     tar -C "$WORK" -cJf "$OUTDIR/$NAME.tar.xz" "$NAME"

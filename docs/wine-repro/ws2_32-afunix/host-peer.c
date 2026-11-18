@@ -57,7 +57,7 @@ static int connect_overlapped(SOCKET sock, const struct sockaddr *target, int le
 
 int main(int argc, char **argv)
 {
-    struct
+    struct unix_address
     {
         ADDRESS_FAMILY family;
         char path[108];
@@ -123,7 +123,8 @@ int main(int argc, char **argv)
         err = offset != (int)sizeof(reply) || memcmp(reply, "PONG", sizeof(reply));
         if (extended)
         {
-            int peer_len = sizeof(addr);
+            struct unix_address peer = {0};
+            int peer_len = sizeof(peer);
             char byte;
 
             ret = recv(sock, &byte, 1, 0);
@@ -133,8 +134,9 @@ int main(int argc, char **argv)
                 err = 1;
             }
 
-            ret = getpeername(sock, (struct sockaddr *)&addr, &peer_len);
-            if (ret || addr.family != AF_UNIX || peer_len != sizeof(addr))
+            ret = getpeername(sock, (struct sockaddr *)&peer, &peer_len);
+            if (ret || peer.family != AF_UNIX || peer_len != (int)sizeof(peer) ||
+                memcmp(peer.path, addr.path, len + 1))
             {
                 printf("peer_after_close=%d error=%d length=%d\n", ret, ret ? WSAGetLastError() : 0, peer_len);
                 err = 1;

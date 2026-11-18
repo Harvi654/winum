@@ -11,6 +11,11 @@ The Wine v3 server replaced the stored local name with the generic
 unnamed AF_UNIX conversion and completed an immediate ConnectEx
 synchronously. Preserve the server's existing bound address and
 use the async completion queue for overlapped AF_UNIX connects.
+When the host has connected immediately, keep the established state
+while the completion is queued. Independent review reproduced a
+native peer send and close leaving POLLOUT and POLLHUP set together,
+with SO_ERROR zero. Treating that as a failed connection would make
+the peer name unavailable after a successful completion.
 The extended peer address uses the full buffer size measured on
 Windows. The server also validates the declared length before
 reading the address family and uses the measured `WSAEFAULT` for
@@ -29,4 +34,5 @@ and scope are recorded in the candidate README.
 | L4 | Pending SpaceMouse integration and maintainer checks |
 
 v4 (2026-11-18) corrects the connecting client's local address and
-overlapped completion.
+overlapped completion. The Linux host probe also exercises pending
+completion when the peer immediately sends data and closes.

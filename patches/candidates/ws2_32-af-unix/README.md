@@ -315,5 +315,17 @@ skips or todos and exit 0. See the [L1 record and bundle](../../../docs/wine-rep
 
 Wine 11.22 L0, paired L2 and native host transport are tracked in
 [run 44398256194](https://github.com/Harvi654/winum/actions/runs/44398256194)
-on `test-run/ws2_32-af-unix-v4-1`. L4 and independent review are open.
-The candidate is outside the production series.
+on `test-run/ws2_32-af-unix-v4-1`. The candidate is outside the
+production series. L4 is open.
+
+Independent cross review of `c3fc029` (2026-11-18) found that the
+pending ConnectEx path could lose its connected state if a native
+peer closed before the first poll. It also found that the L2
+comparison missed unexpected todo successes and repeated failures at
+the same source line. The follow-up keeps the established state
+while the async completion is queued, adds a quick-close host
+probe, and compares hard failure counts by source line and kind.
+A follow-up review confirmed the connected-state change and the
+failure comparison. The quick-close probe does not control poll
+timing, and any partial drop in test coverage needs review. The L1
+test body and its Windows expectations are unchanged.

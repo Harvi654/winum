@@ -63,6 +63,8 @@ def compare(before, after):
         name = ".".join(key)
         old_checks, old_skips, old_failures = old[key]
         new_checks, new_skips, failures = new[key]
+        if old_checks and not new_checks:
+            raise ValueError(f"{name}: candidate ran no checks")
         for (location, kind), added in sorted((failures - old_failures).items()):
             print(f"{name} {location}: {kind} (+{added})")
             new_failures += added
