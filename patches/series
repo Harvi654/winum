@@ -89,3 +89,6 @@ shell32-parentrelativeforui.patch
 
 # Inventor Open inline folder name confirmation.
 shell32-label-edit-enter.patch
+
+# Inventor Open New Folder command.
+shell32-background-menu.patch

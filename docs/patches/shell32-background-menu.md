@@ -1,7 +1,9 @@
 # shell32-background-menu.patch
 
+<!-- winum-test: l1 -->
+
 - **DLL:** `shell32`
-- **Status:** [v2 candidate](../../patches/candidates/shell32-background-menu-v2/README.md)
+- **Status:** In the winum-11.22-2 series on the topic branch. [v2 candidate history](../../patches/candidates/shell32-background-menu-v2/README.md)
 - **Target:** winum-11.22-2 (Wine 11.22), pending validation
 
 ## Symptom
@@ -19,7 +21,7 @@ the submenu before merging its children. Offline Windows 10 build
 on both x86_64 and i686.
 
 Put the New popup ID in the resource's command ID range. Only show it
-when the parent provides the folder creation helper. If folder creation
+when the parent provides the folder creation helper and resolves to a filesystem path. If folder creation
 fails or produces no PIDL, skip selection and label editing. The
 general merge algorithm and the other background popups are unchanged.
 
@@ -67,9 +69,12 @@ diffs on 2026-11-18.
 | L0 | Passed on Wine 11.22 x86_64 and i386 with `--fuzz=0` ([build 44375516021](https://github.com/Harvi654/winum/actions/runs/44375516021)) |
 | L1 | Passed the New submenu checks on offline Windows 10 x86_64 and i386. The shlfolder unit reported 3915 checks and 0 failures on x86_64, and 2128 checks and 3 failures on i386. The three i386 failures are from the existing file timestamp assertion at shlfolder.c:1976. |
 | L2 | Passed both architectures without new failures ([run 44375516288](https://github.com/Harvi654/winum/actions/runs/44375516288)). The two expected baseline menu failures cleared with v2. |
-| L4 | Pending in Inventor on v2 build `aa3632d` |
+| L3 | No separate run. The Wine-specific Recycle Bin check runs in L2. |
+| L4 | Passed in Inventor 2027 on v2 build `aa3632d` (maintainer, 2026-11-18). The maintainer confirmed the New Folder and Enter flow. SOLIDWORKS and AutoCAD deferred under AGENTS.md. |
+| L5 | Pending a week of ordinary use |
+| Cross review | Independent review approved v2 on 2026-11-18 |
 
-## Validation
+## v1 validation
 
 | Level | Result |
 | --- | --- |
@@ -78,4 +83,4 @@ diffs on 2026-11-18.
 | L2 | Passed, paired shell32 suites with and without the fix ([run 44339967832](https://github.com/Harvi654/winum/actions/runs/44339967832)) |
 | L4 | Passed in Inventor on combined candidate `c440f0e` (maintainer, 2026-11-18). Folder creation and name confirmation work. SOLIDWORKS and AutoCAD deferred under AGENTS.md. |
 | L5 | Pending |
-| Cross review | Pending |
+| Cross review | Requested the filesystem restriction implemented in v2 |
