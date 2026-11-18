@@ -1,0 +1,185 @@
+Subject: [TEST PATCH] Allow direct AF_UNIX in the Inventor SpaceMouse trial
+Applies-to: Autodesk-Inventor-for-Linux PR #25 at 54f83ec61329a4fcbaa00c0f991a846b6058277a
+
+Original AI-assisted (Codex) changes, MIT as the Inventor project.
+Use SIAPPDLL_TRANSPORT=afunix with the winum AF_UNIX candidate.
+The DLL connects to spacenavd without a relay and records the first
+nonzero motion event. The default TCP path stays available for a
+paired application test.
+
+diff --git a/scripts/install-spacemouse.sh b/scripts/install-spacemouse.sh
+index 3ddad7c..c7b6c4d 100644
+--- a/scripts/install-spacemouse.sh
++++ b/scripts/install-spacemouse.sh
+@@ -44,5 +44,7 @@ ok "siappdll.dll -> $DLL"
+ 
+ [ -S /run/spnav.sock ] && ok "spacenavd is running" \
+     || warn "spacenavd is not running: sudo pacman -S --needed spacenavd && sudo systemctl enable --now spacenavd"
+-command -v socat >/dev/null && ok "socat found" || warn "socat missing (the launcher relays spacenavd with it): sudo pacman -S --needed socat"
++if [ "${SIAPPDLL_TRANSPORT:-}" != afunix ]; then
++    command -v socat >/dev/null && ok "socat found" || warn "socat missing (the launcher relays spacenavd with it): sudo pacman -S --needed socat"
++fi
+ info "buttons: ${XDG_CONFIG_HOME:-$HOME/.config}/inventor-on-linux/spacemouse.ini (created at the next start)"
+diff --git a/scripts/launch-inventor.sh b/scripts/launch-inventor.sh
+index 7307066..592335f 100755
+--- a/scripts/launch-inventor.sh
++++ b/scripts/launch-inventor.sh
+@@ -160,13 +160,16 @@ if [ "${N:-0}" -gt 0 ] 2>/dev/null; then
+ fi
+ rm -f "$ICONREG"
+ 
+-# 3D mouse: Inventor navigates with a 3D mouse through siappdll.dll; ours
+-# (spacenav/siappdll.c) reads spacenavd. Windows programs can't open its UNIX
+-# socket (no AF_UNIX in Wine's ws2_32), so relay it to 127.0.0.1 while the
+-# prefix runs. A relay that is already listening is fine too.
+-if [ -S /run/spnav.sock ] && [ -f "$P_C/windows/system32/siappdll.dll" ] && command -v socat >/dev/null; then
+-    socat "TCP-LISTEN:${SIAPPDLL_PORT:-17462},bind=127.0.0.1,reuseaddr,fork" UNIX-CONNECT:/run/spnav.sock 2>/dev/null &
+-    SPNAV_RELAY=$!
++# Set SIAPPDLL_TRANSPORT=afunix for a direct test with the winum candidate.
++# The default transport relays the same native socket over loopback TCP.
++if [ -S /run/spnav.sock ] && [ -f "$P_C/windows/system32/siappdll.dll" ] &&
++   { [ "${SIAPPDLL_TRANSPORT:-}" = afunix ] || command -v socat >/dev/null; }; then
++    if [ "${SIAPPDLL_TRANSPORT:-}" = afunix ]; then
++        info "SpaceMouse direct transport: AF_UNIX /run/spnav.sock"
++    else
++        socat "TCP-LISTEN:${SIAPPDLL_PORT:-17462},bind=127.0.0.1,reuseaddr,fork" UNIX-CONNECT:/run/spnav.sock 2>/dev/null &
++        SPNAV_RELAY=$!
++    fi
+     # the DLL is built by install-spacemouse.sh, outside the migrations: an
+     # updated checkout keeps the old one until the script runs again
+     if [ "$(cat "$WINEPREFIX/.inventor-on-linux/siappdll-source" 2>/dev/null)" != "$(sha256sum "$SCRIPTS_DIR/../spacenav/siappdll.c" | cut -d' ' -f1)" ]; then
+@@ -175,10 +178,12 @@ if [ -S /run/spnav.sock ] && [ -f "$P_C/windows/system32/siappdll.dll" ] && comm
+     # its button file stays on the Linux side, read through Wine's \\?\unix
+     # path: no drive or link needed (isolation would turn a link into an empty
+     # folder), and edits apply while Inventor runs
+-    SPNAV_CFG="${XDG_CONFIG_HOME:-$HOME/.config}/inventor-on-linux"
+-    mkdir -p "$SPNAV_CFG"
+-    [ -e "$SPNAV_CFG/spacemouse.ini" ] || cp "$SCRIPTS_DIR/../spacenav/spacemouse.ini" "$SPNAV_CFG/"
+-    SIAPPDLL_CONFIG="\\\\?\\unix$(realpath "$SPNAV_CFG/spacemouse.ini" | tr / '\\')"
++    if [ -z "${SIAPPDLL_CONFIG:-}" ]; then
++        SPNAV_CFG="${XDG_CONFIG_HOME:-$HOME/.config}/inventor-on-linux"
++        mkdir -p "$SPNAV_CFG"
++        [ -e "$SPNAV_CFG/spacemouse.ini" ] || cp "$SCRIPTS_DIR/../spacenav/spacemouse.ini" "$SPNAV_CFG/"
++        SIAPPDLL_CONFIG="\\\\?\\unix$(realpath "$SPNAV_CFG/spacemouse.ini" | tr / '\\')"
++    fi
+     export SIAPPDLL_CONFIG
+ fi
+ 
+diff --git a/spacenav/siappdll.c b/spacenav/siappdll.c
+index 4b29361..b5339b6 100644
+--- a/spacenav/siappdll.c
++++ b/spacenav/siappdll.c
+@@ -4,10 +4,10 @@
+  *
+  * Inventor (and other CAD programs) look for siappdll.dll at start and, when
+  * it is there, drive their own 3D mouse navigation through it. Under Wine the
+- * device belongs to spacenavd on the Linux side; Windows programs can't open
+- * its UNIX socket (Wine has no AF_UNIX in ws2_32), so the launcher relays it
+- * to 127.0.0.1 (scripts/launch-inventor.sh, socat) and this library reads the
+- * relay: 8 x int32 per event (type, x, y, z, rx, ry, rz, period or button).
++ * device belongs to spacenavd on the Linux side. The launcher normally
++ * relays its socket to 127.0.0.1 through socat. The AF_UNIX candidate can
++ * instead open the native socket directly. Both receive 8 x int32 per
++ * event (type, x, y, z, rx, ry, rz, period or button).
+  *
+  * Events reach the application the way the SIAPP API defines it: a message
+  * registered as "SpaceWareMessage00" is posted to the window given to SiOpen,
+@@ -23,6 +23,7 @@
+  * file is read at every press, so changes apply at once.
+  *
+  * Environment (Windows side; Wine passes the Linux environment through):
++ *   SIAPPDLL_TRANSPORT  afunix for the candidate's direct transport
+  *   SIAPPDLL_PORT     relay port on 127.0.0.1 (default 17462)
+  *   SIAPPDLL_LOG      write a log to this Windows path
+  *   SIAPPDLL_CONFIG   button file (default %APPDATA%\inventor-on-linux\spacemouse.ini;
+@@ -43,6 +44,8 @@
+ 
+ #define COBJMACROS
+ #include <winsock2.h>
++#include <afunix.h>
++#include <stddef.h>
+ #include <ws2tcpip.h>
+ #include <windows.h>
+ #include <ole2.h>
+@@ -236,36 +239,63 @@ static void handle_packet(const int *p)
+ 
+ static DWORD WINAPI reader_proc(void *arg)
+ {
+-    char portbuf[16];
++    static const SOCKADDR_UN unix_addr = { .sun_family = AF_UNIX, .sun_path = "\\\\?\\unix\\run\\spnav.sock" };
++    struct sockaddr_in tcp_addr = { AF_INET };
++    char transport[sizeof("afunix")], portbuf[16];
+     unsigned short port = 17462;
++    const struct sockaddr *target;
++    int target_len, family;
++    BOOL direct;
+ 
+-    if (GetEnvironmentVariableA("SIAPPDLL_PORT", portbuf, sizeof(portbuf))) port = atoi(portbuf);
++    direct = GetEnvironmentVariableA("SIAPPDLL_TRANSPORT", transport, sizeof(transport)) ==
++             sizeof("afunix") - 1 && !strcmp(transport, "afunix");
++    if (direct)
++    {
++        family = AF_UNIX;
++        target = (const struct sockaddr *)&unix_addr;
++        target_len = offsetof(SOCKADDR_UN, sun_path) + strlen(unix_addr.sun_path) + 1;
++    }
++    else
++    {
++        if (GetEnvironmentVariableA("SIAPPDLL_PORT", portbuf, sizeof(portbuf))) port = atoi(portbuf);
++        tcp_addr.sin_port = htons(port);
++        tcp_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
++        family = AF_INET;
++        target = (const struct sockaddr *)&tcp_addr;
++        target_len = sizeof(tcp_addr);
++    }
+ 
+     while (!stopping)
+     {
+-        struct sockaddr_in addr = { AF_INET };
++        BOOL movement_logged = FALSE;
+         int packet[8], got = 0, n;
+ 
+-        addr.sin_port = htons(port);
+-        addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+-        sock = socket(AF_INET, SOCK_STREAM, 0);
+-        if (sock == INVALID_SOCKET || connect(sock, (struct sockaddr *)&addr, sizeof(addr)))
++        sock = socket(family, SOCK_STREAM, 0);
++        if (sock == INVALID_SOCKET || connect(sock, target, target_len))
+         {
++            if (direct) trace("AF_UNIX connection failed, error %d\n", WSAGetLastError());
+             if (sock != INVALID_SOCKET) closesocket(sock);
+             sock = INVALID_SOCKET;
+             Sleep(2000);
+             continue;
+         }
+         connected = 1;
+-        trace("connected to spacenavd relay 127.0.0.1:%u\n", port);
++        if (direct) trace("connected directly to spacenavd (AF_UNIX)\n");
++        else trace("connected to spacenavd relay 127.0.0.1:%u\n", port);
+         while (!stopping && (n = recv(sock, (char *)packet + got, sizeof(packet) - got, 0)) > 0)
+         {
+             if ((got += n) < (int)sizeof(packet)) continue;
++            if (direct && !movement_logged && !packet[0] &&
++                (packet[1] || packet[2] || packet[3] || packet[4] || packet[5] || packet[6]))
++            {
++                trace("AF_UNIX motion received\n");
++                movement_logged = TRUE;
++            }
+             handle_packet(packet);
+             got = 0;
+         }
+         connected = 0;
+-        trace("relay connection closed\n");
++        trace("%s connection closed\n", direct ? "AF_UNIX" : "relay");
+         closesocket(sock);
+         sock = INVALID_SOCKET;
+         if (!stopping) Sleep(2000);
+@@ -1363,7 +1393,7 @@ __declspec(dllexport) const char * SPWAPI SpwErrorString(enum spw_ret err)
+     case SI_IS_EVENT:       return "message is a 3D mouse event";
+     case SI_SKIP_EVENT:     return "message is the library's own, ignore it";
+     case SI_NOT_EVENT:      return "message is not a 3D mouse event";
+-    case SI_NO_DRIVER:      return "spacenavd relay on 127.0.0.1 not listening";
++    case SI_NO_DRIVER:      return "spacenavd connection unavailable";
+     case SI_NO_RESPONSE:    return "spacenavd did not answer";
+     case SI_UNSUPPORTED:    return "not implemented by this library";
+     case SI_UNINITIALIZED:  return "SiInitialize was not called";

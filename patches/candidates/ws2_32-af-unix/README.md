@@ -331,3 +331,7 @@ timing, and any partial drop in test coverage needs review. The L1
 test body and its Windows expectations are unchanged. The follow-up
 is pinned to `36b088f` in [run 44406951061](https://github.com/Harvi654/winum/actions/runs/44406951061)
 on `test-run/ws2_32-af-unix-v4-2`.
+
+For SpaceMouse L4, see the [local Inventor PR #25 trial](../../../docs/wine-repro/ws2_32-afunix/spacemouse-l4.md).
+It uses a separate checkout and prefix copy with an explicit direct
+transport mode and a filtered connection/motion trace.
