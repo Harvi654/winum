@@ -1,0 +1,83 @@
+name: Validate shell32 breadcrumb candidate
+
+on:
+  push:
+    branches: ['test-run/shell32-parentrelativeforui-1']
+    paths: ['.github/workflows/test-shell32-parentrelativeforui.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [baseline, candidate]
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 350
+      - name: Dependencies (official Arch repositories)
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed git python mingw-w64-gcc xorg-server-xvfb xorg-xauth \
+            alsa-lib libpulse gnutls krb5 dbus fontconfig freetype2 ttf-dejavu \
+            libx11 libxext libxi libxrandr libxrender libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
+            wayland mesa libglvnd vulkan-icd-loader vulkan-headers \
+            gst-plugins-base-libs sdl2 libcups libgphoto2 sane libpcap v4l-utils pcsclite unixodbc ocl-icd opencl-headers \
+            giflib
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Build and run the shell32 suites
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if [ "$VARIANT" = baseline ]; then
+            sed -i '/^shell32-parentrelativeforui\.patch$/d' patches/series
+          fi
+          export JOBS="$(nproc)"
+          export WORK=/tmp/work
+          export TESTS=shell32
+          export GROUP=shell32
+          export MAKE_L1=0
+          export L1_UNITS=shell32:shlfolder
+          if [ "$VARIANT" = candidate ]; then
+            export MAKE_L1=1
+          fi
+          bash scripts/test-series.sh series out
+      - name: Show breadcrumb test counts
+        run: |
+          for log in out/logs/shell32.*.shlfolder.log; do
+            printf '%s\n' "${log##*/}"
+            grep -E 'UI name.*hr |shlfolder: .*tests executed' "$log" | tail -n 20
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: shell32-results-${{ matrix.variant }}
+          path: out/results-*.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: matrix.variant == 'candidate'
+        with:
+          name: shell32-breadcrumb-l1
+          path: out/l1-bundle/
+      - name: Build log on failure
+        if: failure()
+        run: tail -n 80 /tmp/work/configure.log /tmp/work/build.log || true
+
+  compare:
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: shell32-results-*
+          path: results
+      - name: Compare both builds
+        run: |
+          set -o pipefail
+          python3 scripts/compare-tests.py compare results/shell32-results-baseline results/shell32-results-candidate |
+            tee "$GITHUB_STEP_SUMMARY"
