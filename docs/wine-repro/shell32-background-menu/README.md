@@ -75,4 +75,11 @@ The top-level entries with captions were Give access to, New and
 Properties. New was an enabled submenu in all three ranges. These
 results cover the initial menu. They do not measure the entries
 populated when New is opened or the result of invoking New Folder.
-The Inventor trace is pending.
+Inventor 2027 on winum-11.22-1, breadcrumb candidate `9cd7d88`,
+confirmed the first range on right-click in the Open dialog. Process,
+thread and pointer values are masked.
+
+```text
+<PID>:<TID>:trace:shell:BackgroundMenu_QueryContextMenu (<ptr>)->(hmenu=<ptr> indexmenu=0 cmdfirst=0 cmdlast=7fff flags=0 )
+<PID>:<TID>:trace:shell:BackgroundMenu_QueryContextMenu (<ptr>)->returning 0x101
+```
