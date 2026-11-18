@@ -31,13 +31,28 @@ The [MEASURE results](../wine-repro/shell32-background-menu/README.md)
 capture the initial menu structure. Actual folder creation is checked
 in Inventor.
 
+## Confirming the new folder name
+
+In Inventor 2027 on candidate `5ef7578`, New Folder creates the folder
+and opens the inline name editor. Pressing Enter after typing a new
+name leaves the default name and opens the folder. Clicking the
+background or scrolling commits the edited name. In the maintainer's
+Windows Inventor UI check, Enter committed the name and stayed in the
+parent folder. This was an application check.
+
+The Wine list-view edit control handles Enter in `EditLblWndProcT`
+and sends an end-label-edit notification. Enter delivered to the
+list view instead sends `NM_RETURN`, which the shell view handles
+as the default action. A trace will distinguish a key delivered to
+the list from an edit accepted or canceled before navigation.
+
 ## Validation
 
 | Level | Result |
 | --- | --- |
-| L0 | Candidate build queued on `test-run/shell32-background-menu-1` |
+| L0 | Passed on Wine 11.22 x86_64 and i386 with `--fuzz=0` ([build 44339967795](https://github.com/Harvi654/winum/actions/runs/44339967795)) |
 | L1 | MEASURE passed on x86_64 and i686. Windows regression test pending. |
-| L2 | Paired shell32 tests pending |
-| L4 | Inventor checks pending |
+| L2 | Passed, paired shell32 suites with and without the fix ([run 44339967832](https://github.com/Harvi654/winum/actions/runs/44339967832)) |
+| L4 | Inventor 2027 can create a folder through New. Keyboard confirmation and the remaining smoke checks are pending. |
 | L5 | Pending |
 | Cross review | Pending |
