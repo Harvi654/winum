@@ -155,6 +155,13 @@ records the paired comparison and the AutoCAD test procedure.
 
 ## AutoCAD 2027 follow-up
 
+In the paired Save As dialog test with FILEDIA set to 1, the
+baseline froze during filename editing and required termination.
+With the autocomplete v2 candidate, Cancel returned to the drawing,
+editing continued and AutoCAD exited normally. The
+[paired shell32 test run](https://github.com/Harvi654/winum/actions/runs/44592013573)
+uses the same runtime and test executables for both variants.
+
 On 2026-11-19 the maintainer reported that editing the filename worked
 with the v2 candidate. AutoCAD still crashed on saving and when opening
 an existing DWG.
