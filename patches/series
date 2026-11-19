@@ -83,3 +83,6 @@ ole32-createfromfile-package.patch
 ole32-storage-localdocs.patch
 ole32-propset-null-strings.patch
 packager-save-view-advise.patch
+
+# PR #4, test build only
+msxml3-replacechild-same-node.patch

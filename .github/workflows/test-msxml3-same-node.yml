@@ -1,0 +1,96 @@
+name: Validate MSXML3 same-node candidate
+
+on:
+  push:
+    branches: ['test-run/msxml3-replacechild-same-node-1']
+    paths: ['.github/workflows/test-msxml3-same-node.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [baseline, candidate]
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 350
+    steps:
+      - name: Dependencies (official Arch repositories)
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed git python mingw-w64-gcc xorg-server-xvfb xorg-xauth \
+            alsa-lib libpulse gnutls krb5 dbus fontconfig freetype2 ttf-dejavu \
+            libx11 libxext libxi libxrandr libxrender libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
+            wayland mesa libglvnd vulkan-icd-loader vulkan-headers \
+            gst-plugins-base-libs sdl2 libcups libgphoto2 sane libpcap v4l-utils pcsclite unixodbc ocl-icd opencl-headers \
+            giflib
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Build and run the msxml3 suites
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if [ "$VARIANT" = baseline ]; then
+            patch_file=patches/msxml3-replacechild-same-node.patch
+            sed -n '/^diff --git a\/dlls\/msxml3\/tests\/domdoc\.c b\//,$p' "$patch_file" > /tmp/msxml3-test-only.patch
+            test -s /tmp/msxml3-test-only.patch
+            cp /tmp/msxml3-test-only.patch "$patch_file"
+          fi
+          export JOBS="$(nproc)"
+          export WORK=/tmp/work
+          export TESTS=msxml3
+          export GROUP=msxml3
+          export MAKE_L1=0
+          export L1_UNITS=msxml3:domdoc
+          if [ "$VARIANT" = candidate ]; then
+            export MAKE_L1=1
+          fi
+          bash scripts/test-series.sh series out
+      - name: Verify test coverage and report summaries
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path('out/results-series-msxml3.json')
+          results = json.loads(path.read_text())
+          expected = {f'msxml3.{arch}.{unit}' for arch in ('x86_64', 'i386')
+                      for unit in ('domdoc', 'saxreader', 'schema', 'httpreq', 'xmlview')}
+          missing = sorted(key for key in expected if not results.get(key, {}).get('finished'))
+          if missing:
+              raise SystemExit('Test missing or unfinished: '+', '.join(missing))
+          for key, item in sorted(results.items()):
+              print(key, item['tests'], item['failures'], item['skipped'])
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: msxml3-results-${{ matrix.variant }}
+          path: out/results-*.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: matrix.variant == 'candidate'
+        with:
+          name: msxml3-same-node-l1
+          path: out/l1-bundle/
+      - name: Build log on failure
+        if: failure()
+        run: tail -n 80 /tmp/work/configure.log /tmp/work/build.log || true
+
+  compare:
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: msxml3-results-*
+          path: results
+      - name: Compare both builds
+        run: |
+          set -o pipefail
+          python3 scripts/compare-tests.py compare results/msxml3-results-baseline results/msxml3-results-candidate |
+            tee "$GITHUB_STEP_SUMMARY"
