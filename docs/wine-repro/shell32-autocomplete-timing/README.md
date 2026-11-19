@@ -1,4 +1,4 @@
-# Shell autocomplete timing on Windows 10
+# Shell autocomplete callback timing
 
 AutoCAD 2027's Save As file-name edit can stop responding while the
 application enumerates autocomplete suggestions. Wine 11.22's
@@ -121,6 +121,31 @@ VM and double-click `run-tests.bat`. Leave the mouse and keyboard idle
 while the test windows are open. Return `result-shell32-autocomplete-thread-x86_64.txt`,
 `result-shell32-autocomplete-thread-i686.txt` and `exitcodes.txt`.
 
-The MEASURE results establish the expected behavior. The Wine test's
-own Windows run (L1) is pending. The test-only patch leaves the Wine
-runtime unchanged.
+### L1 result
+
+Passed on 2026-11-19 in the maintainer's offline Windows 10 VM using the
+[test bundle](https://github.com/Harvi654/winum/actions/runs/44554709236)
+from `5d308e9`. Both x86_64 and i686 ran 10 checks with zero failures,
+zero skips and process exit code 0. This covers the Wine test itself
+as well as the earlier MEASURE result for the empty source.
+
+### Wine baseline
+
+On 2026-11-19, the x86_64 L1 executable reported the expected
+`todo_wine` on the SHA-256-verified [winum-11.22-1 release](https://github.com/Harvi654/winum/releases/tag/winum-11.22-1)
+(`ba856f8`, fresh prefix with Xvfb). Its only `Next` call ran on the
+edit thread before `WM_CHAR` returned. The test recorded 10 checks,
+one expected todo, zero failures and zero skips.
+
+In the x86_64 MEASURE replay, winum read all 1,024 suggestions from
+the fast source and made a final call that returned `S_FALSE`.
+Both slow sources made 129 calls on the edit thread before
+`WM_CHAR` returned, including the call that reached the end.
+Input dispatch took about 1.57 seconds. The window answered none
+of the probe messages while `Next` was active. The same two sources
+on Windows 10 left the edit responsive during enumeration.
+
+The local winum baseline is x86_64 only. The i686 test and MEASURE
+executables failed to start in that Linux environment and yielded no
+assertion results. The built-in 32-bit `cmd.exe` also failed to start
+in a fresh prefix there. Both i686 runs on Windows 10 completed.
