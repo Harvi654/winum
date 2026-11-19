@@ -51,3 +51,33 @@
   (if (vl-catch-all-error-p result)
     (winum-open-log log "activex_error"))
   (princ))
+
+(defun winum-open-dbx-database (log drawing app database / active item lines)
+  (setq active (vla-get-name (vla-get-activedocument app)))
+  (winum-open-log log "dbx_open_enter")
+  (vlax-invoke-method database 'Open drawing)
+  (winum-open-log log "dbx_open_return")
+  (setq lines 0)
+  (vlax-for item (vla-get-modelspace database)
+    (if (= (vla-get-objectname item) "AcDbLine")
+      (setq lines (1+ lines))))
+  (winum-open-log log (strcat "dbx_lines=" (itoa lines)))
+  (winum-open-log log
+    (if (= active (vla-get-name (vla-get-activedocument app)))
+      "dbx_active_document=unchanged"
+      "dbx_active_document=changed")))
+
+(defun winum-open-dbx (log drawing / app database result)
+  (winum-open-log log "dbx_begin")
+  (setq app (vlax-get-acad-object))
+  (setq database (vl-catch-all-apply 'vla-getinterfaceobject
+                   (list app "ObjectDBX.AxDbDocument.26")))
+  (if (vl-catch-all-error-p database)
+    (winum-open-log log "dbx_object_unavailable")
+    (progn
+      (setq result (vl-catch-all-apply 'winum-open-dbx-database
+                     (list log drawing app database)))
+      (if (vl-catch-all-error-p result)
+        (winum-open-log log "dbx_error"))
+      (vlax-release-object database)))
+  (princ))

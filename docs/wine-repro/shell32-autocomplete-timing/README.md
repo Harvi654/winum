@@ -624,12 +624,40 @@ unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
 bash scripts/trace-autocad-dwg.sh baseline open-activex "$ACAD_DWG_CONTROLS/line-2018.dwg"
 ~~~
 
-An `activex_open_enter` marker followed by the same fail-fast would
-reproduce the fault across both desktop entry points. A successful
-`activex_open_expected_dwg` and a visible line drawing would distinguish
-the ActiveX path from the failing command path. A caught `activex_error`
-without the fail-fast is a separate outcome. The prefix still uses
-ordinary AutoCAD licensing and startup.
+On 2026-11-20, the baseline ActiveX trial reported `reactors_ready`,
+`control_regen`, `activex_begin`, then `activex_open_enter`. Desktop
+AutoCAD exited with code 9 after `0xc0000409` at
+`coreclr.dll+0x14922d`. The scratch DWG was unchanged. No return or
+caught error was recorded. The command and ActiveX entry points both
+reproduce the fail-fast with this fixture.
+
+### Read a side database inside desktop AutoCAD
+
+The `open-dbx` trial loads the same scratch DWG through the AutoCAD
+2027 `ObjectDBX.AxDbDocument.26` interface in the existing desktop
+process. It calls `Open` on a side database, counts `AcDbLine` objects
+in model space, and checks the active drawing's name before and after.
+Only stage markers, the count and the name comparison are logged. The
+probe does not save the drawing or open it in a document tab.
+[Autodesk 2027 ObjectDBX example](https://help.autodesk.com/cloudhelp/2027/ENU/AutoCAD-ActiveX-Reference/files/GUID-D9E0A89C-2D81-4141-8B88-B9AC6EAABD62.htm)
+
+~~~bash
+export ACAD_OPEN_EVENTS_LISP="$PWD/docs/wine-repro/shell32-autocomplete-timing/dwg-open-events.lsp"
+unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
+bash scripts/trace-autocad-dwg.sh baseline open-dbx "$ACAD_DWG_CONTROLS/line-2018.dwg"
+~~~
+
+Start a blank drawing, paste the setup line, run `._REGEN` and paste
+the `winum-open-dbx` line. Close AutoCAD after the trial and return
+`variant=`, `open_event=` and `fault_module=` from the summary.
+
+`dbx_open_return`, `dbx_lines=1` and `dbx_active_document=unchanged`
+confirm that this desktop process can read the fixture through
+ObjectDBX. The difference then lies somewhere in the document-open
+path that the side database bypasses. A matching fail-fast after
+`dbx_open_enter` would reproduce it during the side database open as
+well. `dbx_object_unavailable` or a caught `dbx_error` without the
+matching fail-fast leaves the comparison inconclusive.
 
 ### Capture the fail-fast reason
 
