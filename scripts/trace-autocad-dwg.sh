@@ -65,6 +65,17 @@ if [[ $# == 3 ]]; then
     cp -- "$3" "$probe_dwg"
     probe_hash="$(sha256sum < "$probe_dwg")"
     probe_path="C:\\${probe_dir##*/}\\probe.dwg"
+    python3 - "$probe_dwg" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+file = Path(sys.argv[1])
+with file.open("rb") as stream:
+    signature = stream.read(6)
+version = signature.decode("ascii") if re.fullmatch(rb"AC[0-9]{4}", signature) else "other"
+print(f"dwg_header={version} dwg_bytes={file.stat().st_size}")
+PY
 fi
 
 if [[ "$2" == startup-open ]]; then
@@ -88,9 +99,21 @@ if [[ "${ACAD_EVENTPIPE:-0}" == 1 ]]; then
     export DOTNET_EventPipeOutputPath="C:\\${eventpipe_dir##*/}\\events-{pid}.nettrace"
 fi
 rc=0
+launcher=(bash scripts/launch-autocad.sh "${launch_args[@]}")
+dwg_io_trace=
+if [[ "${ACAD_DWG_IO:-0}" == 1 ]]; then
+    if [[ -z "$probe_dwg" ]] || ! command -v strace >/dev/null; then
+        echo 'DWG I/O tracing requires a DWG argument and strace.' >&2
+        exit 2
+    fi
+    dwg_io_trace="$ACAD_LOGDIR/dwg-io.txt"
+    launcher=(strace -f -qq -s 0 -P "$probe_dwg"
+        -e trace=open,openat,openat2,read,pread64,readv,preadv,preadv2,mmap
+        -o "$dwg_io_trace" -- "${launcher[@]}")
+fi
 if [[ -n "${ACAD_FAILFAST_OBSERVER:-}" ]]; then
     test -f "$ACAD_FAILFAST_OBSERVER"
-    bash scripts/launch-autocad.sh "${launch_args[@]}" > "$ACAD_LOGDIR/launcher.txt" 2>&1 &
+    "${launcher[@]}" > "$ACAD_LOGDIR/launcher.txt" 2>&1 &
     launcher_pid=$!
     if read -r -p 'Wait for AutoCAD to open, then press Enter here before the file operation. '; then
         observer_rc=0
@@ -99,7 +122,7 @@ if [[ -n "${ACAD_FAILFAST_OBSERVER:-}" ]]; then
     fi
     wait "$launcher_pid" || rc=$?
 else
-    bash scripts/launch-autocad.sh "${launch_args[@]}" > "$ACAD_LOGDIR/launcher.txt" 2>&1 || rc=$?
+    "${launcher[@]}" > "$ACAD_LOGDIR/launcher.txt" 2>&1 || rc=$?
 fi
 printf 'variant=%s trial=%s launcher_exit=%s\n' "$1" "$2" "$rc"
 if [[ -n "$probe_dwg" ]]; then
@@ -110,6 +133,39 @@ if [[ -n "$probe_dwg" ]]; then
     else
         echo 'dwg_copy_after=changed'
     fi
+fi
+if [[ -n "$dwg_io_trace" ]]; then
+    python3 - "$dwg_io_trace" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+trace = Path(sys.argv[1])
+if not trace.is_file():
+    print("dwg_io_trace=missing")
+    raise SystemExit(0)
+
+syscall = re.compile(r"^\s*(?:\d+\s+)?(?:(\w+)\(|<\.\.\. (\w+) resumed>)")
+result = re.compile(r"\)\s+=\s+(0x[0-9a-f]+|-?[0-9]+)(?=\s|$)", re.I)
+opens = errors = reads = read_bytes = mappings = 0
+with trace.open(encoding="utf-8", errors="replace") as stream:
+    for line in stream:
+        call, status = syscall.match(line), result.search(line)
+        if not call or not status:
+            continue
+        name = call[1] or call[2]
+        value = int(status[1], 0)
+        if name in {"open", "openat", "openat2"}:
+            opens += value >= 0
+            errors += value < 0
+        elif name == "mmap":
+            mappings += value >= 0
+        elif value > 0:
+            reads += 1
+            read_bytes += value
+print(f"dwg_open_ok={opens} dwg_open_failed={errors} dwg_read_ok={reads} "
+      f"dwg_read_bytes={read_bytes} dwg_mmap_ok={mappings}")
+PY
 fi
 shopt -s nullglob
 logs=("$ACAD_LOGDIR"/acad-*.log)

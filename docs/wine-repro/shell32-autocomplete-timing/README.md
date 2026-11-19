@@ -366,6 +366,36 @@ compare that write path with Save As to isolate the operation that fails.
 If AutoCAD stays on its start screen and never opens the startup DWG,
 the startup argument trial is inconclusive.
 
+In the first startup trial, the maintainer used a DWG already known to
+open on Windows. AutoCAD exited during loading with `0xc0000409` at
+`coreclr.dll+0x14922d`, the same address as the earlier command trials.
+The summary counted zero TrueView loads and zero `RegLoadAppKey` stub
+calls. The paired command trial with this exact DWG is still open.
+
+### Measure reads of the startup DWG
+
+Trace the same startup trial on the same baseline prefix with `strace`
+installed. The helper prints only the file's six-byte DWG format code
+when it matches `AC` followed by four digits, the file size and counts
+of file operations. `AC1032` is the AutoCAD 2018 DWG format, and
+`AC1027` is the 2013 format. The header identifies the format generation.
+It gives no indication of damage, drawing classes or external references.
+[Autodesk format codes](https://www.autodesk.com/support/technical/article/caas/sfdcarticles/sfdcarticles/drawing-version-codes-for-autocad.html)
+
+~~~bash
+unset ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
+export ACAD_DWG_IO=1
+bash scripts/trace-autocad-dwg.sh baseline startup-open "$ACAD_DWG_FIXTURE"
+~~~
+
+The system-call filter follows the launcher and its children on Linux
+and selects the scratch DWG by its exact path. A positive read count
+establishes that bytes were read. A successful mapping establishes
+that the file was mapped. Neither result establishes that the drawing
+parsed or opened. If opening fails before bytes are read or a mapping
+is recorded, check path handling and the startup sequence first. Compare
+the fail-fast signature with the untraced trial. Raw traces are private.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the
