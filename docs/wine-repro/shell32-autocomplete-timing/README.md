@@ -152,3 +152,34 @@ in a fresh prefix there. Both i686 runs on Windows 10 completed.
 
 The [runtime candidate](../../../patches/candidates/shell32-autocomplete-responsive/README.md)
 records the paired comparison and the AutoCAD test procedure.
+
+## AutoCAD 2027 follow-up
+
+On 2026-11-19 the maintainer reported that editing the filename worked
+with the v2 candidate. AutoCAD still crashed on saving and when opening
+an existing DWG. The paired application run and a crash trace for this
+build are pending.
+
+Keep the candidate and baseline Winum runtimes on the same MSXML3
+build and reuse the two prepared test prefixes. Run one operation per
+launch with FILEDIA set to 0. Save a scratch drawing under a new name
+and test Open separately with a known-good DWG. If an operation only
+crashes with the dialog enabled, run it again with FILEDIA set to 1.
+
+From the winum checkout, use the shared launcher with an existing
+`ACAD_AUTOCOMPLETE_WORK`:
+
+~~~bash
+bash scripts/trace-autocad-dwg.sh candidate save-0
+~~~
+
+Use `baseline` for the matching control and `open-0`, `save-1` or
+`open-1` for those operations. Set FILEDIA in AutoCAD as printed at
+startup. After each launch return the script's summary and, for Save
+As, whether the new file appeared before the crash.
+
+The trace uses Wine SEH and DLL load channels in acad.exe. Raw logs
+stay in the private run directory. The summary includes exception
+codes, addresses and module names. It checks whether the unhandled
+address matches the previously recorded fail-fast site in
+D3DCompiler_47_cor3.dll at offset 0x11922d.
