@@ -7,8 +7,8 @@ edit window's message handler and gathers the full list. This
 program observes the Windows implementation with its own edit
 window, without launching AutoCAD or enumerating the filesystem.
 
-Each case creates a fresh edit and initializes `IAutoComplete2`
-with autosuggest and autoappend. The program sends one synthetic
+Each autocomplete case creates a fresh edit and initializes `IAutoComplete2`
+with autosuggest and autoappend. The program starts with one synthetic
 character, pumps the UI, and summarizes callbacks. The source is
 finite, reports the number of strings produced and returns
 `S_FALSE` when it runs out.
@@ -118,20 +118,47 @@ An apartment lookup failure is itself a result. Interface query counts
 and apartment type show what the provider can observe. They do not
 identify the implementation of Windows autocomplete.
 
-Use the same [offline VM procedure](#offline-windows-10) and return the
-same three text files from a fresh directory. The outcomes determine
-whether a COM worker using an ordinary proxy can reproduce the measured
-callback behavior for the plain object. If autocomplete differs from
-that control, measure a provider owned by a separate STA and supplied
-through an explicit proxy before choosing a worker design. Before a
-runtime change, also measure what happens to in-flight `Next` calls
-when input changes, autocomplete is disabled or the edit is destroyed.
-
 In a Linux x86_64 check with winum-11.22-1 and the v2 runtime candidate,
 the explicit marshaling controls both returned `S_FALSE`. The plain
 provider received `Next` on the original STA, and the free-threaded
-provider received it on the MTA worker. Windows results for the new
-controls are pending.
+provider received it on the MTA worker.
+
+On 2026-11-19, both Windows 10 VM executables from
+[`33ee610`](https://github.com/Harvi654/winum/actions/runs/44619793847)
+exited with code 0. The explicit controls agreed on both architectures.
+The plain provider received `Next` on the UI main STA (type 3).
+The free-threaded provider received it on the MTA worker (type 1).
+For autocomplete, all `Next` calls in the four cases ran off the UI.
+The first callback in every case reported a separate STA (type 0,
+qualifier 0). The providers observed zero `IMarshal` and `IAgileObject`
+queries. A normal COM transfer therefore gave different callback
+placement for the plain provider. The counters do not reveal how
+autocomplete obtained that behavior.
+
+### Separate provider STA and in-flight calls
+
+`separate-sta` creates the plain provider on its own STA, marshals
+`IEnumString` from there into the edit STA and passes the resulting
+proxy to `IAutoComplete2::Init`. The owner pumps messages throughout
+the case. `on_provider_owner` counts actual calls on the owner and
+distinguishes it from both the edit thread and an autocomplete worker.
+
+The three `*-during-next` cases hold the first input-triggered `Next`
+until the edit action returns or the 1.5 second wait expires. They use
+a local plain provider with alternating `a` and `b` suggestions.
+The edit handles exactly one action: replace the selected input with
+`b`, disable autocomplete, or destroy the edit window. The summary
+records whether the held call was active when the action started and
+returned, how many calls had started at those points, the hold's wait
+result, and the final edit prefix. `hold_wait=0` is event signaled and
+`hold_wait=258` is timeout. Timings locate a possible synchronous wait.
+They are not exact expectations for a regression test.
+
+Use the same [offline VM procedure](#offline-windows-10) and return the
+same three text files from a fresh directory. These cases distinguish
+delivery to a real STA proxy from delivery to the original in-process
+fixture. The action results show which calls and completion messages a
+worker must handle when the edit stops using its current results.
 
 ## Wine regression test
 
