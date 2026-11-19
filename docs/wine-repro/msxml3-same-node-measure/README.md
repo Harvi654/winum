@@ -40,16 +40,39 @@ Its `msxml3-same-node-l1` artifact contains `run-tests.bat`. The
 standalone MEASURE establishes Windows behavior. L1 on the Wine test
 is recorded after that test reflects the measurements.
 
+## Windows 10 result (2026-11-19)
+
+The maintainer ran the offline bundle from `81a3a91`. x86_64 and
+i686 both exited 0. All 16 case records are identical after the
+architecture banner.
+
+| Parent | Operation | Return | Tree after the call |
+| --- | --- | --- | --- |
+| Element | replaceChild | `S_OK` | Two children, same last child, parent and XML |
+| Element | insertBefore | `S_OK` | Two children, same last child, parent and XML |
+| Document | replaceChild on the root element | `S_OK` | One child, same root, parent and XML |
+| Document | insertBefore on the root element | `E_FAIL` | One child, same root, parent and XML |
+
+For successful calls with an output pointer, the returned object has the
+child's COM identity. With separately retrieved interfaces, Windows gave
+different `IXMLDOMNode` pointers for the same child and the same
+`IUnknown` identity. Wine uses independent wrapper identities for
+element accesses. The revised regression test checks that the return
+matches the relevant input wrapper and verifies the same tree outcome.
+Leaving the insertBefore same-child guard after the type check preserves
+the measured `E_FAIL` for the root. The runtime hunks are unchanged.
+This is the MEASURE result. L1 for the revised Wine test is pending.
+
 ## AutoCAD 2027 comparison on Arch
 
 Use the installed winum 11.22-1 for the baseline and the
-[PR #4 runtime artifact](https://github.com/Harvi654/winum/actions/runs/44528762825)
-for the candidate. The baseline Wine patch set is identical to
+[PR #4 runtime artifact](https://github.com/Harvi654/winum/actions/runs/44528762825/artifacts/14533394848)
+for the candidate. Build `aeb7a59` completed on Wine 11.22 with WoW64. The baseline Wine patch set is identical to
 `winum-11.22-1`. The test branch adds only the contributor's MSXML
 patch to the normal runtime. The candidate tarball uses the same
 filename as the stable build, so unpack it in a separate directory.
 
-Once the artifact appears, run this from your winum checkout:
+Run this from your winum checkout:
 
 ```bash
 export MSXML_BASE="$HOME/.local/share/winum/winum-11.22-1-x86_64"
@@ -135,8 +158,8 @@ the trace counts and the size change.
 - At the document root, node_insert_before checks child type before
   the new same-node guard. The existing single-element check sees the
   root already in the document and can reject inserting it before
-  itself. The Windows fixture includes this case. Confirm the native
-  result before changing the guard or scope.
+  itself. The Windows fixture confirms that this check must remain
+  before the guard.
 - A generated `__pycache__/check.cpython-311.pyc` from another topic
   appears in the PR diff and should be excluded. The current commit
   author uses the contributor's handle and GitHub noreply address.
