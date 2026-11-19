@@ -207,10 +207,24 @@ Passed on 2026-11-19 in the maintainer's offline Windows 10 VM using the
 from `5d308e9`. Both x86_64 and i686 ran 10 checks with zero failures,
 zero skips and process exit code 0. This covers the Wine test itself
 as well as the earlier MEASURE result for the empty source.
-The two extended lifecycle cases still need their own offline L1 run.
+
+### L1 result for the extended lifecycle test
+
+The [extended test bundle](https://github.com/Harvi654/winum/actions/runs/44623001615)
+from `d02aa0b` passed in the offline Windows 10 VM on 2026-11-19.
+Both x86_64 and i686 ran 34 checks with zero failures, zero skips,
+zero todos and zero flaky checks. Both executables exited with code 0.
+
 In the x86_64 Linux replay on the v2 runtime, the extended test ran
 34 checks with three expected todos, zero failures and zero skips.
 Both edit actions ran after the held callback returned.
+
+The lifecycle assertions are ready to check a new runtime. Standard COM
+proxy delivery can route `Next` back to the edit STA. Calling an
+arbitrary STA provider directly from a worker would instead bypass its
+COM apartment boundary. The measured lifecycle behavior defines when
+the edit must stop using a result. The callback transport for a
+Windows-compatible implementation remains open.
 
 ### Wine baseline
 
