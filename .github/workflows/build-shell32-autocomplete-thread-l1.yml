@@ -1,0 +1,34 @@
+name: Build shell32 autocomplete threading L1 bundle
+
+on:
+  push:
+    branches: ['topic/shell32-autocomplete-measure']
+    paths:
+      - '.github/workflows/build-shell32-autocomplete-thread-l1.yml'
+      - 'scripts/build-l1-shell32-autocomplete-thread.sh'
+      - 'patches/tests-first/shell32-tests-autocomplete-thread.patch'
+      - 'wine/version.env'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    steps:
+      - name: MinGW (official Arch repositories)
+        run: pacman -Syu --noconfirm --needed git mingw-w64-gcc
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build and verify the Windows test bundle
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash scripts/build-l1-shell32-autocomplete-thread.sh out/autocomplete-thread-l1
+          cd out/autocomplete-thread-l1
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: autocomplete-thread-l1
+          path: out/autocomplete-thread-l1/
+          retention-days: 30

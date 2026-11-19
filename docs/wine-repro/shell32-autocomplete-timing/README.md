@@ -67,4 +67,60 @@ bash scripts/build-measure-bundle.sh "$AUTOCOMPLETE_MEASURE_OUT" \
 (cd "$AUTOCOMPLETE_MEASURE_OUT" && sha256sum -c SHA256SUMS)
 ```
 
-Windows results are pending. No runtime patch is included here.
+## Windows 10 results
+
+Measured on 2026-11-19 in the maintainer's offline VM using the
+[MEASURE bundle](https://github.com/Harvi654/winum/actions/runs/44548426145)
+from `d297048`. Both executables exited with code 0.
+`WM_CHAR` returned within the tick counter's resolution (reported
+0 ms), with no `Next` callbacks before input or inside the
+input message. All the observed `Next` callbacks ran off the thread
+that owned the edit window.
+
+| Source | `Next` calls (x86_64 / i686) | End of source (x86_64 / i686) | UI replies during `Next` (x86_64 / i686) |
+| --- | ---: | --- | ---: |
+| Empty | 1 / 1 | `S_FALSE` / `S_FALSE` | 0 / 0 |
+| Fast, 1,024 items | 1,001 / 1,001 | No `S_FALSE` observed in either run | 0 / 0 |
+| Slow, standard marshaling | 123 / 122 | Call still active at sampling in both runs | 60 / 62 |
+| Slow, free-threaded marshaling | 123 / 123 | Call still active at sampling in both runs | 61 / 58 |
+
+Both architectures requested one item per call, reset the source once
+per case and did not call `Clone`. In the fast case both returned 1,001
+items, with no call still active at sampling. This is an observation
+for that source, prefix and option set. The measurement does not
+establish a general enumeration limit. The slow cases establish that
+the edit window could respond before the source finished.
+
+Wine 11.22 calls `enumerate_strings()` inline from `autocomplete_text()`
+on the edit thread when it needs to refresh its suggestion list. A
+slow source can therefore hold up the input handler. This explains
+how the dialog could stop responding during the repeated
+`IsNetDrive` calls in the AutoCAD 2027 trace. Whether that source
+would finish and whether moving or rescheduling callbacks fixes the
+dialog still need separate confirmation in AutoCAD.
+
+## Wine regression test
+
+`patches/tests-first/shell32-tests-autocomplete-thread.patch` adds the
+`shell32:autocomplete_thread` test to Wine 11.22. It uses the empty
+source case and checks that autocomplete calls `Next` after input on a
+thread other than the one owning the edit. It uses a time limit only
+to stop waiting for a missing callback. It does not assert an input
+duration or a suggestion limit.
+
+To build the same Wine test for both architectures with MinGW:
+
+```bash
+export AUTOCOMPLETE_L1_OUT="$PWD/l1-shell32-autocomplete-thread"
+bash scripts/build-l1-shell32-autocomplete-thread.sh "$AUTOCOMPLETE_L1_OUT"
+(cd "$AUTOCOMPLETE_L1_OUT" && sha256sum -c SHA256SUMS)
+```
+
+Copy the verified folder to a new directory in the offline Windows 10
+VM and double-click `run-tests.bat`. Leave the mouse and keyboard idle
+while the test windows are open. Return `result-shell32-autocomplete-thread-x86_64.txt`,
+`result-shell32-autocomplete-thread-i686.txt` and `exitcodes.txt`.
+
+The MEASURE results establish the expected behavior. The Wine test's
+own Windows run (L1) is pending. The test-only patch leaves the Wine
+runtime unchanged.
