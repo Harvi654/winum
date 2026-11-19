@@ -316,8 +316,55 @@ The summary includes managed exception types if the runtime reports
 them through the event log or debug output. For an
 unhandled exception, the summary reports the image and offset
 when the fault address falls within a recorded loaded image range.
-It also checks for the previously recorded fail-fast site in
-D3DCompiler_47_cor3.dll at offset 0x11922d.
+The original report used a D3DCompiler-relative offset. The newer
+image-range traces place this failure inside CoreCLR.
+
+### Compare startup DWG loading with the OPEN command
+
+[Inventor PR #28](https://github.com/Harvi654/Autodesk-Inventor-for-Linux/pull/28)
+handles first startup of `dwgviewr.exe`, the TrueView OLE server used by
+Inventor's sketch command Insert AutoCAD file. It seeds the viewer's
+per-user registry and supplies the native `d3dcompiler_47.dll` required by
+the prefix override. The PR also uses the winum PR #4 MSXML3 fix for
+the viewer's profile loop. Inventor's File > Open uses its own DWG/DXF
+wizard. The AutoCAD failure above occurred in `acad.exe`, with a mapped
+CoreCLR fail-fast address and the MSXML3 fix already present. The
+comparison counts TrueView loads and `RegLoadAppKey` stub calls to check
+the possible startup overlap. It prints only process counts and public
+module names. The two shader compiler filenames are distinct DLLs.
+
+Use the existing baseline prefix copy and the same test runtime for
+both runs. Choose a small DWG that opens normally in Windows. The helper
+stages a new scratch copy in the test prefix's C: drive for each run.
+Disable the earlier optional collectors for this comparison.
+
+~~~bash
+export ACAD_DWG_FIXTURE="$HOME/path/to/known-good.dwg"
+unset ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
+bash scripts/trace-autocad-dwg.sh baseline startup-open "$ACAD_DWG_FIXTURE"
+~~~
+
+The launcher passes the scratch DWG as a startup argument. Record whether
+the drawing itself opens. If it opens, make a small edit and run `._QSAVE`
+once. Record whether AutoCAD survives that operation, then close it.
+The summary says whether the scratch DWG changed. A changed file alone
+does not establish a successful save or reopen.
+
+Then start a fresh AutoCAD process on the same baseline with:
+
+~~~bash
+bash scripts/trace-autocad-dwg.sh baseline open-0 "$ACAD_DWG_FIXTURE"
+~~~
+
+Set `FILEDIA` to 0, run `._OPEN` with the Windows path printed by the
+helper and record whether it opens. Return only the two summaries and
+the visible result of each action. If startup opens the drawing but
+the command fails, compare command dispatch and document activation.
+If both opening paths fail with the same signature, investigate the
+shared DWG loading path. If startup opens the drawing and QSAVE succeeds,
+compare that write path with Save As to isolate the operation that fails.
+If AutoCAD stays on its start screen and never opens the startup DWG,
+the startup argument trial is inconclusive.
 
 ### Capture the fail-fast reason
 

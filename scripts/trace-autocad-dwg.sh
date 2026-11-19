@@ -3,9 +3,17 @@
 set -euo pipefail
 umask 077
 
-if [[ $# != 2 || ! "$1" =~ ^(candidate|baseline)$ || ! "$2" =~ ^(idle|(save|open)-[01])$ ]]; then
+usage() {
     echo 'Usage: trace-autocad-dwg.sh candidate|baseline idle|save-0|open-0|save-1|open-1' >&2
+    echo '       trace-autocad-dwg.sh candidate|baseline startup-open|open-0 KNOWN_GOOD_DWG' >&2
     exit 2
+}
+
+[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|(save|open)-[01]|startup-open)$ ]] || usage
+if [[ "$2" == startup-open ]]; then
+    [[ $# == 3 ]] || usage
+elif [[ $# == 3 && "$2" != open-0 ]]; then
+    usage
 fi
 
 work="$(realpath -e "$ACAD_AUTOCOMPLETE_WORK")"
@@ -30,7 +38,7 @@ export WINE="$ACAD_WINE_BIN/wine"
 export WINESERVER="$ACAD_WINE_BIN/wineserver"
 export WINELOADER="$WINE"
 export ACAD_LOGDIR="$(mktemp -d "$work/dwg-$1-$2.XXXXXXXX")"
-export WINEDEBUG='-all,+pid,acad.exe:+seh,acad.exe:+loaddll,acad.exe:+module,acad.exe:+eventlog'
+export WINEDEBUG='-all,+pid,acad.exe:+seh,acad.exe:+loaddll,acad.exe:+module,acad.exe:+eventlog,acad.exe:fixme+reg,dwgviewr.exe:+loaddll,dwgviewr.exe:fixme+reg'
 cd "${ACAD_REPO:-$HOME/autocad-on-linux}"
 test -x "$WINE"
 test -f scripts/launch-autocad.sh
@@ -47,11 +55,27 @@ if ! bash -c '
     exit 1
 fi
 
-if [[ "$2" == idle ]]; then
+launch_args=()
+probe_dwg=
+if [[ $# == 3 ]]; then
+    test -f "$3" && test -s "$3" || { echo 'A nonempty local DWG is required.' >&2; exit 2; }
+    test "$(realpath -e "$ACAD_PREFIX/drive_c")" = "$ACAD_PREFIX/drive_c"
+    probe_dir="$(mktemp -d "$ACAD_PREFIX/drive_c/winum-dwg.XXXXXXXX")"
+    probe_dwg="$probe_dir/probe.dwg"
+    cp -- "$3" "$probe_dwg"
+    probe_hash="$(sha256sum < "$probe_dwg")"
+    probe_path="C:\\${probe_dir##*/}\\probe.dwg"
+fi
+
+if [[ "$2" == startup-open ]]; then
+    launch_args=("$probe_path")
+    printf 'Opening a scratch DWG at startup. If the drawing opens, edit it, run QSAVE, then close AutoCAD.\n'
+elif [[ "$2" == idle ]]; then
     printf 'Starting %s. Stay on the AutoCAD start screen for 60 seconds, then close AutoCAD.\n' "$1"
 else
     printf 'Starting %s. Set FILEDIA to %s and try %s once. Close AutoCAD after the trial.\n' \
         "$1" "${2##*-}" "${2%%-*}"
+    if [[ -n "$probe_dwg" ]]; then printf 'Path for OPEN: %s\n' "$probe_path"; fi
 fi
 eventpipe_dir=
 if [[ "${ACAD_EVENTPIPE:-0}" == 1 ]]; then
@@ -66,7 +90,7 @@ fi
 rc=0
 if [[ -n "${ACAD_FAILFAST_OBSERVER:-}" ]]; then
     test -f "$ACAD_FAILFAST_OBSERVER"
-    bash scripts/launch-autocad.sh > "$ACAD_LOGDIR/launcher.txt" 2>&1 &
+    bash scripts/launch-autocad.sh "${launch_args[@]}" > "$ACAD_LOGDIR/launcher.txt" 2>&1 &
     launcher_pid=$!
     if read -r -p 'Wait for AutoCAD to open, then press Enter here before the file operation. '; then
         observer_rc=0
@@ -75,9 +99,18 @@ if [[ -n "${ACAD_FAILFAST_OBSERVER:-}" ]]; then
     fi
     wait "$launcher_pid" || rc=$?
 else
-    bash scripts/launch-autocad.sh > "$ACAD_LOGDIR/launcher.txt" 2>&1 || rc=$?
+    bash scripts/launch-autocad.sh "${launch_args[@]}" > "$ACAD_LOGDIR/launcher.txt" 2>&1 || rc=$?
 fi
 printf 'variant=%s trial=%s launcher_exit=%s\n' "$1" "$2" "$rc"
+if [[ -n "$probe_dwg" ]]; then
+    if [[ ! -f "$probe_dwg" ]]; then
+        echo 'dwg_copy_after=missing'
+    elif [[ "$(sha256sum < "$probe_dwg")" == "$probe_hash" ]]; then
+        echo 'dwg_copy_after=unchanged'
+    else
+        echo 'dwg_copy_after=changed'
+    fi
+fi
 shopt -s nullglob
 logs=("$ACAD_LOGDIR"/acad-*.log)
 if [[ "${#logs[@]}" != 1 ]]; then
@@ -88,7 +121,7 @@ fi
 # Only print module names and numeric exception fields. In particular,
 # keep the Windows paths and debugger preamble inside the private run directory.
 python3 - "${logs[0]}" "$eventpipe_dir" <<'PY'
-from collections import deque
+from collections import Counter, deque
 import mmap
 from pathlib import Path
 import re
@@ -98,7 +131,9 @@ prefix = re.compile(r"^([0-9a-f]+):([0-9a-f]+):", re.I)
 mapped = re.compile(r'\bmapping PE file L?"[^"]*[\\/]([a-z0-9_.-]+)" at (0x[0-9a-f]+)-(0x[0-9a-f]+)', re.I)
 loaded = re.compile(r'\bLoaded L?"([^"]*[\\/]([a-z0-9_.-]+))" at (?:0x)?([0-9a-f]+): (\w+)', re.I)
 unloaded = re.compile(r'\b(?:unloading|unloaded module) L?"([^"]+)"', re.I)
-known_modules = {"shell32.dll", "d3dcompiler_47_cor3.dll", "wpfgfx_cor3.dll"}
+known_modules = {"coreclr.dll", "clr.dll", "shell32.dll", "msxml3.dll",
+                 "d3dcompiler_47.dll", "d3dcompiler_47_cor3.dll", "wpfgfx_cor3.dll"}
+reg_load_appkey = re.compile(r":fixme:reg:RegLoadAppKey[AW]\b")
 idle_trace_types = (
     "System.IO.FileNotFoundException",
     "System.ServiceModel.EndpointNotFoundException",
@@ -157,7 +192,9 @@ def eventpipe_summary(folder, pid):
 
 modules = {}
 acad_pids = set()
+trueview_pids = set()
 clr_pids = set()
+reg_loads = Counter()
 regions = {}
 active = {}
 recent = deque(maxlen=8)
@@ -172,6 +209,8 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
     for line in log:
         ids = prefix.match(line)
         pid, tid = ids.groups() if ids else ("?", "?")
+        if reg_load_appkey.search(line):
+            reg_loads[pid] += 1
         if ":trace:module:map_image_into_view " in line and (match := mapped.search(line)):
             name, start, end = match.groups()
             regions[pid, int(start, 16)] = (name.lower(), int(end, 16))
@@ -182,6 +221,8 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
                 if pid != "?":
                     if name == "acad.exe":
                         acad_pids.add(pid)
+                    elif name == "dwgviewr.exe":
+                        trueview_pids.add(pid)
                     elif name == "coreclr.dll":
                         clr_pids.add(pid)
                 if name in known_modules:
@@ -214,6 +255,9 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
 
 for (pid, module), (base, kind) in sorted(modules.items()):
     print(f"loaded pid={pid} module={module} base=0x{base:x} kind={kind}")
+print(f"trueview_processes={len(trueview_pids)}")
+print(f"reg_load_appkey_acad={sum(reg_loads[pid] for pid in acad_pids)} "
+      f"reg_load_appkey_trueview={sum(reg_loads[pid] for pid in trueview_pids)}")
 for pid, tid, code, flags, addr in recent:
     print(f"exception pid={pid} tid={tid} code=0x{code} flags=0x{flags} address=0x{addr}")
 for pid, tid, code, flags, addr, image in fatal:
