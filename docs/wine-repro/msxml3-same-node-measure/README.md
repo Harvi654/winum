@@ -162,6 +162,40 @@ reproduce, the same file name and a stack in MSXML parsing are still
 insufficient to identify the same write loop. Compare the behavior,
 the trace counts and the size change.
 
+## AutoCAD 2027 observation (2026-11-19)
+
+The maintainer's first comparison started from an already enlarged
+profile (11,453,600 bytes). Both variants retained that size and
+exited 1. This pair does not test whether the candidate prevents
+growth on a healthy profile.
+
+A separate copy of the after-install backup was started three times
+with the candidate runtime `aeb7a59`. Runtime selection was verified
+and Wine's builtin msxml3 was loaded each time.
+
+| Start | Initial bytes | Final and peak bytes | Profile saves in trace | Replace calls in trace | Exit |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | 25,501 | 49,311 | 3 | 1 | 9 |
+| 2 | 49,311 | 49,311 | 6 | 2 | 255 |
+| 3 | 49,311 | 49,311 | 0 | 0 | 1 |
+
+The maintainer reported that the application reached a more normal UI
+and felt faster. No sustained profile growth was observed despite
+recorded saves on the first two starts. The trace counts calls and
+does not identify whether their two arguments are aliases. This is
+a positive application observation for the profile, with no paired
+healthy baseline and with the saving failures still open. The
+after-install reference was never launched.
+
+To see whether the reference and test copy are both readable XML and
+whether their `AcApData` counts differ, run the watcher in read-only
+mode. Send only the summaries. Keep the full profile files private.
+
+```bash
+python3 -I "$ACAD_PROFILE_WATCH" "$ACAD_CLEAN_SOURCE" --profile-only
+python3 -I "$ACAD_PROFILE_WATCH" "$ACAD_CLEAN_TEST" --profile-only
+```
+
 ## Wine 11.22 result for the first test build
 
 [Run 44528763253](https://github.com/Harvi654/winum/actions/runs/44528763253)

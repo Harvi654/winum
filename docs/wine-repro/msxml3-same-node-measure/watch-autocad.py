@@ -9,6 +9,7 @@ import re
 import subprocess
 from threading import Thread
 import time
+from xml.etree import ElementTree
 
 GROWTH_LIMIT = 64 * 1024 * 1024
 MSXML_CALL = re.compile(r":trace:msxml:([a-z_]+)\b", re.IGNORECASE)
@@ -56,6 +57,23 @@ def profiles(prefix):
                 except FileNotFoundError:
                     pass
     return sizes
+
+
+def verify_profiles(prefix):
+    found = sorted(profiles(prefix).items())
+    print(f"profiles={len(found)}")
+    status = 0
+    for index, (path, size) in enumerate(found, 1):
+        elements = 0
+        try:
+            for _, element in ElementTree.iterparse(path, events=("end",)):
+                elements += element.tag.rsplit("}", 1)[-1] == "AcApData"
+                element.clear()
+            print(f"profile={index} bytes={size} xml=valid acapdata={elements}")
+        except ElementTree.ParseError as error:
+            print(f"profile={index} bytes={size} xml=invalid line={error.position[0]} acapdata_seen={elements}")
+            status = 1
+    return status
 
 
 def trace_summary(stream, counts):
@@ -163,11 +181,22 @@ def run(prefix, runtime, launcher, log_dir):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("test_prefix", type=Path)
-    parser.add_argument("runtime", type=Path)
+    parser.add_argument("runtime", type=Path, nargs="?")
+    parser.add_argument("--profile-only", action="store_true", help="read Profile.aws XML without starting AutoCAD")
     parser.add_argument("--launcher", type=Path, help="start through the project's scripts/launch-autocad.sh")
     parser.add_argument("--log-dir", type=Path, help="fresh launcher log directory to summarize if needed")
     args = parser.parse_args()
     prefix = args.test_prefix.resolve()
+    if args.profile_only:
+        if not (prefix / "drive_c").is_dir():
+            parser.error("no drive_c in the supplied prefix")
+        try:
+            return verify_profiles(prefix)
+        except OSError:
+            print("Profile read failed")
+            return 2
+    if not args.runtime:
+        parser.error("a Wine runtime is required for a launch")
     if prefix == (Path.home() / ".wine-autocad2027").resolve():
         parser.error("supply a test copy of .wine-autocad2027")
     try:
