@@ -53,7 +53,6 @@ export WINESERVER="$runtime/bin/wineserver"
 export WINELOADER="$WINE"
 export WINEDEBUG=-all
 export WINEDLLOVERRIDES='mscoree,mshtml='
-export XDG_CACHE_HOME="$work/cache"
 source_id="$(git -C "$repo" rev-parse HEAD)"
 printf 'source=%s\nruntime=%s\n' "$source_id" "$release" > "$out/BUILDINFO"
 sha256sum "$candidate" | awk '{print "candidate_sha256=" $1}' >> "$out/BUILDINFO"
@@ -61,6 +60,7 @@ sha256sum "$candidate" | awk '{print "candidate_sha256=" $1}' >> "$out/BUILDINFO
 for variant in baseline candidate; do
     (
         export WINEPREFIX="$work/prefix-$variant"
+        export XDG_CACHE_HOME="$work/cache-$variant"
         logs="$work/logs-$variant"
         mkdir "$logs"
         for arch in x86_64 i386; do
@@ -91,7 +91,8 @@ for variant in baseline candidate; do
                 "$WINEPREFIX/drive_c/windows/$prefix_dll/shell32.dll"
             cmp "$runtime/lib/wine/$arch-windows/shell32.dll" \
                 "$WINEPREFIX/drive_c/windows/$prefix_dll/shell32.dll"
-            executable="$dlldir/tests/$arch-windows/shell32_test.exe"
+            executable="$src/build/$dlldir/tests/$arch-windows/shell32_test.exe"
+            mkdir "$work/run-$variant-$arch"
             units="$out/units-$variant-$arch.txt"
             timeout -k 5 60 "$WINE" "$executable" --list > "$work/list-$variant-$arch.log" 2>&1
             sed -nE 's/^    ([[:alnum:]_]+)\r?$/\1/p' "$work/list-$variant-$arch.log" > "$units"
@@ -100,7 +101,8 @@ for variant in baseline candidate; do
             while IFS= read -r unit; do
                 echo "$variant $arch $unit"
                 log="$logs/shell32.$arch.$unit.log"
-                timeout -k 5 120 "$WINE" "$executable" "$unit" > "$log" 2>&1 || printf 'exit=%s\n' "$?" >> "$log"
+                (cd "$work/run-$variant-$arch" && timeout -k 5 120 "$WINE" "$executable" "$unit") \
+                    > "$log" 2>&1 || printf 'exit=%s\n' "$?" >> "$log"
             done < "$units"
         done
         python3 "$repo/scripts/compare-tests.py" summarize "$logs" > "$out/results-$variant-shell32.json"
