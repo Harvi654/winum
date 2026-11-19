@@ -137,13 +137,17 @@ python3 -I "$ACAD_PROFILE_WATCH" "$ACAD_BASE_PREFIX" "$MSXML_BASE"
 python3 -I "$ACAD_PROFILE_WATCH" "$ACAD_PR4_PREFIX" "$MSXML_CANDIDATE"
 ```
 
-To use the local AutoCAD launcher instead, give the watcher
-`--launcher "$HOME/autocad-on-linux/scripts/launch-autocad.sh"`. It runs
-the launcher from its project root and exports the selected Wine,
-wineserver and test prefix. If the launcher has its own prefix or Wine
-selector, configure it to use those same paths. Use `--log-dir` with a
-fresh log directory if the launcher redirects Wine traces there. A
-missing MSXML load trace leaves the DLL selection unverified.
+The maintainer's local `scripts/launch-autocad.sh` reads
+`common-env.sh`, sources Inventor's `scripts/lib/common.sh`, starts
+the Autodesk services and redirects Wine into `$ACAD_LOGDIR/acad-*.log`.
+To keep that launch path, export `WINEPREFIX` and `INV_PREFIX` to the
+same test copy, `INV_WINE=system`, and the selected Wine's `bin` first
+in `PATH`. Use a fresh `ACAD_LOGDIR` and give the watcher both
+`--launcher "$HOME/autocad-on-linux/scripts/launch-autocad.sh"` and
+`--log-dir "$ACAD_LOGDIR"`. Before actual launch, source the same two
+environment files in a subshell and verify the effective prefix, Wine
+path and log directory. A missing MSXML load trace leaves the DLL
+selection unverified.
 
 The watcher reports size counts for `Profile.aws`, the largest size,
 growth from the starting state, the exit code and selected MSXML
@@ -156,6 +160,17 @@ reproduce the issue, the comparison is a smoke test. If it does
 reproduce, the same file name and a stack in MSXML parsing are still
 insufficient to identify the same write loop. Compare the behavior,
 the trace counts and the size change.
+
+## Wine 11.22 result for the first test build
+
+[Run 44528763253](https://github.com/Harvi654/winum/actions/runs/44528763253)
+at `aeb7a59` found no new failures across 14 suite/architecture pairs.
+On both x86_64 and i386, domdoc changed from six failures in the
+submitted regression checks to zero. Each variant reported two
+existing xmlview failures per architecture. This run used the
+contributor's original regression test. The Windows-informed test
+revision is covered by the separate
+[run 44534917242](https://github.com/Harvi654/winum/actions/runs/44534917242).
 
 ## Review and merge gates
 
