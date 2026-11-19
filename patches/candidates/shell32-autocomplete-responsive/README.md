@@ -1,5 +1,9 @@
 # Shell32 autocomplete responsiveness candidate
 
+The maintainer approved keeping v2 with a known deviation on 2026-11-19.
+The [patch page](../../../docs/patches/shell32-autocomplete-responsive.md)
+records the decision, validation and open Windows compatibility follow-up.
+
 AutoCAD 2027 can stop responding while typing a file name with
 FILEDIA enabled. The trace found repeated drive queries while the
 edit's autocomplete source was being enumerated. See the
@@ -15,9 +19,9 @@ expands the source for the new path.
 
 The candidate calls the source on the edit thread to keep it in the
 same COM apartment. Windows 10 called the measured sources on another
-thread. The thread assertion therefore remains todo_wine. The
-candidate remains blocked for the duration of any single Reset, Expand
-or Next call. A long list can still take time to populate.
+thread. The thread assertion and two held-callback lifecycle checks
+remain `todo_wine`. A single Reset, Expand or Next call can block the
+edit thread. A long list can still take time to populate.
 
 ## Validation on 2026-11-19
 

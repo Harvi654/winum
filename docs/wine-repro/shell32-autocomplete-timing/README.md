@@ -7,6 +7,9 @@ edit window's message handler and gathers the full list. This
 program observes the Windows implementation with its own edit
 window, without launching AutoCAD or enumerating the filesystem.
 
+The [patch page](../../patches/shell32-autocomplete-responsive.md) records
+the approved v2 deviation and where to resume compatibility work.
+
 Each autocomplete case creates a fresh edit and initializes `IAutoComplete2`
 with autosuggest and autoappend. The program starts with one synthetic
 character, pumps the UI, and summarizes callbacks. The source is
