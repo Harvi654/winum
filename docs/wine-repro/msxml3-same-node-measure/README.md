@@ -140,14 +140,15 @@ python3 -I "$ACAD_PROFILE_WATCH" "$ACAD_PR4_PREFIX" "$MSXML_CANDIDATE"
 The maintainer's local `scripts/launch-autocad.sh` reads
 `common-env.sh`, sources Inventor's `scripts/lib/common.sh`, starts
 the Autodesk services and redirects Wine into `$ACAD_LOGDIR/acad-*.log`.
-To keep that launch path, export `WINEPREFIX` and `INV_PREFIX` to the
-same test copy, `INV_WINE=system`, and the selected Wine's `bin` first
-in `PATH`. Use a fresh `ACAD_LOGDIR` and give the watcher both
+On the maintainer's machine, the setup replaced the requested prefix
+and both Wine paths. Give the watcher both
 `--launcher "$HOME/autocad-on-linux/scripts/launch-autocad.sh"` and
-`--log-dir "$ACAD_LOGDIR"`. Before actual launch, source the same two
-environment files in a subshell and verify the effective prefix, Wine
-path and log directory. A missing MSXML load trace leaves the DLL
-selection unverified.
+`--log-dir` with a fresh directory. It runs the reviewed launcher
+with test-specific values after `common-env.sh` and before the common
+library derives paths. It verifies the effective prefix, C: directory,
+Wine executables and log directory before running the startup commands.
+The launcher file on disk stays as supplied. A missing MSXML load
+trace leaves the DLL selection unverified.
 
 The watcher reports size counts for `Profile.aws`, the largest size,
 growth from the starting state, the exit code and selected MSXML

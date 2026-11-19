@@ -12,6 +12,36 @@ import time
 
 GROWTH_LIMIT = 64 * 1024 * 1024
 MSXML_CALL = re.compile(r":trace:msxml:([a-z_]+)\b", re.IGNORECASE)
+LAUNCHER_SETUP = """source "$(dirname "$(readlink -f "$0")")/common-env.sh"
+cd "$INVENTOR_DIR"
+source scripts/lib/common.sh
+"""
+TEST_SETUP = r"""source "$(dirname "$(readlink -f "$0")")/common-env.sh" || exit 2
+export WINEPREFIX="$WINUM_ACAD_TEST_PREFIX"
+export INV_PREFIX="$WINUM_ACAD_TEST_PREFIX"
+export INV_WINE=system
+export PATH="$WINUM_ACAD_TEST_RUNTIME/bin:$PATH"
+export WINE="$WINUM_ACAD_TEST_RUNTIME/bin/wine"
+export WINELOADER="$WINE"
+export WINESERVER="$WINUM_ACAD_TEST_RUNTIME/bin/wineserver"
+export ACAD_LOGDIR="$WINUM_ACAD_TEST_LOGDIR"
+export INV_LOGDIR="$ACAD_LOGDIR"
+export WINEDEBUG="$WINUM_ACAD_TEST_DEBUG"
+cd "$INVENTOR_DIR" || exit 2
+source scripts/lib/common.sh || exit 2
+if [ "$(readlink -f "$WINEPREFIX")" != "$WINUM_ACAD_TEST_PREFIX" ] ||
+   [ "$(readlink -f "$P_C")" != "$WINUM_ACAD_TEST_PREFIX/drive_c" ] ||
+   [ "$(type -t wine)" != file ] ||
+   [ "$(readlink -f "$(type -P wine)")" != "$(readlink -f "$WINUM_ACAD_TEST_RUNTIME/bin/wine")" ] ||
+   [ "$(type -t wineserver)" != file ] ||
+   [ "$(readlink -f "$(type -P wineserver)")" != "$(readlink -f "$WINUM_ACAD_TEST_RUNTIME/bin/wineserver")" ] ||
+   [ "$(readlink -f "$ACAD_LOGDIR")" != "$WINUM_ACAD_TEST_LOGDIR" ]; then
+    echo launcher_test_paths=MISMATCH
+    exit 2
+fi
+echo launcher_test_paths=OK
+"""
+
 
 
 def profiles(prefix):
@@ -32,6 +62,8 @@ def trace_summary(stream, counts):
     with stream:
         for line in stream:
             text = line.lower()
+            if text.strip() in ("launcher_test_paths=ok", "launcher_test_paths=mismatch"):
+                counts["launcher_test_paths_" + text.strip().split("=", 1)[1]] += 1
             if ":loaddll:" in text and "msxml3.dll" in text:
                 dll_kind = text.rsplit(":", 1)[-1].strip()
                 if dll_kind in ("builtin", "native"):
@@ -48,6 +80,15 @@ def trace_summary(stream, counts):
 def stop_test_server(runtime, env):
     subprocess.run([runtime / "bin/wineserver", "-k"], env=env, check=True,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+
+
+def launcher_command(launcher):
+    source = launcher.read_text()
+    executable = next((line for line in source.splitlines() if line.strip() and not line.lstrip().startswith("#")), "")
+    if source.count(LAUNCHER_SETUP) != 1 or executable != LAUNCHER_SETUP.splitlines()[0]:
+        raise ValueError("The launcher's initial setup differs from the reviewed AutoCAD launcher")
+    # Keep $0 and the working directory as in the original invocation.
+    return ["bash", "-c", source.replace(LAUNCHER_SETUP, TEST_SETUP, 1), launcher]
 
 
 def run(prefix, runtime, launcher, log_dir):
@@ -69,7 +110,11 @@ def run(prefix, runtime, launcher, log_dir):
                PATH=f"{runtime / 'bin'}{os.pathsep}{os.environ.get('PATH', '')}",
                WINEDEBUG="-all,acad.exe:+pid,acad.exe:+loaddll,acad.exe:+msxml")
     if launcher:
-        command = ["bash", launcher]
+        if not log_dir or not log_dir.is_dir():
+            raise ValueError("Supply a fresh --log-dir for the AutoCAD launcher")
+        env.update(WINUM_ACAD_TEST_PREFIX=str(prefix), WINUM_ACAD_TEST_RUNTIME=str(runtime),
+                   WINUM_ACAD_TEST_LOGDIR=str(log_dir.resolve()), WINUM_ACAD_TEST_DEBUG=env["WINEDEBUG"])
+        command = launcher_command(launcher)
         cwd = launcher.parent.parent
     else:
         command = [runtime / "bin/wine", exe]
