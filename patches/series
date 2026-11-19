@@ -83,3 +83,6 @@ ole32-createfromfile-package.patch
 ole32-storage-localdocs.patch
 ole32-propset-null-strings.patch
 packager-save-view-advise.patch
+
+# Autocomplete v2 full-build validation only
+shell32-autocomplete-responsive.patch
