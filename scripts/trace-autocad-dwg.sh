@@ -5,12 +5,12 @@ umask 077
 
 usage() {
     echo 'Usage: trace-autocad-dwg.sh candidate|baseline idle|save-0|open-0|save-1|open-1' >&2
-    echo '       trace-autocad-dwg.sh candidate|baseline startup-open|startup-safe|startup-wpf-software|core-open|open-0 KNOWN_GOOD_DWG' >&2
+    echo '       trace-autocad-dwg.sh candidate|baseline startup-open|startup-safe|startup-wpf-software|core-open|open-events|open-0 KNOWN_GOOD_DWG' >&2
     exit 2
 }
 
-[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|(save|open)-[01]|startup-(open|safe|wpf-software)|core-open)$ ]] || usage
-if [[ "$2" == startup-* || "$2" == core-open ]]; then
+[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|(save|open)-[01]|startup-(open|safe|wpf-software)|core-open|open-events)$ ]] || usage
+if [[ "$2" == startup-* || "$2" == core-open || "$2" == open-events ]]; then
     [[ $# == 3 ]] || usage
 elif [[ $# == 3 && "$2" != open-0 ]]; then
     usage
@@ -81,6 +81,7 @@ restore_wpf_rendering() {
 launch_args=()
 launcher_script=scripts/launch-autocad.sh
 probe_dwg=
+open_events=
 if [[ $# == 3 ]]; then
     test -f "$3" && test -s "$3" || { echo 'A nonempty local DWG is required.' >&2; exit 2; }
     test "$(realpath -e "$ACAD_PREFIX/drive_c")" = "$ACAD_PREFIX/drive_c"
@@ -157,6 +158,13 @@ elif [[ "$2" == startup-wpf-software ]]; then
 elif [[ "$2" == startup-open ]]; then
     launch_args=("$probe_path")
     printf 'Opening a scratch DWG at startup. If the drawing opens, edit it, run QSAVE, then close AutoCAD.\n'
+elif [[ "$2" == open-events ]]; then
+    cp -- "${ACAD_OPEN_EVENTS_LISP:?Set the path to dwg-open-events.lsp}" "$probe_dir/open-events.lsp"
+    open_events="$probe_dir/open-events.txt"
+    probe_slash="C:/${probe_dir##*/}"
+    echo 'Create a blank drawing, set FILEDIA to 0, then paste this AutoLISP line:'
+    printf '(progn (load "%s/open-events.lsp") (winum-open-trace "%s/open-events.txt"))\n' "$probe_slash" "$probe_slash"
+    printf 'Run ._REGEN, then ._OPEN with this path: %s\n' "$probe_path"
 elif [[ "$2" == idle ]]; then
     printf 'Starting %s. Stay on the AutoCAD start screen for 60 seconds, then close AutoCAD.\n' "$1"
 else
@@ -208,6 +216,20 @@ if [[ -n "$probe_dwg" ]]; then
         echo 'dwg_copy_after=unchanged'
     else
         echo 'dwg_copy_after=changed'
+    fi
+fi
+if [[ -n "$open_events" ]]; then
+    if [[ -s "$open_events" ]]; then
+        awk '{
+            sub(/\r$/, "")
+            event = tolower($0)
+            if (event ~ /^(reactors_ready|control_regen|command_open|:vlr-(begindwgopen|dwgfileopened|enddwgopen|documentcreated|documenttobeactivated|documentbecamecurrent))$/) {
+                print "open_event=" event
+                seen = 1
+            }
+        } END { if (!seen) print "open_event=unconfirmed" }' "$open_events"
+    else
+        echo 'open_event=unconfirmed'
     fi
 fi
 if [[ -n "$dwg_io_trace" ]]; then

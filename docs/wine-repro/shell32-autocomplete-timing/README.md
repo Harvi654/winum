@@ -568,6 +568,39 @@ would focus that reproducer on the window sequence. If both pass, the
 basic managed file and window paths have a passing control and the
 AutoCAD-specific desktop document activation remains open.
 
+On 2026-11-20, both probes from
+[build 44637686908](https://github.com/Harvi654/winum/actions/runs/44637686908)
+ran on the maintainer's test prefix with .NET 10.0.0. Each caught the
+controlled missing-file exception, read all 27,982 bytes of the DWG,
+reported completion and exited with code 0. The WPF probe rendered
+both windows. The passing controls cover basic exception handling,
+managed file I/O and a WPF window sequence in that prefix.
+
+### Record desktop OPEN events
+
+Use the same baseline prefix and the 2018 line drawing. The helper
+stages `dwg-open-events.lsp` in the scratch directory. It registers
+transient command, DWG and document-manager reactors from the active
+AutoLISP namespace. Each callback writes one known name to the scratch
+log and closes it. It reads no document properties. Logging is limited
+to callbacks delivered to that namespace. An absent event after a
+document switch cannot establish that the application skipped that step.
+[DWG reactors](https://help.autodesk.com/cloudhelp/2025/DEU/AutoCAD-MAC-AutoLISP-Reference/files/GUID-82B7F0D1-02AD-4463-A8A3-BF87EFCC83A4.htm)
+· [Document manager reactors](https://help.autodesk.com/cloudhelp/2018/PTB/AutoCAD-AutoLISP-Reference/files/GUID-6C371938-A51E-43C8-B4A7-365A595DAB11.htm)
+
+~~~bash
+export ACAD_OPEN_EVENTS_LISP="$PWD/docs/wine-repro/shell32-autocomplete-timing/dwg-open-events.lsp"
+unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
+bash scripts/trace-autocad-dwg.sh baseline open-events "$ACAD_DWG_CONTROLS/line-2018.dwg"
+~~~
+
+Create a blank drawing and set `FILEDIA` to 0. Paste the AutoLISP line
+printed by the helper. If AutoCAD blocks the load, report that result.
+Run `._REGEN` to confirm command callbacks in the starting document,
+then run `._OPEN` with the printed path. Return `variant=`, the
+`open_event=` lines and `fault_module=`. Compare the fault signature with
+the previous `OPEN` runs before interpreting the event sequence.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the
