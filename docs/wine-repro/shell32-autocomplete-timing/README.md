@@ -396,6 +396,54 @@ parsed or opened. If opening fails before bytes are read or a mapping
 is recorded, check path handling and the startup sequence first. Compare
 the fail-fast signature with the untraced trial. Raw traces are private.
 
+The maintainer's traced startup trial on 2026-11-19 used an `AC1018`
+DWG of 4,145,388 bytes. The traced processes completed seven reads of
+the exact scratch file, totaling 4,853 bytes. There were no matching
+open or mapping calls in the filtered trace. The reads establish that
+the startup reached the drawing data. Their total can include repeated
+reads of the same offsets. The Wine log recorded `0xc0000409` at
+`coreclr.dll+0x14922d` before the trace collector was stopped manually.
+The launcher exit code 137 describes the collector stop. The scratch
+DWG hash remained unchanged.
+
+### Compare small DWGs in two format generations
+
+Use LibreDWG's public `Line.dwg` fixtures in the 2004 (`AC1018`) and
+2018 (`AC1032`) formats. The accompanying `Line.txt` records show the
+same line endpoints. This controls for the sample's visible geometry
+while comparing two format generations and removes the original
+4 MB drawing's complexity from the test. Their full drawing databases
+can differ. The original drawing is the sample confirmed to open in
+the maintainer's Windows installation.
+
+~~~bash
+export ACAD_DWG_CONTROLS="${ACAD_AUTOCOMPLETE_WORK:?Set the test work directory}/dwg-controls"
+export ACAD_DWG_CONTROLS_REF=47b67c0c5e0b4b33a65c6acea8f26b3e21ac5386
+unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
+
+(
+    set -euo pipefail
+    mkdir -p -- "$ACAD_DWG_CONTROLS"
+    cd "$ACAD_DWG_CONTROLS"
+    for version in 2004 2018; do
+        curl -fsSL "https://raw.githubusercontent.com/LibreDWG/libredwg/$ACAD_DWG_CONTROLS_REF/test/test-data/$version/Line.dwg" \
+            -o "line-$version.dwg"
+    done
+    sha256sum -c <<'SUMS'
+60c86e1d4f038a3f1755d15bd22710c34608900957af61282432e4719b730c24  line-2004.dwg
+1f4edd4c11aaf28b3295fd69fa59376f9cb911c637aa47a6073408ecac4797a3  line-2018.dwg
+SUMS
+)
+~~~
+
+Run `startup-open` once for each control with the same baseline prefix.
+Check whether the line drawing appears, then close AutoCAD. Compare
+the header and fault site for each run. If the small 2004 drawing opens,
+the legacy generation can load in this configuration. If both controls
+fail at the same site, prioritize their common loading or document
+activation path. An outcome that splits by version suggests comparing
+the legacy and modern paths with additional matched fixtures.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the
