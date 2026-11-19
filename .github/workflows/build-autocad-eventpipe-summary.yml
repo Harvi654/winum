@@ -1,0 +1,53 @@
+name: Build AutoCAD EventPipe summary
+
+on:
+  push:
+    branches: ['topic/shell32-autocomplete-measure']
+    paths:
+      - '.github/workflows/build-autocad-eventpipe-summary.yml'
+      - 'docs/wine-repro/shell32-autocomplete-timing/eventpipe-summary.cs'
+      - 'scripts/summarize-autocad-eventpipe.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build the standalone summary assembly
+        run: |
+          set -euo pipefail
+          export OUT="$GITHUB_WORKSPACE/out"
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 2 --max-time 120 -o sdk.tar.gz \
+            https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.100/dotnet-sdk-10.0.100-linux-x64.tar.gz
+          curl -fsSL --retry 2 --max-time 40 -o traceevent.nupkg \
+            https://api.nuget.org/v3-flatcontainer/microsoft.diagnostics.tracing.traceevent/3.2.8/microsoft.diagnostics.tracing.traceevent.3.2.8.nupkg
+          sha256sum -c <<'EOF'
+          a9631cc6bfad0ef167383ac654b54254bad95a6fb4b6f4309fa78f558055e637  sdk.tar.gz
+          37284f885e75326bbd1858bf19f20c9da2818fec7a3bd49803209209be5fd38d  traceevent.nupkg
+          EOF
+          mkdir sdk "$OUT"
+          tar -xzf sdk.tar.gz -C sdk ./dotnet ./host ./shared/Microsoft.NETCore.App ./sdk/10.0.100/Roslyn/bincore
+          unzip -jq traceevent.nupkg 'lib/netstandard2.0/Microsoft.Diagnostics.Tracing.TraceEvent.dll'
+          export CORE="$PWD/sdk/shared/Microsoft.NETCore.App/10.0.0"
+          ./sdk/dotnet ./sdk/sdk/10.0.100/Roslyn/bincore/csc.dll \
+            -nologo -warnaserror -optimize+ -target:exe -out:"$OUT/eventpipe-summary.dll" \
+            -r:"$CORE/System.Private.CoreLib.dll" -r:"$CORE/System.Runtime.dll" \
+            -r:"$CORE/System.Console.dll" -r:"$CORE/netstandard.dll" \
+            -r:"$CORE/System.Collections.dll" -r:"$CORE/System.Text.RegularExpressions.dll" \
+            -r:Microsoft.Diagnostics.Tracing.TraceEvent.dll \
+            "$GITHUB_WORKSPACE/docs/wine-repro/shell32-autocomplete-timing/eventpipe-summary.cs"
+          printf '%s\n' '{"runtimeOptions":{"tfm":"net10.0","framework":{"name":"Microsoft.NETCore.App","version":"10.0.0"}}}' > "$OUT/eventpipe-summary.runtimeconfig.json"
+          cp "$GITHUB_WORKSPACE/scripts/summarize-autocad-eventpipe.sh" "$GITHUB_WORKSPACE/LICENSE" "$OUT/"
+          cd "$OUT"
+          sha256sum ./* > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: autocad-eventpipe-summary
+          path: out/
+          retention-days: 30

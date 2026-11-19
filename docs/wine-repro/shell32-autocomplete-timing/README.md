@@ -269,4 +269,32 @@ messages and paths and stays local.
 On 2026-11-19, a synthetic program using Windows .NET 10.0.0
 under winum-11.22-1 threw two caught exceptions and then called
 FailFast. Its streamed file retained both expected type names.
-The AutoCAD EventPipe run is pending.
+
+The AutoCAD baseline Open trial reached the same CoreCLR offset and
+produced a trace for the crash process. The string scan found
+`System.IO.FileNotFoundException`,
+`System.ServiceModel.EndpointNotFoundException` and
+`Autodesk.DesktopConnector.API.DesktopConnectorNotInstalledException`.
+Their occurrence on the failing thread was not established by the scan.
+
+### Decode an existing EventPipe trace
+
+The EventPipe summary utility uses TraceEvent to read CLR exception
+events and report elapsed time, the native thread ID and the type.
+When the stream is incomplete after a crash, the utility keeps the
+events parsed before the format error. This was tested with a streamed
+Windows .NET 10 trace from winum whose process terminated by fail-fast.
+
+Download and verify the `autocad-eventpipe-summary` artifact. With
+`ACAD_AUTOCOMPLETE_WORK` set, run its shell script with the hexadecimal
+process ID and thread ID from the existing baseline crash summary.
+For the first baseline EventPipe run:
+
+~~~bash
+bash summarize-autocad-eventpipe.sh 0400 0ae8
+~~~
+
+The script locates the existing trace and uses a verified portable
+.NET runtime and TraceEvent package in a temporary directory. The
+trace stays in the prefix. Return only the summary lines with counts,
+times, thread IDs and types.
