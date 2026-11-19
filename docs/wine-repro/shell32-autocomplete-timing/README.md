@@ -601,6 +601,36 @@ then run `._OPEN` with the printed path. Return `variant=`, the
 `open_event=` lines and `fault_module=`. Compare the fault signature with
 the previous `OPEN` runs before interpreting the event sequence.
 
+On 2026-11-20, the command trial reported `reactors_ready`,
+`control_regen`, and `command_open`, then the known fail-fast at
+`coreclr.dll+0x14922d`. The DWG and document-manager reactors reported
+no further events in the starting namespace. The control proves the
+command reactor was working. It cannot establish the timing of events
+that were not delivered to that namespace.
+
+### Compare the ActiveX document open path
+
+Run `open-activex` with the same baseline, staged file and AutoLISP
+probe. Paste the setup line in a blank drawing and run `._REGEN` as
+before. Paste the second line from the helper in place of typing
+`OPEN`. The probe calls `Documents.Open` directly with the staged path
+and read-write access. It records entry and return and checks the name
+of the returned document. The caller and document reactors remain
+scoped to the active starting namespace.
+[Autodesk ActiveX Open method](https://help.autodesk.com/cloudhelp/2024/ENU/AutoCAD-ActiveX-Reference/files/GUID-9ED7A548-7978-4BFD-8462-E2FA747E8880.htm)
+
+~~~bash
+unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
+bash scripts/trace-autocad-dwg.sh baseline open-activex "$ACAD_DWG_CONTROLS/line-2018.dwg"
+~~~
+
+An `activex_open_enter` marker followed by the same fail-fast would
+reproduce the fault across both desktop entry points. A successful
+`activex_open_expected_dwg` and a visible line drawing would distinguish
+the ActiveX path from the failing command path. A caught `activex_error`
+without the fail-fast is a separate outcome. The prefix still uses
+ordinary AutoCAD licensing and startup.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the

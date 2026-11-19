@@ -36,3 +36,18 @@
           (:vlr-documentToBeActivated . winum-open-event)
           (:vlr-documentBecameCurrent . winum-open-event)))))
   (winum-open-log path "reactors_ready"))
+
+(defun winum-open-activex-document (log drawing / documents document)
+  (setq documents (vla-get-documents (vlax-get-acad-object)))
+  (winum-open-log log "activex_open_enter")
+  (setq document (vla-open documents drawing :vlax-false))
+  (winum-open-log log "activex_open_return")
+  (if (= (strcase (vla-get-name document)) "PROBE.DWG")
+    (winum-open-log log "activex_open_expected_dwg")))
+
+(defun winum-open-activex (log drawing / result)
+  (winum-open-log log "activex_begin")
+  (setq result (vl-catch-all-apply 'winum-open-activex-document (list log drawing)))
+  (if (vl-catch-all-error-p result)
+    (winum-open-log log "activex_error"))
+  (princ))
