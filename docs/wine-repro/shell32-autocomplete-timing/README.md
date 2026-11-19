@@ -474,6 +474,35 @@ fail-fast in the console would extend the failure beyond the desktop
 path. If the executable is missing, it fails its own startup, or the
 script marker is absent, treat the draw-open result as unconfirmed.
 
+On 2026-11-20, the maintainer's Core Console run opened the staged
+27,982-byte `AC1032` file and found one LINE. It exited with code 0 and
+left the DWG unchanged. The filtered module trace recorded builtin
+`msxml3.dll` and `shell32.dll`. It recorded no load of CoreCLR or
+`wpfgfx_cor3.dll` for the console process. The same fixture failed in
+desktop AutoCAD. This shows the file can load on this Wine installation
+through the console path. The process comparison leaves the failing
+desktop component open.
+
+### Repeat desktop loading with AutoCAD safe mode
+
+Use the same 2018 fixture, prefix and Wine runtime. The `startup-safe`
+trial adds only AutoCAD's `/safemode` startup switch to the desktop
+invocation. This temporarily restricts the executable code and add-ins
+AutoCAD can load for the session. A successful open would justify
+isolating the blocked components one at a time. The same fault site
+would keep the shared desktop initialization and its runtime in scope.
+[Autodesk safe-mode switch](https://help.autodesk.com/view/ACD/2027/ENU/?caas=caas%2Fdocumentation%2FACD%2F2014%2FENU%2Ffiles%2FGUID-8E54B6EC-5B52-4F62-B7FC-0D4E1EDF093A-htm.html)
+
+~~~bash
+unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
+bash scripts/trace-autocad-dwg.sh baseline startup-safe "$ACAD_DWG_CONTROLS/line-2018.dwg"
+~~~
+
+Record whether the line drawing appears. If AutoCAD opens it, check the
+read-only `SAFEMODE` system variable and close the program. Return the
+filtered trial and fault lines. A run that reaches only the start screen
+does not establish whether safe mode can open the drawing.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the

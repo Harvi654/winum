@@ -5,12 +5,12 @@ umask 077
 
 usage() {
     echo 'Usage: trace-autocad-dwg.sh candidate|baseline idle|save-0|open-0|save-1|open-1' >&2
-    echo '       trace-autocad-dwg.sh candidate|baseline startup-open|core-open|open-0 KNOWN_GOOD_DWG' >&2
+    echo '       trace-autocad-dwg.sh candidate|baseline startup-open|startup-safe|core-open|open-0 KNOWN_GOOD_DWG' >&2
     exit 2
 }
 
-[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|(save|open)-[01]|startup-open|core-open)$ ]] || usage
-if [[ "$2" == startup-open || "$2" == core-open ]]; then
+[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|(save|open)-[01]|startup-(open|safe)|core-open)$ ]] || usage
+if [[ "$2" == startup-open || "$2" == startup-safe || "$2" == core-open ]]; then
     [[ $# == 3 ]] || usage
 elif [[ $# == 3 && "$2" != open-0 ]]; then
     usage
@@ -104,6 +104,9 @@ if [[ "$2" == core-open ]]; then
         '_.QUIT' > "$probe_dir/probe.scr"
     launch_args=(/i "$probe_path" /s "C:\\${probe_dir##*/}\\probe.scr" /l en-US)
     echo 'Opening the scratch DWG in AutoCAD Core Console.'
+elif [[ "$2" == startup-safe ]]; then
+    launch_args=("$probe_path" /safemode)
+    echo 'Opening the scratch DWG in desktop AutoCAD with /safemode.'
 elif [[ "$2" == startup-open ]]; then
     launch_args=("$probe_path")
     printf 'Opening a scratch DWG at startup. If the drawing opens, edit it, run QSAVE, then close AutoCAD.\n'
