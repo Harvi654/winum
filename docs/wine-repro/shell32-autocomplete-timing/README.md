@@ -180,6 +180,11 @@ same CoreCLR offset. The fail-fast reason was 2
 events included CLR and native C++ exception codes. The first observer
 did not record their thread IDs. No Event Log entries were captured.
 
+The next baseline Save As run also reported reason 2 at
+`coreclr.dll+0x14922d`. The observer captured one first-chance CLR
+exception (0xe0434352) on the failing thread. The event contained no
+parameters, and the run produced no Event Log entries.
+
 Keep the candidate and baseline Winum runtimes on the same MSXML3
 build and reuse the two prepared test prefixes. Run one operation per
 launch with FILEDIA set to 0. Save a scratch drawing under a new name
@@ -238,3 +243,30 @@ Wait for AutoCAD to reach the start screen before pressing Enter in
 the terminal. After `observer_ready=1`, set FILEDIA to 0 and open the
 same test DWG. The observer detaches after two minutes if the process
 is still running.
+
+### Collect runtime exception events
+
+The startup EventPipe session can stream the CLR exception provider
+to a private file when enabled with the documented
+[EventPipe environment settings](https://learn.microsoft.com/en-us/dotnet/core/diagnostics/eventpipe).
+Run the baseline Open trial with the existing launcher and without
+the optional debugger observer:
+
+~~~bash
+unset ACAD_FAILFAST_OBSERVER
+export ACAD_EVENTPIPE=1
+bash scripts/trace-autocad-dwg.sh baseline open-0
+~~~
+
+Use FILEDIA 0 and the same test DWG. Files are written below a new
+private `winum-eventpipe.*` directory inside the test prefix's C:
+drive. The summary selects the file matching the crash process ID.
+It reports possible exception type names from the trace's string
+payloads. These hints do not correlate a type to a specific event
+or thread. Return only the summary. The trace can contain exception
+messages and paths and stays local.
+
+On 2026-11-19, a synthetic program using Windows .NET 10.0.0
+under winum-11.22-1 threw two caught exceptions and then called
+FailFast. Its streamed file retained both expected type names.
+The AutoCAD EventPipe run is pending.

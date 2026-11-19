@@ -49,6 +49,16 @@ fi
 
 printf 'Starting %s. Set FILEDIA to %s and try %s once. Close AutoCAD after the trial.\n' \
     "$1" "${2##*-}" "${2%%-*}"
+eventpipe_dir=
+if [[ "${ACAD_EVENTPIPE:-0}" == 1 ]]; then
+    test "$(realpath -e "$ACAD_PREFIX/drive_c")" = "$ACAD_PREFIX/drive_c"
+    eventpipe_dir="$(mktemp -d "$ACAD_PREFIX/drive_c/winum-eventpipe.XXXXXXXX")"
+    export DOTNET_EnableEventPipe=1
+    export DOTNET_EventPipeOutputStreaming=1
+    export DOTNET_EventPipeCircularMB=20
+    export DOTNET_EventPipeConfig='Microsoft-Windows-DotNETRuntime:8000:5'
+    export DOTNET_EventPipeOutputPath="C:\\${eventpipe_dir##*/}\\events-{pid}.nettrace"
+fi
 rc=0
 if [[ -n "${ACAD_FAILFAST_OBSERVER:-}" ]]; then
     test -f "$ACAD_FAILFAST_OBSERVER"
@@ -73,8 +83,10 @@ fi
 
 # Only print module names and numeric exception fields. In particular,
 # keep the Windows paths and debugger preamble inside the private run directory.
-python3 - "${logs[0]}" <<'PY'
+python3 - "${logs[0]}" "$eventpipe_dir" <<'PY'
 from collections import deque
+import mmap
+from pathlib import Path
 import re
 import sys
 
@@ -89,6 +101,45 @@ stack = re.compile(r"^\s*(?:=>)?\s*\d+\s+0x[0-9a-f]+.*\bin ([a-z0-9_.-]+)"
                    r"(?: \(\+0x([0-9a-f]+)\))? \(0x[0-9a-f]+\)\s*$", re.I)
 managed_type = re.compile(r"\b(?:System|Microsoft)(?:\.[A-Za-z_][A-Za-z0-9_]*)*"
                           r"\.(?:[A-Za-z_][A-Za-z0-9_]*)?Exception\b")
+
+def eventpipe_summary(folder, pid):
+    print(f"eventpipe_files={sum(1 for _ in folder.glob('events-*.nettrace'))}")
+    if pid is None:
+        print("eventpipe_status=no_crash_pid")
+        return
+    trace = folder / f"events-{int(pid, 16)}.nettrace"
+    if not trace.is_file():
+        print("eventpipe_status=missing_for_crash_pid")
+        return
+    size = trace.stat().st_size
+    print(f"eventpipe_trace_bytes={size}")
+    if not size:
+        print("eventpipe_status=empty")
+        return
+
+    # Name hints from the exception-only stream. Match both payload string
+    # encodings without printing messages or inferring per-thread ordering.
+    matches = []
+    with trace.open("rb") as stream, mmap.mmap(stream.fileno(), 0, access=mmap.ACCESS_READ) as data:
+        if data[:8] != b"Nettrace":
+            print("eventpipe_status=unrecognized_header")
+            return
+        for encoding in ("ascii", "utf-16-le"):
+            nul = "\0".encode(encoding)
+            pad = rb"\x00" if encoding == "utf-16-le" else b""
+            namespaces = b"|".join(name.encode(encoding) for name in ("System", "Microsoft", "Autodesk"))
+            separator = rb"[.+]" + pad
+            identifier = rb"[A-Za-z_]" + pad + rb"(?:[A-Za-z0-9_]" + pad + rb")*"
+            ending = "Exception".encode(encoding)
+            pattern = re.compile(rb"(?:" + namespaces + rb")(?:" + separator + identifier
+                                 + rb")*" + separator + rb"(?:" + identifier + rb")?" + ending + nul)
+            tail = deque(pattern.finditer(data), maxlen=24)
+            matches.extend((item.start(), item[0][:-len(nul)].decode(encoding)) for item in tail)
+    types = list(dict.fromkeys(name for _, name in sorted(matches)))[-12:]
+    print(f"eventpipe_exception_hints={len(types)}")
+    for name in types:
+        print(f"eventpipe_exception_hint={name}")
+
 
 modules = {}
 regions = {}
@@ -159,5 +210,8 @@ for name in dict.fromkeys(managed):
     print(f"managed_exception={name}")
 print(f"eventlog_lines={eventlog_lines}")
 print(f"stack_dispatch_failed={int(stack_dispatch_failed)} debugger_unhandled={int(debugger_unhandled)}")
+if sys.argv[2]:
+    pid = fatal[-1][0] if fatal and fatal[-1][0] != "?" else None
+    eventpipe_summary(Path(sys.argv[2]), pid)
 PY
 exit "$rc"
