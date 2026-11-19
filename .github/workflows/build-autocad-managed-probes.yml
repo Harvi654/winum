@@ -1,0 +1,63 @@
+name: Build AutoCAD managed open probes
+
+on:
+  push:
+    branches: ['topic/autocad-dwg-failfast']
+    paths:
+      - '.github/workflows/build-autocad-managed-probes.yml'
+      - 'docs/wine-repro/shell32-autocomplete-timing/managed-open-probe.cs'
+      - 'scripts/run-autocad-managed-probes.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build the two framework-dependent probes
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          export OUT="$GITHUB_WORKSPACE/out"
+          curl -fsSL --retry 2 --max-time 120 -o sdk.tar.gz \
+            https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.100/dotnet-sdk-10.0.100-linux-x64.tar.gz
+          curl -fsSL --retry 2 --max-time 40 -o desktop-ref.nupkg \
+            https://api.nuget.org/v3-flatcontainer/microsoft.windowsdesktop.app.ref/10.0.0/microsoft.windowsdesktop.app.ref.10.0.0.nupkg
+          sha256sum -c <<'SUMS'
+          a9631cc6bfad0ef167383ac654b54254bad95a6fb4b6f4309fa78f558055e637  sdk.tar.gz
+          281659957f92e03fc4518ff45862b75ac7bdae3453e0204e62f2a84121b46a10  desktop-ref.nupkg
+          SUMS
+          mkdir sdk desktop "$OUT"
+          tar -xzf sdk.tar.gz -C sdk ./dotnet ./host ./shared/Microsoft.NETCore.App \
+            ./sdk/10.0.100/Roslyn/bincore ./packs/Microsoft.NETCore.App.Ref/10.0.0/ref/net10.0
+          unzip -jq desktop-ref.nupkg 'ref/net10.0/*.dll' -d desktop
+
+          refs=()
+          for dll in sdk/packs/Microsoft.NETCore.App.Ref/10.0.0/ref/net10.0/*.dll; do
+            [[ "$dll" == */WindowsBase.dll ]] || refs+=(-r:"$dll")
+          done
+          csc=(./sdk/dotnet ./sdk/sdk/10.0.100/Roslyn/bincore/csc.dll -nologo -nostdlib+ \
+            -warnaserror -optimize+ -target:exe "${refs[@]}" \
+            "$GITHUB_WORKSPACE/docs/wine-repro/shell32-autocomplete-timing/managed-open-probe.cs")
+          "${csc[@]}" -out:"$OUT/console.dll"
+          "${csc[@]}" -define:WPF -out:"$OUT/wpf.dll" \
+            -r:desktop/WindowsBase.dll -r:desktop/PresentationCore.dll \
+            -r:desktop/PresentationFramework.dll -r:desktop/System.Xaml.dll
+          printf '%s\n' '{"runtimeOptions":{"tfm":"net10.0","rollForward":"Disable","framework":{"name":"Microsoft.NETCore.App","version":"10.0.0"}}}' > "$OUT/console.runtimeconfig.json"
+          printf '%s\n' '{"runtimeOptions":{"tfm":"net10.0","rollForward":"Disable","framework":{"name":"Microsoft.WindowsDesktop.App","version":"10.0.0"}}}' > "$OUT/wpf.runtimeconfig.json"
+
+          printf 'AC1032 synthetic build check\n' > sample.dwg
+          ./sdk/dotnet "$OUT/console.dll" sample.dwg | tee console-check.txt
+          grep -Fx 'probe_stage=complete' console-check.txt
+          cp "$GITHUB_WORKSPACE/scripts/run-autocad-managed-probes.sh" "$GITHUB_WORKSPACE/LICENSE" "$OUT/"
+          cd "$OUT"
+          sha256sum ./* > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: autocad-managed-open-probes
+          path: out/
+          retention-days: 30

@@ -532,6 +532,42 @@ the WPF software-rendering preference did not change the outcome. A
 successful open warrants repeating the normal startup after restoration
 to test whether the difference follows the setting.
 
+On 2026-11-20, the maintainer confirmed `wpf_registry=software_only`
+and reproduced `0xc0000409` at `coreclr.dll+0x14922d` with launcher
+exit 9. The scratch DWG stayed unchanged and the helper restored the
+value's absence. The rendering preference did not change the failure.
+
+### Compare standalone .NET file I/O with a WPF document window
+
+The managed probe workflow builds two small assemblies from our own
+`managed-open-probe.cs`. Both require the x86_64 Windows .NET 10.0.0
+runtime already in the AutoCAD test prefix. Both catch an expected
+`FileNotFoundException` and read every byte of the same staged
+`AC1032` file. The console control starts with `Microsoft.NETCore.App`.
+The WPF probe starts with `Microsoft.WindowsDesktop.App`, waits until
+its first window renders, reads the file, then renders a second window
+on the same UI thread. Both exit on completion or after a time limit.
+
+Use the `autocad-managed-open-probes` artifact from the
+[managed probes workflow](../../../.github/workflows/build-autocad-managed-probes.yml).
+Close AutoCAD and run this with the existing test work directory:
+
+~~~bash
+export ACAD_MANAGED_BUNDLE="$ACAD_AUTOCOMPLETE_WORK/managed-probes"
+(cd "$ACAD_MANAGED_BUNDLE" && sha256sum -c SHA256SUMS)
+bash "$ACAD_MANAGED_BUNDLE/run-autocad-managed-probes.sh" "$ACAD_DWG_CONTROLS/line-2018.dwg"
+~~~
+
+The runner uses the installed `Program Files\dotnet\dotnet.exe` and
+reports missing host or framework directories without changing them.
+It prints the runtime version, stages reached, file size, process exit
+and the faulting image when the Wine trace contains it. Raw traces stay
+in the private test directory. A shared fault in the console fixture
+would support a smaller CLR or Wine reproducer. A WPF-only failure
+would focus that reproducer on the window sequence. If both pass, the
+basic managed file and window paths have a passing control and the
+AutoCAD-specific desktop document activation remains open.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the
