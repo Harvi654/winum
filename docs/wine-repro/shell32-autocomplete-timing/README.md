@@ -503,6 +503,35 @@ read-only `SAFEMODE` system variable and close the program. Return the
 filtered trial and fault lines. A run that reaches only the start screen
 does not establish whether safe mode can open the drawing.
 
+On 2026-11-20, the maintainer's safe-mode trial failed at the same
+site, `coreclr.dll+0x14922d`, with exception `0xc0000409` and launcher
+exit 9. The staged DWG was unchanged. The trace still recorded CoreCLR
+and `wpfgfx_cor3.dll` loading. Restricting the session's executable
+code by this switch did not resolve the failure.
+
+### Test WPF software rendering in desktop AutoCAD
+
+Use the same 2018 line drawing in a normal desktop startup. The
+`startup-wpf-software` trial sets the copied prefix's
+`HKCU\Software\Microsoft\Avalon.Graphics\DisableHWAcceleration`
+DWORD to `1` and verifies that the setting survives a wineserver
+restart. This tests WPF's renderer preference separately from AutoCAD's
+own graphics settings. The helper restores the previous value or its
+absence when it exits. It requires a default value or no value to make
+the comparison meaningful. Close other apps in the test prefix first.
+[Microsoft's WPF rendering setting](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/graphics-rendering-registry-settings#disable-hardware-acceleration-option)
+
+~~~bash
+unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
+bash scripts/trace-autocad-dwg.sh baseline startup-wpf-software "$ACAD_DWG_CONTROLS/line-2018.dwg"
+~~~
+
+Record whether the line appears, plus `wpf_registry=`, `variant=`,
+`fault_module=` and `wpf_registry_restored=`. If the same fault recurs,
+the WPF software-rendering preference did not change the outcome. A
+successful open warrants repeating the normal startup after restoration
+to test whether the difference follows the setting.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the

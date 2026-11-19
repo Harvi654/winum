@@ -5,12 +5,12 @@ umask 077
 
 usage() {
     echo 'Usage: trace-autocad-dwg.sh candidate|baseline idle|save-0|open-0|save-1|open-1' >&2
-    echo '       trace-autocad-dwg.sh candidate|baseline startup-open|startup-safe|core-open|open-0 KNOWN_GOOD_DWG' >&2
+    echo '       trace-autocad-dwg.sh candidate|baseline startup-open|startup-safe|startup-wpf-software|core-open|open-0 KNOWN_GOOD_DWG' >&2
     exit 2
 }
 
-[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|(save|open)-[01]|startup-(open|safe)|core-open)$ ]] || usage
-if [[ "$2" == startup-open || "$2" == startup-safe || "$2" == core-open ]]; then
+[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|(save|open)-[01]|startup-(open|safe|wpf-software)|core-open)$ ]] || usage
+if [[ "$2" == startup-* || "$2" == core-open ]]; then
     [[ $# == 3 ]] || usage
 elif [[ $# == 3 && "$2" != open-0 ]]; then
     usage
@@ -64,6 +64,20 @@ if ! bash -c '
     exit 1
 fi
 
+restore_wpf_rendering() {
+    if [[ "$wpf_previous" == absent ]]; then
+        if "$WINE" reg delete "$wpf_key" /v DisableHWAcceleration /f > "$ACAD_LOGDIR/wpf-restore.txt" 2>&1; then
+            echo 'wpf_registry_restored=absent'
+        else
+            echo 'wpf_registry_restored=failed'
+        fi
+    elif "$WINE" reg add "$wpf_key" /v DisableHWAcceleration /t REG_DWORD /d "$wpf_previous" /f > "$ACAD_LOGDIR/wpf-restore.txt" 2>&1; then
+        echo 'wpf_registry_restored=0'
+    else
+        echo 'wpf_registry_restored=failed'
+    fi
+}
+
 launch_args=()
 launcher_script=scripts/launch-autocad.sh
 probe_dwg=
@@ -107,6 +121,39 @@ if [[ "$2" == core-open ]]; then
 elif [[ "$2" == startup-safe ]]; then
     launch_args=("$probe_path" /safemode)
     echo 'Opening the scratch DWG in desktop AutoCAD with /safemode.'
+elif [[ "$2" == startup-wpf-software ]]; then
+    launch_args=("$probe_path")
+    wpf_key='HKCU\Software\Microsoft\Avalon.Graphics'
+    wpf_previous=absent
+    if ! "$WINE" reg query 'HKCU\Software\Microsoft' > "$ACAD_LOGDIR/wpf-registry-parent.txt" 2>&1; then
+        echo 'wpf_registry=unavailable' >&2
+        exit 2
+    fi
+    if "$WINE" reg query "$wpf_key" /v DisableHWAcceleration > "$ACAD_LOGDIR/wpf-before.txt" 2>&1; then
+        wpf_previous="$(awk '$1 == "DisableHWAcceleration" && $2 == "REG_DWORD" { sub(/\r$/, "", $3); print $3 }' "$ACAD_LOGDIR/wpf-before.txt")"
+        if [[ "$wpf_previous" != 0x0 ]]; then
+            echo 'wpf_registry=baseline_not_default' >&2
+            exit 2
+        fi
+    elif [[ $? != 1 ]]; then
+        echo 'wpf_registry=unavailable' >&2
+        exit 2
+    fi
+
+    trap restore_wpf_rendering EXIT
+    if ! "$WINE" reg add "$wpf_key" /v DisableHWAcceleration /t REG_DWORD /d 1 /f > "$ACAD_LOGDIR/wpf-set.txt" 2>&1; then
+        echo 'wpf_registry=setup_failed' >&2
+        exit 2
+    fi
+    "$WINESERVER" -k >> "$ACAD_LOGDIR/wpf-set.txt" 2>&1 || true
+    if ! "$WINESERVER" -w >> "$ACAD_LOGDIR/wpf-set.txt" 2>&1 ||
+       ! "$WINE" reg query "$wpf_key" /v DisableHWAcceleration > "$ACAD_LOGDIR/wpf-verify.txt" 2>&1 ||
+       ! grep -Eq '^[[:space:]]*DisableHWAcceleration[[:space:]]+REG_DWORD[[:space:]]+0x1[[:space:]]*$' "$ACAD_LOGDIR/wpf-verify.txt"; then
+        echo 'wpf_registry=setup_failed' >&2
+        exit 2
+    fi
+    echo 'wpf_registry=software_only'
+    echo 'Opening the scratch DWG in desktop AutoCAD with WPF hardware acceleration disabled.'
 elif [[ "$2" == startup-open ]]; then
     launch_args=("$probe_path")
     printf 'Opening a scratch DWG at startup. If the drawing opens, edit it, run QSAVE, then close AutoCAD.\n'
