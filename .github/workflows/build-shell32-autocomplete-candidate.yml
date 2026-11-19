@@ -1,0 +1,64 @@
+name: Build shell32 autocomplete candidate
+
+on:
+  push:
+    branches: ['topic/shell32-autocomplete-measure']
+    paths:
+      - '.github/workflows/build-shell32-autocomplete-candidate.yml'
+      - 'patches/candidates/shell32-autocomplete-responsive/*.patch'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    steps:
+      - name: Dependencies (official Arch repositories)
+        run: pacman -Syu --noconfirm --needed git mingw-w64-gcc
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build both shell32 DLLs against the 11.22 series
+        shell: bash
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          source wine/version.env
+          source scripts/lib/wine-source.sh
+          source scripts/lib/wine-patches.sh
+          export WINE_PINNED_VERSION="$WINE_VERSION"
+          test "$WINE_VERSION" = 11.22
+          export CANDIDATE="$GITHUB_WORKSPACE/patches/candidates/shell32-autocomplete-responsive"
+          export SRC="$RUNNER_TEMP/wine-$WINE_VERSION"
+          export TARBALL="$SRC.tar.xz"
+          curl -fL --retry 3 -o "$TARBALL" "https://dl.winehq.org/wine/source/11.x/wine-$WINE_VERSION.tar.xz"
+          wine_verify_tarball "$TARBALL" "$WINE_VERSION"
+          tar -xf "$TARBALL" -C "$RUNNER_TEMP"
+          wine_apply_patches "$SRC" "$GITHUB_WORKSPACE/patches" "$GITHUB_WORKSPACE" HEAD
+          patch -d "$SRC" -p1 --fuzz=0 < "$CANDIDATE/shell32-autocomplete-responsive.patch"
+          printf '\n/* Modified by winum: shell32-autocomplete-responsive candidate. */\n' >> "$SRC/dlls/shell32/autocomplete.c"
+          mkdir "$SRC/build"
+          cd "$SRC/build"
+          ../configure --enable-archs=x86_64,i386 --disable-tests \
+            --without-x --without-wayland --without-vulkan --without-opengl \
+            --without-freetype --without-fontconfig --without-alsa --without-pulse \
+            > configure.log 2>&1 || { tail -n 45 configure.log; exit 1; }
+          make -j"$(nproc)" dlls/shell32/x86_64-windows/shell32.dll \
+            dlls/shell32/i386-windows/shell32.dll > build.log 2>&1 ||
+            { tail -n 55 build.log; exit 1; }
+          export OUT="$GITHUB_WORKSPACE/out/shell32-autocomplete-candidate"
+          for arch in x86_64 i386; do
+            mkdir -p "$OUT/$arch-windows"
+            cp "dlls/shell32/$arch-windows/shell32.dll" "$OUT/$arch-windows/"
+          done
+          cp "$SRC/COPYING.LIB" "$SRC/PATCHES.txt" "$CANDIDATE/shell32-autocomplete-responsive.patch" "$OUT/"
+          printf 'winum 11.22-1 shell32 candidate\nSource https://github.com/%s/tree/%s\n' \
+            "$GITHUB_REPOSITORY" "$GITHUB_SHA" > "$OUT/BUILDINFO"
+          cd "$OUT"
+          sha256sum BUILDINFO COPYING.LIB PATCHES.txt ./*.patch ./*-windows/shell32.dll > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: shell32-autocomplete-candidate
+          path: out/shell32-autocomplete-candidate/
+          retention-days: 30

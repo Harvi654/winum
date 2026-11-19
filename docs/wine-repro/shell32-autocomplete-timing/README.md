@@ -149,3 +149,6 @@ The local winum baseline is x86_64 only. The i686 test and MEASURE
 executables failed to start in that Linux environment and yielded no
 assertion results. The built-in 32-bit `cmd.exe` also failed to start
 in a fresh prefix there. Both i686 runs on Windows 10 completed.
+
+The [runtime candidate](../../../patches/candidates/shell32-autocomplete-responsive/README.md)
+records the paired comparison and the AutoCAD test procedure.
