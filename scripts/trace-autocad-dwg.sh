@@ -50,7 +50,19 @@ fi
 printf 'Starting %s. Set FILEDIA to %s and try %s once. Close AutoCAD after the trial.\n' \
     "$1" "${2##*-}" "${2%%-*}"
 rc=0
-bash scripts/launch-autocad.sh > "$ACAD_LOGDIR/launcher.txt" 2>&1 || rc=$?
+if [[ -n "${ACAD_FAILFAST_OBSERVER:-}" ]]; then
+    test -f "$ACAD_FAILFAST_OBSERVER"
+    bash scripts/launch-autocad.sh > "$ACAD_LOGDIR/launcher.txt" 2>&1 &
+    launcher_pid=$!
+    if read -r -p 'Wait for AutoCAD to open, then press Enter here before the file operation. '; then
+        observer_rc=0
+        "$WINE" "$ACAD_FAILFAST_OBSERVER" --autocad 2>"$ACAD_LOGDIR/observer-stderr.txt" || observer_rc=$?
+        printf 'observer_exit=%s\n' "$observer_rc"
+    fi
+    wait "$launcher_pid" || rc=$?
+else
+    bash scripts/launch-autocad.sh > "$ACAD_LOGDIR/launcher.txt" 2>&1 || rc=$?
+fi
 printf 'variant=%s trial=%s launcher_exit=%s\n' "$1" "$2" "$rc"
 shopt -s nullglob
 logs=("$ACAD_LOGDIR"/acad-*.log)
