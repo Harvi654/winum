@@ -7,7 +7,16 @@
 #include <string.h>
 
 #define FAIL_FAST_STATUS 0xc0000409u
+#define CLR_EXCEPTION_STATUS 0xe0434352u
 #define AUTOCAD_TIMEOUT_MS 120000u
+#define EXCEPTION_HISTORY_SIZE 128u
+
+struct exception_event
+{
+    DWORD thread, code;
+    BOOL has_parameter;
+    ULONG_PTR parameter;
+};
 
 static DWORD autocad_pid(void)
 {
@@ -34,10 +43,34 @@ static DWORD autocad_pid(void)
     return matches == 1 ? pid : 0;
 }
 
+static void report_preceding(const struct exception_event *history, unsigned int count, DWORD thread)
+{
+    const struct exception_event *selected[8];
+    unsigned int available = min(count, EXCEPTION_HISTORY_SIZE);
+    unsigned int i, size = 0;
+
+    for (i = 0; i < available && size < sizeof(selected) / sizeof(*selected); ++i)
+    {
+        const struct exception_event *entry = &history[(count - i - 1) % EXCEPTION_HISTORY_SIZE];
+
+        if (entry->thread == thread) selected[size++] = entry;
+    }
+    printf("same_thread_exceptions=%u\n", size);
+    while (size)
+    {
+        const struct exception_event *entry = selected[--size];
+
+        printf("preceding_exception=0x%08lx", (unsigned long)entry->code);
+        if (entry->code == CLR_EXCEPTION_STATUS && entry->has_parameter)
+            printf(" parameter0=0x%llx", (unsigned long long)entry->parameter);
+        putchar('\n');
+    }
+}
+
 static int observe(DWORD pid, DWORD timeout, BOOL self_test)
 {
     ULONGLONG end = GetTickCount64() + timeout, now;
-    DWORD preceding[8] = {0};
+    struct exception_event preceding[EXCEPTION_HISTORY_SIZE] = {0};
     unsigned int count = 0;
     BOOL initial_breakpoint = TRUE, saw_termination = FALSE, saw_test_reason = FALSE;
 
@@ -60,6 +93,14 @@ static int observe(DWORD pid, DWORD timeout, BOOL self_test)
             case LOAD_DLL_DEBUG_EVENT:
                 if (event.u.LoadDll.hFile) CloseHandle(event.u.LoadDll.hFile);
                 break;
+            case EXIT_THREAD_DEBUG_EVENT:
+            {
+                unsigned int i;
+
+                for (i = 0; i < EXCEPTION_HISTORY_SIZE; ++i)
+                    if (preceding[i].thread == event.dwThreadId) preceding[i].thread = 0;
+                break;
+            }
             case EXCEPTION_DEBUG_EVENT:
             {
                 const EXCEPTION_RECORD *rec = &event.u.Exception.ExceptionRecord;
@@ -74,17 +115,21 @@ static int observe(DWORD pid, DWORD timeout, BOOL self_test)
                 }
                 disposition = DBG_EXCEPTION_NOT_HANDLED;
                 if (first_chance)
-                    preceding[count++ % (sizeof(preceding) / sizeof(*preceding))] = code;
+                {
+                    struct exception_event *entry = &preceding[count++ % EXCEPTION_HISTORY_SIZE];
+
+                    entry->thread = event.dwThreadId;
+                    entry->code = code;
+                    entry->has_parameter = rec->NumberParameters != 0;
+                    entry->parameter = entry->has_parameter ? rec->ExceptionInformation[0] : 0;
+                }
                 else
                 {
-                    unsigned int size = sizeof(preceding) / sizeof(*preceding);
-                    unsigned int first = count > size ? count - size : 0, i;
-
                     saw_termination = TRUE;
-                    for (i = first; i < count; ++i)
-                        printf("preceding_exception=0x%08lx\n", (unsigned long)preceding[i % size]);
-                    printf("last_chance=0x%08lx flags=0x%lx address=0x%llx parameters=%lu\n",
+                    report_preceding(preceding, count, event.dwThreadId);
+                    printf("last_chance=0x%08lx flags=0x%lx tid=0x%lx address=0x%llx parameters=%lu\n",
                            (unsigned long)code, (unsigned long)rec->ExceptionFlags,
+                           (unsigned long)event.dwThreadId,
                            (unsigned long long)(ULONG_PTR)rec->ExceptionAddress,
                            (unsigned long)rec->NumberParameters);
                     if (code == FAIL_FAST_STATUS && rec->NumberParameters)

@@ -174,6 +174,12 @@ The baseline reproduces both crashes without the autocomplete
 candidate. All four failures reached the same CoreCLR address relative
 to the image base. The triggering condition is still unknown.
 
+A second baseline Open run with the debug-event observer reached the
+same CoreCLR offset. The fail-fast reason was 2
+(`FAST_FAIL_STACK_COOKIE_CHECK_FAILURE`). The preceding process-wide
+events included CLR and native C++ exception codes. The first observer
+did not record their thread IDs. No Event Log entries were captured.
+
 Keep the candidate and baseline Winum runtimes on the same MSXML3
 build and reuse the two prepared test prefixes. Run one operation per
 launch with FILEDIA set to 0. Save a scratch drawing under a new name
@@ -206,16 +212,20 @@ D3DCompiler_47_cor3.dll at offset 0x11922d.
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the
 first exception parameter. The terminal SEH message omits it. The
 observer reads Win32 debug events to recover that parameter and the
-preceding exception codes. It does not read process memory or use
-vendor symbols. Attaching sets the process's debugger flag, so compare
-the resulting fault module and offset with the previous run.
+preceding exception codes on the failing thread. For CLR exception
+events it also reports the first numeric argument. The observer does
+not read process memory or use vendor symbols. Attaching sets the
+process's debugger flag, so compare the resulting fault module and
+offset with the previous run.
 
 Build with `scripts/build-measure-bundle.sh` and the
 `docs/wine-repro/shell32-autocomplete-timing/failfast.list` manifest.
 With no arguments, each executable runs a self-test that observes a
 numeric fail-fast reason from its own child process. On winum-11.22-1,
 the x86_64 self-test and a separate attach to a synthetic process both
-reported reason 7 and the expected exit status. In the offline
+reported reason 7 and the expected exit status. A two-thread synthetic
+check of the updated observer reported only the argument from the
+thread that issued fail-fast. In the offline
 Windows VM, run the two self-tests with `run-measure.bat`. For AutoCAD,
 use the x86_64 executable with the existing trace script:
 
