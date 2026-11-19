@@ -16,7 +16,7 @@ on:
         required: false
         default: ''
   push:
-    branches: ['test-run/**']
+    branches: ['test-run/**', '!test-run/shell32-autocomplete-responsive-1']
 
 permissions:
   contents: read

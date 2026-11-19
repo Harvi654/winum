@@ -1,0 +1,33 @@
+name: Test shell32 autocomplete baseline and candidate
+
+on:
+  push:
+    branches: ['test-run/shell32-autocomplete-responsive-1']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shell32:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 55
+    steps:
+      - name: Dependencies (official Arch repositories)
+        run: |
+          pacman -Syu --noconfirm --needed git python mingw-w64-gcc xorg-server-xvfb \
+            libx11 libxext libxi libxrandr libxrender libxcursor libxcomposite libxinerama \
+            libxxf86vm libxkbcommon fontconfig freetype2 ttf-dejavu libglvnd mesa \
+            wayland gnutls alsa-lib libpulse krb5 dbus
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Run the whole shell32 suite in both architectures
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash scripts/test-shell32-autocomplete-l2.sh out
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: shell32-autocomplete-l2
+          path: out/
+          retention-days: 30
