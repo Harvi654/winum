@@ -157,8 +157,12 @@ records the paired comparison and the AutoCAD test procedure.
 
 On 2026-11-19 the maintainer reported that editing the filename worked
 with the v2 candidate. AutoCAD still crashed on saving and when opening
-an existing DWG. The paired application run and a crash trace for this
-build are pending.
+an existing DWG. The candidate's first Save As trial with FILEDIA set
+to 0 exited with code 9 and raised unhandled exception 0xc0000409 with
+flags 0x1. The fault address did not match the known offset from the
+reported D3DCompiler DLL load address. The original trace did not
+include image ranges, so the faulting module and the state of the
+output file remain unconfirmed. The baseline and Open trials are pending.
 
 Keep the candidate and baseline Winum runtimes on the same MSXML3
 build and reuse the two prepared test prefixes. Run one operation per
@@ -178,8 +182,9 @@ Use `baseline` for the matching control and `open-0`, `save-1` or
 startup. After each launch return the script's summary and, for Save
 As, whether the new file appeared before the crash.
 
-The trace uses Wine SEH and DLL load channels in acad.exe. Raw logs
-stay in the private run directory. The summary includes exception
-codes, addresses and module names. It checks whether the unhandled
-address matches the previously recorded fail-fast site in
+The trace uses Wine SEH, DLL load and module mapping channels in
+acad.exe. Raw logs stay in the private run directory. For an
+unhandled exception, the summary reports the image and offset
+when the fault address falls within a recorded loaded image range.
+It also checks for the previously recorded fail-fast site in
 D3DCompiler_47_cor3.dll at offset 0x11922d.

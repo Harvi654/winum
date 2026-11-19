@@ -30,7 +30,7 @@ export WINE="$ACAD_WINE_BIN/wine"
 export WINESERVER="$ACAD_WINE_BIN/wineserver"
 export WINELOADER="$WINE"
 export ACAD_LOGDIR="$(mktemp -d "$work/dwg-$1-$2.XXXXXXXX")"
-export WINEDEBUG='-all,+pid,acad.exe:+seh,acad.exe:+loaddll'
+export WINEDEBUG='-all,+pid,acad.exe:+seh,acad.exe:+loaddll,acad.exe:+module'
 cd "${ACAD_REPO:-$HOME/autocad-on-linux}"
 test -x "$WINE"
 test -f scripts/launch-autocad.sh
@@ -67,7 +67,9 @@ import re
 import sys
 
 prefix = re.compile(r"^([0-9a-f]+):([0-9a-f]+):", re.I)
-loaded = re.compile(r'\bLoaded L?"[^"]*[\\/]([a-z0-9_.-]+)" at (?:0x)?([0-9a-f]+): (\w+)', re.I)
+mapped = re.compile(r'\bmapping PE file L?"[^"]*[\\/]([a-z0-9_.-]+)" at (0x[0-9a-f]+)-(0x[0-9a-f]+)', re.I)
+loaded = re.compile(r'\bLoaded L?"([^"]*[\\/]([a-z0-9_.-]+))" at (?:0x)?([0-9a-f]+): (\w+)', re.I)
+unloaded = re.compile(r'\b(?:unloading|unloaded module) L?"([^"]+)"', re.I)
 known_modules = {"shell32.dll", "d3dcompiler_47_cor3.dll", "wpfgfx_cor3.dll"}
 unhandled = re.compile(r"Unhandled exception code ([0-9a-f]+) flags ([0-9a-f]+) addr (?:0x)?([0-9a-f]+)", re.I)
 exception = re.compile(r"\bcode=(?:0x)?([0-9a-f]+) flags=(?:0x)?([0-9a-f]+) addr=(?:0x)?([0-9a-f]+)", re.I)
@@ -75,6 +77,8 @@ stack = re.compile(r"^\s*(?:=>)?\s*\d+\s+0x[0-9a-f]+.*\bin ([a-z0-9_.-]+)"
                    r"(?: \(\+0x([0-9a-f]+)\))? \(0x[0-9a-f]+\)\s*$", re.I)
 
 modules = {}
+regions = {}
+active = {}
 recent = deque(maxlen=8)
 fatal = deque(maxlen=4)
 frames = []
@@ -85,12 +89,27 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
     for line in log:
         ids = prefix.match(line)
         pid, tid = ids.groups() if ids else ("?", "?")
-        if "trace:loaddll:" in line and (match := loaded.search(line)):
-            module, base, kind = match.groups()
-            if module.lower() in known_modules:
-                modules[pid, module.lower()] = (int(base, 16), kind)
+        if ":trace:module:map_image_into_view " in line and (match := mapped.search(line)):
+            name, start, end = match.groups()
+            regions[pid, int(start, 16)] = (name.lower(), int(end, 16))
+        if ":trace:loaddll:" in line:
+            if match := loaded.search(line):
+                path, name, base, kind = match.groups()
+                name, base = name.lower(), int(base, 16)
+                if name in known_modules:
+                    modules[pid, name] = (base, kind)
+                mapped_name, end = regions.get((pid, base), (None, base))
+                if mapped_name == name:
+                    active[pid, path.lower()] = (name, base, end)
+        if (":trace:loaddll:free_modref " in line or ":trace:module:free_modref " in line):
+            if match := unloaded.search(line):
+                active.pop((pid, match[1].lower()), None)
         if ":seh:" in line and (match := unhandled.search(line)):
-            fatal.append((pid, tid, *match.groups()))
+            code, flags, addr = match.groups()
+            ip = int(addr, 16)
+            images = [(name, ip - base) for (process, _), (name, base, end) in active.items()
+                      if process == pid and base <= ip < end]
+            fatal.append((pid, tid, code, flags, addr, images[0] if len(images) == 1 else None))
         elif ":seh:" in line and (match := exception.search(line)):
             recent.append((pid, tid, *match.groups()))
         if "Exception frame is not in stack limits" in line:
@@ -102,13 +121,17 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
 
 for (pid, module), (base, kind) in sorted(modules.items()):
     print(f"loaded pid={pid} module={module} base=0x{base:x} kind={kind}")
-for kind, records in (("exception", recent), ("unhandled", fatal)):
-    for pid, tid, code, flags, addr in records:
-        print(f"{kind} pid={pid} tid={tid} code=0x{code} flags=0x{flags} address=0x{addr}")
-        # Match the previously observed fault only as an exact image-base-relative address.
-        prior = modules.get((pid, "d3dcompiler_47_cor3.dll"))
-        if kind == "unhandled" and prior and int(addr, 16) - prior[0] == 0x11922D:
+for pid, tid, code, flags, addr in recent:
+    print(f"exception pid={pid} tid={tid} code=0x{code} flags=0x{flags} address=0x{addr}")
+for pid, tid, code, flags, addr, image in fatal:
+    print(f"unhandled pid={pid} tid={tid} code=0x{code} flags=0x{flags} address=0x{addr}")
+    if image:
+        name, offset = image
+        print(f"fault_module={name}+0x{offset:x}")
+        if code.lower() == "c0000409" and image == ("d3dcompiler_47_cor3.dll", 0x11922D):
             print("matches_prior_fault=d3dcompiler_47_cor3.dll+0x11922d")
+    else:
+        print("fault_module=unknown")
 for module, offset in frames:
     print(f"frame module={module}" + (f" offset=0x{offset}" if offset else ""))
 print(f"stack_dispatch_failed={int(stack_dispatch_failed)} debugger_unhandled={int(debugger_unhandled)}")
