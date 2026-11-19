@@ -30,7 +30,10 @@ or Next call. A long list can still take time to populate.
 | Slow standard and agile MEASURE, x86_64 | Baseline about 1.57 s inside WM_CHAR and 21 probe timeouts per case. Candidate 0–1 ms inside WM_CHAR, zero inline Next calls and 0–1 probe timeouts. All 128 suggestions returned per case |
 | Text replacement from inside the first Next call, x86_64 | The replacement remained in the edit and the candidate made no further Next calls for the canceled request |
 | AutoCAD 2027 dialog with FILEDIA=1 | Paired check passed. Baseline froze during filename editing and required termination. With v2 the Cancel button returned to the drawing, editing could continue and AutoCAD exited normally |
-| Full L0, paired L2, and Inventor 2027 and 2026 (L4) | Open |
+| Paired L2 on winum-11.22-1 | All 21 shell32 units completed in each variant on x86_64 and i386. No new failure locations. The autocomplete unit ran 14 fewer callback assertions on each architecture. [Paired results](https://github.com/Harvi654/winum/actions/runs/44592013573) |
+| Inventor 2027 L4 | Maintainer confirmed the Open, Place, Save As, reopen and restart checks using the 11.22-1 runtime with v2 DLLs from build `12294c2` |
+| Inventor 2026 L4 | Maintainer confirmed the same checks in a separate 2026 prefix with the same runtime and v2 DLLs |
+| Full L0 | [Full-series x86_64 and i386 build](https://github.com/Harvi654/winum/actions/runs/44616982879) queued on `test-run/shell32-autocomplete-responsive-2` at `48bc33e` |
 
 The second revision includes two changes from independent review.
 It releases a running request if a callback unwinds and checks the
