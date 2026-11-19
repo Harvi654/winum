@@ -1,0 +1,32 @@
+name: Build MSXML3 same-node MEASURE
+
+on:
+  push:
+    branches: ['topic/msxml3-same-node-measure']
+    paths:
+      - 'docs/wine-repro/msxml3-same-node-measure/measure.c'
+      - 'docs/wine-repro/msxml3-same-node-measure/measure.list'
+      - '.github/workflows/build-msxml3-same-node-measure.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    steps:
+      - run: pacman -Syu --noconfirm --needed git mingw-w64-gcc
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build and verify the offline VM bundle
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash scripts/build-measure-bundle.sh out docs/wine-repro/msxml3-same-node-measure/measure.list
+          cd out
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: msxml3-same-node-measure
+          path: out/
+          retention-days: 30
