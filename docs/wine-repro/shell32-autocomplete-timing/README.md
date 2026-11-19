@@ -277,6 +277,28 @@ produced a trace for the crash process. The string scan found
 `Autodesk.DesktopConnector.API.DesktopConnectorNotInstalledException`.
 Their occurrence on the failing thread was not established by the scan.
 
+The structured decoder recovered 663 exception events before the
+incomplete end of the trace. It found zero events on the failing
+thread (0x0ae8). The last decoded EndpointNotFound and Desktop
+Connector exceptions occurred on thread 0x0b3c at about 38.4 seconds.
+The last decoded exception was FileNotFound on that same thread at
+about 41.4 seconds. The previous Win32 observer still recorded a CLR
+exception on the failing thread during Save As. The decoded Open trace
+does not account for that last phase of the crash.
+
+To check for the same exception names during startup, run an idle
+control with EventPipe in the same baseline prefix:
+
+~~~bash
+unset ACAD_FAILFAST_OBSERVER
+export ACAD_EVENTPIPE=1
+bash scripts/trace-autocad-dwg.sh baseline idle
+~~~
+
+Stay on the AutoCAD start screen for 60 seconds and close the program
+normally. The script selects the AutoCAD process trace even on normal
+exit and reports whether each of the three string hints above appears.
+
 ### Decode an existing EventPipe trace
 
 The EventPipe summary utility uses TraceEvent to read CLR exception

@@ -3,8 +3,8 @@
 set -euo pipefail
 umask 077
 
-if [[ $# != 2 || ! "$1" =~ ^(candidate|baseline)$ || ! "$2" =~ ^(save|open)-[01]$ ]]; then
-    echo 'Usage: trace-autocad-dwg.sh candidate|baseline save-0|open-0|save-1|open-1' >&2
+if [[ $# != 2 || ! "$1" =~ ^(candidate|baseline)$ || ! "$2" =~ ^(idle|(save|open)-[01])$ ]]; then
+    echo 'Usage: trace-autocad-dwg.sh candidate|baseline idle|save-0|open-0|save-1|open-1' >&2
     exit 2
 fi
 
@@ -47,8 +47,12 @@ if ! bash -c '
     exit 1
 fi
 
-printf 'Starting %s. Set FILEDIA to %s and try %s once. Close AutoCAD after the trial.\n' \
-    "$1" "${2##*-}" "${2%%-*}"
+if [[ "$2" == idle ]]; then
+    printf 'Starting %s. Stay on the AutoCAD start screen for 60 seconds, then close AutoCAD.\n' "$1"
+else
+    printf 'Starting %s. Set FILEDIA to %s and try %s once. Close AutoCAD after the trial.\n' \
+        "$1" "${2##*-}" "${2%%-*}"
+fi
 eventpipe_dir=
 if [[ "${ACAD_EVENTPIPE:-0}" == 1 ]]; then
     test "$(realpath -e "$ACAD_PREFIX/drive_c")" = "$ACAD_PREFIX/drive_c"
@@ -95,6 +99,11 @@ mapped = re.compile(r'\bmapping PE file L?"[^"]*[\\/]([a-z0-9_.-]+)" at (0x[0-9a
 loaded = re.compile(r'\bLoaded L?"([^"]*[\\/]([a-z0-9_.-]+))" at (?:0x)?([0-9a-f]+): (\w+)', re.I)
 unloaded = re.compile(r'\b(?:unloading|unloaded module) L?"([^"]+)"', re.I)
 known_modules = {"shell32.dll", "d3dcompiler_47_cor3.dll", "wpfgfx_cor3.dll"}
+idle_trace_types = (
+    "System.IO.FileNotFoundException",
+    "System.ServiceModel.EndpointNotFoundException",
+    "Autodesk.DesktopConnector.API.DesktopConnectorNotInstalledException",
+)
 unhandled = re.compile(r"Unhandled exception code ([0-9a-f]+) flags ([0-9a-f]+) addr (?:0x)?([0-9a-f]+)", re.I)
 exception = re.compile(r"\bcode=(?:0x)?([0-9a-f]+) flags=(?:0x)?([0-9a-f]+) addr=(?:0x)?([0-9a-f]+)", re.I)
 stack = re.compile(r"^\s*(?:=>)?\s*\d+\s+0x[0-9a-f]+.*\bin ([a-z0-9_.-]+)"
@@ -105,11 +114,12 @@ managed_type = re.compile(r"\b(?:System|Microsoft)(?:\.[A-Za-z_][A-Za-z0-9_]*)*"
 def eventpipe_summary(folder, pid):
     print(f"eventpipe_files={sum(1 for _ in folder.glob('events-*.nettrace'))}")
     if pid is None:
-        print("eventpipe_status=no_crash_pid")
+        print("eventpipe_status=no_unique_acad_pid")
         return
+    print(f"eventpipe_pid=0x{pid}")
     trace = folder / f"events-{int(pid, 16)}.nettrace"
     if not trace.is_file():
-        print("eventpipe_status=missing_for_crash_pid")
+        print("eventpipe_status=missing_for_acad_pid")
         return
     size = trace.stat().st_size
     print(f"eventpipe_trace_bytes={size}")
@@ -135,6 +145,10 @@ def eventpipe_summary(folder, pid):
                                  + rb")*" + separator + rb"(?:" + identifier + rb")?" + ending + nul)
             tail = deque(pattern.finditer(data), maxlen=24)
             matches.extend((item.start(), item[0][:-len(nul)].decode(encoding)) for item in tail)
+        for name in idle_trace_types:
+            seen = any(data.find((name + "\0").encode(encoding)) >= 0
+                       for encoding in ("ascii", "utf-16-le"))
+            print(f"eventpipe_watched_hint={name} present={int(seen)}")
     types = list(dict.fromkeys(name for _, name in sorted(matches)))[-12:]
     print(f"eventpipe_exception_hints={len(types)}")
     for name in types:
@@ -142,6 +156,8 @@ def eventpipe_summary(folder, pid):
 
 
 modules = {}
+acad_pids = set()
+clr_pids = set()
 regions = {}
 active = {}
 recent = deque(maxlen=8)
@@ -163,6 +179,11 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
             if match := loaded.search(line):
                 path, name, base, kind = match.groups()
                 name, base = name.lower(), int(base, 16)
+                if pid != "?":
+                    if name == "acad.exe":
+                        acad_pids.add(pid)
+                    elif name == "coreclr.dll":
+                        clr_pids.add(pid)
                 if name in known_modules:
                     modules[pid, name] = (base, kind)
                 mapped_name, end = regions.get((pid, base), (None, base))
@@ -212,6 +233,12 @@ print(f"eventlog_lines={eventlog_lines}")
 print(f"stack_dispatch_failed={int(stack_dispatch_failed)} debugger_unhandled={int(debugger_unhandled)}")
 if sys.argv[2]:
     pid = fatal[-1][0] if fatal and fatal[-1][0] != "?" else None
+    if pid is None:
+        # This log enables loaddll only for acad.exe. Prefer the executable
+        # entry and require a unique match before selecting a trace file.
+        candidates = acad_pids or clr_pids
+        if len(candidates) == 1:
+            pid = next(iter(candidates))
     eventpipe_summary(Path(sys.argv[2]), pid)
 PY
 exit "$rc"
