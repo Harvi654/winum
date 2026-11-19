@@ -2,7 +2,7 @@ name: Validate MSXML3 same-node candidate
 
 on:
   push:
-    branches: ['test-run/msxml3-replacechild-same-node-1']
+    branches: ['test-run/msxml3-replacechild-same-node-2']
     paths: ['.github/workflows/test-msxml3-same-node.yml']
   workflow_dispatch:
 
