@@ -35,7 +35,8 @@ The second revision includes two changes from independent review.
 It releases a running request if a callback unwinds and checks the
 edit state again after autoappend sends messages. The x86_64
 autocomplete and MEASURE checks were repeated with the verified
-v2 artifact. The AutoCAD comparison is pending.
+v2 artifact. The maintainer could edit the filename with the candidate.
+The paired dialog response check is pending.
 
 ## AutoCAD A/B test
 
@@ -121,10 +122,14 @@ run_acad_autocomplete "$ACAD_AUTOCOMPLETE_WORK/base-prefix" "$ACAD_AUTOCOMPLETE_
 run_acad_autocomplete "$ACAD_AUTOCOMPLETE_WORK/candidate-prefix" "$ACAD_AUTOCOMPLETE_WORK/wine" candidate
 ~~~
 
-In each run, set FILEDIA to 1. In a scratch drawing, open **Save As**,
-type a few characters in the file-name field, change the selection
-and cancel. Try **Open** and change directory while typing. If the
-candidate remains responsive, save a scratch DWG under a new name
-and reopen it. Record whether typing, cancellation and save/reopen
-worked for each build. Keep the test files away from original drawings
-and remove the test prefix copies when done.
+In each run, set FILEDIA to 1. In a scratch drawing open **Save As**,
+type the same filename in the same directory and press **Cancel**.
+Record whether the text updates, the dialog responds to Cancel and
+AutoCAD returns to the drawing. Turn off the optional fail-fast
+observer and EventPipe for the pair.
+
+The maintainer reproduced crashes on both Save As and Open with
+FILEDIA set to 0 in both builds. The dialog-only comparison checks the
+autocomplete change without accepting a filename. The CoreCLR
+failure remains open in the
+[AutoCAD follow-up](../../../docs/wine-repro/shell32-autocomplete-timing/README.md#autocad-2027-follow-up).

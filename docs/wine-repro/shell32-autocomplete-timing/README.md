@@ -299,6 +299,13 @@ Stay on the AutoCAD start screen for 60 seconds and close the program
 normally. The script selects the AutoCAD process trace even on normal
 exit and reports whether each of the three string hints above appears.
 
+The control run on 2026-11-19 showed all three names in the selected
+AutoCAD trace without an Open or Save operation. The launcher returned
+96, and the run recorded no unhandled exception or stack-dispatch
+failure. Those names also appear during startup. The result weakens
+the Desktop Connector hypothesis for the shared CoreCLR failure.
+The triggering condition at the CoreCLR fail-fast site is still unknown.
+
 ### Decode an existing EventPipe trace
 
 The EventPipe summary utility uses TraceEvent to read CLR exception
