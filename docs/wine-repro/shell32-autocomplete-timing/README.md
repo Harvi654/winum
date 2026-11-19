@@ -157,12 +157,20 @@ records the paired comparison and the AutoCAD test procedure.
 
 On 2026-11-19 the maintainer reported that editing the filename worked
 with the v2 candidate. AutoCAD still crashed on saving and when opening
-an existing DWG. The candidate's first Save As trial with FILEDIA set
-to 0 exited with code 9 and raised unhandled exception 0xc0000409 with
-flags 0x1. The fault address did not match the known offset from the
-reported D3DCompiler DLL load address. The original trace did not
-include image ranges, so the faulting module and the state of the
-output file remain unconfirmed. The baseline and Open trials are pending.
+an existing DWG.
+
+Both Save As runs with FILEDIA set to 0 used the same MSXML3 build
+(`aeb7a59`). Both exited with code 9 and raised unhandled exception
+0xc0000409 with flags 0x1.
+
+| Variant | Fault location | Output |
+| --- | --- | --- |
+| Autocomplete v2 | Initial trace lacked image ranges | DWG exists, 30,927 bytes. Reopening is unverified |
+| Baseline | `coreclr.dll+0x14922d`, resolved from the loaded image range | Unchecked |
+
+The baseline reproduces the Save As crash without the autocomplete
+candidate. Whether both failures terminate at the same module offset
+remains to be checked. The Open trial with FILEDIA set to 0 is pending.
 
 Keep the candidate and baseline Winum runtimes on the same MSXML3
 build and reuse the two prepared test prefixes. Run one operation per
