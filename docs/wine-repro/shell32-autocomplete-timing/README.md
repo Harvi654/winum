@@ -154,20 +154,38 @@ result, and the final edit prefix. `hold_wait=0` is event signaled and
 `hold_wait=258` is timeout. Timings locate a possible synchronous wait.
 They are not exact expectations for a regression test.
 
-Use the same [offline VM procedure](#offline-windows-10) and return the
-same three text files from a fresh directory. These cases distinguish
-delivery to a real STA proxy from delivery to the original in-process
-fixture. The action results show which calls and completion messages a
-worker must handle when the edit stops using its current results.
+On 2026-11-19, both Windows 10 VM executables from
+[`93e5b98`](https://github.com/Harvi654/winum/actions/runs/44621177032)
+reported the same outcomes:
+
+| Case | Result on x86_64 and i686 |
+| --- | --- |
+| Separate STA proxy | COM unmarshal and autocomplete setup succeeded. The owner received no `Reset` or `Next` during the three-second observation. The probe returned exit code 1 for this case on both architectures. |
+| Replace input during `Next` | The action returned while the first callback was held. The source was reset twice in total, and the edit showed a completion with the replacement `b` prefix. |
+| Disable during `Next` | The action returned while the first callback was held. It was the only `Next` observed, and the edit kept the input `a`. |
+| Destroy during `Next` | The action returned while the first callback was held. It was the only `Next` observed, and the edit was destroyed. |
+
+The three held calls received the release event in all six trials. The
+proxy case establishes that the provider saw no enumeration in this
+window. It does not expose the HRESULT from a possible call on the
+autocomplete worker or establish how Windows handles other proxy types.
+
+For comparison, the x86_64 Linux replay with the v2 candidate called the
+proxy provider on its owner STA. The three edit actions were delivered
+after the held `Next` had timed out on the edit thread. This gives a
+concrete responsiveness difference even when the UI can process messages
+between calls.
 
 ## Wine regression test
 
 `patches/tests-first/shell32-tests-autocomplete-thread.patch` adds the
-`shell32:autocomplete_thread` test to Wine 11.22. It uses the empty
-source case and checks that autocomplete calls `Next` after input on a
-thread other than the one owning the edit. It uses a time limit only
-to stop waiting for a missing callback. It does not assert an input
-duration or a suggestion limit.
+`shell32:autocomplete_thread` test to Wine 11.22. The empty-source case
+checks that autocomplete calls `Next` after input on a thread other than
+the one owning the edit. The two lifecycle cases use an event to hold
+the first callback and check that disabling autocomplete or destroying
+the edit returns before the callback and abandons its results. They
+check callback order and the resulting edit state. Time limits bound
+the test run and the observation window.
 
 To build the same Wine test for both architectures with MinGW:
 
@@ -182,13 +200,17 @@ VM and double-click `run-tests.bat`. Leave the mouse and keyboard idle
 while the test windows are open. Return `result-shell32-autocomplete-thread-x86_64.txt`,
 `result-shell32-autocomplete-thread-i686.txt` and `exitcodes.txt`.
 
-### L1 result
+### L1 result for the original callback-thread test
 
 Passed on 2026-11-19 in the maintainer's offline Windows 10 VM using the
 [test bundle](https://github.com/Harvi654/winum/actions/runs/44554709236)
 from `5d308e9`. Both x86_64 and i686 ran 10 checks with zero failures,
 zero skips and process exit code 0. This covers the Wine test itself
 as well as the earlier MEASURE result for the empty source.
+The two extended lifecycle cases still need their own offline L1 run.
+In the x86_64 Linux replay on the v2 runtime, the extended test ran
+34 checks with three expected todos, zero failures and zero skips.
+Both edit actions ran after the held callback returned.
 
 ### Wine baseline
 
