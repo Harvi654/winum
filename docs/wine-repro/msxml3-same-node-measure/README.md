@@ -137,6 +137,14 @@ python3 -I "$ACAD_PROFILE_WATCH" "$ACAD_BASE_PREFIX" "$MSXML_BASE"
 python3 -I "$ACAD_PROFILE_WATCH" "$ACAD_PR4_PREFIX" "$MSXML_CANDIDATE"
 ```
 
+To use the local AutoCAD launcher instead, give the watcher
+`--launcher "$HOME/autocad-on-linux/scripts/launch-autocad.sh"`. It runs
+the launcher from its project root and exports the selected Wine,
+wineserver and test prefix. If the launcher has its own prefix or Wine
+selector, configure it to use those same paths. Use `--log-dir` with a
+fresh log directory if the launcher redirects Wine traces there. A
+missing MSXML load trace leaves the DLL selection unverified.
+
 The watcher reports size counts for `Profile.aws`, the largest size,
 growth from the starting state, the exit code and selected MSXML
 trace counts. It samples every 0.75 s. At 64 MiB additional growth it
