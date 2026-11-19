@@ -159,18 +159,20 @@ On 2026-11-19 the maintainer reported that editing the filename worked
 with the v2 candidate. AutoCAD still crashed on saving and when opening
 an existing DWG.
 
-Both Save As runs with FILEDIA set to 0 used the same MSXML3 build
-(`aeb7a59`). Both exited with code 9 and raised unhandled exception
+All three observed runs used FILEDIA set to 0 and the same MSXML3 build
+(`aeb7a59`). Each exited with code 9 and raised unhandled exception
 0xc0000409 with flags 0x1.
 
-| Variant | Fault location | Output |
+| Variant and operation | Fault location | Output |
 | --- | --- | --- |
-| Autocomplete v2 | Initial trace lacked image ranges | DWG exists, 30,927 bytes. Reopening is unverified |
-| Baseline | `coreclr.dll+0x14922d`, resolved from the loaded image range | Unchecked |
+| Autocomplete v2, Save As | `coreclr.dll+0x14922d`, recovered from the original trace's load address | DWG exists, 30,927 bytes. Reopening is unverified |
+| Baseline, Save As | `coreclr.dll+0x14922d`, resolved from the loaded image range | Unchecked |
+| Autocomplete v2, Open | `coreclr.dll+0x14922d`, resolved from the loaded image range | Existing DWG failed to open |
 
 The baseline reproduces the Save As crash without the autocomplete
-candidate. Whether both failures terminate at the same module offset
-remains to be checked. The Open trial with FILEDIA set to 0 is pending.
+candidate. All three failures reached the same CoreCLR address relative
+to the image base. The triggering condition and the baseline Open
+result are still unknown.
 
 Keep the candidate and baseline Winum runtimes on the same MSXML3
 build and reuse the two prepared test prefixes. Run one operation per
@@ -190,8 +192,10 @@ Use `baseline` for the matching control and `open-0`, `save-1` or
 startup. After each launch return the script's summary and, for Save
 As, whether the new file appeared before the crash.
 
-The trace uses Wine SEH, DLL load and module mapping channels in
-acad.exe. Raw logs stay in the private run directory. For an
+The trace uses Wine SEH, DLL load, module mapping and event log
+channels in acad.exe. Raw logs stay in the private run directory.
+The summary includes managed exception types if the runtime reports
+them through the event log or debug output. For an
 unhandled exception, the summary reports the image and offset
 when the fault address falls within a recorded loaded image range.
 It also checks for the previously recorded fail-fast site in

@@ -30,7 +30,7 @@ export WINE="$ACAD_WINE_BIN/wine"
 export WINESERVER="$ACAD_WINE_BIN/wineserver"
 export WINELOADER="$WINE"
 export ACAD_LOGDIR="$(mktemp -d "$work/dwg-$1-$2.XXXXXXXX")"
-export WINEDEBUG='-all,+pid,acad.exe:+seh,acad.exe:+loaddll,acad.exe:+module'
+export WINEDEBUG='-all,+pid,acad.exe:+seh,acad.exe:+loaddll,acad.exe:+module,acad.exe:+eventlog'
 cd "${ACAD_REPO:-$HOME/autocad-on-linux}"
 test -x "$WINE"
 test -f scripts/launch-autocad.sh
@@ -75,6 +75,8 @@ unhandled = re.compile(r"Unhandled exception code ([0-9a-f]+) flags ([0-9a-f]+) 
 exception = re.compile(r"\bcode=(?:0x)?([0-9a-f]+) flags=(?:0x)?([0-9a-f]+) addr=(?:0x)?([0-9a-f]+)", re.I)
 stack = re.compile(r"^\s*(?:=>)?\s*\d+\s+0x[0-9a-f]+.*\bin ([a-z0-9_.-]+)"
                    r"(?: \(\+0x([0-9a-f]+)\))? \(0x[0-9a-f]+\)\s*$", re.I)
+managed_type = re.compile(r"\b(?:System|Microsoft)(?:\.[A-Za-z_][A-Za-z0-9_]*)*"
+                          r"\.(?:[A-Za-z_][A-Za-z0-9_]*)?Exception\b")
 
 modules = {}
 regions = {}
@@ -82,6 +84,8 @@ active = {}
 recent = deque(maxlen=8)
 fatal = deque(maxlen=4)
 frames = []
+managed = deque(maxlen=8)
+eventlog_lines = 0
 stack_dispatch_failed = False
 debugger_unhandled = False
 
@@ -114,6 +118,11 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
             recent.append((pid, tid, *match.groups()))
         if "Exception frame is not in stack limits" in line:
             stack_dispatch_failed = True
+        if ":eventlog:" in line:
+            eventlog_lines += 1
+        if (":eventlog:" in line or ":seh:OutputDebugString" in line
+                or line.lstrip().startswith("Unhandled exception.")):
+            managed.extend(managed_type.findall(line))
         if line.lstrip().lower().startswith(("wine: unhandled", "unhandled exception", "unhandled page fault")):
             debugger_unhandled = True
         if len(frames) < 8 and (match := stack.search(line)):
@@ -134,6 +143,9 @@ for pid, tid, code, flags, addr, image in fatal:
         print("fault_module=unknown")
 for module, offset in frames:
     print(f"frame module={module}" + (f" offset=0x{offset}" if offset else ""))
+for name in dict.fromkeys(managed):
+    print(f"managed_exception={name}")
+print(f"eventlog_lines={eventlog_lines}")
 print(f"stack_dispatch_failed={int(stack_dispatch_failed)} debugger_unhandled={int(debugger_unhandled)}")
 PY
 exit "$rc"
