@@ -444,6 +444,36 @@ fail at the same site, prioritize their common loading or document
 activation path. An outcome that splits by version suggests comparing
 the legacy and modern paths with additional matched fixtures.
 
+Both line drawings failed in the maintainer's startup trials on
+2026-11-19. The 62,118-byte `AC1018` and 27,982-byte `AC1032` files
+each exited with code 9 and raised `0xc0000409` at
+`coreclr.dll+0x14922d`. Both staged files were unchanged. The fault
+therefore also occurs with small drawings and in both tested format
+generations.
+
+### Compare desktop and Core Console drawing loading
+
+Run the 2018 line fixture with the installation's `accoreconsole.exe`
+on the same baseline runtime and prefix. The helper stages a new copy
+of the DWG and a short AutoLISP script. It makes a private copy of the
+AutoCAD launcher and substitutes the final executable while preserving
+the ordinary prefix setup and service startup. Core Console opens the
+scratch DWG and the script checks the active drawing name and counts
+LINE entities before quitting. The desktop launcher remains available
+for a matching control. [Autodesk Core Console usage](https://help.autodesk.com/cloudhelp/2026/ENU/AutoCAD-Core-Console/files/AUTOCAD_CORE_CONSOLE.html)
+
+~~~bash
+unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
+bash scripts/trace-autocad-dwg.sh baseline core-open "$ACAD_DWG_CONTROLS/line-2018.dwg"
+~~~
+
+Return the summary lines `variant=`, `core_console_dwg=` and
+`fault_module=` if present. `core_console_dwg=1` with a positive line
+count demonstrates usable drawing data on the console path. A matching
+fail-fast in the console would extend the failure beyond the desktop
+path. If the executable is missing, it fails its own startup, or the
+script marker is absent, treat the draw-open result as unconfirmed.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the

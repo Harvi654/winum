@@ -5,12 +5,12 @@ umask 077
 
 usage() {
     echo 'Usage: trace-autocad-dwg.sh candidate|baseline idle|save-0|open-0|save-1|open-1' >&2
-    echo '       trace-autocad-dwg.sh candidate|baseline startup-open|open-0 KNOWN_GOOD_DWG' >&2
+    echo '       trace-autocad-dwg.sh candidate|baseline startup-open|core-open|open-0 KNOWN_GOOD_DWG' >&2
     exit 2
 }
 
-[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|(save|open)-[01]|startup-open)$ ]] || usage
-if [[ "$2" == startup-open ]]; then
+[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|(save|open)-[01]|startup-open|core-open)$ ]] || usage
+if [[ "$2" == startup-open || "$2" == core-open ]]; then
     [[ $# == 3 ]] || usage
 elif [[ $# == 3 && "$2" != open-0 ]]; then
     usage
@@ -29,7 +29,16 @@ case "$1" in
         ;;
 esac
 test "$(realpath -e "$ACAD_PREFIX")" = "$ACAD_PREFIX"
-test -f "$ACAD_PREFIX/drive_c/Program Files/Autodesk/AutoCAD 2027/acad.exe"
+acad_dir="$ACAD_PREFIX/drive_c/Program Files/Autodesk/AutoCAD 2027"
+test -f "$acad_dir/acad.exe"
+acad_image=acad.exe
+if [[ "$2" == core-open ]]; then
+    acad_image=accoreconsole.exe
+    if [[ ! -f "$acad_dir/$acad_image" ]]; then
+        echo 'core_console=not_installed' >&2
+        exit 2
+    fi
+fi
 export WINEPREFIX="$ACAD_PREFIX"
 export INV_PREFIX="$ACAD_PREFIX"
 export INV_WINE=system
@@ -38,7 +47,7 @@ export WINE="$ACAD_WINE_BIN/wine"
 export WINESERVER="$ACAD_WINE_BIN/wineserver"
 export WINELOADER="$WINE"
 export ACAD_LOGDIR="$(mktemp -d "$work/dwg-$1-$2.XXXXXXXX")"
-export WINEDEBUG='-all,+pid,acad.exe:+seh,acad.exe:+loaddll,acad.exe:+module,acad.exe:+eventlog,acad.exe:fixme+reg,dwgviewr.exe:+loaddll,dwgviewr.exe:fixme+reg'
+export WINEDEBUG="-all,+pid,$acad_image:+seh,$acad_image:+loaddll,$acad_image:+module,$acad_image:+eventlog,$acad_image:fixme+reg,dwgviewr.exe:+loaddll,dwgviewr.exe:fixme+reg"
 cd "${ACAD_REPO:-$HOME/autocad-on-linux}"
 test -x "$WINE"
 test -f scripts/launch-autocad.sh
@@ -56,6 +65,7 @@ if ! bash -c '
 fi
 
 launch_args=()
+launcher_script=scripts/launch-autocad.sh
 probe_dwg=
 if [[ $# == 3 ]]; then
     test -f "$3" && test -s "$3" || { echo 'A nonempty local DWG is required.' >&2; exit 2; }
@@ -78,7 +88,23 @@ print(f"dwg_header={version} dwg_bytes={file.stat().st_size}")
 PY
 fi
 
-if [[ "$2" == startup-open ]]; then
+if [[ "$2" == core-open ]]; then
+    # Reuse the launcher's prefix setup and service startup in a private copy.
+    if [[ "$(grep -c '^wine acad\.exe ' "$launcher_script")" != 1 ]]; then
+        echo 'core_console=unsupported_launcher' >&2
+        exit 2
+    fi
+    launcher_dir="$ACAD_LOGDIR/core-launcher"
+    mkdir -- "$launcher_dir"
+    ln -s -- "$(realpath -e scripts/common-env.sh)" "$launcher_dir/common-env.sh"
+    sed 's/^wine acad\.exe /wine accoreconsole.exe /' "$launcher_script" > "$launcher_dir/launch.sh"
+    launcher_script="$launcher_dir/launch.sh"
+    printf '%s\r\n' \
+        '(progn (setq winum-lines (ssget "_X" (quote ((0 . "LINE"))))) (princ (strcat "\nWINUM_DWG_OPEN=" (if (= (strcase (getvar "DWGNAME")) "PROBE.DWG") "1" "0") " LINES=" (itoa (if winum-lines (sslength winum-lines) 0)) "\n")) (princ))' \
+        '_.QUIT' > "$probe_dir/probe.scr"
+    launch_args=(/i "$probe_path" /s "C:\\${probe_dir##*/}\\probe.scr" /l en-US)
+    echo 'Opening the scratch DWG in AutoCAD Core Console.'
+elif [[ "$2" == startup-open ]]; then
     launch_args=("$probe_path")
     printf 'Opening a scratch DWG at startup. If the drawing opens, edit it, run QSAVE, then close AutoCAD.\n'
 elif [[ "$2" == idle ]]; then
@@ -99,7 +125,7 @@ if [[ "${ACAD_EVENTPIPE:-0}" == 1 ]]; then
     export DOTNET_EventPipeOutputPath="C:\\${eventpipe_dir##*/}\\events-{pid}.nettrace"
 fi
 rc=0
-launcher=(bash scripts/launch-autocad.sh "${launch_args[@]}")
+launcher=(bash "$launcher_script" "${launch_args[@]}")
 dwg_io_trace=
 if [[ "${ACAD_DWG_IO:-0}" == 1 ]]; then
     if [[ -z "$probe_dwg" ]] || ! command -v strace >/dev/null; then
@@ -176,7 +202,7 @@ fi
 
 # Only print module names and numeric exception fields. In particular,
 # keep the Windows paths and debugger preamble inside the private run directory.
-python3 - "${logs[0]}" "$eventpipe_dir" <<'PY'
+python3 - "${logs[0]}" "$eventpipe_dir" "$2" <<'PY'
 from collections import Counter, deque
 import mmap
 from pathlib import Path
@@ -260,9 +286,15 @@ managed = deque(maxlen=8)
 eventlog_lines = 0
 stack_dispatch_failed = False
 debugger_unhandled = False
+console_dwg = None
 
 with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
     for line in log:
+        if sys.argv[3] == "core-open":
+            match = re.fullmatch(r"WINUM_DWG_OPEN=([01]) LINES=([0-9]+)",
+                                 line.replace("\x00", "").strip().lstrip("\ufeff"))
+            if match:
+                console_dwg = match.groups()
         ids = prefix.match(line)
         pid, tid = ids.groups() if ids else ("?", "?")
         if reg_load_appkey.search(line):
@@ -275,7 +307,7 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
                 path, name, base, kind = match.groups()
                 name, base = name.lower(), int(base, 16)
                 if pid != "?":
-                    if name == "acad.exe":
+                    if name in {"acad.exe", "accoreconsole.exe"}:
                         acad_pids.add(pid)
                     elif name == "dwgviewr.exe":
                         trueview_pids.add(pid)
@@ -311,6 +343,11 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
 
 for (pid, module), (base, kind) in sorted(modules.items()):
     print(f"loaded pid={pid} module={module} base=0x{base:x} kind={kind}")
+if sys.argv[3] == "core-open":
+    if console_dwg:
+        print(f"core_console_dwg={console_dwg[0]} core_console_lines={console_dwg[1]}")
+    else:
+        print("core_console_dwg=unconfirmed")
 print(f"trueview_processes={len(trueview_pids)}")
 print(f"reg_load_appkey_acad={sum(reg_loads[pid] for pid in acad_pids)} "
       f"reg_load_appkey_trueview={sum(reg_loads[pid] for pid in trueview_pids)}")
