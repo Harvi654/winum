@@ -29,14 +29,15 @@ or Next call. A long list can still take time to populate.
 | Existing shell32 autocomplete unit, x86_64 | Zero failures and skips in both variants. The candidate made 14 fewer Next calls in this suite. The only checks that ran fewer times were the assertions inside that callback |
 | Slow standard and agile MEASURE, x86_64 | Baseline about 1.57 s inside WM_CHAR and 21 probe timeouts per case. Candidate 0–1 ms inside WM_CHAR, zero inline Next calls and 0–1 probe timeouts. All 128 suggestions returned per case |
 | Text replacement from inside the first Next call, x86_64 | The replacement remained in the edit and the candidate made no further Next calls for the canceled request |
-| Full L0, paired L2, AutoCAD and the other shell32 consumer (L4) | Open |
+| AutoCAD 2027 dialog with FILEDIA=1 | Paired check passed. Baseline froze during filename editing and required termination. With v2 the Cancel button returned to the drawing, editing could continue and AutoCAD exited normally |
+| Full L0, paired L2, and Inventor 2027 and 2026 (L4) | Open |
 
 The second revision includes two changes from independent review.
 It releases a running request if a callback unwinds and checks the
 edit state again after autoappend sends messages. The x86_64
 autocomplete and MEASURE checks were repeated with the verified
-v2 artifact. The maintainer could edit the filename with the candidate.
-The paired dialog response check is pending.
+v2 artifact. The maintainer reproduced the dialog freeze in the
+baseline and confirmed normal cancellation and recovery with v2.
 
 ## AutoCAD A/B test
 
