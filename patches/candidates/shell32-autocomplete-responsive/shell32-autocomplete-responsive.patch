@@ -13,6 +13,10 @@ publishing the suggestions. Cancel pending enumeration when the edit no
 longer needs its results. This candidate restores responsiveness between
 calls and leaves the remaining difference in callback threading visible.
 
+2026-11-19, v2 after independent review: clean up canceled requests
+when a provider callback unwinds and recheck the edit state after
+autoappend sends messages to the host window procedure.
+
 diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
 --- a/dlls/shell32/autocomplete.c
 +++ b/dlls/shell32/autocomplete.c
@@ -24,7 +28,15 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
  #include <stdarg.h>
  #include <stdlib.h>
  #include <string.h>
-@@ -48,6 +49,8 @@
+@@ -33,6 +34,7 @@
+ #define COBJMACROS
+ 
+ #include "wine/debug.h"
++#include "wine/exception.h"
+ #include "windef.h"
+ #include "winbase.h"
+ #include "winreg.h"
+@@ -48,6 +50,8 @@
  
  WINE_DEFAULT_DEBUG_CHANNEL(shell);
  
@@ -33,7 +45,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
  typedef struct
  {
      IAutoComplete2 IAutoComplete2_iface;
-@@ -68,6 +71,7 @@
+@@ -68,6 +72,7 @@
      WCHAR *quickComplete;
      IEnumString *enumstr;
      IACList *aclist;
@@ -41,7 +53,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
      AUTOCOMPLETEOPTIONS options;
      WCHAR no_fwd_char;
  } IAutoCompleteImpl;
-@@ -79,6 +83,15 @@
+@@ -79,6 +84,15 @@
      autoappend_flag_displayempty
  };
  
@@ -57,7 +69,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
  enum prefix_filtering
  {
      prefix_filtering_none = 0,  /* no prefix filtering (raw search) */
-@@ -195,54 +208,23 @@
+@@ -195,54 +209,23 @@
      qsort(strs, numstrs, sizeof(*strs), sort_strs_cmpfn[pfx_filter]);
  }
  
@@ -126,7 +138,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
  }
  
  static UINT find_matching_enum_str(IAutoCompleteImpl *ac, UINT start, WCHAR *text,
-@@ -268,6 +250,8 @@
+@@ -268,6 +251,8 @@
  static void free_enum_strs(IAutoCompleteImpl *ac)
  {
      WCHAR **strs = ac->enum_strs;
@@ -135,7 +147,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
      if (strs)
      {
          UINT i = ac->enum_strs_num;
-@@ -457,20 +441,7 @@
+@@ -457,20 +442,7 @@
      return 0;
  }
  
@@ -157,7 +169,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
  {
      /* call IACList::Expand only when needed, if the
         new txt and old_txt require different expansions */
-@@ -480,19 +451,19 @@
+@@ -480,19 +452,19 @@
      size_t i = 0;
  
      /* always expand if the enumerator was reset */
@@ -180,7 +192,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
  
      /* txt has no delim after i, check for a delim further in old_txt */
      if (wcspbrk(&old_txt[i], L"\\/"))
-@@ -500,13 +471,13 @@
+@@ -500,40 +472,41 @@
          /* scan backwards to find the first delim before txt[i] (if any) */
          while (i--)
              if (wcschr(L"\\/", txt[i]))
@@ -193,10 +205,63 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
  
 -    return FALSE;
 +    return 0;
++}
++
++static BOOL matching_state_is_current(IAutoCompleteImpl *ac, HWND hwnd, WCHAR *text, WCHAR **strings)
++{
++    return ac->hwndEdit == hwnd && ac->enabled && ac->txtbackup == text && ac->enum_strs == strings;
  }
  
- static void autoappend_str(IAutoCompleteImpl *ac, WCHAR *text, UINT len, WCHAR *str, HWND hwnd)
-@@ -597,10 +568,83 @@
+-static void autoappend_str(IAutoCompleteImpl *ac, WCHAR *text, UINT len, WCHAR *str, HWND hwnd)
++static void autoappend_str(IAutoCompleteImpl *ac, WCHAR *text, UINT len, WCHAR **strings,
++                           WCHAR *str, HWND hwnd)
+ {
+-    DWORD sel_start;
++    DWORD sel_start = ~0u;
+     WCHAR *tmp;
+     size_t size;
+ 
+     /* Don't auto-append unless the caret is at the end */
+     SendMessageW(hwnd, EM_GETSEL, (WPARAM)&sel_start, 0);
+-    if (sel_start != len)
++    if (sel_start != len || !matching_state_is_current(ac, hwnd, text, strings))
+         return;
+ 
+     /* The character capitalization can be different,
+        so merge text and str into a new string */
+     size = len + lstrlenW(&str[len]) + 1;
+ 
+-    if ((tmp = malloc(size * sizeof(*tmp))))
+-    {
+-        memcpy(tmp, text, len * sizeof(*tmp));
+-        memcpy(&tmp[len], &str[len], (size - len) * sizeof(*tmp));
+-    }
+-    else tmp = str;
+-
++    if (!(tmp = malloc(size * sizeof(*tmp)))) return;
++    memcpy(tmp, text, len * sizeof(*tmp));
++    memcpy(&tmp[len], &str[len], (size - len) * sizeof(*tmp));
+     set_text_and_selection(ac, hwnd, tmp, len, size - 1);
+-    if (tmp != str)
+-        free(tmp);
++    free(tmp);
+ }
+ 
+ static BOOL display_matching_strs(IAutoCompleteImpl *ac, WCHAR *text, UINT len,
+@@ -553,7 +526,11 @@
+             return !(ac->options & ACO_AUTOSUGGEST);
+ 
+         if (flag == autoappend_flag_yes)
+-            autoappend_str(ac, text, len, filter_str_prefix(str[start], pfx_filter), hwnd);
++        {
++            autoappend_str(ac, text, len, str, filter_str_prefix(str[start], pfx_filter), hwnd);
++            /* The edit's window procedure can discard or replace the suggestions. */
++            if (!matching_state_is_current(ac, hwnd, text, str)) return TRUE;
++        }
+         if (!(ac->options & ACO_AUTOSUGGEST))
+             return TRUE;
+ 
+@@ -597,10 +574,101 @@
      return pfx_filter;
  }
  
@@ -215,24 +280,18 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
 +        hide_listbox(ac, ac->hwndListBox, FALSE);
 +}
 +
-+static void CALLBACK enum_timer_proc(HWND hwnd, UINT msg, UINT_PTR id, DWORD now)
++static void enumerate_slice(IAutoCompleteImpl *ac, struct enum_request *request)
 +{
-+    IAutoCompleteImpl *ac = GetPropW(hwnd, autocomplete_propertyW);
-+    struct enum_request *request;
 +    unsigned int calls;
 +    DWORD started = GetTickCount();
 +
-+    if (!ac || !(request = ac->request) || (UINT_PTR)request != id || ac->running_request)
-+        return;
-+
-+    IAutoComplete2_AddRef(&ac->IAutoComplete2_iface);
-+    ac->running_request = request;
 +    if (!request->started)
 +    {
 +        request->started = TRUE;
 +        IEnumString_Reset(ac->enumstr);
 +        if (ac->request == request && request->prefix[0])
 +            IACList_Expand(ac->aclist, request->prefix);
++        if (GetTickCount() - started >= 8) return;
 +    }
 +
 +    /* Keep the source in its apartment. Process a small slice after input. */
@@ -267,10 +326,34 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
 +        }
 +        if (GetTickCount() - started >= 8) break;
 +    }
++}
 +
++static void WINAPI enum_slice_cleanup(BOOL normal, void *context)
++{
++    IAutoCompleteImpl *ac = context;
++    struct enum_request *request = ac->running_request;
++
++    if (!normal && ac->request == request) cancel_enumeration(ac);
 +    ac->running_request = NULL;
 +    if (ac->request != request) free_enum_request(request);
 +    IAutoComplete2_Release(&ac->IAutoComplete2_iface);
++}
++
++static void CALLBACK enum_timer_proc(HWND hwnd, UINT msg, UINT_PTR id, DWORD now)
++{
++    IAutoCompleteImpl *ac = GetPropW(hwnd, autocomplete_propertyW);
++    struct enum_request *request;
++
++    if (!ac || !(request = ac->request) || (UINT_PTR)request != id || ac->running_request)
++        return;
++
++    IAutoComplete2_AddRef(&ac->IAutoComplete2_iface);
++    ac->running_request = request;
++    __TRY
++    {
++        enumerate_slice(ac, request);
++    }
++    __FINALLY_CTX(enum_slice_cleanup, ac)
 +}
 +
  static void autocomplete_text(IAutoCompleteImpl *ac, HWND hwnd, enum autoappend_flag flag)
@@ -281,7 +364,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
      enum prefix_filtering pfx_filter;
      UINT size, len = SendMessageW(hwnd, WM_GETTEXTLENGTH, 0, 0);
  
-@@ -620,36 +664,54 @@
+@@ -620,36 +688,54 @@
          return;
      }
      len = SendMessageW(hwnd, WM_GETTEXT, size, (LPARAM)text);
@@ -348,7 +431,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
      if (ac->hwndListBoxOwner)
          DestroyWindow(ac->hwndListBoxOwner);
      IAutoComplete2_Release(&ac->IAutoComplete2_iface);
-@@ -664,6 +726,7 @@
+@@ -664,6 +750,7 @@
      switch (wParam)
      {
          case VK_ESCAPE:
@@ -356,7 +439,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
              /* When pressing ESC, Windows hides the auto-suggest listbox, if visible */
              if ((ac->options & ACO_AUTOSUGGEST) && IsWindowVisible(ac->hwndListBoxOwner))
              {
-@@ -673,6 +736,7 @@
+@@ -673,6 +760,7 @@
              }
              break;
          case VK_RETURN:
@@ -364,7 +447,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
              /* If quickComplete is set and control is pressed, replace the string */
              if (ac->quickComplete && (GetKeyState(VK_CONTROL) & 0x8000))
              {
-@@ -757,6 +821,7 @@
+@@ -757,6 +845,7 @@
      switch (uMsg)
      {
          case CB_SHOWDROPDOWN:
@@ -372,7 +455,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
              if (This->options & ACO_AUTOSUGGEST)
                  hide_listbox(This, This->hwndListBox, TRUE);
              return 0;
-@@ -769,6 +834,7 @@
+@@ -769,6 +858,7 @@
                  hide_listbox(This, This->hwndListBox, FALSE);
              }
  
@@ -380,7 +463,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
              /* Reset the enumerator if it's not visible anymore */
              if (!IsWindowVisible(hwnd)) free_enum_strs(This);
              break;
-@@ -797,6 +863,7 @@
+@@ -797,6 +887,7 @@
                                            ? autoappend_flag_yes : autoappend_flag_no);
              return ret;
          case WM_SETTEXT:
@@ -388,7 +471,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
              if (This->options & ACO_AUTOSUGGEST)
                  hide_listbox(This, This->hwndListBox, TRUE);
              break;
-@@ -997,6 +1064,7 @@
+@@ -997,6 +1088,7 @@
  
      TRACE("(%p)->(%s)\n", This, (fEnable)?"true":"false");
  
@@ -396,7 +479,7 @@ diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
      This->enabled = fEnable;
  
      return S_OK;
-@@ -1154,6 +1222,7 @@
+@@ -1154,6 +1246,7 @@
  
      TRACE("(%p) -> (0x%lx)\n", This, dwFlag);
  
