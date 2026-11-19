@@ -28,17 +28,21 @@ or Next call. A long list can still take time to populate.
 | Windows 10 L1, existing test from 5d308e9 | Both architectures passed on Windows. Callback thread still differs in the candidate |
 | Existing shell32 autocomplete unit, x86_64 | Zero failures and skips in both variants. The candidate made 14 fewer Next calls in this suite. The only checks that ran fewer times were the assertions inside that callback |
 | Slow standard and agile MEASURE, x86_64 | Baseline about 1.57 s inside WM_CHAR and 21 probe timeouts per case. Candidate 0–1 ms inside WM_CHAR, zero inline Next calls and 0–1 probe timeouts. All 128 suggestions returned per case |
+| Text replacement from inside the first Next call, x86_64 | The replacement remained in the edit and the candidate made no further Next calls for the canceled request |
 | Full L0, paired L2, AutoCAD and the other shell32 consumer (L4) | Open |
 
-This patch remains a candidate. It targets the measured behavior that
-held up the edit and still needs an AutoCAD test.
+The second revision includes two changes from independent review.
+It releases a running request if a callback unwinds and checks the
+edit state again after autoappend sends messages. The x86_64
+autocomplete and MEASURE checks were repeated with the verified
+v2 artifact. The AutoCAD comparison is pending.
 
 ## AutoCAD A/B test
 
-Use the artifact named **shell32-autocomplete-candidate** from the
-**Build shell32 autocomplete candidate** workflow. Verify SHA256SUMS
-in the downloaded folder. The artifact provides both DLLs for
-winum-11.22-1. The base and candidate must use the same version and
+Use **shell32-autocomplete-candidate** from the
+[v2 build](https://github.com/Harvi654/winum/actions/runs/44562084665)
+at `12294c2`. Verify SHA256SUMS in the downloaded folder. The artifact
+provides both DLLs for winum-11.22-1. The base and candidate use the same version and
 other patches. If the AutoCAD test uses the 11.22-1 MSXML3 PR #4
 runtime, keep that runtime in both trials and add these DLLs to its
 candidate copy.
@@ -52,10 +56,10 @@ df -h "$HOME". The two test prefixes and runtime copy are created on
 the home filesystem.
 
 ~~~bash
+export ACAD_AUTOCOMPLETE_WORK="$(mktemp -d "$HOME/.acad-autocomplete.XXXXXXXX")"
 (
     set -eu
     umask 077
-    export ACAD_AUTOCOMPLETE_WORK="$(mktemp -d "$HOME/.acad-autocomplete.XXXXXXXX")"
     test -d "$ACAD_AUTOCOMPLETE_SOURCE/drive_c/Program Files/Autodesk/AutoCAD 2027"
     test -x "$ACAD_AUTOCOMPLETE_BASE/bin/wine"
     grep -Eq '^name:[[:space:]]+winum-11\.22-1-x86_64$' "$ACAD_AUTOCOMPLETE_BASE/BUILDINFO"
@@ -77,10 +81,8 @@ the home filesystem.
 )
 ~~~
 
-Export ACAD_AUTOCOMPLETE_WORK with the resulting directory in the same
-terminal. This launcher function uses the AutoCAD project's prefix
-and Wine overrides. Run each trial separately. Close AutoCAD before
-starting the other one.
+In the same terminal, define this launcher function and run each trial
+separately. Close AutoCAD before starting the other one.
 
 ~~~bash
 run_acad_autocomplete() (
@@ -89,6 +91,7 @@ run_acad_autocomplete() (
     export WINEPREFIX="$ACAD_PREFIX"
     export INV_PREFIX="$ACAD_PREFIX"
     export ACAD_WINE_BIN="$2/bin"
+    export INV_WINE=system
     export PATH="$ACAD_WINE_BIN:$PATH"
     export WINE="$ACAD_WINE_BIN/wine"
     export WINESERVER="$ACAD_WINE_BIN/wineserver"
@@ -98,6 +101,18 @@ run_acad_autocomplete() (
     test -f scripts/launch-autocad.sh
     test -x "$WINE"
     test -d "$ACAD_PREFIX/drive_c"
+    mkdir -p "$ACAD_LOGDIR"
+    if ! bash -c '
+        source scripts/common-env.sh || exit 1
+        cd "$INVENTOR_DIR" || exit 1
+        source scripts/lib/common.sh || exit 1
+        test "$(realpath -e "$WINEPREFIX")" = "$(realpath -e "$1")" &&
+        test "$(realpath -e "$(type -P wine)")" = "$(realpath -e "$2/wine")" &&
+        test "$(realpath -e "$(type -P wineserver)")" = "$(realpath -e "$2/wineserver")"
+    ' bash "$ACAD_PREFIX" "$ACAD_WINE_BIN" > "$ACAD_LOGDIR/preflight.log" 2>&1; then
+        printf '%s\n' 'Launcher prefix or runtime check failed.' >&2
+        exit 1
+    fi
     bash scripts/launch-autocad.sh
 )
 
