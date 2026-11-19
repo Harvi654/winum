@@ -34,11 +34,11 @@ bash scripts/build-measure-bundle.sh "$MSXML3_MEASURE_OUT" \
 (cd "$MSXML3_MEASURE_OUT" && sha256sum -c SHA256SUMS)
 ```
 
-The exact contributor test is also built for x86_64 and i386 by the
-[test job](https://github.com/Harvi654/winum/actions/runs/44528763253).
-Its `msxml3-same-node-l1` artifact contains `run-tests.bat`. The
-standalone MEASURE establishes Windows behavior. L1 on the Wine test
-is recorded after that test reflects the measurements.
+The Windows-informed Wine test was built for x86_64 and i386 in
+[run 44534917242](https://github.com/Harvi654/winum/actions/runs/44534917242).
+The [L1 artifact](https://github.com/Harvi654/winum/actions/runs/44534917242/artifacts/14539207303)
+contains `run-tests.bat`. The standalone MEASURE establishes Windows
+behavior, and the domdoc suite checks the assertions based on it.
 
 ## Windows 10 result (2026-11-19)
 
@@ -61,7 +61,17 @@ element accesses. The revised regression test checks that the return
 matches the relevant input wrapper and verifies the same tree outcome.
 Leaving the insertBefore same-child guard after the type check preserves
 the measured `E_FAIL` for the root. The runtime hunks are unchanged.
-This is the MEASURE result. L1 for the revised Wine test is pending.
+### L1 of the revised Wine test (2026-11-19)
+
+The maintainer ran the revised `msxml3:domdoc` bundle from `e2b2162`
+in the offline Windows 10 VM. Both binaries ran 37,156 checks with
+zero failures or todos and exit 0. Each had three skips for unsupported
+MSXML 4.0 classes. None of the same-node checks was skipped.
+
+| Architecture | Checks | Failures | Skipped | Exit |
+| --- | ---: | ---: | ---: | ---: |
+| x86_64 | 37,156 | 0 | 3 | 0 |
+| i386 | 37,156 | 0 | 3 | 0 |
 
 ## AutoCAD 2027 comparison on Arch
 
@@ -185,7 +195,11 @@ recorded saves on the first two starts. The trace counts calls and
 does not identify whether their two arguments are aliases. This is
 a positive application observation for the profile, with no paired
 healthy baseline and with the saving failures still open. The
-after-install reference was never launched.
+after-install reference was never launched. Read-only verification
+found valid XML in both profiles. The after-install reference
+(25,501 bytes) has zero `AcApData` elements. The candidate copy
+(49,311 bytes) has one. Neither file contained malformed XML at the
+time of the check.
 
 To see whether the reference and test copy are both readable XML and
 whether their `AcApData` counts differ, run the watcher in read-only
@@ -221,11 +235,12 @@ revision is covered by the separate
 - A generated `__pycache__/check.cpython-311.pyc` from another topic
   appears in the PR diff and should be excluded. The current commit
   author uses the contributor's handle and GitHub noreply address.
-- Before promotion into `patches/series`: measure Windows, match and
-  rerun the final regression tests on both Windows architectures,
-  record L0/L2 on the full Wine 11.22 series, run the maintainer's
-  Inventor preview and smoke checks and record this AutoCAD comparison.
-  Add a patch page with the L1 marker once earned. The release checker
-  expects the standard patch header. Preserve contributor attribution
-  in the page and history. The PR's normal build did not include the
-  candidate, which is outside its series.
+- Windows measurement and L1 passed for the test revision on
+  `test-run/msxml3-replacechild-same-node-2`. The PR should carry the
+  reviewed test revision and validation record before promotion.
+  Check final paired L2 on the full Wine 11.22 series and the
+  maintainer's Inventor preview and smoke tests. The AutoCAD
+  profile observation is recorded above. Add the patch page and
+  L1 marker and use the standard patch header with attribution
+  preserved. The PR's normal build did not include the candidate,
+  which is outside its series.
