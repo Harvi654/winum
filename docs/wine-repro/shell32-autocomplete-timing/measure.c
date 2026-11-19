@@ -1,5 +1,5 @@
 /* Original, AI-assisted (Codex), LGPL-2.1-or-later. */
-#define _WIN32_WINNT 0x0600
+#define _WIN32_WINNT 0x0602
 #define COBJMACROS
 
 #include <windows.h>
@@ -23,6 +23,10 @@ struct observation
     LONG next_calls, next_ui, next_worker, during_input, before_input;
     LONG returned, eof, resets, clones, largest_request;
     LONG probe_responses, probe_during_next, probe_timeouts;
+    LONG apartment_sample, marshal_queries, agile_queries;
+    HRESULT apartment_hr;
+    APTTYPE apartment;
+    APTTYPEQUALIFIER apartment_qualifier;
 };
 
 struct source
@@ -39,6 +43,13 @@ struct probe
 {
     HWND window;
     struct observation *obs;
+};
+
+struct marshal_control
+{
+    IStream *stream;
+    HRESULT init_hr, unmarshal_hr, next_hr;
+    ULONG fetched;
 };
 
 static LONG read_count(LONG *counter)
@@ -63,6 +74,8 @@ static HRESULT WINAPI source_query_interface(IEnumString *iface, REFIID iid, voi
     struct source *source = CONTAINING_RECORD(iface, struct source, entry);
 
     *out = NULL;
+    if (IsEqualIID(iid, &IID_IMarshal)) InterlockedIncrement(&source->obs->marshal_queries);
+    if (IsEqualIID(iid, &IID_IAgileObject)) InterlockedIncrement(&source->obs->agile_queries);
     if (IsEqualIID(iid, &IID_IUnknown) || IsEqualIID(iid, &IID_IEnumString))
     {
         *out = iface;
@@ -105,6 +118,13 @@ static HRESULT WINAPI source_next(IEnumString *iface, ULONG requested, LPOLESTR 
 
     if (!out || (!fetched && requested != 1)) return E_POINTER;
     if (fetched) *fetched = 0;
+    if (!InterlockedCompareExchange(&obs->apartment_sample, 1, 0))
+    {
+        obs->apartment = APTTYPE_CURRENT;
+        obs->apartment_qualifier = APTTYPEQUALIFIER_NONE;
+        obs->apartment_hr = CoGetApartmentType(&obs->apartment, &obs->apartment_qualifier);
+        InterlockedExchange(&obs->apartment_sample, 2);
+    }
     InterlockedIncrement(&obs->next_calls);
     InterlockedIncrement(GetCurrentThreadId() == obs->ui_thread ? &obs->next_ui : &obs->next_worker);
     phase = read_count(&obs->phase);
@@ -254,18 +274,111 @@ static DWORD WINAPI probe_thread(void *arg)
     return 0;
 }
 
+static void pump_messages(void)
+{
+    MSG message;
+
+    while (PeekMessageW(&message, NULL, 0, 0, PM_REMOVE))
+    {
+        TranslateMessage(&message);
+        DispatchMessageW(&message);
+    }
+}
+
+static void print_apartment(struct observation *obs)
+{
+    if (read_count(&obs->apartment_sample) != 2)
+    {
+        puts("first_next_apartment_sample=unavailable");
+        return;
+    }
+    printf("first_next_apartment_hr=%08lx type=%d qualifier=%d\n",
+           (unsigned long)obs->apartment_hr, obs->apartment, obs->apartment_qualifier);
+}
+
+static DWORD WINAPI marshal_worker(void *arg)
+{
+    struct marshal_control *control = arg;
+    IEnumString *enumerator;
+    IStream *stream;
+    LPOLESTR text = NULL;
+
+    control->init_hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    if (FAILED(control->init_hr)) return 0;
+
+    stream = control->stream;
+    control->stream = NULL;
+    control->unmarshal_hr = CoGetInterfaceAndReleaseStream(stream, &IID_IEnumString, (void **)&enumerator);
+    if (SUCCEEDED(control->unmarshal_hr))
+    {
+        control->next_hr = IEnumString_Next(enumerator, 1, &text, &control->fetched);
+        CoTaskMemFree(text);
+        IEnumString_Release(enumerator);
+    }
+    CoUninitialize();
+    return 0;
+}
+
+static int run_marshal_control(BOOL agile)
+{
+    struct marshal_control control = {NULL, E_UNEXPECTED, E_UNEXPECTED, E_UNEXPECTED, 0};
+    struct observation *obs = calloc(1, sizeof(*obs));
+    struct source *source = NULL;
+    HANDLE worker = NULL;
+    DWORD wait_result;
+    HRESULT hr = E_OUTOFMEMORY;
+    int status = 1;
+
+    printf("marshal_control=%s\n", agile ? "free-threaded" : "plain-sta");
+    if (!obs) return status;
+    obs->refs = 1;
+    obs->ui_thread = GetCurrentThreadId();
+    obs->agile = agile;
+    source = source_create(obs, 0);
+    if (!source) goto done;
+    hr = CoMarshalInterThreadInterfaceInStream(&IID_IEnumString, (IUnknown *)&source->entry, &control.stream);
+    if (FAILED(hr)) goto done;
+
+    worker = CreateThread(NULL, 0, marshal_worker, &control, 0, NULL);
+    if (!worker)
+    {
+        hr = HRESULT_FROM_WIN32(GetLastError());
+        goto done;
+    }
+    while ((wait_result = MsgWaitForMultipleObjects(1, &worker, FALSE, INFINITE, QS_ALLINPUT)) == WAIT_OBJECT_0 + 1)
+        pump_messages();
+    if (wait_result != WAIT_OBJECT_0)
+    {
+        printf("marshal_control_wait_error=%lu\n", (unsigned long)GetLastError());
+        ExitProcess(2);
+    }
+    printf("marshaled_worker_init=%08lx unmarshal=%08lx next=%08lx fetched=%lu on_ui=%ld off_ui=%ld\n",
+           (unsigned long)control.init_hr, (unsigned long)control.unmarshal_hr, (unsigned long)control.next_hr,
+           (unsigned long)control.fetched, read_count(&obs->next_ui), read_count(&obs->next_worker));
+    print_apartment(obs);
+    status = FAILED(control.init_hr) || FAILED(control.unmarshal_hr) || FAILED(control.next_hr)
+        || !read_count(&obs->next_calls);
+
+done:
+    if (status) printf("marshal_control_incomplete hr=%08lx\n", (unsigned long)hr);
+    if (worker) CloseHandle(worker);
+    if (control.stream)
+    {
+        CoReleaseMarshalData(control.stream);
+        IStream_Release(control.stream);
+    }
+    if (source) IEnumString_Release(&source->entry);
+    release_observation(obs);
+    return status;
+}
+
 static void observe_messages(void)
 {
     ULONGLONG end = GetTickCount64() + OBSERVE_MS;
-    MSG message;
 
     while (GetTickCount64() < end)
     {
-        while (PeekMessageW(&message, NULL, 0, 0, PM_REMOVE))
-        {
-            TranslateMessage(&message);
-            DispatchMessageW(&message);
-        }
+        pump_messages();
         MsgWaitForMultipleObjects(0, NULL, FALSE, 25, QS_ALLINPUT);
     }
 }
@@ -345,6 +458,9 @@ static int run_case(const char *name, ULONG items, DWORD delay, BOOL agile)
     printf("ui_probe_replies=%ld replies_during_next=%ld ui_probe_timeouts=%ld\n",
            read_count(&obs->probe_responses), read_count(&obs->probe_during_next),
            read_count(&obs->probe_timeouts));
+    print_apartment(obs);
+    printf("provider_qi_imarshal=%ld qi_iagileobject=%ld\n",
+           read_count(&obs->marshal_queries), read_count(&obs->agile_queries));
     status = read_count(&obs->next_calls) == read_count(&obs->before_input);
     if (status) puts("no_next_after_input");
 
@@ -390,6 +506,8 @@ int main(void)
     if (!thread) return 2;
 
     printf("MEASURE shell32-autocomplete-timing bits=%u\n", (unsigned)(8 * sizeof(void *)));
+    status |= run_marshal_control(FALSE);
+    status |= run_marshal_control(TRUE);
     status |= run_case("empty", 0, 0, FALSE);
     status |= run_case("fast-long", 1024, 0, FALSE);
     status |= run_case("slow-standard", 128, 12, FALSE);

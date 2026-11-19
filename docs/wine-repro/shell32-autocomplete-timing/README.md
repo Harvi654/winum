@@ -16,7 +16,7 @@ finite, reports the number of strings produced and returns
 - `empty`: empty control case.
 - `fast-long`: 1,024 in-memory suggestions, no added delay.
 - `slow-standard`: 128 suggestions, 12 ms added delay per returned
-  item, standard COM marshaling for an STA object.
+  item, an object created on the edit's STA without a custom marshaler.
 - `slow-agile`: the same 128 suggestions and delay with a
   free-threaded marshaler, to distinguish callback threading from
   delivery through the standard STA proxy.
@@ -81,7 +81,7 @@ that owned the edit window.
 | --- | ---: | --- | ---: |
 | Empty | 1 / 1 | `S_FALSE` / `S_FALSE` | 0 / 0 |
 | Fast, 1,024 items | 1,001 / 1,001 | No `S_FALSE` observed in either run | 0 / 0 |
-| Slow, standard marshaling | 123 / 122 | Call still active at sampling in both runs | 60 / 62 |
+| Slow, plain STA object | 123 / 122 | Call still active at sampling in both runs | 60 / 62 |
 | Slow, free-threaded marshaling | 123 / 123 | Call still active at sampling in both runs | 61 / 58 |
 
 Both architectures requested one item per call, reset the source once
@@ -98,6 +98,40 @@ how the dialog could stop responding during the repeated
 `IsNetDrive` calls in the AutoCAD 2027 trace. Whether that source
 would finish and whether moving or rescheduling callbacks fixes the
 dialog still need separate confirmation in AutoCAD.
+
+## Follow-up on COM apartments
+
+The original `slow-standard` result shows where `Next` ran. It does
+not establish that Windows autocomplete used a standard COM proxy.
+The updated program first measures two controls without autocomplete.
+It marshals the same kinds of provider objects from the edit's STA to
+an MTA worker with `CoMarshalInterThreadInterfaceInStream`. The worker
+unmarshals and calls `Next` once. The STA pumps messages. The two
+controls show where the callee runs through an explicit COM transfer,
+for a plain object and for an object that aggregates the free-threaded
+marshaler.
+
+The program then repeats the four autocomplete cases. It adds the
+`CoGetApartmentType` HRESULT, type and qualifier from the first `Next`,
+and the number of provider queries for `IMarshal` and `IAgileObject`.
+An apartment lookup failure is itself a result. Interface query counts
+and apartment type show what the provider can observe. They do not
+identify the implementation of Windows autocomplete.
+
+Use the same [offline VM procedure](#offline-windows-10) and return the
+same three text files from a fresh directory. The outcomes determine
+whether a COM worker using an ordinary proxy can reproduce the measured
+callback behavior for the plain object. If autocomplete differs from
+that control, measure a provider owned by a separate STA and supplied
+through an explicit proxy before choosing a worker design. Before a
+runtime change, also measure what happens to in-flight `Next` calls
+when input changes, autocomplete is disabled or the edit is destroyed.
+
+In a Linux x86_64 check with winum-11.22-1 and the v2 runtime candidate,
+the explicit marshaling controls both returned `S_FALSE`. The plain
+provider received `Next` on the original STA, and the free-threaded
+provider received it on the MTA worker. Windows results for the new
+controls are pending.
 
 ## Wine regression test
 
