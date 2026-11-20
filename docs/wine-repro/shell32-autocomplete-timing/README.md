@@ -860,6 +860,37 @@ markers with the earlier pair. Record `recent_history_restored=` for
 both runs. A changed outcome would need a repeat after restoring the
 policy to confirm the association.
 
+On 2026-11-20, `open-activex` and `save-activex` both reached the
+policy branch once and neither emitted a scratch-path message from
+`SHAddToRecentDocs`. Each still exited with code 9 after `0xc0000409`
+at `coreclr.dll+0x14922d`. The temporary policy was removed after
+each run. Save As produced a 32,046-byte `AC1032` file before the
+crash, without a recorded completion. Shell recent-document history
+processing is unnecessary to reproduce either crash.
+
+### Compare the desktop operations on native Windows
+
+Use native AutoCAD 2027 at the same product update level when that
+installation is available. This is a program check. If AutoCAD requires
+sign-in, use the separate online snapshot and leave the offline MEASURE
+snapshot for Windows API tests.
+
+Put `run-dwg-desktop-check.bat`, `dwg-open-events.lsp`, and the
+SHA-256-pinned `line-2018.dwg` from the earlier control in one writable
+folder. Run the batch file. It verifies the DWG, stages copies in a new
+temporary directory, and prints the same ActiveX calls used under Wine.
+Run each in a separate AutoCAD session. If the AutoLISP load is blocked,
+record that as a setup result. The batch file writes
+`result-autocad-dwg-windows.txt` with the Windows version and selected
+markers. Return only that text, the AutoCAD version from About, and
+whether the drawing opened, saved, or crashed. Leave DWGs and raw
+logs in the VM.
+
+If native AutoCAD completes both calls on the same fixture, use the
+difference to prioritize compatibility analysis of the desktop file
+lifecycle. A matching native failure would redirect the investigation
+toward the application build or the shared fixture and setup.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the
