@@ -1132,6 +1132,31 @@ that eventually reported the unhandled exception. Matching sites can
 identify a shared earlier path. Their appearance in a returning call
 also establishes that reaching the site can be survivable.
 
+The saved ObjectDBX call and post-return messages resolved to
+`oleaut32.dll+0x1a481`. The desktop Open call had one access violation
+message at `accore.dll+0x5cc8c3` and one with an unresolved address.
+Both were on the calling thread. Neither appeared on the thread that
+reported the terminal `0xc0000409`. `oleaut32.dll+0x1a481` also appeared
+before Open, and `adwindows.dll+0x303edb` appeared before both calls.
+The measured in-call sites differ between the two paths. The terminal
+thread is a stronger lead for the common Open and Save As failure.
+
+Read the latest saved Open and Save As traces from both runtimes with
+`--fault-chain`. This reports up to eight exception dispatch messages
+from the eventual fatal thread in order, with the observed instruction
+sites and only small fast-fail or HRESULT-shaped CLR arguments when
+logged. The argument remains a raw numeric observation. Other threads,
+absolute addresses, paths and register dumps stay out of the summary.
+
+~~~bash
+python3 -I scripts/summarize-autocad-file-window.py --fault-chain "$ACAD_AUTOCOMPLETE_WORK"
+~~~
+
+Return only `fault_chain=` and `fault_dispatch=`. A terminal exception
+without preceding dispatch messages bounds what the saved trace can
+show. An earlier dispatch shared by both operations and runtime
+versions would give a more specific compatibility probe.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the

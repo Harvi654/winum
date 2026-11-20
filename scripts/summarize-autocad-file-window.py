@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # Original, AI-assisted (Codex), LGPL-2.1-or-later.
 import argparse
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, deque
+from dataclasses import dataclass
 import os
 from pathlib import Path
 import re
@@ -16,10 +17,28 @@ PRIVATE_NAMES = {value.lower() for value in (os.getenv('USER'), os.getenv('LOGNA
 REQUEST = re.compile(r'\bname=L"([^"\r\n]+)".*\bdisp=(\d+) options=([0-9a-f]+)\b', re.I)
 WARNING = re.compile(r'L"([^"\r\n]+)" not found \(([0-9a-f]{8})\)$', re.I)
 AV = re.compile(r'^(?:code=|Unhandled exception code )(?:0x)?c0000005\b', re.I)
-AV_ADDRESS = re.compile(r'\baddr(?:=| )(?:0x)?([a-f0-9]+)(?: \(([^()]+)\+(?:0x)?([a-f0-9]+)\))?', re.I)
+EXCEPTION_ADDRESS = re.compile(r'\baddr(?:=| )(?:0x)?([a-f0-9]+)(?: \(([^()]+)\+(?:0x)?([a-f0-9]+)\))?', re.I)
+EXCEPTION_HEADER = re.compile(r'^code=(?:0x)?([0-9a-f]{8})(?: \([^)]*\))? flags=(?:0x)?([0-9a-f]+) addr=', re.I)
+EXCEPTION_ARG0 = re.compile(r'^\s*info\[0\]=(?:0x)?([0-9a-f]{1,16})\s*$', re.I)
 FATAL = re.compile(r'^Unhandled exception code (?:0x)?([0-9a-f]{8})\b', re.I)
 MARKER = re.compile(r'/winum-dwg\.[a-z0-9]+/open-events\.txt\.(dbx|activex)_open_(enter|return)$')
 DISPOSITION = ('supersede', 'open', 'create', 'open_if', 'overwrite', 'overwrite_if')
+CHAIN_RUNS = (
+    ('baseline-open', '', 'open-activex'),
+    ('baseline-save', '', 'save-activex'),
+    ('dotnet-10.0.15-open', 'dotnet-10.0.15', 'open-activex'),
+    ('dotnet-10.0.15-save', 'dotnet-10.0.15', 'save-activex'),
+)
+
+
+@dataclass
+class Dispatch:
+    code: str
+    flags: str
+    module: str
+    offset: str
+    function: str
+    arg0: str = '-'
 
 
 def path_group(path):
@@ -49,7 +68,7 @@ def public_module(name):
 
 
 def exception_site(message, images):
-    match = AV_ADDRESS.search(message)
+    match = EXCEPTION_ADDRESS.search(message)
     if not match:
         return 'unresolved', '-'
     address, name, offset = match.groups()
@@ -63,7 +82,23 @@ def exception_site(message, images):
     return 'unresolved', '-'
 
 
-def scan(log, probe):
+def keep_dispatch(message, function, images, entries):
+    if match := EXCEPTION_HEADER.match(message):
+        code, flags = match.groups()
+        module, offset = exception_site(message, images)
+        entries.append(Dispatch(code.lower(), flags.lower(), module, offset, function))
+        return True
+    if entries and entries[-1].function == function and (match := EXCEPTION_ARG0.fullmatch(message)):
+        event = entries[-1]
+        value = int(match[1], 16)
+        if event.code == 'e0434352' and value >> 32 in (0, 0xffffffff) and value & 0x80000000:
+            event.arg0 = f'0x{value & 0xffffffff:08x}'
+        elif event.code == 'c0000409' and value <= 0xffff:
+            event.arg0 = f'0x{value:x}'
+    return False
+
+
+def scan(log, probe, fault_only=False):
     processes = set()
     entered, returned = Counter(), Counter()
     active, phase, fault = {}, {}, {}
@@ -71,6 +106,9 @@ def scan(log, probe):
     exceptions = Counter()
     sites = Counter()
     mappings, images = {}, defaultdict(dict)
+    chain = defaultdict(lambda: deque(maxlen=8))
+    dispatches = Counter()
+    termination = {}
     with log.open(encoding='utf-8', errors='replace') as stream:
         for line in stream:
             match = LINE.match(line.rstrip('\r\n'))
@@ -93,6 +131,8 @@ def scan(log, probe):
             if pid not in processes or pid in fault:
                 continue
             if channel == 'seh':
+                if fault_only and keep_dispatch(message, function, images[pid], chain[pid, tid]):
+                    dispatches[pid, tid] += 1
                 if AV.match(message):
                     stage, same_thread = phase.get(pid, 'before'), tid == active.get(pid)
                     exceptions[stage, same_thread] += 1
@@ -100,7 +140,9 @@ def scan(log, probe):
                     sites[pid, tid, stage, same_thread, module, offset] += 1
                 if match := FATAL.match(message):
                     fault[pid] = (match[1].lower(), tid)
-            if channel != 'file' or function != 'NtCreateFile':
+                    if fault_only:
+                        termination[pid] = exception_site(message, images[pid])
+            if fault_only or channel != 'file' or function != 'NtCreateFile':
                 continue
             if level == 'trace' and (match := REQUEST.search(message)):
                 raw_path, disposition, options = match.groups()
@@ -126,6 +168,19 @@ def scan(log, probe):
                 event = (match[2].lower(), path_group(path), kind, disposition)
                 lookups[pid, tid, tid == active[pid], event] += 1
                 paths[event].add(path)
+
+    if fault_only:
+        if not fault:
+            print(f'fault_chain={probe} terminal=missing')
+        for pid, (code, tid) in sorted(fault.items()):
+            module, offset = termination[pid]
+            entries = chain[pid, tid]
+            print(f'fault_chain={probe} terminal=0x{code} module={module} offset={offset} '
+                  f'dispatches={dispatches[pid, tid]} shown={len(entries)}')
+            for event in entries:
+                print(f'fault_dispatch=0x{event.code} flags=0x{event.flags} module={event.module} '
+                      f'offset={event.offset} arg0={event.arg0}')
+        return
 
     codes = ','.join(sorted({f'0x{code}' for code, _ in fault.values()})) or 'none'
     print(f'file_detail={probe} started={sum(entered.values())} returned={sum(returned.values())} fatal={codes}')
@@ -165,17 +220,20 @@ def scan(log, probe):
 def main():
     parser = argparse.ArgumentParser(description='Classify saved AutoCAD file lookups and access violation messages.')
     parser.add_argument('work', type=Path, help='original AutoCAD test directory')
+    parser.add_argument('--fault-chain', action='store_true', help='show exception dispatches only on the fatal thread')
     args = parser.parse_args()
-    for probe, trial in (('dbx', 'open-dbx'), ('activex', 'open-activex')):
-        logs = args.work.glob(f'dwg-baseline-{trial}.*/acad-*.log')
+    runs = CHAIN_RUNS if args.fault_chain else (('dbx', '', 'open-dbx'), ('activex', '', 'open-activex'))
+    label = 'fault_chain' if args.fault_chain else 'file_detail'
+    for probe, directory, trial in runs:
+        logs = (args.work / directory).glob(f'dwg-baseline-{trial}.*/acad-*.log')
         try:
             log = max(logs, key=lambda path: path.stat().st_mtime_ns, default=None)
             if log is None:
-                print(f'file_detail={probe} log=missing')
+                print(f'{label}={probe} log=missing')
                 continue
-            scan(log, probe)
+            scan(log, probe, args.fault_chain)
         except OSError:
-            print(f'file_detail={probe} log=unreadable')
+            print(f'{label}={probe} log=unreadable')
 
 
 if __name__ == '__main__':
