@@ -1432,6 +1432,22 @@ These channels do not log every call or return. Keep raw logs local and
 compare an individual API's return on both systems if the trace gives
 a candidate.
 
+The candidate trial logged 289 COM messages from command entry to the
+rename request and zero from that request to the terminal exception.
+The restored recent-history policy, saved DWG and terminal offset
+matched the earlier runs. This capture produced no COM call or return
+to compare in the post-rename interval.
+
+As a separate runtime control, repeat the same `candidate save-events`
+trial with `DOTNET_TieredCompilation=0` exported before launch. Retain
+the COM trace and recent-history settings above, and leave the debugger
+observer and EventPipe off. Microsoft documents this per-process setting
+for [tiered compilation](https://learn.microsoft.com/en-us/dotnet/core/runtime-config/compilation#tiered-compilation).
+Compare the saved file, completion event and terminal exception. A changed
+result calls for a repeat with the default setting on the same runtime.
+This control tests sensitivity to the compilation mode and timing. It
+does not identify the failing operation.
+
 [dwg-urlmon-startup]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-2027-status.md#fixed-along-the-way
 
 ### winum patch review
