@@ -906,6 +906,57 @@ and fail on winum in the same AutoCAD product build. The shared CoreCLR
 offset identifies where the process terminates. A Wine fix needs a
 smaller reproducer that isolates the triggering compatibility difference.
 
+### Compare the installed AutoCAD and .NET files
+
+Build `autocad-file-inventory.cpp` with a C++17 compiler and the
+OpenSSL development files on Linux. Build the same source on Arch with
+64-bit MinGW for the Windows 10 VM. The Windows executable uses
+Windows CNG for SHA-256 and runs without AutoCAD, .NET or administrator
+permissions. The Linux executable reads the tested prefix directly.
+
+~~~bash
+export ACAD_FILE_TOOLS="$PWD/docs/wine-repro/shell32-autocomplete-timing"
+export ACAD_FILE_OUT="$ACAD_AUTOCOMPLETE_WORK/file-comparison"
+mkdir -- "$ACAD_FILE_OUT"
+c++ -std=c++17 -O2 -Wall -Wextra -Werror \
+    "$ACAD_FILE_TOOLS/autocad-file-inventory.cpp" -lcrypto -o "$ACAD_FILE_OUT/autocad-file-inventory"
+x86_64-w64-mingw32-g++ -std=c++17 -O2 -Wall -Wextra -Werror -static -municode \
+    "$ACAD_FILE_TOOLS/autocad-file-inventory.cpp" -lbcrypt -o "$ACAD_FILE_OUT/autocad-file-inventory.exe"
+cp -- "$ACAD_FILE_TOOLS/run-autocad-file-inventory.bat" "$ACAD_FILE_OUT/"
+~~~
+
+Close AutoCAD on both systems. In the offline Windows snapshot with the
+reference installation, put the batch file and `.exe` in a writable
+folder and run the batch file. It defaults to 64-bit `Program Files`
+and writes `windows-autocad-files.tsv`. An installed copy is sufficient
+and AutoCAD does not need to be started or signed in. Transfer only that
+generated text inventory to `ACAD_FILE_OUT` on Arch. The inventory
+contains paths relative to the program roots, byte counts, and SHA-256
+digests. Hashes are calculated for whole files without parsing their
+contents. The tool skips filesystem links and omits user profiles and
+Windows system files.
+
+The inventory covers program binaries, configuration files and drawing
+templates in `Autodesk/AutoCAD 2027`. It also covers x64 .NET 10
+`host/fxr`, `Microsoft.NETCore.App`, and `Microsoft.WindowsDesktop.App`
+for each installed 10.x version, plus `dotnet.exe`. Three entries at
+the `Program Files` level check for known installer misplacements
+involving `AcJab.dll`, `AdMigrator.xml`, and `AcCommandWeight.xml`.
+
+~~~bash
+"$ACAD_FILE_OUT/autocad-file-inventory" \
+    "$ACAD_AUTOCOMPLETE_WORK/base-prefix/drive_c/Program Files" > "$ACAD_FILE_OUT/prefix-autocad-files.tsv"
+python3 -I "$ACAD_FILE_TOOLS/compare-autocad-files.py" \
+    "$ACAD_FILE_OUT/windows-autocad-files.tsv" "$ACAD_FILE_OUT/prefix-autocad-files.tsv" \
+    "$ACAD_FILE_OUT/local-differences.tsv"
+~~~
+
+Return only the printed `root=`, `group=` and `component=` summary.
+Keep the full inventories and `local-differences.tsv` private. Differences
+can reflect language, configuration or installed package choices. A
+matching hash confirms bytes for that file. Registry and COM registration
+state need separate checks.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the
