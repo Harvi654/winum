@@ -83,6 +83,18 @@ with four bytes and zero bytes respectively.
 
 A preliminary x86_64 run on Winum 11.22 (`ba856f8`) produced the same
 30 records using a locally compiled executable from the same probe
-source. The comparison with the exact CI executables on both Linux
-runtimes remains to be run. A local i686 launch failed before entering
-the probe. An independent i686 control failed in the same environment.
+source. An i686 launch and an independent i686 control failed before
+entering their probes in that environment.
+
+The maintainer then ran the exact CI executables with Arch's system Wine
+and Winum. Both runtimes reported `wine-11.22`. Both architectures ran to
+completion and matched all Windows records.
+
+| Architecture | Exports checked | Scenario steps measured | Matching records | Differences | Incomplete |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| x86_64 | 12 | 18 | 30 | 0 | 0 |
+| i686 | 12 | 18 | 30 | 0 | 0 |
+
+The comparison uses the Arch package as its distribution baseline.
+The Radeon Vulkan and desktop MIME warnings appeared during the Linux
+runs, and the probe completion markers were present for both runtimes.
