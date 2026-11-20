@@ -770,6 +770,48 @@ A matching fail-fast after `activex_save_enter` reproduces the crash
 through both desktop save entry points. An `activex_save_return` and
 a readable output show that this ActiveX route can complete the save.
 
+On 2026-11-20, the baseline ActiveX trial reached `activex_save_enter`
+and `save_begin` and produced a 32,046-byte `AC1032` file. The launcher
+exited with code 9 after `0xc0000409` at `coreclr.dll+0x14922d`. The
+trace contains no save completion, method return, or caught ActiveX
+error. Both desktop save entry points reproduce the failure. The
+earlier Core Console readback covered the command trial's output.
+
+### Compare Shell activity during ActiveX open and save
+
+The desktop `Documents.Open` and `Document.SaveAs` paths fail at the
+same CoreCLR offset. Desktop document creation, tab switching, and
+ObjectDBX reads succeeded. Check whether the two failing operations
+show shared activity at the Windows Shell boundary before attributing
+the failure to file metadata or recent-document integration.
+
+Set `ACAD_DWG_SHELL_TRACE=1` and repeat `open-activex` and `save-activex`
+as separate launches on the same baseline. Use the same 2018 line DWG
+for open and a new one-line drawing for save. The opt-in adds the
+Wine `shell` channel for `acad.exe` and counts messages from a fixed
+set of Shell functions across the run. It reports process, fatal-thread
+and scratch-path counts. The scratch-path count requires a message to
+print the unique scratch directory name. Some messages log only
+pointers, and a function may emit multiple messages for a single call.
+These counts describe observed trace output. Each raw log stays in the
+private run directory, and the summary omits function arguments.
+
+~~~bash
+(
+    export ACAD_OPEN_EVENTS_LISP="$PWD/docs/wine-repro/shell32-autocomplete-timing/dwg-open-events.lsp"
+    export ACAD_DWG_SHELL_TRACE=1
+    unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
+    bash scripts/trace-autocad-dwg.sh baseline open-activex "$ACAD_DWG_CONTROLS/line-2018.dwg" || [[ $? -eq 9 ]] || exit 1
+    bash scripts/trace-autocad-dwg.sh baseline save-activex
+)
+~~~
+
+For each run, return `variant=`, the `open_event=` or `save_event=`
+markers, `fault_module=`, `shell_trace_acad_processes=`, and `shell_api=`.
+Compare the fault signature before using the counts to select a new
+probe. A shared message pattern needs a targeted follow-up to establish
+whether it contributes to the failure.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the

@@ -211,6 +211,19 @@ else
         "$1" "${2##*-}" "${2%%-*}"
     if [[ -n "$probe_dwg" ]]; then printf 'Path for OPEN: %s\n' "$probe_path"; fi
 fi
+shell_subject=
+if [[ "${ACAD_DWG_SHELL_TRACE:-0}" == 1 ]]; then
+    case "$2" in
+        open-activex|save-activex)
+            shell_subject="${probe_dir##*/}"
+            export WINEDEBUG="$WINEDEBUG,$acad_image:+shell"
+            ;;
+        *)
+            echo 'Shell tracing requires open-activex or save-activex.' >&2
+            exit 2
+            ;;
+    esac
+fi
 eventpipe_dir=
 if [[ "${ACAD_EVENTPIPE:-0}" == 1 ]]; then
     test "$(realpath -e "$ACAD_PREFIX/drive_c")" = "$ACAD_PREFIX/drive_c"
@@ -324,7 +337,7 @@ fi
 
 # Only print module names and numeric exception fields. In particular,
 # keep the Windows paths and debugger preamble inside the private run directory.
-python3 - "${logs[0]}" "$eventpipe_dir" "$2" <<'PY'
+python3 - "${logs[0]}" "$eventpipe_dir" "$2" "$shell_subject" <<'PY'
 from collections import Counter, deque
 import mmap
 from pathlib import Path
@@ -338,6 +351,10 @@ unloaded = re.compile(r'\b(?:unloading|unloaded module) L?"([^"]+)"', re.I)
 known_modules = {"coreclr.dll", "clr.dll", "shell32.dll", "msxml3.dll",
                  "d3dcompiler_47.dll", "d3dcompiler_47_cor3.dll", "wpfgfx_cor3.dll"}
 reg_load_appkey = re.compile(r":fixme:reg:RegLoadAppKey[AW]\b")
+shell_functions = ("SHAddToRecentDocs", "SHChangeNotify", "SHCreateItemFromParsingName",
+                   "SHGetFileInfoW", "SHGetPropertyStoreFromParsingName")
+shell_call = re.compile(r"(?:trace|warn|fixme|err):shell:(" + "|".join(shell_functions) + r")\b")
+shell_subject = sys.argv[4].lower()
 idle_trace_types = (
     "System.IO.FileNotFoundException",
     "System.ServiceModel.EndpointNotFoundException",
@@ -399,6 +416,8 @@ acad_pids = set()
 trueview_pids = set()
 clr_pids = set()
 reg_loads = Counter()
+shell_lines = Counter()
+shell_path_lines = Counter()
 regions = {}
 active = {}
 recent = deque(maxlen=8)
@@ -419,6 +438,11 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
                 console_dwg = match.groups()
         ids = prefix.match(line)
         pid, tid = ids.groups() if ids else ("?", "?")
+        if shell_subject and ids and (match := shell_call.match(line, ids.end())):
+            name = match[1]
+            shell_lines[pid, tid, name] += 1
+            if shell_subject in line[match.end():].lower():
+                shell_path_lines[pid, name] += 1
         if reg_load_appkey.search(line):
             reg_loads[pid] += 1
         if ":trace:module:map_image_into_view " in line and (match := mapped.search(line)):
@@ -484,6 +508,16 @@ for pid, tid, code, flags, addr, image in fatal:
             print("matches_prior_fault=d3dcompiler_47_cor3.dll+0x11922d")
     else:
         print("fault_module=unknown")
+if shell_subject:
+    fault_thread = next(((pid, tid) for pid, tid, *_ in reversed(fatal) if pid in acad_pids), None)
+    print(f"shell_trace_acad_processes={len(acad_pids)} shell_trace_fault_thread={int(fault_thread is not None)}")
+    for name in shell_functions:
+        process_lines = sum(count for (pid, _, api), count in shell_lines.items()
+                            if pid in acad_pids and api == name)
+        path_lines = sum(shell_path_lines[pid, name] for pid in acad_pids)
+        thread_lines = shell_lines[(*fault_thread, name)] if fault_thread else 0
+        print(f"shell_api={name} process_lines={process_lines} fault_thread_lines={thread_lines} "
+              f"scratch_path_lines={path_lines}")
 for module, offset in frames:
     print(f"frame module={module}" + (f" offset=0x{offset}" if offset else ""))
 for name in dict.fromkeys(managed):
