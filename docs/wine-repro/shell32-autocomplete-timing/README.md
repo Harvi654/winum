@@ -750,6 +750,17 @@ twelve records on the thread that reported `0xc0000409`. A record is a
 candidate for further analysis. Thread identity alone does not make it
 the cause, and an empty result can reflect a missed callback.
 
+On 2026-11-20, the observer self-test ran successfully and recorded 414
+throws. The only record on the fail-fast thread was
+`System.NotImplementedException` with HRESULT `0x80004001`. AutoCAD
+again left an `AC1032` DWG and ended at `coreclr.dll+0x1855fd` after
+`save_begin`. The HRESULT identifies the managed exception but leaves
+its origin open. Use the observer version that reports assembly and
+method names for `NotImplementedException`. `source=exception` records
+frames from the exception and `source=live` records the stack inside
+the callback when the exception has no frames yet. The first usable
+call site will guide the next targeted comparison with Windows.
+
 ### Check creation and activation of a second desktop document
 
 `new-document` calls `Documents.Add` from an already open blank

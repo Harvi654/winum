@@ -842,18 +842,26 @@ if sys.argv[8]:
                           if pid in acad_pids and code.lower() == "c0000409"), None)
         records = 0
         related = []
-        record = re.compile(r"managed_exception tid=0x([0-9a-f]+) type=([A-Za-z0-9_.+`]{1,180}|<redacted>) hr=0x([0-9a-f]{8})")
+        current = None
+        symbol = r"[A-Za-z0-9_.+`<>$-]{1,240}"
+        record = re.compile(rf"managed_exception tid=0x([0-9a-f]+) type={symbol} hr=0x[0-9a-f]{{8}}")
+        frame = re.compile(rf"managed_frame source=(?:exception|live) index=(?:[0-9]|1[01]) assembly={symbol} method={symbol}")
         for entry in observer.read_text(encoding="utf-8", errors="replace").splitlines():
             if re.fullmatch(r"managed_probe=(?:armed tid=0x[0-9a-f]+|self_test ok=[01]|limit)", entry):
                 print(entry)
             elif (match := record.fullmatch(entry)):
                 records += 1
-                if int(match[1], 16) == fault_tid:
-                    related.append(entry)
+                current = [entry] if int(match[1], 16) == fault_tid else None
+                if current is not None:
+                    related.append(current)
+            elif entry.startswith("managed_exception "):
+                current = None
+            elif current is not None and len(current) <= 12 and frame.fullmatch(entry):
+                current.append(entry)
         print(f"managed_probe_records={records} on_fault_thread={len(related)} "
               f"fault_thread_confirmed={int(fault_tid is not None)}")
-        for entry in related[-12:]:
-            print(entry)
+        for group in related[-12:]:
+            print(*group, sep="\n")
 if shell_subject:
     fault_thread = next(((pid, tid) for pid, tid, *_ in reversed(fatal) if pid in acad_pids), None)
     print(f"shell_trace_acad_processes={len(acad_pids)} shell_trace_fault_thread={int(fault_thread is not None)}")

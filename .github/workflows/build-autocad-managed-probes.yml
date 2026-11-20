@@ -96,6 +96,8 @@ jobs:
           WINUM_ACAD_EXCEPTION_LOG="$PWD/self-test.txt" ./sdk/dotnet self-test.dll
           grep -Fx 'managed_probe=self_test ok=1' self-test.txt
           grep -E '^managed_exception tid=0x[0-9a-f]+ type=System.InvalidOperationException hr=0x80131509$' self-test.txt
+          grep -E '^managed_exception tid=0x[0-9a-f]+ type=System.NotImplementedException hr=0x80004001$' self-test.txt
+          grep -E '^managed_frame source=(exception|live) index=[0-9]+ assembly=self-test method=WinumSaveObserver\+StackCheck.Throw$' self-test.txt
           cp "$GITHUB_WORKSPACE/LICENSE" "$out/"
           cd "$out"
           sha256sum LICENSE managed-save-observer.dll > SHA256SUMS
