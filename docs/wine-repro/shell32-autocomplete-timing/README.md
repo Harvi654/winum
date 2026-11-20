@@ -1219,19 +1219,37 @@ build. Disabling recent-document history left both crashes reproducible.
   call in the failing operation. The series leaves Wine's x86_64
   fast-fail dispatch unchanged.
 
-For the first patch comparison, build two Wine 11.22 runtimes from the
-same series with only `combase-stub-activation-context.patch` omitted
-from the comparison build. Keep MSXML3 PR #4, the URLMON startup fixes,
-and the .NET version in both trials. Use private copies of the same
-test-prefix state and run `open-activex` and `save-activex`. Compare
-successful return markers and DWG readback with the Windows results.
-Record startup separately if either build cannot reach the operation.
-The patch review has no paired AutoCAD result yet.
+For the first patch comparison, use the [reference build][dwg-review-a]
+and the [build without the COM patch][dwg-review-b]. The preparation
+script verifies both archives and compares their patch manifests. It uses
+the reference Wine runtime in both trials and stages only the x86_64 and
+i386 `combase.dll` from the comparison build in the candidate runtime
+and prefix. Both trials keep MSXML3 PR #4, the URLMON startup fixes,
+and the same .NET version from the previous test prefix.
+
+Close AutoCAD before copying the previous test prefix. Pass the previous
+test directory with `base-prefix` and `dwg-controls/line-2018.dwg` to
+`scripts/prepare-autocad-combase-ab.sh` along with a new empty directory
+on the test disk. Check that the disk can fit two copies of the prefix.
+Start with `open-activex` on each copy, one launch at a time. Set
+`ACAD_AUTOCOMPLETE_WORK` to the new directory and `ACAD_OPEN_EVENTS_LISP`
+to `dwg-open-events.lsp` in this directory of the repository. Pass
+`$ACAD_AUTOCOMPLETE_WORK/line-2018.dwg` to `trace-autocad-dwg.sh` with
+`baseline open-activex` and `candidate open-activex` in turn. Follow the
+printed AutoLISP steps once per launch. A successful Open should report
+`open_event=activex_open_return` and `open_event=activex_open_expected_dwg`.
+Compare `variant=`, `open_event=`, the `combase.dll` load, `dotnet_loaded=`,
+`unhandled` and `fault_module=`. Record startup separately if an arm
+cannot reach the operation. Use a fresh pair for `save-activex` if Open
+changes either prefix's application state. Save success needs the return
+marker and DWG readback because the baseline already writes a file.
 
 [dwg-review-series]: https://github.com/Harvi654/winum/blob/aeb7a59/patches/series
 [dwg-review-history]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-experiment-2026-11.md#2026-11-17-quick-try-on-the-desktop-pc-installer-v040-winum-1122-1
 [dwg-review-combase]: ../../patches/combase-stub-activation-context.md
 [dwg-review-typelib]: ../../patches/oleaut32-typelib-keep-released.md
+[dwg-review-a]: https://github.com/Harvi654/winum/actions/runs/44528762825
+[dwg-review-b]: https://github.com/Harvi654/winum/actions/runs/44739990758
 
 ### Capture the fail-fast reason
 
