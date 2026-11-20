@@ -3,8 +3,8 @@
 set -euo pipefail
 umask 077
 
-if [[ $# != 3 || ! "$1" =~ ^(combase|oleaut32)$ ]]; then
-    echo 'Usage: prepare-autocad-dwg-ab.sh combase|oleaut32 PREVIOUS_DWG_TEST_DIR EMPTY_AB_DIR' >&2
+if [[ $# != 3 || ! "$1" =~ ^(combase|oleaut32|startup-patches)$ ]]; then
+    echo 'Usage: prepare-autocad-dwg-ab.sh combase|oleaut32|startup-patches PREVIOUS_DWG_TEST_DIR EMPTY_AB_DIR' >&2
     exit 2
 fi
 
@@ -19,6 +19,10 @@ case "$module" in
         patch=oleaut32-typelib-keep-released.patch
         run=44749216299
         revision=d3d7826
+        ;;
+    startup-patches)
+        run=44757013362
+        revision=c5ddcfe
         ;;
 esac
 previous="$(realpath -e -- "$2")"
@@ -55,20 +59,35 @@ patch_list() {
     awk -v omit="${2:-}" '/^[[:xdigit:]]+  [^ ]+\.patch$/ && $2 != omit {print}' "$1/BUILDINFO"
 }
 
-if ! patch_list "$reference" | awk -v patch="$patch" '$2 == patch { found = 1 } END { exit !found }' ||
-    ! cmp -s <(patch_list "$reference" "$patch") \
-        <(patch_list "$comparison"); then
+if [[ "$module" == startup-patches ]]; then
+    expected="$(patch_list "$reference" | awk '
+        $2 == "urlmon-maptozone-null-terminate.patch" ||
+        $2 == "urlmon-res-zone-local-machine.patch" ||
+        $2 == "msxml3-replacechild-same-node.patch"')"
+    if [[ $(wc -l <<< "$expected") -ne 3 || "$expected" != "$(patch_list "$comparison")" ]]; then
+        echo 'The comparison build must contain exactly the two URLMON patches and the MSXML3 PR #4 patch.' >&2
+        exit 1
+    fi
+elif ! patch_list "$reference" | awk -v patch="$patch" '$2 == patch { found = 1 } END { exit !found }' ||
+    ! cmp -s <(patch_list "$reference" "$patch") <(patch_list "$comparison"); then
     echo 'Build manifests do not match the single-patch comparison.' >&2
     exit 1
 fi
 
 cp -aT --reflink=auto -- "$prefix" "$work/base-prefix"
 cp -aT --reflink=auto -- "$prefix" "$work/candidate-prefix"
-cp -aT --reflink=auto -- "$reference" "$work/wine"
 cp -- "$fixture" "$work/line-2018.dwg"
+
+if [[ "$module" == startup-patches ]]; then
+    mv -T -- "$comparison" "$work/wine"
+    printf '%s\n' "$reference" > "$work/base-runtime.txt"
+    echo 'dwg_ab=ready mode=startup-patches'
+    exit 0
+fi
 
 # Use the reference Wine distribution in both trials. Stage the comparison DLL
 # in both the candidate runtime and its prefix to avoid prefix fallback.
+cp -aT --reflink=auto -- "$reference" "$work/wine"
 for arch in x86_64 i386; do
     dll="lib/wine/$arch-windows/$module.dll"
     case "$arch" in

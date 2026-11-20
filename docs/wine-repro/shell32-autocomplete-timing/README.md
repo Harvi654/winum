@@ -1267,6 +1267,36 @@ return or crash markers. A successful comparison merits a repeat
 and a separate Save As pair. Another identical Open failure lowers
 the priority of the cache hypothesis.
 
+On 2026-11-20, the maintainer verified both runtime archives and recorded
+distinct `oleaut32.dll` hashes for both architectures. With and without
+the type library cache patch, AutoCAD loaded built-in `oleaut32.dll`
+and .NET `10.0.0`, reached `activex_open_enter`, and terminated with
+`0xc0000409` at `coreclr.dll+0x14922d` (launcher status 9). Neither
+run returned from Open. The input fixture remained unchanged. The
+Open crash therefore reproduces with either of the two suspected patches
+omitted individually. This comparison did not exercise Save As.
+
+#### Wine 11.22 with the AutoCAD startup and profile fixes
+
+The [third comparison build][dwg-review-startup-b] keeps the two URLMON
+patches for AutoCAD startup and MSXML3 PR #4 for the profile. This removes
+the remainder of the winum series from the Wine 11.22 runtime. Use
+`scripts/prepare-autocad-dwg-ab.sh startup-patches` with the original
+test directory and a new empty directory. Run the same `open-activex`
+pair with the same fixture and .NET version. This comparison selects
+the full comparison runtime for its candidate copy. The two DLL-only
+comparisons above continue to select the reference runtime with a DLL
+substitution.
+
+If the candidate reaches the same Open failure, the omitted patches
+are unnecessary to reproduce it in this setup. This leaves the three
+retained patches, the prefix state, and Wine 11.22 behavior in scope.
+If Open succeeds, reinstate related patches in groups to find the first
+one that restores the failure. Failure to reach Open is a startup result
+and leaves the question open. If the comparison yields no lead, stop
+removing patches and resume with a comparable newer Wine build or a
+specific observed API difference.
+
 [dwg-review-series]: https://github.com/Harvi654/winum/blob/aeb7a59/patches/series
 [dwg-review-history]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-experiment-2026-11.md#2026-11-17-quick-try-on-the-desktop-pc-installer-v040-winum-1122-1
 [dwg-review-combase]: ../../patches/combase-stub-activation-context.md
@@ -1274,6 +1304,7 @@ the priority of the cache hypothesis.
 [dwg-review-a]: https://github.com/Harvi654/winum/actions/runs/44528762825
 [dwg-review-b]: https://github.com/Harvi654/winum/actions/runs/44739990758
 [dwg-review-cache-b]: https://github.com/Harvi654/winum/actions/runs/44749216299
+[dwg-review-startup-b]: https://github.com/Harvi654/winum/actions/runs/44757013362
 
 ### Capture the fail-fast reason
 
