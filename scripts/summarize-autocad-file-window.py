@@ -28,7 +28,8 @@ PATH_RESOLUTION = re.compile(r'^L"[^"\r\n]+" -> ret ([a-f0-9]{1,8})\b', re.I)
 SAVE_PATH_FUNCTIONS = {'MoveFileWithProgressW', 'ReplaceFileW', 'DeleteFileW'}
 SAVE_LOOKUP_WARNINGS = {'NtCreateFile', 'NtQueryAttributesFile', 'NtQueryFullAttributesFile'}
 SAVE_SCRATCH_SUFFIXES = {'.dwg', '.bak', '.dwl', '.dwl2', '.tmp', '.ac$', '.sv$', '.log', '.txt', '.xml', '.ini'}
-SAVE_PUBLIC_NAMES = {'saved.dwg', 'saved.bak', 'saved.dwl', 'saved.dwl2', 'saved.dwg.bak', 'saved.dwg.tmp'}
+SAVE_PUBLIC_NAMES = {'saved.dwg', 'saved.bak', 'saved.dwl', 'saved.dwl2', 'saved.dwg.bak', 'saved.dwg.tmp',
+                     'saved.cloudinfo', '.autodesk.support'}
 DISPOSITION = ('supersede', 'open', 'create', 'open_if', 'overwrite', 'overwrite_if')
 CHAIN_RUNS = (
     ('baseline-open', '', 'open-activex'),

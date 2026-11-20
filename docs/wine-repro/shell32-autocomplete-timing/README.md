@@ -1389,6 +1389,21 @@ between the rename and `save_command_exit`. Record the operation and
 result, or that no matching query was observed. Leave unclassified names
 and raw paths out of the shared results.
 
+The native Windows 10 `19045.6466` command trial completed with
+`save_target_complete` and `:VLR-commandEnded` and produced a 32,725-byte
+DWG. Its Procmon capture decoded all 4,499 events. Between `save_begin`
+and `save_command_exit`, `SetRenameInformationFile` returned `SUCCESS`
+for the scratch `.tmp` and the renamed file closed as `saved.dwg`. After the
+rename, three attribute queries on `saved.dwg` reported `SUCCESS` as
+`QueryNetworkOpenInformationFile` events. Three `CreateFile` events with
+`Read Attributes`, `Open` and `Open Reparse Point` reported `NAME NOT FOUND`
+in the same scratch directory: one for `saved.cloudinfo` and two for
+`.autodesk.support`. Windows proceeded to create and write `saved.dwl`
+and `saved.dwl2` and completed the command. The two names are now included
+in the filtered Wine output. If the recorded Wine miss matches one of
+these names, the successful Windows trial also observed its absence and
+that lookup is a low-priority lead for the failure.
+
 [dwg-urlmon-startup]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-2027-status.md#fixed-along-the-way
 
 ### winum patch review
