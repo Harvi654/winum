@@ -1365,6 +1365,19 @@ closes to a path or determine every API return. Compare it with the
 same command in Windows Procmon to decide whether an individual request
 needs a narrower trace with its return value. Keep the raw traces local.
 
+The summarized control recorded a `MoveFileWithProgressW` request from
+a scratch file to the target DWG, ten successful target path resolutions
+during saving, and one `NtQueryFullAttributesFile` name-not-found warning
+on the eventual fault thread for another file in the scratch directory.
+The target did not exist when initially queried. Counts include both
+path-layer messages and API warnings, which can describe the same call.
+The warning does not identify a failed write. Use `save_io_fault_lookup`
+to identify the affected file by a fixed synthetic basename or by its
+extension and `save_io_target_resolution` to position target lookups
+before or after the rename request. These positions do not identify the
+rename return. Look for the equivalent attribute query and result in
+the successful Windows Procmon trace before treating it as an error.
+
 [dwg-urlmon-startup]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-2027-status.md#fixed-along-the-way
 
 ### winum patch review

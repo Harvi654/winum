@@ -27,6 +27,8 @@ FILE_PATH = re.compile(r'L"([^"\r\n]+)"')
 PATH_RESOLUTION = re.compile(r'^L"[^"\r\n]+" -> ret ([a-f0-9]{1,8})\b', re.I)
 SAVE_PATH_FUNCTIONS = {'MoveFileWithProgressW', 'ReplaceFileW', 'DeleteFileW'}
 SAVE_LOOKUP_WARNINGS = {'NtCreateFile', 'NtQueryAttributesFile', 'NtQueryFullAttributesFile'}
+SAVE_SCRATCH_SUFFIXES = {'.dwg', '.bak', '.dwl', '.dwl2', '.tmp', '.ac$', '.sv$', '.log', '.txt', '.xml', '.ini'}
+SAVE_PUBLIC_NAMES = {'saved.dwg', 'saved.bak', 'saved.dwl', 'saved.dwl2', 'saved.dwg.bak', 'saved.dwg.tmp'}
 DISPOSITION = ('supersede', 'open', 'create', 'open_if', 'overwrite', 'overwrite_if')
 CHAIN_RUNS = (
     ('baseline-open', '', 'open-activex'),
@@ -69,7 +71,9 @@ def basename(path):
 def scan_save_io(log):
     processes = set()
     scratch, phase, fault = {}, {}, {}
-    events = Counter()
+    rename_requested = set()
+    events, target_resolution = Counter(), Counter()
+    missing_scratch, missing_paths = Counter(), defaultdict(set)
 
     def scope(path, folder):
         if folder in path:
@@ -125,6 +129,20 @@ def scan_save_io(log):
             else:
                 continue
             events[pid, phase[pid], function, '+'.join(scopes), detail, tid] += 1
+            if function == 'MoveFileWithProgressW' and len(paths) >= 2 and scope(paths[1], scratch[pid]) == 'target':
+                rename_requested.add(pid)
+            timing = 'after_request' if pid in rename_requested else 'before_request'
+            if function == 'get_nt_and_unix_names' and scopes == ('target',):
+                target_resolution[pid, timing, detail] += 1
+            if scopes == ('scratch_other',) and detail in {'path_status:0xc0000034', 'lookup_warning:0xc0000034'}:
+                path = paths[0]
+                name = basename(path)
+                if name not in SAVE_PUBLIC_NAMES:
+                    suffix = Path(name).suffix
+                    name = '*' + suffix if suffix in SAVE_SCRATCH_SUFFIXES else '<redacted>'
+                key = pid, tid, phase[pid], timing, function, detail, name
+                missing_scratch[key] += 1
+                missing_paths[key].add(path)
 
     if len(phase) != 1:
         print('save_io_window=unconfirmed')
@@ -143,6 +161,15 @@ def scan_save_io(log):
     for key, count in counts.items():
         stage, function, scopes, detail = key
         print(f'save_io={stage} api={function} scope={scopes} detail={detail} count={count} fault_thread={on_fault[key]}')
+    print(f'save_io_rename_request={"seen" if pid in rename_requested else "missing"}')
+    for (process, timing, detail), count in target_resolution.items():
+        if process == pid:
+            print(f'save_io_target_resolution={timing} detail={detail} count={count}')
+    for key, count in missing_scratch.items():
+        process, tid, stage, timing, function, detail, name = key
+        if process == pid and tid == fault_tid:
+            print(f'save_io_fault_lookup={stage} rename={timing} api={function} detail={detail} '
+                  f'file={name} count={count} distinct_paths={len(missing_paths[key])}')
 
 
 def public_module(name):
