@@ -855,6 +855,28 @@ would justify testing the measured 32-byte behavior in AutoCAD. A trace
 with no query leaves that relationship open because relay intercepts
 builtin exports and some calls can go through other paths.
 
+The AutoCAD baseline recorded one `ucrtbase.__CxxQueryExceptionSize`
+return of 16 during `saving` on the fail-fast thread. Exception filter,
+registration, and unregistration calls and returns appeared in the
+same phase on that thread. The loaded UCRT and VC runtime were builtin.
+The program wrote an `AC1032` DWG and exited at `coreclr.dll+0x1855fd`
+before the save completion event.
+
+The `autocad-crt-size-ab` artifact contains two x64 UCRT DLLs compiled
+with the same inputs from the `aeb7a59` reference series. The candidate
+uses the size of `cxx_frame_info` for the x64 UCRT query. Use
+`prepare-autocad-crt-size-ab.sh` with the previous test directory, the
+verified build bundle, and an empty test directory. It stages the DLLs
+in separate copies of the runtime and prefix. Set
+`ACAD_AUTOCOMPLETE_WORK` to that directory and repeat `save-events`
+with `ACAD_DWG_CRT_TRACE=1` for `baseline` and `candidate`, in that
+order. Each save uses a fresh one-line drawing and a new test path.
+The baseline should reproduce the failure and the 16-byte return.
+Check the candidate for a 32-byte return, `save_target_complete`,
+`:vlr-commandEnded`, and continued operation after `SAVEAS` before
+closing the application. The fix remains a candidate pending this
+comparison.
+
 ### Check creation and activation of a second desktop document
 
 `new-document` calls `Documents.Add` from an already open blank
