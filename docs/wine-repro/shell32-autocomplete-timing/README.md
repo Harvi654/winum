@@ -1456,6 +1456,35 @@ zero afterward. The test outcome was unchanged with tiering disabled.
 Continue with the matched newer Wine comparison below. On 2026-11-20,
 the WineHQ 11.23 source archive and upstream tag were unavailable.
 
+#### Capture selected Wine relay calls
+
+The earlier AutoCAD traces enabled `shell` and `ole` debug channels
+in separate trials. Wine 11.22 uses `commdlg` for both the common file
+dialog and the COM item dialog. These channels print diagnostics from
+individual Wine implementations. The `relay` channel additionally
+records calls and return values for supported builtin exports.
+
+On the reduced Wine 11.22 test copy, set `ACAD_DWG_RELAY_TRACE=1` and
+run `trace-autocad-dwg.sh candidate save-events` with `FILEDIA=0`. The
+runner sets a temporary `RelayInclude` list and enables relay for
+`acad.exe`. It restores the prior setting after the launch. The filter
+covers the public common-dialog entry points, selected COM activation
+exports and selected file operations, including `MoveFileWithProgressW`.
+The `commdlg`, `shell`, `ole` and `file` channels provide supporting
+diagnostics in the local log.
+
+~~~bash
+python3 -I scripts/summarize-autocad-file-window.py --save-relay "$ACAD_AUTOCOMPLETE_WORK"
+~~~
+
+Return `save_relay_` lines and the save events. The summary gives counts
+and raw low-32-bit return values during the command, and identifies
+messages from the terminal thread. The rename request is a phase boundary.
+The return from that request appears in the later phase if relay catches
+it. The filter covers selected builtin entry points. Calls within a DLL,
+calls to native code and COM vtable calls may be outside relay coverage.
+Use a separate `FILEDIA=1` run to investigate dialog entry points.
+
 #### Native Ole32 startup control
 
 On a disposable copy of the reduced Wine 11.22 prefix, a local trial

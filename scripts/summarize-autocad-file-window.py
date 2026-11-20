@@ -33,6 +33,13 @@ SAVE_PUBLIC_NAMES = {'saved.dwg', 'saved.bak', 'saved.dwl', 'saved.dwl2', 'saved
 COM_CHANNELS = {'ole', 'combase', 'rpc', 'storage'}
 COM_STATUS = re.compile(r'\b(?:hr(?:es(?:ult)?)?|status|result|return(?:ed|ing|s)?|failed(?: with)?)'
                         r'(?: (?:with|error|hr))*\s*[=:,]?\s*(?:0x)?([89ac][0-9a-f]{7})\b', re.I)
+RELAY_LINE = re.compile(r'^([a-f0-9]+):([a-f0-9]+):(Call|Ret)\s+([a-z0-9_.]+)\((.*)$', re.I)
+RELAY_VALUE = re.compile(r'^\) retval=(?:0x)?([a-f0-9]{1,16})\b', re.I)
+RELAY_APIS = {
+    'comdlg32.getopenfilenamew', 'comdlg32.getsavefilenamew', 'kernelbase.movefilewithprogressw',
+    'kernelbase.getfileattributesexw', 'ntdll.ntqueryfullattributesfile', 'ntdll.ntsetinformationfile',
+    'combase.cocreateinstance', 'combase.cogetclassobject',
+}
 DISPOSITION = ('supersede', 'open', 'create', 'open_if', 'overwrite', 'overwrite_if')
 CHAIN_RUNS = (
     ('baseline-open', '', 'open-activex'),
@@ -72,7 +79,7 @@ def basename(path):
     return re.split(r'[\\/]', path.lower())[-1]
 
 
-def scan_save_io(log, *, com_only=False):
+def scan_save_io(log, *, com_only=False, relay_only=False):
     processes = set()
     scratch, phase, fault = {}, {}, {}
     rename_requested = set()
@@ -80,6 +87,7 @@ def scan_save_io(log, *, com_only=False):
     missing_scratch, missing_paths = Counter(), defaultdict(set)
     com_messages, com_signals = Counter(), Counter()
     com_tail = defaultdict(lambda: deque(maxlen=12))
+    relay_events = Counter()
 
     def scope(path, folder):
         if folder in path:
@@ -93,6 +101,14 @@ def scan_save_io(log, *, com_only=False):
 
     with log.open(encoding='utf-8', errors='replace') as stream:
         for line in stream:
+            if relay_only and (relay := RELAY_LINE.match(line)):
+                pid, tid, action, name, arguments = relay.groups()
+                name = name.lower().replace('.dll.', '.')
+                if pid in processes and phase.get(pid) in {'command', 'saving'} and name in RELAY_APIS:
+                    value_match = RELAY_VALUE.match(arguments) if action == 'Ret' else None
+                    value = f'0x{int(value_match[1], 16) & 0xffffffff:08x}' if value_match else '-'
+                    relay_events[pid, tid, pid in rename_requested, name, action, value] += 1
+                continue
             if not (match := LINE.match(line.rstrip('\r\n'))):
                 continue
             pid, tid, level, channel, function, message = match.groups()
@@ -131,7 +147,7 @@ def scan_save_io(log, *, com_only=False):
             if (level == 'trace' and function == 'MoveFileWithProgressW' and len(paths) >= 2 and
                     scope(paths[1], scratch[pid]) == 'target'):
                 rename_requested.add(pid)
-            if com_only:
+            if com_only or relay_only:
                 continue
             scopes = tuple(dict.fromkeys(group for path in paths if (group := scope(path, scratch[pid]))))
             if not scopes:
@@ -164,11 +180,31 @@ def scan_save_io(log, *, com_only=False):
                 missing_paths[key].add(path)
 
     if len(phase) != 1:
-        print('save_com_window=unconfirmed' if com_only else 'save_io_window=unconfirmed')
+        label = 'save_relay_window' if relay_only else 'save_com_window' if com_only else 'save_io_window'
+        print(f'{label}=unconfirmed')
         return
     pid, window = next(iter(phase.items()))
     fault_tid, code = fault.get(pid, (None, None))
     terminal = f'0x{code}' if code else 'none'
+    if relay_only:
+        print(f'save_relay_window={window} terminal={terminal} rename_request={"seen" if pid in rename_requested else "missing"}')
+        counts, on_fault = Counter(), Counter()
+        for (process, tid, after, name, action, value), count in relay_events.items():
+            if process == pid:
+                key = after, name, action, value
+                counts[key] += count
+                if tid == fault_tid:
+                    on_fault[key] += count
+        print(f'save_relay_messages={sum(counts.values())} fault_thread={sum(on_fault.values())}')
+        order = sorted(counts, key=lambda key: (not on_fault[key], not key[0], key))
+        for key in order[:24]:
+            after, name, action, value = key
+            timing = 'after_request' if after else 'before_request'
+            print(f'save_relay_event={action.lower()} phase={timing} api={name} retval={value} '
+                  f'count={counts[key]} fault_thread={on_fault[key]}')
+        if len(order) > 24:
+            print(f'save_relay_omitted={len(order) - 24}')
+        return
     if com_only:
         print(f'save_com_window={window} terminal={terminal} rename_request={"seen" if pid in rename_requested else "missing"}')
         before = sum(count for (process, _, after), count in com_messages.items() if process == pid and not after)
@@ -374,16 +410,17 @@ def main():
     mode.add_argument('--fault-chain', action='store_true', help='show exception dispatches only on the fatal thread')
     mode.add_argument('--save-io', action='store_true', help='summarize file requests from the latest candidate Save As trace')
     mode.add_argument('--save-com', action='store_true', help='summarize COM messages from the latest candidate Save As trace')
+    mode.add_argument('--save-relay', action='store_true', help='summarize relay calls from the latest candidate Save As trace')
     args = parser.parse_args()
-    if args.save_io or args.save_com:
-        label = 'save_com_window' if args.save_com else 'save_io_window'
+    if args.save_io or args.save_com or args.save_relay:
+        label = 'save_relay_window' if args.save_relay else 'save_com_window' if args.save_com else 'save_io_window'
         try:
             logs = args.work.glob('dwg-candidate-save-events.*/acad-*.log')
             log = max(logs, key=lambda path: path.stat().st_mtime_ns, default=None)
             if log is None:
                 print(f'{label}=unconfirmed log=missing')
             else:
-                scan_save_io(log, com_only=args.save_com)
+                scan_save_io(log, com_only=args.save_com, relay_only=args.save_relay)
         except OSError:
             print(f'{label}=unconfirmed log=unreadable')
         return

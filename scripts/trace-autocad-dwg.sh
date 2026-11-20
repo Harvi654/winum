@@ -147,6 +147,37 @@ disable_recent_history() {
     echo 'recent_history_policy=disabled'
 }
 
+run_save_relay() (
+    key='HKCU\Software\Wine\Debug'
+    config_log="$ACAD_LOGDIR/relay-config.txt"
+    apis='comdlg32.GetOpenFileNameW;comdlg32.GetSaveFileNameW;kernelbase.MoveFileWithProgressW;kernelbase.GetFileAttributesExW;ntdll.NtQueryFullAttributesFile;ntdll.NtSetInformationFile;combase.CoCreateInstance;combase.CoGetClassObject'
+    query_exit=0
+    timeout 20s "$WINE" reg query "$key" /v RelayInclude > "$config_log" 2>&1 || query_exit=$?
+    case "$query_exit" in
+        0)
+            backup="C:\\${probe_dir##*/}\\relay-before.reg"
+            timeout 20s "$WINE" reg export "$key" "$backup" /y >> "$config_log" 2>&1 || {
+                echo 'save_relay_filter=backup_failed' >&2
+                return 2
+            }
+            restore=(reg import "$backup")
+            ;;
+        1) restore=(reg delete "$key" /v RelayInclude /f) ;;
+        *) echo 'save_relay_filter=query_failed' >&2; return 2 ;;
+    esac
+    trap 'if timeout 20s "$WINE" "${restore[@]}" >> "$config_log" 2>&1; then
+              echo save_relay_filter=restored
+          else
+              echo save_relay_filter=restore_failed
+          fi' EXIT
+    timeout 20s "$WINE" reg add "$key" /v RelayInclude /t REG_SZ /d "$apis" /f >> "$config_log" 2>&1 || {
+        echo 'save_relay_filter=setup_failed' >&2
+        return 2
+    }
+    echo 'save_relay_filter=enabled'
+    "$@" > "$ACAD_LOGDIR/launcher.txt" 2>&1
+)
+
 print_dwg_info() {
     python3 - "$1" <<'PY'
 from pathlib import Path
@@ -170,6 +201,7 @@ file_subject=
 recovery_subject=
 api_subject=
 com_save_trace="${ACAD_DWG_COM_TRACE:-0}"
+save_relay_trace="${ACAD_DWG_RELAY_TRACE:-0}"
 event_label=open_event
 if [[ $# == 3 && ( ! -f "$3" || ! -s "$3" ) ]]; then
     echo 'A nonempty local DWG is required.' >&2
@@ -221,6 +253,13 @@ if [[ "$com_save_trace" == 1 ]]; then
         exit 2
     fi
     export WINEDEBUG="$WINEDEBUG,$acad_image:+file,$acad_image:+ole,$acad_image:+combase,$acad_image:+rpc,$acad_image:+storage"
+fi
+if [[ "$save_relay_trace" == 1 ]]; then
+    if [[ "$1" != candidate || "$2" != save-events || -n "${ACAD_FAILFAST_OBSERVER:-}" ]]; then
+        echo 'Relay tracing requires candidate save-events without the debugger observer.' >&2
+        exit 2
+    fi
+    export WINEDEBUG="$WINEDEBUG,$acad_image:+relay,$acad_image:+file,$acad_image:+commdlg,$acad_image:+shell,$acad_image:+ole"
 fi
 
 if [[ "$2" == core-open ]]; then
@@ -306,7 +345,7 @@ elif [[ "$2" =~ ^(new-document|save-(events|activex)|open-(events|activex|dbx))$
             save_dwg="$probe_dir/saved.dwg"
             event_label=save_event
             printf '(progn (load "%s/open-events.lsp") ' "$probe_slash"
-            if [[ -n "$recovery_subject" || -n "$api_subject" || "$com_save_trace" == 1 ]]; then
+            if [[ -n "$recovery_subject" || -n "$api_subject" || "$com_save_trace" == 1 || "$save_relay_trace" == 1 ]]; then
                 printf '(setq winum-trace-file-window T) '
             fi
             printf '(winum-save-trace "%s/open-events.txt" "%s/saved.dwg"))\n' "$probe_slash" "$probe_slash"
@@ -382,6 +421,8 @@ if [[ -n "${ACAD_FAILFAST_OBSERVER:-}" ]]; then
         printf 'observer_exit=%s\n' "$observer_rc"
     fi
     wait "$launcher_pid" || rc=$?
+elif [[ "$save_relay_trace" == 1 ]]; then
+    run_save_relay "${launcher[@]}" || rc=$?
 else
     "${launcher[@]}" > "$ACAD_LOGDIR/launcher.txt" 2>&1 || rc=$?
 fi
