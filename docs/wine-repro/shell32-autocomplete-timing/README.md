@@ -886,10 +886,26 @@ markers. Return only that text, the AutoCAD version from About, and
 whether the drawing opened, saved, or crashed. Leave DWGs and raw
 logs in the VM.
 
-If native AutoCAD completes both calls on the same fixture, use the
-difference to prioritize compatibility analysis of the desktop file
-lifecycle. A matching native failure would redirect the investigation
-toward the application build or the shared fixture and setup.
+On 2026-11-20, native AutoCAD on Windows 10 build `19045.6466` completed
+both trials with the SHA-256-verified fixture. In the open trial,
+`documentToBeActivated` and `documentBecameCurrent` were delivered
+between `activex_open_enter` and `activex_open_return`. The probe
+verified the returned document name. In the save trial, AutoCAD
+reported `save_begin`, `save_target_complete`, and `activex_save_return`
+in order. The maintainer saw the drawing take the name `saved.dwg`,
+and the output was 32,596 bytes.
+
+| Operation | Native Windows | Baseline winum 11.22-1 with the MSXML3 fix |
+| --- | --- | --- |
+| ActiveX Open | Document activation callbacks and method return | Fail-fast after method entry, with no activation callback delivered to the starting namespace |
+| ActiveX Save As | File completion callback and method return | File written, then fail-fast without a completion callback or method return |
+
+The Windows report did not include the AutoCAD build from About. Record
+the exact application builds on Windows and Wine before treating this
+as a build-matched comparison. The observed contrast favors examining
+the desktop file lifecycle under Wine. The shared CoreCLR offset
+identifies where the process terminates. A Wine fix needs a smaller
+reproducer that isolates the triggering compatibility difference.
 
 ### Capture the fail-fast reason
 
