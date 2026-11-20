@@ -6,12 +6,12 @@ umask 077
 usage() {
     echo 'Usage: trace-autocad-dwg.sh candidate|baseline idle|save-0|open-0|save-1|open-1|new-document|save-events|save-activex' >&2
     echo '       trace-autocad-dwg.sh candidate|baseline startup-open|startup-safe|startup-wpf-software|core-open|core-save KNOWN_GOOD_DWG' >&2
-    echo '       trace-autocad-dwg.sh candidate|baseline open-events|open-activex|open-dbx|open-0 KNOWN_GOOD_DWG' >&2
+    echo '       trace-autocad-dwg.sh candidate|baseline open-events|open-activex|open-dbx|save-dbx|open-0 KNOWN_GOOD_DWG' >&2
     exit 2
 }
 
-[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|new-document|save-(events|activex)|(save|open)-[01]|startup-(open|safe|wpf-software)|core-(open|save)|open-(events|activex|dbx))$ ]] || usage
-if [[ "$2" =~ ^(startup-.*|core-(open|save)|open-(events|activex|dbx))$ ]]; then
+[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|new-document|save-(events|activex|dbx)|(save|open)-[01]|startup-(open|safe|wpf-software)|core-(open|save)|open-(events|activex|dbx))$ ]] || usage
+if [[ "$2" =~ ^(startup-.*|core-(open|save)|save-dbx|open-(events|activex|dbx))$ ]]; then
     [[ $# == 3 ]] || usage
 elif [[ $# == 3 && "$2" != open-0 ]]; then
     usage
@@ -331,12 +331,12 @@ elif [[ "$2" == startup-wpf-software ]]; then
 elif [[ "$2" == startup-open ]]; then
     launch_args=("$probe_path")
     printf 'Opening a scratch DWG at startup. If the drawing opens, edit it, run QSAVE, then close AutoCAD.\n'
-elif [[ "$2" =~ ^(new-document|save-(events|activex)|open-(events|activex|dbx))$ ]]; then
+elif [[ "$2" =~ ^(new-document|save-(events|activex|dbx)|open-(events|activex|dbx))$ ]]; then
     cp -- "${ACAD_OPEN_EVENTS_LISP:?Set the path to dwg-open-events.lsp}" "$probe_dir/open-events.lsp"
     open_events="$probe_dir/open-events.txt"
     probe_slash="C:/${probe_dir##*/}"
     echo 'Create a blank drawing, set FILEDIA to 0, then paste this AutoLISP line:'
-    if [[ "$2" != save-* ]]; then
+    if [[ ! "$2" =~ ^save-(events|activex)$ ]]; then
         printf '(progn (load "%s/open-events.lsp") ' "$probe_slash"
         if [[ -n "$file_subject" ]]; then
             printf '(setq winum-trace-file-window T) '
@@ -350,6 +350,13 @@ elif [[ "$2" =~ ^(new-document|save-(events|activex)|open-(events|activex|dbx))$
         open-activex|open-dbx)
             echo 'Run ._REGEN, then paste the second AutoLISP line:'
             printf '(winum-%s "%s/open-events.txt" "%s/probe.dwg")\n' "$2" "$probe_slash" "$probe_slash"
+            ;;
+        save-dbx)
+            save_dwg="$probe_dir/saved.dwg"
+            event_label=save_event
+            echo 'Run ._REGEN, then paste this AutoLISP line once to save the side database:'
+            printf '(winum-save-dbx "%s/open-events.txt" "%s/probe.dwg" "%s/saved.dwg")\n' \
+                "$probe_slash" "$probe_slash" "$probe_slash"
             ;;
         new-document)
             echo 'Run ._REGEN, then paste this line once to add and switch drawings:'
@@ -464,7 +471,7 @@ if [[ -n "$open_events" ]]; then
             sub(/\r$/, "")
             event = tolower($0)
             if (event ~ /^(reactors_ready|control_regen|command_open|activex_(begin|open_enter|open_return|open_expected_dwg|error)|:vlr-(begindwgopen|dwgfileopened|enddwgopen|documentcreated|documenttobeactivated|documentbecamecurrent))$/ ||
-                event ~ /^dbx_(begin|object_unavailable|open_enter|open_return|lines=[0-9]+|active_document=(unchanged|changed)|error)$/ ||
+                event ~ /^dbx_(begin|object_unavailable|(open|edit|save)_(enter|return)|save_unavailable|lines=[0-9]+|active_document=(unchanged|changed)|error)$/ ||
                 event ~ /^new_(begin|add_enter|add_return|count_delta=-?[0-9]+|add_active=(created|other)|activate_(original|created)_(enter|active|other)|error)$/ ||
                 event ~ /^(save_(reactors_ready|begin|target_complete|other_complete)|activex_save_(enter|return|error)|:vlr-command(willstart|ended|cancelled|failed))$/) {
                 print key "=" event

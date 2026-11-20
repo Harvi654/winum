@@ -502,6 +502,14 @@ because the desktop trial also wrote a DWG before it failed. If the
 console returns successfully, use the desktop work after entering the
 save command to guide the next comparison.
 
+On 2026-11-20, `core-save` on `aeb7a59` opened the one-line fixture and
+returned from Save As with two lines and launcher status 0. The scratch
+input was unchanged and the output was a 38,424-byte `AC1032` DWG. The
+console module summary reported builtin COM libraries and no CoreCLR
+load. The desktop command and ActiveX path had previously raised the
+fail-fast after producing an `AC1032` file. The next control keeps
+`acad.exe` as the host and exercises a side database.
+
 ### Repeat desktop loading with AutoCAD safe mode
 
 Use the same 2018 fixture, prefix and Wine runtime. The `startup-safe`
@@ -678,6 +686,28 @@ exited with code 0. The desktop process can read the fixture and
 enumerate its geometry through ObjectDBX. The comparison narrows the
 failure to the path used to open an existing DWG as a desktop document.
 It does not identify the point of failure within that path.
+
+### Save a side database inside desktop AutoCAD
+
+Use `save-dbx` with the same prefix and staged 2018 DWG used in
+`core-save`. The desktop test opens the copy via ObjectDBX, adds the
+same LINE as the console test, calls `SaveAs` for a new `saved.dwg`,
+and logs the return, model-space line count, and active drawing name
+comparison. The probe calls the one-argument `SaveAs` on the side
+database, using the format chosen by that object. Check the DWG header
+in the output before comparing format-specific behavior.
+
+~~~bash
+export ACAD_OPEN_EVENTS_LISP="$PWD/docs/wine-repro/shell32-autocomplete-timing/dwg-open-events.lsp"
+bash scripts/trace-autocad-dwg.sh baseline save-dbx "$ACAD_DWG_CONTROLS/line-2018.dwg"
+~~~
+
+Start a blank drawing, paste the setup line, run `._REGEN`, and paste
+the `winum-save-dbx` line once. Return `variant=`, `dwg_saved=`,
+`dwg_header=`, `save_event=`, and `fault_module=` if present. A return
+with two lines and a new `AC1032` file shows that the desktop process
+can also save the fixture through its side database. If the probe
+stops earlier, use the last stage marker to locate the failing call.
 
 ### Check creation and activation of a second desktop document
 

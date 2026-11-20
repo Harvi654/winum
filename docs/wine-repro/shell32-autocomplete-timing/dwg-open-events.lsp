@@ -110,11 +110,25 @@
     (winum-open-log log "activex_error"))
   (princ))
 
-(defun winum-open-dbx-database (log drawing app database / active item lines)
+(defun winum-save-dbx-database (log database output / model)
+  (if (vlax-method-applicable-p database 'SaveAs)
+    (progn
+      (setq model (vla-get-modelspace database))
+      (winum-open-log log "dbx_edit_enter")
+      (vla-addline model (vlax-3d-point '(17.0 23.0 0.0))
+                         (vlax-3d-point '(31.0 23.0 0.0)))
+      (winum-open-log log "dbx_edit_return")
+      (winum-open-log log "dbx_save_enter")
+      (vlax-invoke-method database 'SaveAs (vl-string-translate "/" "\\" output))
+      (winum-open-log log "dbx_save_return"))
+    (winum-open-log log "dbx_save_unavailable")))
+
+(defun winum-dbx-database (log drawing output app database / active item lines)
   (setq active (vla-get-name (vla-get-activedocument app)))
   (winum-open-log log "dbx_open_enter")
   (vlax-invoke-method database 'Open drawing)
   (winum-open-log log "dbx_open_return")
+  (if output (winum-save-dbx-database log database output))
   (setq lines 0)
   (vlax-for item (vla-get-modelspace database)
     (if (= (vla-get-objectname item) "AcDbLine")
@@ -125,7 +139,7 @@
       "dbx_active_document=unchanged"
       "dbx_active_document=changed")))
 
-(defun winum-open-dbx (log drawing / app database result)
+(defun winum-run-dbx (log drawing output / app database result)
   (winum-open-log log "dbx_begin")
   (setq app (vlax-get-acad-object))
   (setq database (vl-catch-all-apply 'vla-getinterfaceobject
@@ -133,12 +147,18 @@
   (if (vl-catch-all-error-p database)
     (winum-open-log log "dbx_object_unavailable")
     (progn
-      (setq result (vl-catch-all-apply 'winum-open-dbx-database
-                     (list log drawing app database)))
+      (setq result (vl-catch-all-apply 'winum-dbx-database
+                     (list log drawing output app database)))
       (if (vl-catch-all-error-p result)
         (winum-open-log log "dbx_error"))
       (vlax-release-object database)))
   (princ))
+
+(defun winum-open-dbx (log drawing)
+  (winum-run-dbx log drawing nil))
+
+(defun winum-save-dbx (log drawing output)
+  (winum-run-dbx log drawing output))
 
 (defun winum-new-document-activate (log app document role / marker)
   (setq marker (strcat "new_activate_" role))
