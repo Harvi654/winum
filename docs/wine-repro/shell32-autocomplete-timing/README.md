@@ -1395,6 +1395,36 @@ With the packaged observer and summary reader, run the updated
 `eventpipe_parse_status=`, `eventpipe_method_events=`,
 `eventpipe_return_method=` and the existing stack summary lines.
 
+On 2026-11-20, the combined observer and EventPipe trial recorded 12
+native CoreCLR frames before the observer's frame limit. The first caller
+of the termination routine was `coreclr+0xf040c`. Disassembly of the
+official Windows x64 .NET 10.0.0 DLL identifies this as the return from
+the failure branch of `CrawlFrame::CheckGSCookies`. The native stack also
+includes `coreclr+0x1fdcce`, whose call to the stack walker passes `0x511`.
+The flags and the surrounding instructions match
+[`ep_rt_walk_managed_stack_for_thread`][autocad-eventpipe-stackwalk].
+EventPipe's own stack collection therefore took this path to fail-fast.
+The first-chance CLR exception happened on the same thread in this trial.
+
+The reader recovered 27,220 method-load events before a format error.
+The selected return address was `coreclr+0x32a403`, which belongs to the
+native CoreCLR DLL. That address yielded zero matches in the managed
+method ranges and differs from the executable mapping in the earlier
+observer-only trial.
+
+Repeat with the same observer and EventPipe settings and
+`DOTNET_EventPipeEnableStackwalk=0`. This disables EventPipe stack
+collection while retaining exception and method events in .NET 10.0.0.
+A synthetic .NET 10.0.0 run under winum-11.22-1 still matched its known
+managed return address with that setting.
+Compare the stack with the observer-only trial and look for a method
+match for the newly observed return address. Check the exception type
+only for events attributed to the fatal thread. If the stack still
+ends in CoreCLR or the EventPipe recording is incomplete, record the
+remaining gap before changing instrumentation again.
+
+[autocad-eventpipe-stackwalk]: https://github.com/dotnet/runtime/blob/v10.0.0/src/coreclr/vm/eventing/eventpipe/ep-rt-coreclr.cpp#L69-L88
+
 ### Build and run the fail-fast observer
 
 Build with `scripts/build-measure-bundle.sh` and the
