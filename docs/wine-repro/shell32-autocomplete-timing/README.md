@@ -1189,6 +1189,27 @@ fix and .NET version, change only the Wine runtime, and run the same
 against the Windows markers above. A Wine patch needs a separate
 reproducer that distinguishes Wine from the Windows API behavior.
 
+### Compare the Drawing Recovery registry read
+
+The Windows `SAVEAS` registry capture compared against the .NET 10.0.15
+test prefix listed 51 Windows hits missing from the Wine registry
+snapshot. One was flagged by the comparison tool's Autodesk filter,
+the `LoggedFileCount` value below the active AutoCAD profile's
+`Drawing Recovery` key. This is a static difference. The comparison
+does not show whether AutoCAD queries it during Save As under Wine.
+
+Use the .NET 10.0.15 test directory and run `save-events` with
+`ACAD_DWG_RECOVERY_TRACE=1`. The script enables registry tracing for
+`acad.exe` and uses the existing AutoLISP reactor to mark the Save As
+command window. Follow the printed instructions with `FILEDIA=0` and
+save to the supplied scratch path. Return `recovery_save_window=`,
+`recovery_query=`, `variant=`, and `fault_module=`. The summary counts
+`NtQueryValueKey` calls by value name and phase. It also counts calls
+from the fatal thread. It does not report raw registry data, the full
+key path or the query's return status. A query in the command window
+is a candidate for a further check with the exact key and measured
+Windows value. A confirmed window with zero queries lowers its priority.
+
 ### winum patch review
 
 The review used the [series from the crashing build][dwg-review-series]

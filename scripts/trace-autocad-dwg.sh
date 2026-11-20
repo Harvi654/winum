@@ -167,6 +167,7 @@ probe_dwg=
 save_dwg=
 open_events=
 file_subject=
+recovery_subject=
 event_label=open_event
 if [[ $# == 3 && ( ! -f "$3" || ! -s "$3" ) ]]; then
     echo 'A nonempty local DWG is required.' >&2
@@ -195,6 +196,14 @@ if [[ "${ACAD_DWG_FILE_TRACE:-0}" == 1 ]]; then
             exit 2
             ;;
     esac
+fi
+if [[ "${ACAD_DWG_RECOVERY_TRACE:-0}" == 1 ]]; then
+    if [[ "$2" != save-events ]]; then
+        echo 'Drawing Recovery tracing requires save-events.' >&2
+        exit 2
+    fi
+    recovery_subject="${probe_dir##*/}"
+    export WINEDEBUG="$WINEDEBUG,$acad_image:+file,$acad_image:+reg"
 fi
 
 if [[ "$2" == core-open ]]; then
@@ -279,8 +288,11 @@ elif [[ "$2" =~ ^(new-document|save-(events|activex)|open-(events|activex|dbx))$
         save-events|save-activex)
             save_dwg="$probe_dir/saved.dwg"
             event_label=save_event
-            printf '(progn (load "%s/open-events.lsp") (winum-save-trace "%s/open-events.txt" "%s/saved.dwg"))\n' \
-                "$probe_slash" "$probe_slash" "$probe_slash"
+            printf '(progn (load "%s/open-events.lsp") ' "$probe_slash"
+            if [[ -n "$recovery_subject" ]]; then
+                printf '(setq winum-trace-file-window T) '
+            fi
+            printf '(winum-save-trace "%s/open-events.txt" "%s/saved.dwg"))\n' "$probe_slash" "$probe_slash"
             if [[ "$2" == save-activex ]]; then
                 echo 'Draw one line, run ._REGEN, then paste the ActiveX save call once:'
                 printf '(winum-save-activex "%s/open-events.txt" "%s/saved.dwg")\n' "$probe_slash" "$probe_slash"
@@ -433,7 +445,7 @@ fi
 
 # Only print module names and numeric exception fields. In particular,
 # keep the Windows paths and debugger preamble inside the private run directory.
-python3 - "${logs[0]}" "$eventpipe_dir" "$2" "$shell_subject" "$file_subject" <<'PY'
+python3 - "${logs[0]}" "$eventpipe_dir" "$2" "$shell_subject" "$file_subject" "$recovery_subject" <<'PY'
 from collections import Counter, deque
 import mmap
 import os
@@ -458,6 +470,8 @@ shell_call = re.compile(r"(?:trace|warn|fixme|err):shell:(" + "|".join(shell_fun
 recent_policy_trace = re.compile(r"\s+policy value for NoRecentDocsHistory = 0*1\s*$")
 shell_subject = sys.argv[4].lower()
 file_subject = sys.argv[5].lower()
+recovery_subject = sys.argv[6].lower()
+recovery_query = re.compile(r':trace:reg:NtQueryValueKey\s+\([^,]+,L"LoggedFileCount",', re.I)
 file_markers = {
     'open-activex': ('activex_open_enter', 'activex_open_return', 'activex_error'),
     'open-dbx': ('dbx_open_enter', 'dbx_open_return', 'dbx_error'),
@@ -563,6 +577,8 @@ file_started = {}
 file_ended = {}
 file_misses = Counter()
 file_operation_thread = Counter()
+recovery_phase = {}
+recovery_queries = Counter()
 
 with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
     for line in log:
@@ -573,6 +589,14 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
                 console_dwg = match.groups()
         ids = prefix.match(line)
         pid, tid = ids.groups() if ids else ("?", "?")
+        if recovery_subject and ids:
+            if ':trace:file:NtCreateFile ' in line and recovery_subject in line.lower():
+                if 'open-events.txt.save_command_enter"' in line:
+                    recovery_phase[pid] = 'during'
+                elif pid in recovery_phase and 'open-events.txt.save_command_exit"' in line:
+                    recovery_phase[pid] = 'after'
+            if recovery_query.search(line):
+                recovery_queries[pid, tid, recovery_phase.get(pid, 'before')] += 1
         if file_subject and pid in acad_pids:
             if ':trace:file:NtCreateFile ' in line and file_subject in line.lower():
                 enter, returned, failed = file_markers[sys.argv[3]]
@@ -625,6 +649,8 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
         if ":seh:" in line and (match := unhandled.search(line)):
             if pid in file_started:
                 file_ended.setdefault(pid, 'fault')
+            if recovery_phase.get(pid) == 'during':
+                recovery_phase[pid] = 'fault'
             code, flags, addr = match.groups()
             ip = int(addr, 16)
             images = [(name, ip - base) for (process, _), (name, base, end) in active.items()
@@ -689,6 +715,15 @@ if file_subject:
               f"operation_thread={file_operation_thread[entry]}")
     if len(order) > 10:
         print(f"file_omitted={len(order) - 10}")
+if recovery_subject:
+    windows = ','.join(recovery_phase[pid] for pid in sorted(acad_pids & recovery_phase.keys())) or 'unconfirmed'
+    print(f"recovery_save_window={windows}")
+    fault_thread = next(((pid, tid) for pid, tid, *_ in reversed(fatal) if pid in acad_pids), None)
+    for phase in ('before', 'during', 'after'):
+        total = sum(count for (pid, _, stage), count in recovery_queries.items()
+                    if pid in acad_pids and stage == phase)
+        on_fault_thread = recovery_queries[(*fault_thread, phase)] if fault_thread else 0
+        print(f"recovery_query=LoggedFileCount phase={phase} count={total} fault_thread={on_fault_thread}")
 for module, offset in frames:
     print(f"frame module={module}" + (f" offset=0x{offset}" if offset else ""))
 for name in dict.fromkeys(managed):

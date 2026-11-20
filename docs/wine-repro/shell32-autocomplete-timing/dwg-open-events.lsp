@@ -8,7 +8,8 @@
       (close stream)))
   (if (and winum-trace-file-window
            (member message '("activex_open_enter" "activex_open_return" "activex_error"
-                             "dbx_open_enter" "dbx_open_return" "dbx_error"))
+                             "dbx_open_enter" "dbx_open_return" "dbx_error"
+                             "save_command_enter" "save_command_exit"))
            (setq stream (open (strcat path "." message) "w")))
     (close stream))
   (princ))
@@ -46,7 +47,13 @@
   (setq name (car arguments))
   (if (and (eq (type name) 'STR)
            (= (vl-string-left-trim "._" (strcase name)) "SAVEAS"))
-    (winum-open-event reactor arguments))
+    (progn
+      (winum-open-event reactor arguments)
+      (if winum-trace-file-window
+        (winum-open-log (vlr-data reactor)
+          (if (eq (vlr-current-reaction-name) ':vlr-commandWillStart)
+            "save_command_enter"
+            "save_command_exit")))))
   (princ))
 
 (defun winum-save-event (reactor arguments / data path)
