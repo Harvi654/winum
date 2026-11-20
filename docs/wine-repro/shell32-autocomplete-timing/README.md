@@ -761,6 +761,27 @@ frames from the exception and `source=live` records the stack inside
 the callback when the exception has no frames yet. The first usable
 call site will guide the next targeted comparison with Windows.
 
+The follow-up on 2026-11-20 found one frame on the fatal thread,
+`Autodesk.AutoCAD.Internal.AcShareFileData..ctor` in `Acmgd`, for the
+same exception type and HRESULT. That locates the managed throw.
+The specific underlying call is still open. The earlier comparison
+found `saved.cloudinfo` absent during both a successful Windows save
+and a failing Wine save. The Desktop Connector exception names from
+EventPipe also appeared during idle startup.
+
+Run the v2 observer on the existing offline Windows 10 VM with
+AutoCAD 2027 before tracing a narrower Wine API set. Extract the
+Windows observer bundle to a writable local folder, close AutoCAD,
+and start `run-managed-save-windows.bat`. Follow the displayed
+`NETLOAD`, `WINUMEXCEPTIONS`, and `SAVEAS` steps for the same local
+one-line drawing, then close AutoCAD. The batch starts the process
+with the log destination, retains the raw log under TEMP, and
+reports the native command markers, observer self-test, and matching
+managed throws and frames. A matching throw during a successful
+Windows save shifts the comparison to how the exception is handled.
+A successful, armed control with no matching throw shifts the
+comparison to paths that can produce the throw in Wine.
+
 ### Check creation and activation of a second desktop document
 
 `new-document` calls `Documents.Add` from an already open blank
