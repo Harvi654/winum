@@ -1341,6 +1341,30 @@ If the method disappears and the crash persists, leave this Shell
 history path out of further Save As patch work. The native Windows
 capture above can still locate differences in post-write file work.
 
+On 2026-11-20, the control observed one policy skip and zero
+`IPersistFile_fnSaveCompleted` messages. AutoCAD still wrote a
+31,438-byte `AC1032` DWG and ended with status 9 and `0xc0000409` at
+`coreclr.dll+0x1855fd` after `save_begin`. The prior absent registry
+value was restored. Shell recent-document processing is unnecessary
+to reproduce this failure on the reduced build.
+
+The control already captured `+file`. Summarize its saved log without
+relaunching AutoCAD:
+
+~~~bash
+python3 -I scripts/summarize-autocad-file-window.py --save-io "$ACAD_AUTOCOMPLETE_WORK"
+~~~
+
+This selects the latest candidate `save-events` log in that directory.
+The marker files delimit the window through termination or command
+return. The output counts a fixed set of path-bearing file operations
+for the target DWG, scratch and temporary files. `path_status` reports
+path resolution. `request` and `disposition` describe calls, and do not
+imply success. The saved trace cannot assign all handle-only writes or
+closes to a path or determine every API return. Compare it with the
+same command in Windows Procmon to decide whether an individual request
+needs a narrower trace with its return value. Keep the raw traces local.
+
 [dwg-urlmon-startup]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-2027-status.md#fixed-along-the-way
 
 ### winum patch review
