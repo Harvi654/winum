@@ -1,0 +1,27 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ucrtbase: Return the x86-64 C++ exception frame size.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+On Windows 10 x86-64, __CxxQueryExceptionSize returns 32 in both
+ucrtbase and vcruntime140. Wine's UCRT returns the 16-byte size of the
+exception type descriptor, while __CxxRegisterExceptionObject uses a
+cxx_frame_info record with four pointers.
+
+Return the size of that record on the measured UCRT architecture.
+
+diff --git a/dlls/msvcrt/except.c b/dlls/msvcrt/except.c
+--- a/dlls/msvcrt/except.c
++++ b/dlls/msvcrt/except.c
+@@ -814,7 +814,11 @@
+  */
+ unsigned int CDECL __CxxQueryExceptionSize(void)
+ {
++#if _MSVCR_VER >= 140 && defined(__x86_64__)
++    return sizeof(cxx_frame_info);
++#else
+     return sizeof(cxx_exception_type);
++#endif
+ }
+
+ /*********************************************************************
