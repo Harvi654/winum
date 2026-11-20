@@ -1189,6 +1189,50 @@ fix and .NET version, change only the Wine runtime, and run the same
 against the Windows markers above. A Wine patch needs a separate
 reproducer that distinguishes Wine from the Windows API behavior.
 
+### winum patch review
+
+The review used the [series from the crashing build][dwg-review-series]
+(`aeb7a59`, Wine 11.22). The [November 17 AutoCAD notes][dwg-review-history]
+already record `SAVEAS` with `FILEDIA=0` writing a DWG and then ending
+with `0xc0000409` on the winum-11.22-1 release before MSXML3 PR #4.
+The autocomplete candidate also reproduced the failure with `FILEDIA=0`.
+The breadcrumb and background-menu candidates were absent from this
+build. Disabling recent-document history left both crashes reproducible.
+
+- [`combase-stub-activation-context`][dwg-review-combase] is the first
+  patch to isolate. It activates the context saved when the stub manager
+  was created for incoming RPC stub invocations. The Windows measurement
+  found no activation context at an STA server and the caller's context
+  at an MTA server. The saved context can change class or DLL resolution.
+  The ActiveX trials establish the entry point into AutoCAD, while the
+  traces leave use of this patched RPC path unconfirmed.
+- [`oleaut32-typelib-keep-released`][dwg-review-typelib] keeps file-backed
+  type libraries in a bounded cache after their last release. The
+  `oleaut32.dll+0x1a481` access violations also appeared around ObjectDBX
+  calls that returned successfully. The desktop Open trace places its
+  call-time access violations outside the eventual fatal thread. The
+  saved offsets do not identify a cache operation. Confirm the loaded DLL
+  kind and look for type-library activity before treating it as a match.
+- The `rpcrt4-ndrstubcall3`, `ntdll-locate-xstate-feature-enabled`, and OLE
+  structured-storage patches are lower priority. The traces have yet to
+  show an affected `NdrStubCall3`, extended-context lookup or storage
+  call in the failing operation. The series leaves Wine's x86_64
+  fast-fail dispatch unchanged.
+
+For the first patch comparison, build two Wine 11.22 runtimes from the
+same series with only `combase-stub-activation-context.patch` omitted
+from the comparison build. Keep MSXML3 PR #4, the URLMON startup fixes,
+and the .NET version in both trials. Use private copies of the same
+test-prefix state and run `open-activex` and `save-activex`. Compare
+successful return markers and DWG readback with the Windows results.
+Record startup separately if either build cannot reach the operation.
+The patch review has no paired AutoCAD result yet.
+
+[dwg-review-series]: https://github.com/Harvi654/winum/blob/aeb7a59/patches/series
+[dwg-review-history]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-experiment-2026-11.md#2026-11-17-quick-try-on-the-desktop-pc-installer-v040-winum-1122-1
+[dwg-review-combase]: ../../patches/combase-stub-activation-context.md
+[dwg-review-typelib]: ../../patches/oleaut32-typelib-keep-released.md
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the
