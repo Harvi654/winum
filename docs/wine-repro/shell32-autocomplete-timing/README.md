@@ -1157,6 +1157,38 @@ without preceding dispatch messages bounds what the saved trace can
 show. An earlier dispatch shared by both operations and runtime
 versions would give a more specific compatibility probe.
 
+On 2026-11-20, all four saved runs reported zero earlier dispatch
+messages on the eventual fatal thread. On .NET 10.0.0, both Open and
+Save As still terminated at `coreclr.dll+0x14922d`. With 10.0.15, both
+terminated at `coreclr.dll+0x1855fd`. All four terminal records were
+`0xc0000409`. Wine 11.22 sends the x86_64 fast-fail interrupt directly
+to `NtRaiseException` with `first_chance` set to false. In a separate
+winum-11.22-1 run, an original x86_64 program calling `__fastfail`
+also produced the terminal record with zero dispatch messages.
+The result describes the visibility of the saved SEH trace. The earlier
+debug observer reported a CLR first-chance exception on the fatal thread
+during a separate Save As trial.
+
+### Investigation checkpoint
+
+The matched AutoCAD 2027 `X.60.0.0` desktop operations complete on
+Windows 10 `19045.6466` and fail under winum-11.22-1 with MSXML3 PR #4
+(`aeb7a59`). The inventoried AutoCAD files match by SHA-256. Installing
+the VM's .NET version in a sibling prefix reproduces both failures.
+ObjectDBX reads the fixture and the Core Console opens the DWG written
+before the desktop crash. The bounded Shell, loader, file and SEH traces
+provide no specific failing Wine API to reproduce independently. The
+best remaining hypothesis is a compatibility difference somewhere in
+the desktop document lifecycle leading to a fast-fail on another thread.
+
+Keep the DWG test recipes and the baseline intact. Resume when there
+is a comparable newer Wine build or a specific API difference to test.
+For the build comparison, clone the same baseline, use the same MSXML3
+fix and .NET version, change only the Wine runtime, and run the same
+`open-activex` and `save-activex` trials. Match successful completion
+against the Windows markers above. A Wine patch needs a separate
+reproducer that distinguishes Wine from the Windows API behavior.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the
