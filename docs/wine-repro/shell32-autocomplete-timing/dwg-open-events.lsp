@@ -81,3 +81,34 @@
         (winum-open-log log "dbx_error"))
       (vlax-release-object database)))
   (princ))
+
+(defun winum-new-document-activate (log app document role / marker)
+  (setq marker (strcat "new_activate_" role))
+  (winum-open-log log (strcat marker "_enter"))
+  (vla-activate document)
+  (winum-open-log log
+    (strcat marker
+      (if (= (vla-get-name document) (vla-get-name (vla-get-activedocument app)))
+        "_active" "_other"))))
+
+(defun winum-new-document-control (log / app documents original created count)
+  (setq app (vlax-get-acad-object)
+        documents (vla-get-documents app)
+        original (vla-get-activedocument app)
+        count (vla-get-count documents))
+  (winum-open-log log "new_add_enter")
+  (setq created (vla-add documents))
+  (winum-open-log log "new_add_return")
+  (winum-open-log log (strcat "new_count_delta=" (itoa (- (vla-get-count documents) count))))
+  (winum-open-log log
+    (if (= (vla-get-name created) (vla-get-name (vla-get-activedocument app)))
+      "new_add_active=created" "new_add_active=other"))
+  (winum-new-document-activate log app original "original")
+  (winum-new-document-activate log app created "created"))
+
+(defun winum-new-document (log / result)
+  (winum-open-log log "new_begin")
+  (setq result (vl-catch-all-apply 'winum-new-document-control (list log)))
+  (if (vl-catch-all-error-p result)
+    (winum-open-log log "new_error"))
+  (princ))

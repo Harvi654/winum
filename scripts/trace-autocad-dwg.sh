@@ -4,13 +4,13 @@ set -euo pipefail
 umask 077
 
 usage() {
-    echo 'Usage: trace-autocad-dwg.sh candidate|baseline idle|save-0|open-0|save-1|open-1' >&2
+    echo 'Usage: trace-autocad-dwg.sh candidate|baseline idle|save-0|open-0|save-1|open-1|new-document' >&2
     echo '       trace-autocad-dwg.sh candidate|baseline startup-open|startup-safe|startup-wpf-software|core-open KNOWN_GOOD_DWG' >&2
     echo '       trace-autocad-dwg.sh candidate|baseline open-events|open-activex|open-dbx|open-0 KNOWN_GOOD_DWG' >&2
     exit 2
 }
 
-[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|(save|open)-[01]|startup-(open|safe|wpf-software)|core-open|open-(events|activex|dbx))$ ]] || usage
+[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|new-document|(save|open)-[01]|startup-(open|safe|wpf-software)|core-open|open-(events|activex|dbx))$ ]] || usage
 if [[ "$2" =~ ^(startup-.*|core-open|open-(events|activex|dbx))$ ]]; then
     [[ $# == 3 ]] || usage
 elif [[ $# == 3 && "$2" != open-0 ]]; then
@@ -83,10 +83,15 @@ launch_args=()
 launcher_script=scripts/launch-autocad.sh
 probe_dwg=
 open_events=
-if [[ $# == 3 ]]; then
-    test -f "$3" && test -s "$3" || { echo 'A nonempty local DWG is required.' >&2; exit 2; }
+if [[ $# == 3 && ( ! -f "$3" || ! -s "$3" ) ]]; then
+    echo 'A nonempty local DWG is required.' >&2
+    exit 2
+fi
+if [[ $# == 3 || "$2" == new-document ]]; then
     test "$(realpath -e "$ACAD_PREFIX/drive_c")" = "$ACAD_PREFIX/drive_c"
     probe_dir="$(mktemp -d "$ACAD_PREFIX/drive_c/winum-dwg.XXXXXXXX")"
+fi
+if [[ $# == 3 ]]; then
     probe_dwg="$probe_dir/probe.dwg"
     cp -- "$3" "$probe_dwg"
     probe_hash="$(sha256sum < "$probe_dwg")"
@@ -159,7 +164,7 @@ elif [[ "$2" == startup-wpf-software ]]; then
 elif [[ "$2" == startup-open ]]; then
     launch_args=("$probe_path")
     printf 'Opening a scratch DWG at startup. If the drawing opens, edit it, run QSAVE, then close AutoCAD.\n'
-elif [[ "$2" =~ ^open-(events|activex|dbx)$ ]]; then
+elif [[ "$2" == new-document || "$2" =~ ^open-(events|activex|dbx)$ ]]; then
     cp -- "${ACAD_OPEN_EVENTS_LISP:?Set the path to dwg-open-events.lsp}" "$probe_dir/open-events.lsp"
     open_events="$probe_dir/open-events.txt"
     probe_slash="C:/${probe_dir##*/}"
@@ -172,6 +177,10 @@ elif [[ "$2" =~ ^open-(events|activex|dbx)$ ]]; then
         open-activex|open-dbx)
             echo 'Run ._REGEN, then paste the second AutoLISP line:'
             printf '(winum-%s "%s/open-events.txt" "%s/probe.dwg")\n' "$2" "$probe_slash" "$probe_slash"
+            ;;
+        new-document)
+            echo 'Run ._REGEN, then paste this line once to add and switch drawings:'
+            printf '(winum-new-document "%s/open-events.txt")\n' "$probe_slash"
             ;;
     esac
 elif [[ "$2" == idle ]]; then
@@ -233,7 +242,8 @@ if [[ -n "$open_events" ]]; then
             sub(/\r$/, "")
             event = tolower($0)
             if (event ~ /^(reactors_ready|control_regen|command_open|activex_(begin|open_enter|open_return|open_expected_dwg|error)|:vlr-(begindwgopen|dwgfileopened|enddwgopen|documentcreated|documenttobeactivated|documentbecamecurrent))$/ ||
-                event ~ /^dbx_(begin|object_unavailable|open_enter|open_return|lines=[0-9]+|active_document=(unchanged|changed)|error)$/) {
+                event ~ /^dbx_(begin|object_unavailable|open_enter|open_return|lines=[0-9]+|active_document=(unchanged|changed)|error)$/ ||
+                event ~ /^new_(begin|add_enter|add_return|count_delta=-?[0-9]+|add_active=(created|other)|activate_(original|created)_(enter|active|other)|error)$/) {
                 print "open_event=" event
                 seen = 1
             }

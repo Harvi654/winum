@@ -651,13 +651,42 @@ Start a blank drawing, paste the setup line, run `._REGEN` and paste
 the `winum-open-dbx` line. Close AutoCAD after the trial and return
 `variant=`, `open_event=` and `fault_module=` from the summary.
 
-`dbx_open_return`, `dbx_lines=1` and `dbx_active_document=unchanged`
-confirm that this desktop process can read the fixture through
-ObjectDBX. The difference then lies somewhere in the document-open
-path that the side database bypasses. A matching fail-fast after
-`dbx_open_enter` would reproduce it during the side database open as
-well. `dbx_object_unavailable` or a caught `dbx_error` without the
-matching fail-fast leaves the comparison inconclusive.
+On 2026-11-20, the maintainer ran the ObjectDBX call three times in one
+baseline session. Each attempt delivered `:vlr-dwgfileopened` between
+`dbx_open_enter` and `dbx_open_return`, found one line, and reported the
+same active drawing name. The scratch DWG was unchanged and AutoCAD
+exited with code 0. The desktop process can read the fixture and
+enumerate its geometry through ObjectDBX. The comparison narrows the
+failure to the path used to open an existing DWG as a desktop document.
+It does not identify the point of failure within that path.
+
+### Check creation and activation of a second desktop document
+
+`new-document` calls `Documents.Add` from an already open blank
+drawing, using AutoCAD's default template selection. It records the
+change in document count and whether the new drawing became active.
+It then calls `Activate` on the original drawing and on the new one
+and compares the active drawing name after each call. Only markers
+and the count difference are logged. Use an empty test session and
+close both drawings without saving.
+[Add method](https://help.autodesk.com/cloudhelp/2027/ENU/AutoCAD-ActiveX-Reference/files/GUID-6DB6EFDF-C393-4BD0-9E59-A57BCDA3456F.htm)
+· [Activate method](https://help.autodesk.com/cloudhelp/2027/ENU/AutoCAD-ActiveX-Reference/files/GUID-8131A6DF-ED9F-4281-9207-C17BBDB187BF.htm)
+
+~~~bash
+export ACAD_OPEN_EVENTS_LISP="$PWD/docs/wine-repro/shell32-autocomplete-timing/dwg-open-events.lsp"
+unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
+bash scripts/trace-autocad-dwg.sh baseline new-document
+~~~
+
+Start with one blank drawing. Load the probe with the printed setup
+line, run `._REGEN` and paste `winum-new-document` once. Report the
+filtered summary and whether a second tab appeared. `new_count_delta=1`,
+`new_activate_original_active`, and `new_activate_created_active`
+show that general document creation and activation work in the same
+desktop process. The matching fail-fast during Add or Activate would
+give a smaller trigger. If markers stop at a document switch and the
+process survives, check whether both tabs are visible and can be selected
+manually. The probe starts in the original drawing's AutoLISP namespace.
 
 ### Capture the fail-fast reason
 
