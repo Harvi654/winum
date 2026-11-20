@@ -1263,6 +1263,20 @@ the hashes after the run. The known `aeb7a59` reference result above
 provides the Save As control for this follow-up. The three-patch build
 contains the two URLMON startup fixes and MSXML3 PR #4.
 
+On 2026-11-20, `c5ddcfe` reached `:vlr-commandwillstart` and `save_begin`
+on the fresh candidate copy. It wrote a 31,434-byte `AC1032` scratch DWG
+and exited with launcher status 9 and exception `0xc0000409` at
+`coreclr.dll+0x1855fd`, matching the full `aeb7a59` build on .NET 10.0.15.
+No save completion event was recorded. The preparation reported unchanged
+hashes for the five selected .NET files. The desktop trace confirmed
+native `mscoree.dll` and .NET 10.0.15 CoreCLR. Post-run hashes were not
+captured in the submitted summary.
+
+The omitted patches are unnecessary to reproduce Save As as well as
+desktop Open with the tested prefix. The three retained patches, the
+copied prefix state and Wine 11.22 remain in scope. System Wine 11.22
+still has only a startup result.
+
 [dwg-urlmon-startup]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-2027-status.md#fixed-along-the-way
 
 ### winum patch review
@@ -1375,18 +1389,20 @@ The input DWG stayed unchanged in both copies.
 The patches omitted from `c5ddcfe` are unnecessary to reproduce this
 desktop Open failure in the copied prefix, including the COM stub
 activation context and type library cache. The three retained patches,
-the copied prefix state, and Wine 11.22 behavior remain in scope. Save As
-was outside this paired run. The best remaining hypothesis is a
-compatibility difference in the desktop document lifecycle. The terminal
-CoreCLR offset identifies where the failure was reported. Its trigger
-remains unknown.
+the copied prefix state, and Wine 11.22 behavior remain in scope. The
+[.NET 10.0.15 Save As comparison](#compare-with-the-installed-system-wine)
+later reproduced the Save As failure on the same three-patch build. The
+best remaining hypothesis is a compatibility difference in the desktop
+document lifecycle. The terminal CoreCLR offset identifies where the
+failure was reported. Its trigger remains unknown.
 
 This closes the three patch comparisons. For a newer Wine comparison,
 use `c5ddcfe` as the 11.22 control. Keep the three patches, the source
-prefix, the fixture and the .NET version matched when repeating
-`open-activex`. If the newer runtime changes the result, use a separate
-matched pair for `save-activex`. Resume individual patch work if a trace
-identifies a specific API difference.
+prefix, the fixture and the .NET version matched within each pair. Start
+with `save-events` on .NET 10.0.15 and check for save completion and a
+usable drawing. Repeat `open-activex` separately with the same 2018 DWG
+and .NET 10.0.0 as the earlier Open comparison. Resume individual patch
+work if a trace identifies a specific API difference.
 
 [dwg-review-series]: https://github.com/Harvi654/winum/blob/aeb7a59/patches/series
 [dwg-review-history]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-experiment-2026-11.md#2026-11-17-quick-try-on-the-desktop-pc-installer-v040-winum-1122-1
