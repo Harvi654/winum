@@ -324,6 +324,10 @@ if [[ "${ACAD_EVENTPIPE:-0}" == 1 ]]; then
     export DOTNET_EventPipeOutputStreaming=1
     export DOTNET_EventPipeCircularMB=20
     export DOTNET_EventPipeConfig='Microsoft-Windows-DotNETRuntime:8000:5'
+    if [[ "${ACAD_EVENTPIPE_METHODS:-0}" == 1 ]]; then
+        export DOTNET_EventPipeConfig='Microsoft-Windows-DotNETRuntime:8018:5'
+        printf 'eventpipe_run=%s\n' "${eventpipe_dir##*/}"
+    fi
     export DOTNET_EventPipeOutputPath="C:\\${eventpipe_dir##*/}\\events-{pid}.nettrace"
 fi
 rc=0

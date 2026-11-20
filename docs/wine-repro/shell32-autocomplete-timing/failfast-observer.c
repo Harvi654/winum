@@ -194,7 +194,13 @@ static unsigned int report_stack(HANDLE process, DWORD thread_id)
         report_frame(process, "frame", count++, pc);
     }
     if (next_return && next_return != pc)
+    {
+        char methods[2];
+
         report_frame(process, "next_return", count, next_return);
+        if (GetEnvironmentVariableA("ACAD_EVENTPIPE_METHODS", methods, sizeof(methods)) == 1 && methods[0] == '1')
+            printf("observer_return_pc=0x%llx\n", (unsigned long long)next_return);
+    }
     printf("observer_stack_status=%s frames=%u\n",
            count == STACK_FRAME_LIMIT ? "limit" : count > 1 ? "walk_ended" : "fault_frame_only", count);
     SymCleanup(process);

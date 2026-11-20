@@ -3,8 +3,18 @@
 set -euo pipefail
 umask 077
 
-if [[ $# != 2 || ! "$1" =~ ^[[:xdigit:]]{1,8}$ || ! "$2" =~ ^[[:xdigit:]]{1,8}$ ]]; then
-    echo 'Usage: summarize-autocad-eventpipe.sh HEX_PROCESS_ID HEX_THREAD_ID' >&2
+if [[ $# == 2 && "$1" == --from-summary ]]; then
+    summary="$2"
+    export ACAD_EVENTPIPE_RUN="$(sed -nE 's/^eventpipe_run=(winum-eventpipe\.[[:alnum:]]{8})\r?$/\1/p' "$summary")"
+    test -n "$ACAD_EVENTPIPE_RUN"
+    set -- "$(sed -nE 's/^eventpipe_pid=0x([[:xdigit:]]+)\r?$/\1/p' "$summary")" \
+        "$(sed -nE 's/^last_chance=.* tid=0x([[:xdigit:]]+) .*/\1/p' "$summary")" \
+        "$(sed -nE 's/^observer_return_pc=0x([[:xdigit:]]+)\r?$/\1/p' "$summary")"
+fi
+
+if [[ $# -lt 2 || $# -gt 3 || ! "$1" =~ ^[[:xdigit:]]{1,8}$ || ! "$2" =~ ^[[:xdigit:]]{1,8}$ ||
+      ( $# == 3 && ! "$3" =~ ^[[:xdigit:]]{1,16}$ ) ]]; then
+    echo 'Usage: summarize-autocad-eventpipe.sh HEX_PROCESS_ID HEX_THREAD_ID [HEX_RETURN_PC]' >&2
     exit 2
 fi
 
@@ -13,7 +23,12 @@ bundle="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 drive="$(realpath -e -- "$ACAD_AUTOCOMPLETE_WORK/base-prefix/drive_c")"
 pid="$((16#$1))"
 shopt -s nullglob
-traces=("$drive"/winum-eventpipe.*/events-"$pid".nettrace)
+if [[ -n "${ACAD_EVENTPIPE_RUN:-}" ]]; then
+    [[ "$ACAD_EVENTPIPE_RUN" =~ ^winum-eventpipe\.[[:alnum:]]{8}$ ]]
+    traces=("$drive/$ACAD_EVENTPIPE_RUN/events-$pid.nettrace")
+else
+    traces=("$drive"/winum-eventpipe.*/events-"$pid".nettrace)
+fi
 if [[ "${#traces[@]}" != 1 ]]; then
     printf 'matching_eventpipe_files=%s\n' "${#traces[@]}"
     exit 2
@@ -35,4 +50,4 @@ tar -xzf runtime.tar.gz
 unzip -jq traceevent.nupkg 'lib/netstandard2.0/Microsoft.Diagnostics.Tracing.TraceEvent.dll' \
     'lib/netstandard2.0/Microsoft.Diagnostics.FastSerialization.dll'
 cp -- "$bundle/eventpipe-summary.dll" "$bundle/eventpipe-summary.runtimeconfig.json" .
-./dotnet ./eventpipe-summary.dll "${traces[0]}" "$2"
+./dotnet ./eventpipe-summary.dll "${traces[0]}" "${@:2}"

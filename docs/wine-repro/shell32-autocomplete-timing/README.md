@@ -1371,6 +1371,32 @@ failed. Query its memory mapping to distinguish a loaded image,
 executable memory without a known module, and a nonexecutable or
 unmapped address before choosing a follow-up trace.
 
+The next `save-0` trial reported `memory=mapped executable=1` for
+that return address with allocation offset `0x5a467`. No mapped
+filename was reported. CoreCLR can use file mappings for generated
+code on Windows, so look up the address in the JIT method-load events
+of the same process. The mapping alone leaves the caller unidentified.
+
+### Identify the return address through EventPipe
+
+Use the stack observer and EventPipe in one `save-0` run. Set both
+`ACAD_EVENTPIPE=1` and `ACAD_EVENTPIPE_METHODS=1` and save the launcher
+summary locally. The trace script enables exception, JIT and loader
+events. The observer prints `observer_return_pc=` in this mode. The
+summary script selects the specific EventPipe run and process, then
+compares the byte before that return address against live method ranges.
+The summary emits a method name only for a single match and omits source
+paths, signatures and raw code addresses. A truncated trace can omit
+method loads. A zero-match result leaves the caller unresolved.
+
+With the packaged observer and summary reader, run the updated
+`trace-autocad-dwg.sh baseline save-0` and pass the saved summary to
+`summarize-autocad-eventpipe.sh --from-summary`. Return only
+`eventpipe_parse_status=`, `eventpipe_method_events=`,
+`eventpipe_return_method=` and the existing stack summary lines.
+
+### Build and run the fail-fast observer
+
 Build with `scripts/build-measure-bundle.sh` and the
 `docs/wine-repro/shell32-autocomplete-timing/failfast.list` manifest.
 With no arguments, each executable observes a synthetic child. The
