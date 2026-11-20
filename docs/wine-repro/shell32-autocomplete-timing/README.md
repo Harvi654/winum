@@ -1503,6 +1503,14 @@ match `NtSetInformationFile` calls and returns from the rename thread
 after the target rename request. A zero count means there was no
 matched rename return in the saved trace.
 
+The saved relay log contained three matched `FileRenameInformation`
+returns on the rename-request thread after the target request. All
+three returned `STATUS_SUCCESS`. The native Windows capture also
+recorded a successful rename to the target DWG. The reduced Wine
+runtime still reached `0xc0000409` after the recorded renames and
+before the save completion event. The measured rename statuses give
+no failing file operation to use as the basis for a patch.
+
 #### Native Ole32 startup control
 
 On a disposable copy of the reduced Wine 11.22 prefix, a local trial
