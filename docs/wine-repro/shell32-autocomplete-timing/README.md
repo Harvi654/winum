@@ -1243,6 +1243,28 @@ before it reaches Save As, record where startup stopped. If the system
 version differs from the reference, the pair compares complete Wine
 builds, including the version and the patch set.
 
+On 2026-11-20, the maintainer compared winum `aeb7a59` with the installed
+system Wine. Both reported Wine 11.22. The preparation verified all
+five selected .NET file hashes in both copies. Both desktop processes
+loaded native `mscoree.dll` and .NET 10.0.15 CoreCLR. Winum reached
+`save_begin`, wrote the scratch DWG, and exited with `0xc0000409` at
+`coreclr.dll+0x1855fd`. Both system Wine attempts exited with status 1
+before reaching the Save As reactor. The visible `.NET Assertion Failed`
+dialog named `AcSbGridDisplay` in status bar XAML initialization. This
+matches the earlier [AutoCAD URLMON startup symptom][dwg-urlmon-startup].
+The system Wine trial ended before answering the Save As comparison.
+
+For a Save As comparison with the [three-patch Wine 11.22 build][dwg-review-startup-b],
+prepare only the candidate copy from the same .NET 10.0.15 source test
+directory. Pass the unpacked `c5ddcfe` runtime as the second argument
+and `--candidate-only` as the last argument to the existing preparation
+script. Retain `mscoree=n` during `candidate save-events` and verify
+the hashes after the run. The known `aeb7a59` reference result above
+provides the Save As control for this follow-up. The three-patch build
+contains the two URLMON startup fixes and MSXML3 PR #4.
+
+[dwg-urlmon-startup]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-2027-status.md#fixed-along-the-way
+
 ### winum patch review
 
 The review used the [series from the crashing build][dwg-review-series]

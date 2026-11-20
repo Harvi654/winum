@@ -3,8 +3,8 @@
 set -euo pipefail
 umask 077
 
-if [[ $# != 3 ]]; then
-    echo 'Usage: prepare-autocad-system-wine-ab.sh PREVIOUS_DWG_TEST_DIR SYSTEM_WINE_ROOT EMPTY_AB_DIR' >&2
+if [[ $# -lt 3 || $# -gt 4 || ( $# == 4 && "$4" != --candidate-only ) ]]; then
+    echo 'Usage: prepare-autocad-system-wine-ab.sh PREVIOUS_DWG_TEST_DIR COMPARISON_WINE_ROOT EMPTY_AB_DIR [--candidate-only]' >&2
     exit 2
 fi
 
@@ -54,7 +54,14 @@ framework_files=(
 ) > "$work/dotnet-files.sha256"
 
 printf 'winum_wine=%s\n' "$("$reference/bin/wine" --version)"
-printf 'system_wine=%s\n' "$("$system/bin/wine" --version)"
+if [[ $# == 4 ]]; then
+    printf 'candidate_wine=%s\n' "$("$system/bin/wine" --version)"
+    if [[ -f "$system/BUILDINFO" ]]; then
+        awk '$1 == "commit:" {print "candidate_commit=" $2}' "$system/BUILDINFO"
+    fi
+else
+    printf 'system_wine=%s\n' "$("$system/bin/wine" --version)"
+fi
 if [[ -f "$reference/BUILDINFO" ]]; then
     awk '$1 == "commit:" {print "winum_commit=" $2}' "$reference/BUILDINFO"
 fi
@@ -90,8 +97,14 @@ prepare_prefix() (
     printf 'dotnet_files=%s status=unchanged\n' "$trial"
 )
 
-prepare_prefix base "$reference"
+if [[ $# == 3 ]]; then
+    prepare_prefix base "$reference"
+fi
 prepare_prefix candidate "$system"
 ln -s -- "$system" "$work/wine"
 printf '%s\n' "$reference" > "$work/base-runtime.txt"
-echo 'system_wine_ab=ready'
+if [[ $# == 4 ]]; then
+    echo 'candidate_prefix=ready'
+else
+    echo 'system_wine_ab=ready'
+fi
