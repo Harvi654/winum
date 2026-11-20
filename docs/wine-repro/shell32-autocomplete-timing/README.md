@@ -1004,6 +1004,36 @@ exception code. Module-relative addresses can differ between the two
 CoreCLR binaries. Retain the baseline copy until the paired result is
 recorded and remove the extra private clone when it is no longer needed.
 
+On 2026-11-20, both desktop trials loaded native `coreclr.dll`,
+`hostfxr.dll`, `hostpolicy.dll` and `wpfgfx_cor3.dll` from 10.0.15.
+Open reached `activex_open_enter` without a return. Save reached
+`save_begin` and wrote a 32,078-byte `AC1032` file without a completion
+event or method return. Both exited with code 9 and exception
+`0xc0000409` at `coreclr.dll+0x1855fd`. The previous 10.0.0 runs had
+the same outcomes at `coreclr.dll+0x14922d`. Upgrading the runtime
+alone leaves the desktop failure in place.
+
+### Compare existing Wine loader diagnostics
+
+Run the loader summary using the original test work directory. It
+selects the latest available `acad-*.log` for baseline idle, Open and
+Save and for Open and Save in the 10.0.15 copy. It counts explicit
+module-load errors, missing imports and dynamic exports, stub allocations
+and initialization failures for `acad.exe` before its first unhandled
+exception. The reported names contain only module basenames and matching
+export tokens. Full paths stay in the logs.
+
+~~~bash
+python3 -I scripts/summarize-autocad-loader.py "$ACAD_AUTOCOMPLETE_WORK"
+~~~
+
+Return `loader_run=`, `loader_event=`, and `loader_omitted=` lines.
+`fault_thread` is the number of matching messages in the eventual
+failing thread. `idle_seen` uses the baseline startup-only trace as a
+noise reference, also for runs using the newer runtime. These reports
+cover the whole captured run up to the exception. An event unique to
+one trial needs a more focused trace to identify its timing or effect.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the
