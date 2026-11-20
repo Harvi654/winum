@@ -1210,6 +1210,15 @@ key path or the query's return status. A query in the command window
 is a candidate for a further check with the exact key and measured
 Windows value. A confirmed window with zero queries lowers its priority.
 
+On 2026-11-20, the .NET 10.0.15 prefix created an `AC1032` DWG and
+then exited with `0xc0000409` at `coreclr.dll+0x1855fd`. The reactor
+confirmed the Save As command window up to the crash. The registry
+trace counted three `LoggedFileCount` queries before the command and
+zero during it. None of the three ran on the fatal thread. This lowers
+the priority of the value as a direct trigger and does not justify
+adding it to the prefix. The trace leaves any effect of the earlier
+queries and the remaining registry differences open.
+
 ### winum patch review
 
 The review used the [series from the crashing build][dwg-review-series]
