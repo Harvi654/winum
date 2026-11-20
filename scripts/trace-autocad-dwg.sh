@@ -441,7 +441,7 @@ prefix = re.compile(r"^([0-9a-f]+):([0-9a-f]+):", re.I)
 mapped = re.compile(r'\bmapping PE file L?"[^"]*[\\/]([a-z0-9_.-]+)" at (0x[0-9a-f]+)-(0x[0-9a-f]+)', re.I)
 loaded = re.compile(r'\bLoaded L?"([^"]*[\\/]([a-z0-9_.-]+))" at (?:0x)?([0-9a-f]+): (\w+)', re.I)
 unloaded = re.compile(r'\b(?:unloading|unloaded module) L?"([^"]+)"', re.I)
-known_modules = {"coreclr.dll", "clr.dll", "shell32.dll", "msxml3.dll", "combase.dll",
+known_modules = {"coreclr.dll", "clr.dll", "shell32.dll", "msxml3.dll", "combase.dll", "oleaut32.dll",
                  "d3dcompiler_47.dll", "d3dcompiler_47_cor3.dll", "wpfgfx_cor3.dll"}
 runtime_modules = {"coreclr.dll", "hostfxr.dll", "hostpolicy.dll", "wpfgfx_cor3.dll"}
 runtime_path = re.compile(r'[\\/]+dotnet[\\/]+(?:host[\\/]+fxr|shared[\\/]+'

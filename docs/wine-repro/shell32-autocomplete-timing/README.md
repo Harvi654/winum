@@ -1199,8 +1199,8 @@ The autocomplete candidate also reproduced the failure with `FILEDIA=0`.
 The breadcrumb and background-menu candidates were absent from this
 build. Disabling recent-document history left both crashes reproducible.
 
-- [`combase-stub-activation-context`][dwg-review-combase] is the first
-  patch to isolate. It activates the context saved when the stub manager
+- [`combase-stub-activation-context`][dwg-review-combase] was the first
+  patch isolated. It activates the context saved when the stub manager
   was created for incoming RPC stub invocations. The Windows measurement
   found no activation context at an STA server and the caller's context
   at an MTA server. The saved context can change class or DLL resolution.
@@ -1229,8 +1229,9 @@ and the same .NET version from the previous test prefix.
 
 Close AutoCAD before copying the previous test prefix. Pass the previous
 test directory with `base-prefix` and `dwg-controls/line-2018.dwg` to
-`scripts/prepare-autocad-combase-ab.sh` along with a new empty directory
-on the test disk. Check that the disk can fit two copies of the prefix.
+`scripts/prepare-autocad-dwg-ab.sh combase` along with a new empty
+directory on the test disk. Check that the disk can fit two copies of
+the prefix.
 Start with `open-activex` on each copy, one launch at a time. Set
 `ACAD_AUTOCOMPLETE_WORK` to the new directory and `ACAD_OPEN_EVENTS_LISP`
 to `dwg-open-events.lsp` in this directory of the repository. Pass
@@ -1244,12 +1245,35 @@ cannot reach the operation. Use a fresh pair for `save-activex` if Open
 changes either prefix's application state. Save success needs the return
 marker and DWG readback because the baseline already writes a file.
 
+#### COM stub activation context result
+
+On 2026-11-20, desktop `open-activex` reached `activex_open_enter` on
+both copies. Both loaded built-in `combase.dll` and .NET `10.0.0`,
+terminated with `0xc0000409` at `coreclr.dll+0x14922d`, and returned
+launcher status 9. The fixture was unchanged in both copies. Neither
+trial reached `activex_open_return`. The Open crash reproduced with
+the COM stub patch omitted. Save As was outside this paired run.
+
+#### Type library cache comparison
+
+The [second comparison build][dwg-review-cache-b] omits only
+`oleaut32-typelib-keep-released.patch` from `aeb7a59`. It includes the
+COM stub patch and both `oleaut32-typedesc` patches. Check for a built-in
+`oleaut32.dll` load in the original Open trial before staging the DLLs.
+Use `scripts/prepare-autocad-dwg-ab.sh oleaut32` with the original
+test directory and a fresh empty directory. Repeat `open-activex`
+against both copies and record the `oleaut32.dll` load alongside the
+return or crash markers. A successful comparison merits a repeat
+and a separate Save As pair. Another identical Open failure lowers
+the priority of the cache hypothesis.
+
 [dwg-review-series]: https://github.com/Harvi654/winum/blob/aeb7a59/patches/series
 [dwg-review-history]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-experiment-2026-11.md#2026-11-17-quick-try-on-the-desktop-pc-installer-v040-winum-1122-1
 [dwg-review-combase]: ../../patches/combase-stub-activation-context.md
 [dwg-review-typelib]: ../../patches/oleaut32-typelib-keep-released.md
 [dwg-review-a]: https://github.com/Harvi654/winum/actions/runs/44528762825
 [dwg-review-b]: https://github.com/Harvi654/winum/actions/runs/44739990758
+[dwg-review-cache-b]: https://github.com/Harvi654/winum/actions/runs/44749216299
 
 ### Capture the fail-fast reason
 

@@ -3,13 +3,26 @@
 set -euo pipefail
 umask 077
 
-if [[ $# != 2 ]]; then
-    echo 'Usage: prepare-autocad-combase-ab.sh PREVIOUS_DWG_TEST_DIR EMPTY_AB_DIR' >&2
+if [[ $# != 3 || ! "$1" =~ ^(combase|oleaut32)$ ]]; then
+    echo 'Usage: prepare-autocad-dwg-ab.sh combase|oleaut32 PREVIOUS_DWG_TEST_DIR EMPTY_AB_DIR' >&2
     exit 2
 fi
 
-previous="$(realpath -e -- "$1")"
-work="$(realpath -e -- "$2")"
+module="$1"
+case "$module" in
+    combase)
+        patch=combase-stub-activation-context.patch
+        run=44739990758
+        revision=53ac693
+        ;;
+    oleaut32)
+        patch=oleaut32-typelib-keep-released.patch
+        run=44749216299
+        revision=d3d7826
+        ;;
+esac
+previous="$(realpath -e -- "$2")"
+work="$(realpath -e -- "$3")"
 prefix="$previous/base-prefix"
 fixture="$previous/dwg-controls/line-2018.dwg"
 name=winum-11.22-1-x86_64
@@ -34,16 +47,16 @@ download_build() (
 )
 
 download_build reference 44528762825 aeb7a59
-download_build comparison 44739990758 53ac693
+download_build comparison "$run" "$revision"
 reference="$work/reference/$name"
 comparison="$work/comparison/$name"
 
 patch_list() {
-    awk '/^[[:xdigit:]]+  [^ ]+\.patch$/ {print}' "$1/BUILDINFO"
+    awk -v omit="${2:-}" '/^[[:xdigit:]]+  [^ ]+\.patch$/ && $2 != omit {print}' "$1/BUILDINFO"
 }
 
-if ! grep -Eq '  combase-stub-activation-context\.patch$' "$reference/BUILDINFO" ||
-    ! cmp -s <(patch_list "$reference" | sed '/  combase-stub-activation-context\.patch$/d') \
+if ! patch_list "$reference" | awk -v patch="$patch" '$2 == patch { found = 1 } END { exit !found }' ||
+    ! cmp -s <(patch_list "$reference" "$patch") \
         <(patch_list "$comparison"); then
     echo 'Build manifests do not match the single-patch comparison.' >&2
     exit 1
@@ -54,10 +67,10 @@ cp -aT --reflink=auto -- "$prefix" "$work/candidate-prefix"
 cp -aT --reflink=auto -- "$reference" "$work/wine"
 cp -- "$fixture" "$work/line-2018.dwg"
 
-# Use the reference Wine distribution in both trials. Only combase comes
-# from the comparison build. Stage both PE copies to avoid prefix fallback.
+# Use the reference Wine distribution in both trials. Stage the comparison DLL
+# in both the candidate runtime and its prefix to avoid prefix fallback.
 for arch in x86_64 i386; do
-    dll="lib/wine/$arch-windows/combase.dll"
+    dll="lib/wine/$arch-windows/$module.dll"
     case "$arch" in
         x86_64) destination=system32 ;;
         i386) destination=syswow64 ;;
@@ -65,7 +78,7 @@ for arch in x86_64 i386; do
     test -s "$reference/$dll"
     test -s "$comparison/$dll"
     if cmp -s "$reference/$dll" "$comparison/$dll"; then
-        echo "The $arch COM DLLs are identical." >&2
+        echo "The $arch $module DLLs are identical." >&2
         exit 1
     fi
     for trial in base candidate; do
@@ -73,13 +86,13 @@ for arch in x86_64 i386; do
         test "$(realpath -e -- "$system_dir")" = "$system_dir"
         runtime="$reference"
         if [[ "$trial" == candidate ]]; then runtime="$comparison"; fi
-        cp --remove-destination -- "$runtime/$dll" "$system_dir/combase.dll"
+        cp --remove-destination -- "$runtime/$dll" "$system_dir/$module.dll"
     done
     cp --remove-destination -- "$comparison/$dll" "$work/wine/$dll"
-    printf 'combase_arch=%s reference=%s comparison=%s\n' "$arch" \
+    printf 'dwg_ab_dll=%s arch=%s reference=%s comparison=%s\n' "$module" "$arch" \
         "$(sha256sum < "$reference/$dll" | cut -d' ' -f1)" \
         "$(sha256sum < "$comparison/$dll" | cut -d' ' -f1)"
 done
 
 printf '%s\n' "$reference" > "$work/base-runtime.txt"
-echo 'combase_ab=ready'
+printf 'dwg_ab=ready dll=%s\n' "$module"
