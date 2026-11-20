@@ -1312,6 +1312,35 @@ build a small synthetic test of the same contract on both systems before
 changing Wine. If the logged symptoms provide no lead, the result bounds
 this diagnostic run and leaves silent behavioral differences open.
 
+On 2026-11-20, the reduced build produced a 31,467-byte `AC1032` DWG,
+then reached the same fail-fast at `coreclr.dll+0x1855fd`. The only new
+implementation hint after `save_begin` was one
+`shell:IPersistFile_fnSaveCompleted` message on a different thread. In
+Wine 11.22 this is the Shell Link object's completion method. It logs
+a stub message and returns `S_OK`. `SHAddToRecentDocs` calls this method
+after writing the `.lnk` file. The summary alone does not identify the
+caller. An earlier test with Shell recent history disabled retained the
+ActiveX Save As crash on the full build.
+[Wine Shell Link implementation](https://gitlab.winehq.org/wine/wine/-/blob/wine-11.22/dlls/shell32/shelllink.c)
+
+`EtwEventWrite` also appeared during startup and the command, and
+returns `ERROR_SUCCESS` without writing an event in Wine 11.22.
+`GetTempPath2W` appeared during startup and before `save_begin` and
+delegates to `GetTempPathW` in this Wine version. The OLE clipboard
+message also appeared before the command. The only logged error on the
+fatal thread was the terminal `NtRaiseException` message.
+
+For a direct control, repeat `candidate save-events` once with both
+`ACAD_DWG_API_TRACE=1` and `ACAD_DWG_NO_RECENT=1` in the same test copy.
+The existing policy helper now supports this trial on the candidate
+copy and restores the original setting. The Shell summary counts
+`IPersistFile_fnSaveCompleted` messages across the desktop process.
+Check `shell_recent_policy_skip_lines`, the count for that method, the
+save events, the terminal exception, and `recent_history_restored`.
+If the method disappears and the crash persists, leave this Shell
+history path out of further Save As patch work. The native Windows
+capture above can still locate differences in post-write file work.
+
 [dwg-urlmon-startup]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-2027-status.md#fixed-along-the-way
 
 ### winum patch review

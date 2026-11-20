@@ -321,18 +321,18 @@ fi
 shell_subject=
 if [[ "${ACAD_DWG_SHELL_TRACE:-0}" == 1 || "${ACAD_DWG_NO_RECENT:-0}" == 1 ]]; then
     case "$2" in
-        open-activex|save-activex)
+        open-activex|save-activex|save-events)
             shell_subject="${probe_dir##*/}"
             export WINEDEBUG="$WINEDEBUG,$acad_image:+shell"
             ;;
         *)
-            echo 'Shell tracing requires open-activex or save-activex.' >&2
+            echo 'Shell tracing requires open-activex, save-activex, or save-events.' >&2
             exit 2
             ;;
     esac
 fi
 if [[ "${ACAD_DWG_NO_RECENT:-0}" == 1 ]]; then
-    if [[ "$1" != baseline ]] || ! disable_recent_history; then
+    if ! disable_recent_history; then
         echo 'recent_history_policy=setup_failed' >&2
         exit 2
     fi
@@ -474,7 +474,7 @@ runtime_path = re.compile(r'[\\/]+dotnet[\\/]+(?:host[\\/]+fxr|shared[\\/]+'
                           r'([0-9]+\.[0-9]+\.[0-9]+)[\\/]+', re.I)
 reg_load_appkey = re.compile(r":fixme:reg:RegLoadAppKey[AW]\b")
 shell_functions = ("SHAddToRecentDocs", "SHChangeNotify", "SHCreateItemFromParsingName",
-                   "SHGetFileInfoW", "SHGetPropertyStoreFromParsingName")
+                   "SHGetFileInfoW", "SHGetPropertyStoreFromParsingName", "IPersistFile_fnSaveCompleted")
 shell_call = re.compile(r"(?:trace|warn|fixme|err):shell:(" + "|".join(shell_functions) + r")\b")
 recent_policy_trace = re.compile(r"\s+policy value for NoRecentDocsHistory = 0*1\s*$")
 shell_subject = sys.argv[4].lower()
