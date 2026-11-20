@@ -457,7 +457,7 @@ prefix = re.compile(r"^([0-9a-f]+):([0-9a-f]+):", re.I)
 mapped = re.compile(r'\bmapping PE file L?"[^"]*[\\/]([a-z0-9_.-]+)" at (0x[0-9a-f]+)-(0x[0-9a-f]+)', re.I)
 loaded = re.compile(r'\bLoaded L?"([^"]*[\\/]([a-z0-9_.-]+))" at (?:0x)?([0-9a-f]+): (\w+)', re.I)
 unloaded = re.compile(r'\b(?:unloading|unloaded module) L?"([^"]+)"', re.I)
-known_modules = {"coreclr.dll", "clr.dll", "shell32.dll", "msxml3.dll", "combase.dll", "oleaut32.dll",
+known_modules = {"coreclr.dll", "clr.dll", "mscoree.dll", "shell32.dll", "msxml3.dll", "combase.dll", "oleaut32.dll",
                  "d3dcompiler_47.dll", "d3dcompiler_47_cor3.dll", "wpfgfx_cor3.dll"}
 runtime_modules = {"coreclr.dll", "hostfxr.dll", "hostpolicy.dll", "wpfgfx_cor3.dll"}
 runtime_path = re.compile(r'[\\/]+dotnet[\\/]+(?:host[\\/]+fxr|shared[\\/]+'
@@ -635,7 +635,7 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
                         trueview_pids.add(pid)
                     elif name == "coreclr.dll":
                         clr_pids.add(pid)
-                if name in known_modules:
+                if name in known_modules or name.startswith(('libmono-', 'mono-', 'wine-mono')):
                     modules[pid, name] = (base, kind)
                 if name in runtime_modules:
                     version = runtime_path.search(path)

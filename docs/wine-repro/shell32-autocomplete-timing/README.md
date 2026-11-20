@@ -1219,6 +1219,30 @@ the priority of the value as a direct trigger and does not justify
 adding it to the prefix. The trace leaves any effect of the earlier
 queries and the remaining registry differences open.
 
+### Compare with the installed system Wine
+
+Use `scripts/prepare-autocad-system-wine-ab.sh` with the .NET 10.0.15
+test directory, `/usr` for the installed Wine on Arch, and a new empty
+directory on the test disk. Check space for two complete prefix copies
+and close any application using the source prefix. The script creates
+a reference copy for the existing winum runtime and a candidate copy
+for the system runtime. It runs `wineboot -u` with `mscoree=d` on each
+copy and then disables automatic prefix updates there. It verifies that
+the native `mscoree.dll` and Framework CLR files for both architectures
+and the .NET 10.0.15 `coreclr.dll` have kept the source prefix hashes.
+
+For both launches use `mscoree=n` in `WINEDLLOVERRIDES`. Run
+`trace-autocad-dwg.sh baseline save-events` and then
+`trace-autocad-dwg.sh candidate save-events` with `FILEDIA=0` and the
+provided scratch paths. Verify the same hashes again after each run.
+The trace reports the `mscoree`, `clr`, `coreclr`, and Mono runtime DLLs
+when the desktop process loads them. An absent Framework DLL line can
+mean the operation used only the separately installed .NET 10 runtime.
+Compare Save As completion and the crash site. If system Wine exits
+before it reaches Save As, record where startup stopped. If the system
+version differs from the reference, the pair compares complete Wine
+builds, including the version and the patch set.
+
 ### winum patch review
 
 The review used the [series from the crashing build][dwg-review-series]
