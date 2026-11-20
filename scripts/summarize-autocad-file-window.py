@@ -48,6 +48,9 @@ RELAY_APIS = {
     'kernelbase.getfileattributesexw', 'ntdll.ntqueryfullattributesfile', 'ntdll.ntsetinformationfile',
     'combase.cocreateinstance', 'combase.cogetclassobject',
 }
+CRT_MODULES = {'vcruntime140', 'ucrtbase', 'msvcrt', 'msvcr80', 'msvcr90', 'msvcr100', 'msvcr110', 'msvcr120'}
+CRT_APIS = {'__cxxqueryexceptionsize', '__cxxexceptionfilter', '__cxxregisterexceptionobject', '__cxxunregisterexceptionobject'}
+CRT_SAVE_PHASES = {'save_command_enter': 'command', 'save_begin': 'saving', 'save_command_exit': 'ended'}
 DISPOSITION = ('supersede', 'open', 'create', 'open_if', 'overwrite', 'overwrite_if')
 CHAIN_RUNS = (
     ('baseline-open', '', 'open-activex'),
@@ -349,6 +352,66 @@ def public_module(name):
     return name
 
 
+def scan_crt_relay(log):
+    processes, modules = set(), set()
+    phase, scratch = {}, {}
+    events = Counter()
+    fault_thread = None
+    with log.open(encoding='utf-8', errors='replace') as stream:
+        for line in stream:
+            if match := RELAY_LINE.match(line):
+                pid, tid, action, name, arguments = match.groups()
+                module, _, api = name.lower().replace('.dll.', '.').partition('.')
+                if pid in processes and module in CRT_MODULES and api in CRT_APIS:
+                    value = RELAY_VALUE.match(arguments) if action == 'Ret' else None
+                    status = int(value[1], 16) & 0xffffffff if value and api == '__cxxqueryexceptionsize' else None
+                    events[pid, tid, phase.get(pid, 'before'), module, api, action, status] += 1
+                continue
+            if not (match := LINE.match(line.rstrip('\r\n'))):
+                continue
+            pid, tid, level, channel, function, message = match.groups()
+            if channel == 'loaddll' and (loaded := LOADED.match(message)):
+                name = basename(loaded[1])
+                kind = message[loaded.end():].strip().partition(' ')[0]
+                if name == 'acad.exe':
+                    processes.add(pid)
+                elif name.removesuffix('.dll') in CRT_MODULES and kind in {'native', 'builtin'}:
+                    modules.add((pid, name, kind))
+            if pid not in processes:
+                continue
+            if channel == 'file' and level == 'trace' and function == 'NtCreateFile':
+                if request := REQUEST.search(message):
+                    path = re.sub(r'[\\/]+', '/', request[1]).lower()
+                    if marker := SAVE_MARKER.search(path):
+                        folder, name = marker.groups()
+                        if name == 'save_command_enter':
+                            scratch.setdefault(pid, folder)
+                        if folder == scratch.get(pid):
+                            phase[pid] = CRT_SAVE_PHASES[name]
+            elif channel == 'seh' and (fatal := FATAL.match(message)) and fatal[1].lower() == 'c0000409':
+                fault_thread = pid, tid
+                phase[pid] = 'fault'
+
+    for pid, name, kind in sorted(modules):
+        if pid in processes and (not fault_thread or fault_thread[0] == pid):
+            print(f'crt_module={name} kind={kind}')
+    query_records = [(event, count) for event, count in events.items()
+                     if event[-3:-1] == ('__cxxqueryexceptionsize', 'Ret') and event[-1] is not None]
+    query_returns = sum(count for _, count in query_records)
+    query_on_fault = sum(count for event, count in query_records if event[:2] == fault_thread)
+    print(f'crt_relay_records={sum(events.values())} fault_thread_confirmed={int(fault_thread is not None)}')
+    print(f'crt_size_returns={query_returns} fault_thread={query_on_fault}')
+    grouped = Counter()
+    for (pid, tid, stage, module, api, action, status), count in events.items():
+        grouped[stage, module, api, action, status, (pid, tid) == fault_thread] += count
+    priority = sorted(grouped, key=lambda event: (not event[-1], event[2] != '__cxxqueryexceptionsize', -grouped[event]))
+    for event in priority[:32]:
+        stage, module, api, action, status, on_fault = event
+        size = f' bytes={status}' if status is not None else ''
+        print(f'crt_relay={module}.{api} action={action.lower()} phase={stage}{size} '
+              f'fault_thread={int(on_fault)} count={grouped[event]}')
+
+
 def exception_site(message, images):
     match = EXCEPTION_ADDRESS.search(message)
     if not match:
@@ -512,9 +575,22 @@ def main():
     mode.add_argument('--save-io', action='store_true', help='summarize file requests from the latest candidate Save As trace')
     mode.add_argument('--save-com', action='store_true', help='summarize COM messages from the latest candidate Save As trace')
     mode.add_argument('--save-relay', action='store_true', help='summarize relay calls from the latest candidate Save As trace')
+    mode.add_argument('--crt-relay', action='store_true', help='summarize CRT helper calls from the latest CRT trace')
     mode.add_argument('--dbx-save', action='store_true', help='summarize access violation sites from the latest ObjectDBX Save As trace')
     mode.add_argument('--inventor-export', action='store_true', help='summarize the Inventor AutoCAD DWG export control')
     args = parser.parse_args()
+    if args.crt_relay:
+        try:
+            logs = (path for path in args.work.glob('dwg-*-save-events.*/acad-*.log')
+                    if (path.parent / 'crt-relay.enabled').is_file())
+            log = max(logs, key=lambda path: path.stat().st_mtime_ns, default=None)
+            if log is None:
+                print('crt_relay=unconfirmed log=missing')
+            else:
+                scan_crt_relay(log)
+        except OSError:
+            print('crt_relay=unconfirmed log=unreadable')
+        return
     if args.inventor_export:
         try:
             scan_inventor_export(args.work)

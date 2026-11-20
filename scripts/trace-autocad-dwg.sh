@@ -148,9 +148,10 @@ disable_recent_history() {
 }
 
 run_save_relay() (
+    apis="$1"
+    shift
     key='HKCU\Software\Wine\Debug'
     config_log="$ACAD_LOGDIR/relay-config.txt"
-    apis='comdlg32.GetOpenFileNameW;comdlg32.GetSaveFileNameW;kernelbase.MoveFileWithProgressW;kernelbase.GetFileAttributesExW;ntdll.NtQueryFullAttributesFile;ntdll.NtSetInformationFile;combase.CoCreateInstance;combase.CoGetClassObject'
     query_exit=0
     timeout 20s "$WINE" reg query "$key" /v RelayInclude > "$config_log" 2>&1 || query_exit=$?
     case "$query_exit" in
@@ -170,10 +171,15 @@ run_save_relay() (
           else
               echo save_relay_filter=restore_failed
           fi' EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
     timeout 20s "$WINE" reg add "$key" /v RelayInclude /t REG_SZ /d "$apis" /f >> "$config_log" 2>&1 || {
         echo 'save_relay_filter=setup_failed' >&2
         return 2
     }
+    if [[ "$crt_relay_trace" == 1 ]]; then
+        : > "$ACAD_LOGDIR/crt-relay.enabled"
+    fi
     echo 'save_relay_filter=enabled'
     "$@" > "$ACAD_LOGDIR/launcher.txt" 2>&1
 )
@@ -202,6 +208,8 @@ recovery_subject=
 api_subject=
 com_save_trace="${ACAD_DWG_COM_TRACE:-0}"
 save_relay_trace="${ACAD_DWG_RELAY_TRACE:-0}"
+crt_relay_trace="${ACAD_DWG_CRT_TRACE:-0}"
+relay_apis=
 managed_save_probe="${ACAD_MANAGED_SAVE_PROBE:-}"
 managed_exception_log=
 event_label=open_event
@@ -265,11 +273,25 @@ if [[ "$com_save_trace" == 1 ]]; then
     fi
     export WINEDEBUG="$WINEDEBUG,$acad_image:+file,$acad_image:+ole,$acad_image:+combase,$acad_image:+rpc,$acad_image:+storage"
 fi
-if [[ "$save_relay_trace" == 1 ]]; then
+if [[ "$crt_relay_trace" == 1 ]]; then
+    if [[ "$2" != save-events || "$save_relay_trace" == 1 || -n "${ACAD_FAILFAST_OBSERVER:-}" ]]; then
+        echo 'CRT tracing requires save-events without another relay filter or the debugger observer.' >&2
+        exit 2
+    fi
+    crt_apis=()
+    for module in vcruntime140 ucrtbase msvcrt msvcr80 msvcr90 msvcr100 msvcr110 msvcr120; do
+        for api in __CxxQueryExceptionSize __CxxExceptionFilter __CxxRegisterExceptionObject __CxxUnregisterExceptionObject; do
+            crt_apis+=("$module.$api")
+        done
+    done
+    relay_apis="$(IFS=';'; echo "${crt_apis[*]}")"
+    export WINEDEBUG="$WINEDEBUG,$acad_image:+relay,$acad_image:+file"
+elif [[ "$save_relay_trace" == 1 ]]; then
     if [[ "$1" != candidate || "$2" != save-events || -n "${ACAD_FAILFAST_OBSERVER:-}" ]]; then
         echo 'Relay tracing requires candidate save-events without the debugger observer.' >&2
         exit 2
     fi
+    relay_apis='comdlg32.GetOpenFileNameW;comdlg32.GetSaveFileNameW;kernelbase.MoveFileWithProgressW;kernelbase.GetFileAttributesExW;ntdll.NtQueryFullAttributesFile;ntdll.NtSetInformationFile;combase.CoCreateInstance;combase.CoGetClassObject'
     export WINEDEBUG="$WINEDEBUG,$acad_image:+relay,$acad_image:+file,$acad_image:+commdlg,$acad_image:+shell,$acad_image:+ole"
 fi
 
@@ -377,7 +399,7 @@ elif [[ "$2" =~ ^(new-document|save-(events|activex|dbx)|open-(events|activex|db
             save_dwg="$probe_dir/saved.dwg"
             event_label=save_event
             printf '(progn (load "%s/open-events.lsp") ' "$probe_slash"
-            if [[ -n "$managed_exception_log" || -n "$recovery_subject" || -n "$api_subject" || "$com_save_trace" == 1 || "$save_relay_trace" == 1 ]]; then
+            if [[ -n "$managed_exception_log" || -n "$recovery_subject" || -n "$api_subject" || "$com_save_trace" == 1 || -n "$relay_apis" ]]; then
                 printf '(setq winum-trace-file-window T) '
             fi
             printf '(winum-save-trace "%s/open-events.txt" "%s/saved.dwg"))\n' "$probe_slash" "$probe_slash"
@@ -460,8 +482,8 @@ if [[ -n "${ACAD_FAILFAST_OBSERVER:-}" ]]; then
         printf 'observer_exit=%s\n' "$observer_rc"
     fi
     wait "$launcher_pid" || rc=$?
-elif [[ "$save_relay_trace" == 1 ]]; then
-    run_save_relay "${launcher[@]}" || rc=$?
+elif [[ -n "$relay_apis" ]]; then
+    run_save_relay "$relay_apis" "${launcher[@]}" || rc=$?
 else
     "${launcher[@]}" > "$ACAD_LOGDIR/launcher.txt" 2>&1 || rc=$?
 fi

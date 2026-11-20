@@ -836,6 +836,25 @@ probe with the three builtin DLLs returned 16 for `vcruntime140.dll`,
 number, trace AutoCAD's size query and registration on the same
 thread before tying that difference to the failure.
 
+The x64 Windows VM with .NET 10.0.15 returned 32 bytes from
+`vcruntime140.dll` and `ucrtbase.dll`. Its `msvcrt.dll` did not expose
+the query. The size difference is measured independently of AutoCAD.
+To check whether the application observes it, repeat the failing
+baseline save with the CRT-specific relay filter.
+
+~~~bash
+ACAD_DWG_CRT_TRACE=1 bash scripts/trace-autocad-dwg.sh baseline save-events
+python3 -I scripts/summarize-autocad-file-window.py --crt-relay "$ACAD_AUTOCOMPLETE_WORK"
+~~~
+
+The relay filter covers the size query, exception filter, registration,
+and unregistration exports in the relevant builtin CRT DLLs. The report
+includes loaded module kinds, return sizes, save phases, and the fatal
+thread match. A 16-byte return during the save on the fatal thread
+would justify testing the measured 32-byte behavior in AutoCAD. A trace
+with no query leaves that relationship open because relay intercepts
+builtin exports and some calls can go through other paths.
+
 ### Check creation and activation of a second desktop document
 
 `new-document` calls `Documents.Add` from an already open blank
