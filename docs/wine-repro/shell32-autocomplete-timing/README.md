@@ -725,6 +725,25 @@ fail-fast, AutoCAD reported that it had saved the target before the
 fault. Use the existing `core-open` trial on the written DWG to
 verify that it can be reopened and still contains the line.
 
+On 2026-11-20, the baseline `save-events` run delivered the command
+start and `save_begin` callbacks. It produced an `AC1032` file of
+31,498 bytes. The launcher exited with code 9 after `0xc0000409` at
+`coreclr.dll+0x14922d`. The trace contains no `saveComplete` or
+command-end callback. The delivered events place the failure after
+save began. Reopening the output will determine whether the written
+DWG can be read and contains the test line.
+
+Set `ACAD_SAVED_DWG` to that run's `saved.dwg` below `base-prefix/drive_c`
+and pass it to `core-open`. The launcher stages a copy before opening it.
+
+~~~bash
+bash scripts/trace-autocad-dwg.sh baseline core-open "$ACAD_SAVED_DWG"
+~~~
+
+`core_console_dwg=1 core_console_lines=1` with an unchanged copy and
+exit code 0 confirms a readable drawing with the test line. The command
+and save completion callbacks remain unconfirmed in the desktop run.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the
