@@ -900,12 +900,11 @@ and the output was 32,596 bytes.
 | ActiveX Open | Document activation callbacks and method return | Fail-fast after method entry, with no activation callback delivered to the starting namespace |
 | ActiveX Save As | File completion callback and method return | File written, then fail-fast without a completion callback or method return |
 
-The Windows report did not include the AutoCAD build from About. Record
-the exact application builds on Windows and Wine before treating this
-as a build-matched comparison. The observed contrast favors examining
-the desktop file lifecycle under Wine. The shared CoreCLR offset
-identifies where the process terminates. A Wine fix needs a smaller
-reproducer that isolates the triggering compatibility difference.
+About reported `X.60.0.0 AutoCAD 2027` on both native Windows and the
+baseline prefix on Arch Linux. The desktop calls complete on Windows
+and fail on winum in the same AutoCAD product build. The shared CoreCLR
+offset identifies where the process terminates. A Wine fix needs a
+smaller reproducer that isolates the triggering compatibility difference.
 
 ### Capture the fail-fast reason
 
