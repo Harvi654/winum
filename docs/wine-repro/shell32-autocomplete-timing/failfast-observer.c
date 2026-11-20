@@ -69,7 +69,7 @@ static void report_preceding(const struct exception_event *history, unsigned int
     }
 }
 
-static void report_frame(HANDLE process, unsigned int index, DWORD64 pc)
+static void report_frame(HANDLE process, const char *record, unsigned int index, DWORD64 pc)
 {
     IMAGEHLP_MODULE64 module = {0};
 
@@ -78,10 +78,10 @@ static void report_frame(HANDLE process, unsigned int index, DWORD64 pc)
         pc - module.BaseOfImage < module.ImageSize &&
         module.ModuleName[0] && strspn(module.ModuleName, "abcdefghijklmnopqrstuvwxyz"
                                       "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-") == strlen(module.ModuleName))
-        printf("observer_stack_frame=%u module=%s offset=0x%llx\n", index, module.ModuleName,
+        printf("observer_stack_%s=%u module=%s offset=0x%llx\n", record, index, module.ModuleName,
                (unsigned long long)(pc - module.BaseOfImage));
     else
-        printf("observer_stack_frame=%u module=unresolved\n", index);
+        printf("observer_stack_%s=%u module=unresolved\n", record, index);
 }
 
 static unsigned int report_stack(HANDLE process, DWORD thread_id)
@@ -89,7 +89,7 @@ static unsigned int report_stack(HANDLE process, DWORD thread_id)
     STACKFRAME64 frame = {0};
     CONTEXT context = {0};
     DWORD machine;
-    DWORD64 pc, sp;
+    DWORD64 pc, sp, next_return = 0;
     unsigned int attempts, count = 0;
     HANDLE thread = OpenThread(THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, thread_id);
 
@@ -126,17 +126,20 @@ static unsigned int report_stack(HANDLE process, DWORD thread_id)
     frame.AddrPC.Mode = frame.AddrFrame.Mode = frame.AddrStack.Mode = AddrModeFlat;
     pc = frame.AddrPC.Offset;
     sp = frame.AddrStack.Offset;
-    report_frame(process, count++, pc);
+    report_frame(process, "frame", count++, pc);
     for (attempts = 0; count < STACK_FRAME_LIMIT && attempts < STACK_FRAME_LIMIT; ++attempts)
     {
         if (!StackWalk64(machine, process, thread, &frame, &context, NULL, SymFunctionTableAccess64,
                          SymGetModuleBase64, NULL) || !frame.AddrPC.Offset || frame.AddrStack.Offset < sp)
             break;
+        next_return = frame.AddrReturn.Offset;
         if (frame.AddrPC.Offset == pc && frame.AddrStack.Offset == sp) continue;
         pc = frame.AddrPC.Offset;
         sp = frame.AddrStack.Offset;
-        report_frame(process, count++, pc);
+        report_frame(process, "frame", count++, pc);
     }
+    if (next_return && next_return != pc)
+        report_frame(process, "next_return", count, next_return);
     printf("observer_stack_status=%s frames=%u\n",
            count == STACK_FRAME_LIMIT ? "limit" : count > 1 ? "walk_ended" : "fault_frame_only", count);
     SymCleanup(process);

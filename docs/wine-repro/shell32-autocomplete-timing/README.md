@@ -1330,8 +1330,10 @@ preceding exception codes on the failing thread. For CLR exception
 events it also reports the first numeric argument. At a last-chance
 fast-fail event it reads the paused thread context and uses `StackWalk64`
 for up to 12 frames. The output includes module names and relative
-offsets. Debug information lookup uses a local search path. Managed JIT
-frames may be unresolved and may stop the walk. Attaching sets the
+offsets. `observer_stack_next_return=` reports the return address the
+walker provided for its last frame, when available. This address is
+separate from the successfully walked frames. Debug information lookup
+uses a local search path. Managed JIT frames may stop the walk. Attaching sets the
 process's debugger flag, so compare the resulting fault module and
 offset with the previous run.
 
@@ -1344,12 +1346,27 @@ frames are needed to distinguish the caller. For example, an
 reason with `CrawlFrame::SetCurGSCookie` in the stack, but the AutoCAD
 stack has yet to identify that path.
 
+On 2026-11-20, the maintainer repeated `save-0` on winum-11.22-1 with
+.NET 10.0.0. The fatal thread had one earlier CLR exception (`0xe0434352`)
+and stopped with reason 2. The observer walked `coreclr+0x14922d`
+and `coreclr+0x15456b`. In the official Windows x64 DLL, the second
+address immediately follows a call to the termination routine from the
+helper at `coreclr+0x154560`. That helper passes zero to the routine,
+matching [`DoJITFailFast`][autocad-fastfail-helper] on Windows x64.
+The DLL has two direct calls to the helper, ending at `0xee09b` and
+`0x156e10`. The first follows checks against the process's GS cookie.
+One more return address can distinguish those paths or identify an
+indirect caller. The two reported frames do not identify the caller of
+`DoJITFailFast`.
+
 Build with `scripts/build-measure-bundle.sh` and the
 `docs/wine-repro/shell32-autocomplete-timing/failfast.list` manifest.
 With no arguments, each executable observes a synthetic child. The
 x86_64 self-test under winum-11.22-1 reported reason 7 and six frames.
 A separate attach test returned reason 2, the synthetic CLR exception
-from the fatal thread, and five frames. In the offline Windows VM, run
+from the fatal thread, and five frames. In a local build limited to two
+frames, the observer reported the third frame's address as the last
+frame's return address. In the offline Windows VM, run
 the two self-tests with `run-measure.bat`. For AutoCAD, start with Save
 As because the earlier `save-0` trial observed a CLR exception on the
 fatal thread. Use the x86_64 observer with the existing trace script:
@@ -1369,6 +1386,7 @@ Wine relay trial if the stack points to a particular exported Wine API
 whose call and return need verification.
 
 [autocad-fastfail]: https://learn.microsoft.com/en-us/cpp/intrinsics/fastfail
+[autocad-fastfail-helper]: https://github.com/dotnet/runtime/blob/v10.0.0/src/coreclr/vm/jithelpers.cpp#L982-L1016
 [autocad-fastfail-similar]: https://github.com/dotnet/runtime/issues/89309
 
 ### Collect runtime exception events
