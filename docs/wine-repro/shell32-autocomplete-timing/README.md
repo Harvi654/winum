@@ -1511,6 +1511,41 @@ runtime still reached `0xc0000409` after the recorded renames and
 before the save completion event. The measured rename statuses give
 no failing file operation to use as the basis for a patch.
 
+#### Compare with an Inventor DWG export
+
+Use a disposable copy of the Inventor 2027 prefix on the test disk
+and the full winum runtime from the AutoCAD reference. The reduced
+AutoCAD candidate has only three patches. Record the full runtime's
+`BUILDINFO` commit before comparing logs across applications.
+Run `bash scripts/trace-inventor-dwg-export.sh <revision>` using the
+winum revision containing the trace scripts. Close Inventor before
+copying the source prefix. The runner looks up the reference build
+from the existing AutoCAD test directories and uses `~/nvme` for the
+new test directory.
+
+Create one Inventor drawing sheet with a single model view. Use
+**File > Export > Export to DWG** and choose the AutoCAD 2018 DWG
+format. Export to `C:\winum-export-check\inventor-export.dwg` and
+close Inventor when export finishes. The trace directory holds the
+copied `inventor-prefix/` and launcher `logs/`. Enable the `file`,
+`loaddll`, `seh`, `ole` and `relay` channels for `Inventor.exe` and
+`dwgviewr.exe`. Use the same `RelayInclude` entries as the AutoCAD
+Save As trace. The filter is local to the disposable prefix.
+[Autodesk export procedure](https://help.autodesk.com/cloudhelp/2027/ENU/Inventor-Help/files/GUID-0BA0F188-8990-4054-BBEB-41C38F6982F2.htm)
+
+~~~bash
+python3 -I scripts/summarize-autocad-file-window.py --inventor-export "$INV_EXPORT_WORK"
+~~~
+
+Return `inventor_export_` lines and whether the export completed in the
+interface. The summary finds the target's first write or rename request
+and reports the selected builtin returns from that point to process
+exit, including any shutdown activity. It accepts the sheet-name suffix
+the exporter can add. The summary omits file paths and call arguments.
+The test establishes which steps are observable in a successful Inventor
+export. Comparing an individual return with AutoCAD requires the same
+Wine build and comparable inputs to that operation.
+
 #### Native Ole32 startup control
 
 On a disposable copy of the reduced Wine 11.22 prefix, a local trial

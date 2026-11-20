@@ -38,6 +38,11 @@ RELAY_VALUE = re.compile(r'^\) retval=(?:0x)?([a-f0-9]{1,16})\b', re.I)
 RELAY_INFORMATION_CLASS = re.compile(r',\s*(?:0x)?([a-f0-9]{1,16})\)\s+ret=', re.I)
 RELAY_RETURN_SITE = re.compile(r'\bret=(?:0x)?([a-f0-9]{1,16})\s*$', re.I)
 RENAME_CLASSES = {10: 'FileRenameInformation', 65: 'FileRenameInformationEx'}
+EXPORT_TARGET = re.compile(r'/winum-export-check/inventor-export[^/]*\.dwg$')
+FILE_ACCESS = re.compile(r'\baccess=([a-f0-9]{1,8})\b', re.I)
+RUNTIME_VERSION = re.compile(r'/dotnet/shared/microsoft\.netcore\.app/([0-9.]+)/coreclr\.dll$')
+EXPORT_PROCESSES = {'inventor.exe', 'dwgviewr.exe'}
+EXPORT_MODULES = {'coreclr.dll', 'combase.dll', 'ole32.dll', 'oleaut32.dll', 'rpcrt4.dll', 'shell32.dll'}
 RELAY_APIS = {
     'comdlg32.getopenfilenamew', 'comdlg32.getsavefilenamew', 'kernelbase.movefilewithprogressw',
     'kernelbase.getfileattributesexw', 'ntdll.ntqueryfullattributesfile', 'ntdll.ntsetinformationfile',
@@ -80,6 +85,79 @@ def path_group(path):
 
 def basename(path):
     return re.split(r'[\\/]', path.lower())[-1]
+
+
+def scan_inventor_export(work):
+    output_dir = work / 'inventor-prefix/drive_c/winum-export-check'
+    outputs = sorted(path for path in output_dir.glob('inventor-export*.dwg') if path.is_file())
+    print(f'inventor_export_files={len(outputs)}')
+    for path in outputs:
+        with path.open('rb') as drawing:
+            signature = drawing.read(6)
+        version = signature.decode('ascii') if re.fullmatch(rb'AC[0-9]{4}', signature) else 'other'
+        print(f'inventor_export_dwg={version} bytes={path.stat().st_size}')
+
+    log = max((work / 'logs').glob('inventor-*.log'), key=lambda path: path.stat().st_mtime_ns, default=None)
+    if log is None:
+        print('inventor_export_trace=log_missing')
+        return
+
+    processes, modules, versions, anchor = {}, defaultdict(set), defaultdict(set), {}
+    events, rename_requests, ole_messages, faults = Counter(), Counter(), Counter(), Counter()
+    with log.open(encoding='utf-8', errors='replace') as stream:
+        for line in stream:
+            if relay := RELAY_LINE.match(line):
+                pid, _, action, name, arguments = relay.groups()
+                name = name.lower().replace('.dll.', '.')
+                if (pid in anchor and name in RELAY_APIS and action == 'Ret' and
+                        (returned := RELAY_VALUE.match(arguments))):
+                    phase = 'after_rename_request' if rename_requests[pid] else 'after_write_request'
+                    events[pid, phase, name, int(returned[1], 16) & 0xffffffff] += 1
+                continue
+            if not (match := LINE.match(line.rstrip('\r\n'))):
+                continue
+            pid, _, level, channel, function, message = match.groups()
+            if channel == 'loaddll' and (loaded := LOADED.match(message)):
+                path, _ = loaded.groups()
+                name = basename(path)
+                if name in EXPORT_PROCESSES:
+                    processes[pid] = name
+                elif name in EXPORT_MODULES:
+                    modules[pid].add(name)
+                    if version := RUNTIME_VERSION.search(re.sub(r'[\\/]+', '/', path).lower()):
+                        versions[pid].add(version[1])
+            if pid not in processes:
+                continue
+            if channel == 'file' and level == 'trace':
+                if function == 'MoveFileWithProgressW' and len(paths := FILE_PATH.findall(message)) >= 2:
+                    if EXPORT_TARGET.search(re.sub(r'[\\/]+', '/', paths[1]).lower()):
+                        rename_requests[pid] += 1
+                        anchor.setdefault(pid, 'rename_request')
+                elif function == 'NtCreateFile' and (request := REQUEST.search(message)):
+                    if (EXPORT_TARGET.search(re.sub(r'[\\/]+', '/', request[1]).lower()) and
+                            (access := FILE_ACCESS.search(message)) and int(access[1], 16) & 0x40000006):
+                        anchor.setdefault(pid, 'write_request')
+            elif pid in anchor and channel in COM_CHANNELS:
+                ole_messages[pid] += 1
+            elif pid in anchor and channel == 'seh' and (fatal := FATAL.match(message)):
+                faults[pid, fatal[1].lower()] += 1
+
+    if not anchor:
+        print('inventor_export_trace=no_target_request')
+    for pid, first in anchor.items():
+        print(f'inventor_export_trace={first} process={processes[pid]} '
+              f'rename_requests={rename_requests[pid]} com_messages={ole_messages[pid]}')
+        print(f'inventor_export_modules={",".join(sorted(modules[pid])) or "none"} '
+              f'coreclr={",".join(sorted(versions[pid])) or "unconfirmed"}')
+        returns = [(phase, name, status, count) for (process, phase, name, status), count in events.items()
+                   if process == pid]
+        for phase, name, status, count in sorted(returns)[:24]:
+            print(f'inventor_export_return={name} phase={phase} retval=0x{status:08x} count={count}')
+        if len(returns) > 24:
+            print(f'inventor_export_omitted={len(returns) - 24}')
+        for (process, code), count in faults.items():
+            if process == pid:
+                print(f'inventor_export_fault=0x{code} count={count}')
 
 
 def scan_save_io(log, *, com_only=False, relay_only=False):
@@ -422,14 +500,21 @@ def scan(log, probe, fault_only=False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Classify saved AutoCAD file lookups and access violation messages.')
-    parser.add_argument('work', type=Path, help='original AutoCAD test directory')
+    parser = argparse.ArgumentParser(description='Summarize saved AutoCAD and Inventor DWG traces.')
+    parser.add_argument('work', type=Path, help='DWG test directory')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--fault-chain', action='store_true', help='show exception dispatches only on the fatal thread')
     mode.add_argument('--save-io', action='store_true', help='summarize file requests from the latest candidate Save As trace')
     mode.add_argument('--save-com', action='store_true', help='summarize COM messages from the latest candidate Save As trace')
     mode.add_argument('--save-relay', action='store_true', help='summarize relay calls from the latest candidate Save As trace')
+    mode.add_argument('--inventor-export', action='store_true', help='summarize the Inventor AutoCAD DWG export control')
     args = parser.parse_args()
+    if args.inventor_export:
+        try:
+            scan_inventor_export(args.work)
+        except OSError:
+            print('inventor_export_trace=unreadable')
+        return
     if args.save_io or args.save_com or args.save_relay:
         label = 'save_relay_window' if args.save_relay else 'save_com_window' if args.save_com else 'save_io_window'
         try:
