@@ -812,6 +812,54 @@ Compare the fault signature before using the counts to select a new
 probe. A shared message pattern needs a targeted follow-up to establish
 whether it contributes to the failure.
 
+On 2026-11-20, both baseline ActiveX trials again exited with code 9
+after `0xc0000409` at `coreclr.dll+0x14922d`. `SHAddToRecentDocs`
+produced seven trace lines during Open and eight during Save As. Each
+run included one line with its scratch path and zero lines on the
+fatal thread. The other four watched functions produced zero lines.
+The traces establish that both paths reached recent-document
+processing on another thread. They leave its role in the crash open.
+
+### Skip Windows Shell recent-document history
+
+Use `ACAD_DWG_NO_RECENT=1` on the same baseline test prefix. The
+script temporarily sets `NoRecentDocsHistory` to `REG_DWORD` 1 in the
+Explorer policy key selected by Wine 11.22. It uses the machine key
+when present and the user key otherwise. Wine's `SHAddToRecentDocs`
+checks this value before resolving the document path or recording
+history. This isolates the Shell's history processing from AutoCAD's
+own recent-file list.
+[Wine 11.22 shell32 implementation](https://gitlab.winehq.org/wine/wine/-/blob/wine-11.22/dlls/shell32/shellord.c)
+
+The script verifies the temporary value before launch, enables the
+same `shell` trace, and restores the original zero or removes the
+value when it was absent. It removes keys it created if still empty.
+The scratch prefix should be used by one trial at a time.
+
+A synthetic caller on winum-11.22-1 reached the normal path trace
+with the policy absent and the early-return trace with it enabled.
+The wrapper restored an absent policy and an existing machine DWORD
+of zero. It preserved the user value and refused a machine value of
+an unexpected type.
+
+~~~bash
+(
+    export ACAD_OPEN_EVENTS_LISP="$PWD/docs/wine-repro/shell32-autocomplete-timing/dwg-open-events.lsp"
+    export ACAD_DWG_NO_RECENT=1
+    unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
+    bash scripts/trace-autocad-dwg.sh baseline open-activex "$ACAD_DWG_CONTROLS/line-2018.dwg" || [[ $? -eq 9 ]] || exit 1
+    bash scripts/trace-autocad-dwg.sh baseline save-activex
+)
+~~~
+
+`shell_recent_policy_skip_lines` above zero confirms that AutoCAD's
+Shell calls reached the policy branch. Zero `scratch_path_lines` for
+`SHAddToRecentDocs` confirms that no matching path-processing message
+was emitted. Compare `fault_module=` and the open or save completion
+markers with the earlier pair. Record `recent_history_restored=` for
+both runs. A changed outcome would need a repeat after restoring the
+policy to confirm the association.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the

@@ -79,6 +79,74 @@ restore_wpf_rendering() {
     fi
 }
 
+restore_recent_history() {
+    local key
+    local log="$ACAD_LOGDIR/recent-restore.txt"
+    local errors="$ACAD_LOGDIR/recent-restore-stderr.txt"
+    if [[ "$recent_previous" == 0 ]]; then
+        if "$WINE" reg add "$recent_key" /v NoRecentDocsHistory /t REG_DWORD /d 0 /f > "$log" 2>&1 &&
+            "$WINE" reg query "$recent_key" /v NoRecentDocsHistory >> "$log" 2>&1 &&
+            grep -Eq "$recent_dword"'0+[[:space:]]*$' "$log"; then
+            echo 'recent_history_restored=0'
+        else
+            echo 'recent_history_restored=failed'
+        fi
+        return
+    fi
+
+    if ! "$WINE" reg delete "$recent_key" /v NoRecentDocsHistory /f > "$log" 2>&1; then
+        echo 'recent_history_restored=failed'
+        return
+    fi
+    for key in "${recent_created_keys[@]}"; do
+        if "$WINE" reg query "$key" > "$log" 2>> "$errors" &&
+            ! grep -q '[^[:space:]]' "$log" &&
+            "$WINE" reg delete "$key" /f >> "$log" 2>&1; then
+            continue
+        fi
+        echo 'recent_history_restored=value_removed_key_retained'
+        return
+    done
+    echo 'recent_history_restored=absent'
+}
+
+disable_recent_history() {
+    local policies='Software\Microsoft\Windows\CurrentVersion\Policies'
+    local log="$ACAD_LOGDIR/recent-policy.txt"
+    local query_rc=0
+    recent_created_keys=()
+    recent_dword='^[[:space:]]*NoRecentDocsHistory[[:space:]]+REG_DWORD[[:space:]]+0x'
+
+    # Wine checks HKCU only if it cannot open the Explorer policies key in HKLM.
+    recent_key="HKLM\\$policies\\Explorer"
+    if ! "$WINE" reg query "$recent_key" > "$log" 2>&1; then
+        recent_key="HKCU\\$policies\\Explorer"
+        if ! "$WINE" reg query "$recent_key" > "$log" 2>&1; then
+            recent_created_keys+=("$recent_key")
+            if ! "$WINE" reg query "HKCU\\$policies" > "$log" 2>&1; then
+                recent_created_keys+=("HKCU\\$policies")
+            fi
+        fi
+    fi
+    "$WINE" reg query "$recent_key" /v NoRecentDocsHistory > "$log" 2>&1 || query_rc=$?
+    case "$query_rc" in
+        0)
+            grep -Eq "$recent_dword"'0+[[:space:]]*$' "$log" || return 1
+            recent_previous=0
+            ;;
+        1) recent_previous=absent ;;
+        *) return 1 ;;
+    esac
+
+    trap restore_recent_history EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    "$WINE" reg add "$recent_key" /v NoRecentDocsHistory /t REG_DWORD /d 1 /f > "$log" 2>&1 &&
+        "$WINE" reg query "$recent_key" /v NoRecentDocsHistory >> "$log" 2>&1 &&
+        grep -Eq "$recent_dword"'0*1[[:space:]]*$' "$log" || return 1
+    echo 'recent_history_policy=disabled'
+}
+
 print_dwg_info() {
     python3 - "$1" <<'PY'
 from pathlib import Path
@@ -212,7 +280,7 @@ else
     if [[ -n "$probe_dwg" ]]; then printf 'Path for OPEN: %s\n' "$probe_path"; fi
 fi
 shell_subject=
-if [[ "${ACAD_DWG_SHELL_TRACE:-0}" == 1 ]]; then
+if [[ "${ACAD_DWG_SHELL_TRACE:-0}" == 1 || "${ACAD_DWG_NO_RECENT:-0}" == 1 ]]; then
     case "$2" in
         open-activex|save-activex)
             shell_subject="${probe_dir##*/}"
@@ -223,6 +291,12 @@ if [[ "${ACAD_DWG_SHELL_TRACE:-0}" == 1 ]]; then
             exit 2
             ;;
     esac
+fi
+if [[ "${ACAD_DWG_NO_RECENT:-0}" == 1 ]]; then
+    if [[ "$1" != baseline ]] || ! disable_recent_history; then
+        echo 'recent_history_policy=setup_failed' >&2
+        exit 2
+    fi
 fi
 eventpipe_dir=
 if [[ "${ACAD_EVENTPIPE:-0}" == 1 ]]; then
@@ -354,6 +428,7 @@ reg_load_appkey = re.compile(r":fixme:reg:RegLoadAppKey[AW]\b")
 shell_functions = ("SHAddToRecentDocs", "SHChangeNotify", "SHCreateItemFromParsingName",
                    "SHGetFileInfoW", "SHGetPropertyStoreFromParsingName")
 shell_call = re.compile(r"(?:trace|warn|fixme|err):shell:(" + "|".join(shell_functions) + r")\b")
+recent_policy_trace = re.compile(r"\s+policy value for NoRecentDocsHistory = 0*1\s*$")
 shell_subject = sys.argv[4].lower()
 idle_trace_types = (
     "System.IO.FileNotFoundException",
@@ -418,6 +493,7 @@ clr_pids = set()
 reg_loads = Counter()
 shell_lines = Counter()
 shell_path_lines = Counter()
+shell_no_recent = Counter()
 regions = {}
 active = {}
 recent = deque(maxlen=8)
@@ -443,6 +519,8 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
             shell_lines[pid, tid, name] += 1
             if shell_subject in line[match.end():].lower():
                 shell_path_lines[pid, name] += 1
+            if name == "SHAddToRecentDocs" and recent_policy_trace.match(line, match.end()):
+                shell_no_recent[pid] += 1
         if reg_load_appkey.search(line):
             reg_loads[pid] += 1
         if ":trace:module:map_image_into_view " in line and (match := mapped.search(line)):
@@ -511,6 +589,7 @@ for pid, tid, code, flags, addr, image in fatal:
 if shell_subject:
     fault_thread = next(((pid, tid) for pid, tid, *_ in reversed(fatal) if pid in acad_pids), None)
     print(f"shell_trace_acad_processes={len(acad_pids)} shell_trace_fault_thread={int(fault_thread is not None)}")
+    print(f"shell_recent_policy_skip_lines={sum(shell_no_recent[pid] for pid in acad_pids)}")
     for name in shell_functions:
         process_lines = sum(count for (pid, _, api), count in shell_lines.items()
                             if pid in acad_pids and api == name)
