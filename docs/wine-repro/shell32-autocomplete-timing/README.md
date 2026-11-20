@@ -1485,6 +1485,24 @@ it. The filter covers selected builtin entry points. Calls within a DLL,
 calls to native code and COM vtable calls may be outside relay coverage.
 Use a separate `FILEDIA=1` run to investigate dialog entry points.
 
+The reduced build captured 564 relay messages during the command. It
+returned `STATUS_SUCCESS` on all 272 captured `NtSetInformationFile`
+returns and `S_OK` on the one `CoCreateInstance` return, which preceded
+the rename. The only two messages on the terminal thread were a
+`NtQueryFullAttributesFile` call and its `STATUS_OBJECT_NAME_NOT_FOUND`
+return after the rename request. Windows had also observed a missing
+`saved.cloudinfo` in the earlier attribute-lookup control. AutoCAD
+wrote the DWG and reproduced `0xc0000409` at `coreclr.dll+0x1855fd`.
+The previous relay and recent history settings were restored.
+
+No direct `MoveFileWithProgressW` return appeared in the filtered relay
+output. It can be called internally from `MoveFileExW` in Wine's
+`kernelbase`. Reuse the saved log with `--save-relay` to check
+`save_relay_rename=`. These lines use the file information class and
+match `NtSetInformationFile` calls and returns from the rename thread
+after the target rename request. A zero count means there was no
+matched rename return in the saved trace.
+
 #### Native Ole32 startup control
 
 On a disposable copy of the reduced Wine 11.22 prefix, a local trial

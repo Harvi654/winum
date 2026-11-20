@@ -35,6 +35,9 @@ COM_STATUS = re.compile(r'\b(?:hr(?:es(?:ult)?)?|status|result|return(?:ed|ing|s
                         r'(?: (?:with|error|hr))*\s*[=:,]?\s*(?:0x)?([89ac][0-9a-f]{7})\b', re.I)
 RELAY_LINE = re.compile(r'^([a-f0-9]+):([a-f0-9]+):(Call|Ret)\s+([a-z0-9_.]+)\((.*)$', re.I)
 RELAY_VALUE = re.compile(r'^\) retval=(?:0x)?([a-f0-9]{1,16})\b', re.I)
+RELAY_INFORMATION_CLASS = re.compile(r',\s*(?:0x)?([a-f0-9]{1,16})\)\s+ret=', re.I)
+RELAY_RETURN_SITE = re.compile(r'\bret=(?:0x)?([a-f0-9]{1,16})\s*$', re.I)
+RENAME_CLASSES = {10: 'FileRenameInformation', 65: 'FileRenameInformationEx'}
 RELAY_APIS = {
     'comdlg32.getopenfilenamew', 'comdlg32.getsavefilenamew', 'kernelbase.movefilewithprogressw',
     'kernelbase.getfileattributesexw', 'ntdll.ntqueryfullattributesfile', 'ntdll.ntsetinformationfile',
@@ -88,6 +91,8 @@ def scan_save_io(log, *, com_only=False, relay_only=False):
     com_messages, com_signals = Counter(), Counter()
     com_tail = defaultdict(lambda: deque(maxlen=12))
     relay_events = Counter()
+    rename_threads, pending_renames = {}, {}
+    rename_returns = Counter()
 
     def scope(path, folder):
         if folder in path:
@@ -108,6 +113,14 @@ def scan_save_io(log, *, com_only=False, relay_only=False):
                     value_match = RELAY_VALUE.match(arguments) if action == 'Ret' else None
                     value = f'0x{int(value_match[1], 16) & 0xffffffff:08x}' if value_match else '-'
                     relay_events[pid, tid, pid in rename_requested, name, action, value] += 1
+                    if (name == 'ntdll.ntsetinformationfile' and rename_threads.get(pid) == tid and
+                            (site := RELAY_RETURN_SITE.search(arguments))):
+                        key = pid, tid, int(site[1], 16)
+                        if action == 'Call' and (info := RELAY_INFORMATION_CLASS.search(arguments)):
+                            if label := RENAME_CLASSES.get(int(info[1], 16) & 0xffffffff):
+                                pending_renames[key] = label
+                        elif value_match and (label := pending_renames.pop(key, None)):
+                            rename_returns[pid, label, value] += 1
                 continue
             if not (match := LINE.match(line.rstrip('\r\n'))):
                 continue
@@ -147,6 +160,7 @@ def scan_save_io(log, *, com_only=False, relay_only=False):
             if (level == 'trace' and function == 'MoveFileWithProgressW' and len(paths) >= 2 and
                     scope(paths[1], scratch[pid]) == 'target'):
                 rename_requested.add(pid)
+                rename_threads[pid] = tid
             if com_only or relay_only:
                 continue
             scopes = tuple(dict.fromkeys(group for path in paths if (group := scope(path, scratch[pid]))))
@@ -196,6 +210,10 @@ def scan_save_io(log, *, com_only=False, relay_only=False):
                 if tid == fault_tid:
                     on_fault[key] += count
         print(f'save_relay_messages={sum(counts.values())} fault_thread={sum(on_fault.values())}')
+        print(f'save_relay_rename_returns={sum(count for (process, _, _), count in rename_returns.items() if process == pid)}')
+        for (process, label, value), count in rename_returns.items():
+            if process == pid:
+                print(f'save_relay_rename={label} retval={value} count={count}')
         order = sorted(counts, key=lambda key: (not on_fault[key], not key[0], key))
         for key in order[:24]:
             after, name, action, value = key
