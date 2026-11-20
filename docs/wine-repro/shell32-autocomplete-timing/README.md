@@ -957,6 +957,53 @@ can reflect language, configuration or installed package choices. A
 matching hash confirms bytes for that file. Registry and COM registration
 state need separate checks.
 
+On 2026-11-20, all 1,216 inventoried AutoCAD files matched between the VM
+and the baseline prefix. There were no differing files or files unique
+to either side in the AutoCAD directory. `acad.exe`, `AcJab.dll`, and
+the two other probed `acadprivate` files matched at their intended paths.
+The known misplaced copies were absent on both sides. In the .NET
+inventory, the VM had x64 10.0.15 and the prefix had 10.0.0, including
+hostfxr, CoreCLR and Windows Desktop. Each runtime contributed 475
+files at version-specific paths. The shared `dotnet.exe` path also
+had a different hash. This verifies the measured AutoCAD payload and
+identifies a concrete runtime difference. The inventory records installed
+files and does not establish what the process loaded.
+
+### Test the baseline prefix with .NET 10.0.15
+
+Keep winum and the AutoCAD installation fixed. Close AutoCAD before
+running `scripts/prepare-autocad-dotnet-10.0.15.sh`. It verifies the
+official Windows x64 Core and Desktop ZIPs, then clones the baseline
+prefix alongside the original on the same filesystem. The clone adds
+the .NET 10.0.15 host, Core and Desktop version directories and takes
+the matching `dotnet.exe`. Its older runtime directories remain available
+for normal framework selection. The original `base-prefix` and Wine
+runtime are untouched. The space check allows for a full copy if the
+filesystem cannot reflink.
+[Core archive and vendor checksum](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-10.0.15-windows-x64-binaries-zip)
+· [Desktop archive and vendor checksum](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-desktop-10.0.15-windows-x64-binaries-zip)
+
+~~~bash
+bash scripts/prepare-autocad-dotnet-10.0.15.sh
+export ACAD_DOTNET_TEST="$ACAD_AUTOCOMPLETE_WORK/dotnet-10.0.15"
+export ACAD_OPEN_EVENTS_LISP="$PWD/docs/wine-repro/shell32-autocomplete-timing/dwg-open-events.lsp"
+(
+    export ACAD_AUTOCOMPLETE_WORK="$ACAD_DOTNET_TEST"
+    unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER ACAD_DWG_SHELL_TRACE ACAD_DWG_NO_RECENT
+    bash scripts/trace-autocad-dwg.sh baseline open-activex "$ACAD_DWG_CONTROLS/line-2018.dwg" || [[ $? -eq 9 ]] || exit 1
+    bash scripts/trace-autocad-dwg.sh baseline save-activex
+)
+~~~
+
+Use the same ActiveX open and save steps as in the baseline trials.
+The `dotnet_loaded=` lines report versions from native module load paths
+in the AutoCAD process without exposing the paths. Require the CoreCLR
+line to report `version=10.0.15` before attributing any change to the
+updated runtime. Compare method returns, save completion, and the
+exception code. Module-relative addresses can differ between the two
+CoreCLR binaries. Retain the baseline copy until the paired result is
+recorded and remove the extra private clone when it is no longer needed.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the

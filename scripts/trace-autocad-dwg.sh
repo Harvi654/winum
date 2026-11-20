@@ -424,6 +424,10 @@ loaded = re.compile(r'\bLoaded L?"([^"]*[\\/]([a-z0-9_.-]+))" at (?:0x)?([0-9a-f
 unloaded = re.compile(r'\b(?:unloading|unloaded module) L?"([^"]+)"', re.I)
 known_modules = {"coreclr.dll", "clr.dll", "shell32.dll", "msxml3.dll",
                  "d3dcompiler_47.dll", "d3dcompiler_47_cor3.dll", "wpfgfx_cor3.dll"}
+runtime_modules = {"coreclr.dll", "hostfxr.dll", "hostpolicy.dll", "wpfgfx_cor3.dll"}
+runtime_path = re.compile(r'[\\/]+dotnet[\\/]+(?:host[\\/]+fxr|shared[\\/]+'
+                          r'microsoft\.(?:netcore|windowsdesktop)\.app)[\\/]+'
+                          r'([0-9]+\.[0-9]+\.[0-9]+)[\\/]+', re.I)
 reg_load_appkey = re.compile(r":fixme:reg:RegLoadAppKey[AW]\b")
 shell_functions = ("SHAddToRecentDocs", "SHChangeNotify", "SHCreateItemFromParsingName",
                    "SHGetFileInfoW", "SHGetPropertyStoreFromParsingName")
@@ -487,6 +491,7 @@ def eventpipe_summary(folder, pid):
 
 
 modules = {}
+runtime_versions = set()
 acad_pids = set()
 trueview_pids = set()
 clr_pids = set()
@@ -539,6 +544,9 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
                         clr_pids.add(pid)
                 if name in known_modules:
                     modules[pid, name] = (base, kind)
+                if name in runtime_modules:
+                    version = runtime_path.search(path)
+                    runtime_versions.add((pid, name, version[1] if version else "unconfirmed"))
                 mapped_name, end = regions.get((pid, base), (None, base))
                 if mapped_name == name:
                     active[pid, path.lower()] = (name, base, end)
@@ -567,6 +575,9 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
 
 for (pid, module), (base, kind) in sorted(modules.items()):
     print(f"loaded pid={pid} module={module} base=0x{base:x} kind={kind}")
+for pid, module, version in sorted(runtime_versions):
+    if pid in acad_pids:
+        print(f"dotnet_loaded={module} version={version}")
 if sys.argv[3] == "core-open":
     if console_dwg:
         print(f"core_console_dwg={console_dwg[0]} core_console_lines={console_dwg[1]}")
