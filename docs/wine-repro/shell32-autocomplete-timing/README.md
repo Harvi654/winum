@@ -688,6 +688,43 @@ give a smaller trigger. If markers stop at a document switch and the
 process survives, check whether both tabs are visible and can be selected
 manually. The probe starts in the original drawing's AutoLISP namespace.
 
+On 2026-11-20, the maintainer confirmed that the second drawing
+appeared and that both tabs could be selected manually. `Documents.Add`
+returned with `new_count_delta=1`. The immediate ActiveX checks
+reported `new_add_active=other`, `new_activate_original_active` and
+`new_activate_created_other`. Document activation callbacks continued
+after the last immediate check. The callbacks did not identify which
+document became current. AutoCAD exited with code 0. The trial shows
+that this baseline supports creating and switching desktop documents.
+
+### Record SAVEAS command and file completion
+
+`save-events` runs the baseline in the existing test prefix. It stages
+a reactor in the starting drawing and supplies a fresh `saved.dwg`
+path below `C:`. It observes `SAVEAS` command start, end, failure or
+cancellation, and the drawing's `beginSave` and `saveComplete` events.
+The probe reports whether the completion path matched the scratch
+target, comparing case and slash variants locally. After the launcher
+exits, it reports whether the DWG exists and, if so, its size and
+six-byte format signature. No paths or drawing properties from the
+callbacks are included in the summary.
+[AutoLISP DWG reactors](https://help.autodesk.com/view/ACD/2027/ENU/?caas=caas%2Fdocumentation%2FACD%2F2014%2FENU%2Ffiles%2FGUID-82B7F0D1-02AD-4463-A8A3-BF87EFCC83A4-htm.html)
+
+~~~bash
+export ACAD_OPEN_EVENTS_LISP="$PWD/docs/wine-repro/shell32-autocomplete-timing/dwg-open-events.lsp"
+unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
+bash scripts/trace-autocad-dwg.sh baseline save-events
+~~~
+
+Start one blank drawing, set `FILEDIA` to 0 and load the printed setup
+line. Draw a line, run `._REGEN` and use `._SAVEAS` in the default DWG
+format with the printed path. Close AutoCAD if it remains open. Return
+`variant=`, `save_event=`, `dwg_saved=`, `dwg_header=`, and any
+`fault_module=` line. If `save_target_complete` precedes the matching
+fail-fast, AutoCAD reported that it had saved the target before the
+fault. Use the existing `core-open` trial on the written DWG to
+verify that it can be reopened and still contains the line.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the

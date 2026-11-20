@@ -37,6 +37,40 @@
           (:vlr-documentBecameCurrent . winum-open-event)))))
   (winum-open-log path "reactors_ready"))
 
+(defun winum-save-command (reactor arguments / name)
+  (setq name (car arguments))
+  (if (and (eq (type name) 'STR)
+           (= (vl-string-left-trim "._" (strcase name)) "SAVEAS"))
+    (winum-open-event reactor arguments))
+  (princ))
+
+(defun winum-save-event (reactor arguments / data path)
+  (setq data (vlr-data reactor)
+        path (cadr arguments))
+  (cond
+    ((eq (vlr-current-reaction-name) ':vlr-beginSave)
+     (winum-open-log (car data) "save_begin"))
+    ((and (eq (type path) 'STR)
+          (= (strcase (vl-string-translate "\\" "/" path)) (strcase (cadr data))))
+     (winum-open-log (car data) "save_target_complete"))
+    (T (winum-open-log (car data) "save_other_complete"))))
+
+(defun winum-save-trace (log drawing)
+  (winum-open-trace log)
+  (setq winum-open-reactors
+    (append
+      (list
+        (vlr-command-reactor log
+          '((:vlr-commandWillStart . winum-save-command)
+            (:vlr-commandEnded . winum-save-command)
+            (:vlr-commandFailed . winum-save-command)
+            (:vlr-commandCancelled . winum-save-command)))
+        (vlr-dwg-reactor (list log drawing)
+          '((:vlr-beginSave . winum-save-event)
+            (:vlr-saveComplete . winum-save-event))))
+      winum-open-reactors))
+  (winum-open-log log "save_reactors_ready"))
+
 (defun winum-open-activex-document (log drawing / documents document)
   (setq documents (vla-get-documents (vlax-get-acad-object)))
   (winum-open-log log "activex_open_enter")

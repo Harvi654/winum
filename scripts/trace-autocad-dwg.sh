@@ -4,13 +4,13 @@ set -euo pipefail
 umask 077
 
 usage() {
-    echo 'Usage: trace-autocad-dwg.sh candidate|baseline idle|save-0|open-0|save-1|open-1|new-document' >&2
+    echo 'Usage: trace-autocad-dwg.sh candidate|baseline idle|save-0|open-0|save-1|open-1|new-document|save-events' >&2
     echo '       trace-autocad-dwg.sh candidate|baseline startup-open|startup-safe|startup-wpf-software|core-open KNOWN_GOOD_DWG' >&2
     echo '       trace-autocad-dwg.sh candidate|baseline open-events|open-activex|open-dbx|open-0 KNOWN_GOOD_DWG' >&2
     exit 2
 }
 
-[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|new-document|(save|open)-[01]|startup-(open|safe|wpf-software)|core-open|open-(events|activex|dbx))$ ]] || usage
+[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|new-document|save-events|(save|open)-[01]|startup-(open|safe|wpf-software)|core-open|open-(events|activex|dbx))$ ]] || usage
 if [[ "$2" =~ ^(startup-.*|core-open|open-(events|activex|dbx))$ ]]; then
     [[ $# == 3 ]] || usage
 elif [[ $# == 3 && "$2" != open-0 ]]; then
@@ -79,24 +79,8 @@ restore_wpf_rendering() {
     fi
 }
 
-launch_args=()
-launcher_script=scripts/launch-autocad.sh
-probe_dwg=
-open_events=
-if [[ $# == 3 && ( ! -f "$3" || ! -s "$3" ) ]]; then
-    echo 'A nonempty local DWG is required.' >&2
-    exit 2
-fi
-if [[ $# == 3 || "$2" == new-document ]]; then
-    test "$(realpath -e "$ACAD_PREFIX/drive_c")" = "$ACAD_PREFIX/drive_c"
-    probe_dir="$(mktemp -d "$ACAD_PREFIX/drive_c/winum-dwg.XXXXXXXX")"
-fi
-if [[ $# == 3 ]]; then
-    probe_dwg="$probe_dir/probe.dwg"
-    cp -- "$3" "$probe_dwg"
-    probe_hash="$(sha256sum < "$probe_dwg")"
-    probe_path="C:\\${probe_dir##*/}\\probe.dwg"
-    python3 - "$probe_dwg" <<'PY'
+print_dwg_info() {
+    python3 - "$1" <<'PY'
 from pathlib import Path
 import re
 import sys
@@ -107,6 +91,28 @@ with file.open("rb") as stream:
 version = signature.decode("ascii") if re.fullmatch(rb"AC[0-9]{4}", signature) else "other"
 print(f"dwg_header={version} dwg_bytes={file.stat().st_size}")
 PY
+}
+
+launch_args=()
+launcher_script=scripts/launch-autocad.sh
+probe_dwg=
+save_dwg=
+open_events=
+event_label=open_event
+if [[ $# == 3 && ( ! -f "$3" || ! -s "$3" ) ]]; then
+    echo 'A nonempty local DWG is required.' >&2
+    exit 2
+fi
+if [[ $# == 3 || "$2" == new-document || "$2" == save-events ]]; then
+    test "$(realpath -e "$ACAD_PREFIX/drive_c")" = "$ACAD_PREFIX/drive_c"
+    probe_dir="$(mktemp -d "$ACAD_PREFIX/drive_c/winum-dwg.XXXXXXXX")"
+fi
+if [[ $# == 3 ]]; then
+    probe_dwg="$probe_dir/probe.dwg"
+    cp -- "$3" "$probe_dwg"
+    probe_hash="$(sha256sum < "$probe_dwg")"
+    probe_path="C:\\${probe_dir##*/}\\probe.dwg"
+    print_dwg_info "$probe_dwg"
 fi
 
 if [[ "$2" == core-open ]]; then
@@ -164,12 +170,14 @@ elif [[ "$2" == startup-wpf-software ]]; then
 elif [[ "$2" == startup-open ]]; then
     launch_args=("$probe_path")
     printf 'Opening a scratch DWG at startup. If the drawing opens, edit it, run QSAVE, then close AutoCAD.\n'
-elif [[ "$2" == new-document || "$2" =~ ^open-(events|activex|dbx)$ ]]; then
+elif [[ "$2" =~ ^(new-document|save-events|open-(events|activex|dbx))$ ]]; then
     cp -- "${ACAD_OPEN_EVENTS_LISP:?Set the path to dwg-open-events.lsp}" "$probe_dir/open-events.lsp"
     open_events="$probe_dir/open-events.txt"
     probe_slash="C:/${probe_dir##*/}"
     echo 'Create a blank drawing, set FILEDIA to 0, then paste this AutoLISP line:'
-    printf '(progn (load "%s/open-events.lsp") (winum-open-trace "%s/open-events.txt"))\n' "$probe_slash" "$probe_slash"
+    if [[ "$2" != save-events ]]; then
+        printf '(progn (load "%s/open-events.lsp") (winum-open-trace "%s/open-events.txt"))\n' "$probe_slash" "$probe_slash"
+    fi
     case "$2" in
         open-events)
             printf 'Run ._REGEN, then ._OPEN with this path: %s\n' "$probe_path"
@@ -181,6 +189,14 @@ elif [[ "$2" == new-document || "$2" =~ ^open-(events|activex|dbx)$ ]]; then
         new-document)
             echo 'Run ._REGEN, then paste this line once to add and switch drawings:'
             printf '(winum-new-document "%s/open-events.txt")\n' "$probe_slash"
+            ;;
+        save-events)
+            save_dwg="$probe_dir/saved.dwg"
+            event_label=save_event
+            printf '(progn (load "%s/open-events.lsp") (winum-save-trace "%s/open-events.txt" "%s/saved.dwg"))\n' \
+                "$probe_slash" "$probe_slash" "$probe_slash"
+            printf 'Draw one line, run ._REGEN, then ._SAVEAS with the default DWG format and this path: C:\\%s\\saved.dwg\n' \
+                "${probe_dir##*/}"
             ;;
     esac
 elif [[ "$2" == idle ]]; then
@@ -236,20 +252,29 @@ if [[ -n "$probe_dwg" ]]; then
         echo 'dwg_copy_after=changed'
     fi
 fi
+if [[ -n "$save_dwg" ]]; then
+    if [[ -f "$save_dwg" ]]; then
+        echo 'dwg_saved=present'
+        print_dwg_info "$save_dwg"
+    else
+        echo 'dwg_saved=missing'
+    fi
+fi
 if [[ -n "$open_events" ]]; then
     if [[ -s "$open_events" ]]; then
-        awk '{
+        awk -v key="$event_label" '{
             sub(/\r$/, "")
             event = tolower($0)
             if (event ~ /^(reactors_ready|control_regen|command_open|activex_(begin|open_enter|open_return|open_expected_dwg|error)|:vlr-(begindwgopen|dwgfileopened|enddwgopen|documentcreated|documenttobeactivated|documentbecamecurrent))$/ ||
                 event ~ /^dbx_(begin|object_unavailable|open_enter|open_return|lines=[0-9]+|active_document=(unchanged|changed)|error)$/ ||
-                event ~ /^new_(begin|add_enter|add_return|count_delta=-?[0-9]+|add_active=(created|other)|activate_(original|created)_(enter|active|other)|error)$/) {
-                print "open_event=" event
+                event ~ /^new_(begin|add_enter|add_return|count_delta=-?[0-9]+|add_active=(created|other)|activate_(original|created)_(enter|active|other)|error)$/ ||
+                event ~ /^(save_(reactors_ready|begin|target_complete|other_complete)|:vlr-command(willstart|ended|cancelled|failed))$/) {
+                print key "=" event
                 seen = 1
             }
-        } END { if (!seen) print "open_event=unconfirmed" }' "$open_events"
+        } END { if (!seen) print key "=unconfirmed" }' "$open_events"
     else
-        echo 'open_event=unconfirmed'
+        printf '%s=unconfirmed\n' "$event_label"
     fi
 fi
 if [[ -n "$dwg_io_trace" ]]; then
