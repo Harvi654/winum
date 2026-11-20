@@ -740,9 +740,35 @@ and pass it to `core-open`. The launcher stages a copy before opening it.
 bash scripts/trace-autocad-dwg.sh baseline core-open "$ACAD_SAVED_DWG"
 ~~~
 
-`core_console_dwg=1 core_console_lines=1` with an unchanged copy and
-exit code 0 confirms a readable drawing with the test line. The command
-and save completion callbacks remain unconfirmed in the desktop run.
+On 2026-11-20, Core Console opened that same 31,498-byte `AC1032`
+output on the baseline. It reported `core_console_dwg=1` and
+`core_console_lines=1`, left the copy unchanged, and exited with code 0.
+The crash therefore left a readable drawing with the test geometry.
+The desktop trace still ends before a save or command completion
+callback was delivered.
+
+### Compare the ActiveX document save path
+
+`save-activex` uses the same drawing, baseline and save reactors as
+`save-events`. It calls `Document.SaveAs` on the active document,
+explicitly requesting the 2018 DWG format used in the command trial.
+The probe records entry, return, or a caught ActiveX error. The
+launcher checks the fresh output file as in `save-events`.
+[AutoCAD ActiveX SaveAs method](https://help.autodesk.com/cloudhelp/2027/ENU/AutoCAD-ActiveX-Reference/files/GUID-ED0D0B02-25FC-4ED2-9DEE-2B0C9AA9416A.htm)
+
+~~~bash
+export ACAD_OPEN_EVENTS_LISP="$PWD/docs/wine-repro/shell32-autocomplete-timing/dwg-open-events.lsp"
+unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER
+bash scripts/trace-autocad-dwg.sh baseline save-activex
+~~~
+
+Use one blank drawing with `FILEDIA` set to 0. Load the printed setup
+line, draw one line, run `._REGEN`, and paste the `winum-save-activex`
+line once. Close AutoCAD if it stays open. Return `variant=`,
+`save_event=`, `dwg_saved=`, `dwg_header=`, and any `fault_module=`.
+A matching fail-fast after `activex_save_enter` reproduces the crash
+through both desktop save entry points. An `activex_save_return` and
+a readable output show that this ActiveX route can complete the save.
 
 ### Capture the fail-fast reason
 

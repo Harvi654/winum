@@ -71,6 +71,18 @@
       winum-open-reactors))
   (winum-open-log log "save_reactors_ready"))
 
+(defun winum-save-activex-document (log drawing / document)
+  (setq document (vla-get-activedocument (vlax-get-acad-object)))
+  (winum-open-log log "activex_save_enter")
+  (vla-saveas document (vl-string-translate "/" "\\" drawing) ac2018_dwg)
+  (winum-open-log log "activex_save_return"))
+
+(defun winum-save-activex (log drawing / result)
+  (setq result (vl-catch-all-apply 'winum-save-activex-document (list log drawing)))
+  (if (vl-catch-all-error-p result)
+    (winum-open-log log "activex_save_error"))
+  (princ))
+
 (defun winum-open-activex-document (log drawing / documents document)
   (setq documents (vla-get-documents (vlax-get-acad-object)))
   (winum-open-log log "activex_open_enter")

@@ -4,13 +4,13 @@ set -euo pipefail
 umask 077
 
 usage() {
-    echo 'Usage: trace-autocad-dwg.sh candidate|baseline idle|save-0|open-0|save-1|open-1|new-document|save-events' >&2
+    echo 'Usage: trace-autocad-dwg.sh candidate|baseline idle|save-0|open-0|save-1|open-1|new-document|save-events|save-activex' >&2
     echo '       trace-autocad-dwg.sh candidate|baseline startup-open|startup-safe|startup-wpf-software|core-open KNOWN_GOOD_DWG' >&2
     echo '       trace-autocad-dwg.sh candidate|baseline open-events|open-activex|open-dbx|open-0 KNOWN_GOOD_DWG' >&2
     exit 2
 }
 
-[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|new-document|save-events|(save|open)-[01]|startup-(open|safe|wpf-software)|core-open|open-(events|activex|dbx))$ ]] || usage
+[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|new-document|save-(events|activex)|(save|open)-[01]|startup-(open|safe|wpf-software)|core-open|open-(events|activex|dbx))$ ]] || usage
 if [[ "$2" =~ ^(startup-.*|core-open|open-(events|activex|dbx))$ ]]; then
     [[ $# == 3 ]] || usage
 elif [[ $# == 3 && "$2" != open-0 ]]; then
@@ -103,7 +103,7 @@ if [[ $# == 3 && ( ! -f "$3" || ! -s "$3" ) ]]; then
     echo 'A nonempty local DWG is required.' >&2
     exit 2
 fi
-if [[ $# == 3 || "$2" == new-document || "$2" == save-events ]]; then
+if [[ $# == 3 || "$2" =~ ^(new-document|save-(events|activex))$ ]]; then
     test "$(realpath -e "$ACAD_PREFIX/drive_c")" = "$ACAD_PREFIX/drive_c"
     probe_dir="$(mktemp -d "$ACAD_PREFIX/drive_c/winum-dwg.XXXXXXXX")"
 fi
@@ -170,12 +170,12 @@ elif [[ "$2" == startup-wpf-software ]]; then
 elif [[ "$2" == startup-open ]]; then
     launch_args=("$probe_path")
     printf 'Opening a scratch DWG at startup. If the drawing opens, edit it, run QSAVE, then close AutoCAD.\n'
-elif [[ "$2" =~ ^(new-document|save-events|open-(events|activex|dbx))$ ]]; then
+elif [[ "$2" =~ ^(new-document|save-(events|activex)|open-(events|activex|dbx))$ ]]; then
     cp -- "${ACAD_OPEN_EVENTS_LISP:?Set the path to dwg-open-events.lsp}" "$probe_dir/open-events.lsp"
     open_events="$probe_dir/open-events.txt"
     probe_slash="C:/${probe_dir##*/}"
     echo 'Create a blank drawing, set FILEDIA to 0, then paste this AutoLISP line:'
-    if [[ "$2" != save-events ]]; then
+    if [[ "$2" != save-* ]]; then
         printf '(progn (load "%s/open-events.lsp") (winum-open-trace "%s/open-events.txt"))\n' "$probe_slash" "$probe_slash"
     fi
     case "$2" in
@@ -190,13 +190,18 @@ elif [[ "$2" =~ ^(new-document|save-events|open-(events|activex|dbx))$ ]]; then
             echo 'Run ._REGEN, then paste this line once to add and switch drawings:'
             printf '(winum-new-document "%s/open-events.txt")\n' "$probe_slash"
             ;;
-        save-events)
+        save-events|save-activex)
             save_dwg="$probe_dir/saved.dwg"
             event_label=save_event
             printf '(progn (load "%s/open-events.lsp") (winum-save-trace "%s/open-events.txt" "%s/saved.dwg"))\n' \
                 "$probe_slash" "$probe_slash" "$probe_slash"
-            printf 'Draw one line, run ._REGEN, then ._SAVEAS with the default DWG format and this path: C:\\%s\\saved.dwg\n' \
-                "${probe_dir##*/}"
+            if [[ "$2" == save-activex ]]; then
+                echo 'Draw one line, run ._REGEN, then paste the ActiveX save call once:'
+                printf '(winum-save-activex "%s/open-events.txt" "%s/saved.dwg")\n' "$probe_slash" "$probe_slash"
+            else
+                printf 'Draw one line, run ._REGEN, then ._SAVEAS with the default DWG format and this path: C:\\%s\\saved.dwg\n' \
+                    "${probe_dir##*/}"
+            fi
             ;;
     esac
 elif [[ "$2" == idle ]]; then
@@ -268,7 +273,7 @@ if [[ -n "$open_events" ]]; then
             if (event ~ /^(reactors_ready|control_regen|command_open|activex_(begin|open_enter|open_return|open_expected_dwg|error)|:vlr-(begindwgopen|dwgfileopened|enddwgopen|documentcreated|documenttobeactivated|documentbecamecurrent))$/ ||
                 event ~ /^dbx_(begin|object_unavailable|open_enter|open_return|lines=[0-9]+|active_document=(unchanged|changed)|error)$/ ||
                 event ~ /^new_(begin|add_enter|add_return|count_delta=-?[0-9]+|add_active=(created|other)|activate_(original|created)_(enter|active|other)|error)$/ ||
-                event ~ /^(save_(reactors_ready|begin|target_complete|other_complete)|:vlr-command(willstart|ended|cancelled|failed))$/) {
+                event ~ /^(save_(reactors_ready|begin|target_complete|other_complete)|activex_save_(enter|return|error)|:vlr-command(willstart|ended|cancelled|failed))$/) {
                 print key "=" event
                 seen = 1
             }
