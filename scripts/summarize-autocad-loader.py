@@ -25,6 +25,10 @@ EXPORT = re.compile(r'(?:"([a-z0-9_?@$]+)"|\(null\)) \(ordinal ([0-9]+)\) not fo
 STUB = re.compile(r'No implementation for (\S+)\.([a-z0-9_?@$]+)'
                   r'(?: imported from (.+?), (?:setting to|allocating stub) [a-f0-9x]+)?', re.I)
 INIT = re.compile(r'Initialization of (.+?) failed\s*$', re.I)
+STARTUP = re.compile(r'(?:Importing dlls for|Initializing (?:system dll|dlls) for|TLS init\s+failed when loading) '
+                     r'(.+?)(?: failed)?, status (?:0x)?([a-f0-9]{8})\b', re.I)
+FORWARD = re.compile(r"(module not found|function not found|process_attach failed) for forward "
+                     r"'([a-z0-9_.#?@$-]{1,120})' used by (.+)", re.I)
 PRIVATE_NAMES = {value.lower() for value in (os.getenv('USER'), os.getenv('LOGNAME'), Path.home().name) if value}
 
 
@@ -40,6 +44,11 @@ def module_name(path):
 
 
 def loader_failure(message):
+    if match := STARTUP.fullmatch(message):
+        return f'startup module={module_name(match[1])} status=0x{match[2].lower()}'
+    if match := FORWARD.fullmatch(message):
+        reason = match[1].lower().replace(' ', '_')
+        return f'forward target={public_token(match[2])} importer={module_name(match[3])} reason={reason}'
     if match := LOAD.fullmatch(message):
         return f'load module={module_name(match[1])} status=0x{match[2].lower()}'
     if match := IMPORT.fullmatch(message.rstrip('.')):
@@ -69,6 +78,8 @@ def scan(log):
                 fatal.setdefault(pid, (tid, match[1].lower()))
             elif channel == 'module' and pid not in fatal and (failure := loader_failure(message)):
                 counts[pid, tid, failure] += 1
+                if failure.startswith('startup module=acad.exe '):
+                    pids.add(pid)
 
     events, on_fault_thread = Counter(), Counter()
     for (pid, tid, failure), count in counts.items():
@@ -83,11 +94,14 @@ def scan(log):
 def main():
     parser = argparse.ArgumentParser(description='Summarize saved AutoCAD Wine loader traces without relaunching.')
     parser.add_argument('work', type=Path, help='original AutoCAD test directory')
+    parser.add_argument('--candidate-startup', action='store_true', help='read the latest candidate Save As startup log')
     args = parser.parse_args()
+    runs = (('candidate-startup', '', 'save-events'),) if args.candidate_startup else RUNS
+    variant = 'candidate' if args.candidate_startup else 'baseline'
     idle = None
-    for label, subdir, trial in RUNS:
+    for label, subdir, trial in runs:
         try:
-            logs = (args.work / subdir).glob(f'dwg-baseline-{trial}.*/acad-*.log')
+            logs = (args.work / subdir).glob(f'dwg-{variant}-{trial}.*/acad-*.log')
             log = max(logs, key=lambda path: path.stat().st_mtime_ns, default=None)
             if log is None:
                 print(f'loader_run={label} log=missing')
@@ -101,8 +115,10 @@ def main():
         code_list = ','.join(f'0x{code}' for code in codes) or 'none'
         print(f'loader_run={label} processes={processes} fatal={code_list} '
               f'messages={sum(events.values())} distinct={len(events)}')
-        order = sorted(events, key=lambda item: (not on_fault_thread[item], idle is not None and item in idle,
-                                                 -events[item], item))
+        order = sorted(events, key=lambda item: (
+            args.candidate_startup and not item.startswith(('startup ', 'forward ')),
+            args.candidate_startup and 'ole32' not in item.lower() and 'combase' not in item.lower(),
+            not on_fault_thread[item], idle is not None and item in idle, -events[item], item))
         for item in order[:8]:
             idle_seen = 'unknown' if idle is None else str(int(item in idle))
             print(f'loader_event={item} count={events[item]} fault_thread={on_fault_thread[item]} idle_seen={idle_seen}')
