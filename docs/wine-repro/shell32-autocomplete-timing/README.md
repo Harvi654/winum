@@ -1114,6 +1114,24 @@ ordinary attempt to create an existing directory. Confirm its request
 type before treating these counts as a lead. Investigate ObjectDBX cleanup
 separately if the exception messages cluster after the return.
 
+The follow-up on 2026-11-20 classified 92 collisions as create-only
+requests for four directories and four as create-only requests for one
+file. None of the logged file warnings occurred on the thread that
+reported the fatal exception. The ObjectDBX trace contains two
+access-violation messages within the two recorded calls and eleven
+after a return, all on the caller thread. Desktop Open contains two
+within its call, also on the caller thread. These are trace messages,
+and repeated messages may refer to one exception.
+
+The same summary now reports `access_violation_site=` using the module
+and relative offset printed by Wine, or a unique active PE image range
+from the loader trace. Addresses with no match are unresolved. Return
+`file_detail=`, `access_violation_phase=` and `access_violation_site=`
+for both saved runs. `fault_thread` identifies a message on the thread
+that eventually reported the unhandled exception. Matching sites can
+identify a shared earlier path. Their appearance in a returning call
+also establishes that reaching the site can be survivable.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the

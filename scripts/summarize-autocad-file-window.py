@@ -2,15 +2,21 @@
 # Original, AI-assisted (Codex), LGPL-2.1-or-later.
 import argparse
 from collections import Counter, defaultdict
+import os
 from pathlib import Path
 import re
 
 
 LINE = re.compile(r'^([0-9a-f]+):([0-9a-f]+):(trace|warn|err):(\w+):(\w+) (.*)$', re.I)
-ACAD_IMAGE = re.compile(r'Loaded L?"[^"\n]*[\\/]acad\.exe" at ', re.I)
+MAPPED = re.compile(r'mapping PE file L?"([^"\n]+)" at (?:0x)?([a-f0-9]+)-(?:0x)?([a-f0-9]+)$', re.I)
+LOADED = re.compile(r'Loaded L?"([^"\n]+)" at (?:0x)?([a-f0-9]+):', re.I)
+UNLOADED = re.compile(r'\b(?:unloading|unloaded module) L?"([^"\n]+)"', re.I)
+MODULE = re.compile(r'[a-z0-9_.+-]{1,96}\.(?:dll|exe|ocx|drv|arx|dbx|crx|hdi)', re.I)
+PRIVATE_NAMES = {value.lower() for value in (os.getenv('USER'), os.getenv('LOGNAME'), Path.home().name) if value}
 REQUEST = re.compile(r'\bname=L"([^"\r\n]+)".*\bdisp=(\d+) options=([0-9a-f]+)\b', re.I)
 WARNING = re.compile(r'L"([^"\r\n]+)" not found \(([0-9a-f]{8})\)$', re.I)
 AV = re.compile(r'^(?:code=|Unhandled exception code )(?:0x)?c0000005\b', re.I)
+AV_ADDRESS = re.compile(r'\baddr(?:=| )(?:0x)?([a-f0-9]+)(?: \(([^()]+)\+(?:0x)?([a-f0-9]+)\))?', re.I)
 FATAL = re.compile(r'^Unhandled exception code (?:0x)?([0-9a-f]{8})\b', re.I)
 MARKER = re.compile(r'/winum-dwg\.[a-z0-9]+/open-events\.txt\.(dbx|activex)_open_(enter|return)$')
 DISPOSITION = ('supersede', 'open', 'create', 'open_if', 'overwrite', 'overwrite_if')
@@ -32,25 +38,66 @@ def path_group(path):
     return 'other'
 
 
+def basename(path):
+    return re.split(r'[\\/]', path.lower())[-1]
+
+
+def public_module(name):
+    if not MODULE.fullmatch(name) or any(private in name for private in PRIVATE_NAMES):
+        return '<redacted>'
+    return name
+
+
+def exception_site(message, images):
+    match = AV_ADDRESS.search(message)
+    if not match:
+        return 'unresolved', '-'
+    address, name, offset = match.groups()
+    if name:
+        return public_module(basename(name)), f'0x{int(offset, 16):x}'
+    address = int(address, 16)
+    candidates = [(name, address - base) for name, base, end in images.values() if base <= address < end]
+    if len(candidates) == 1:
+        name, offset = candidates[0]
+        return public_module(name), f'0x{offset:x}'
+    return 'unresolved', '-'
+
+
 def scan(log, probe):
     processes = set()
     entered, returned = Counter(), Counter()
     active, phase, fault = {}, {}, {}
     requests, lookups, paths = {}, Counter(), defaultdict(set)
     exceptions = Counter()
+    sites = Counter()
+    mappings, images = {}, defaultdict(dict)
     with log.open(encoding='utf-8', errors='replace') as stream:
         for line in stream:
             match = LINE.match(line.rstrip('\r\n'))
             if not match:
                 continue
             pid, tid, level, channel, function, message = match.groups()
-            if channel == 'loaddll' and ACAD_IMAGE.match(message):
-                processes.add(pid)
+            if channel == 'module' and function == 'map_image_into_view' and (match := MAPPED.fullmatch(message)):
+                path, base, end = match.groups()
+                mappings[pid, int(base, 16)] = (basename(path), int(end, 16))
+            elif channel == 'loaddll' and (match := LOADED.match(message)):
+                path, base = match.groups()
+                name, base = basename(path), int(base, 16)
+                if name == 'acad.exe':
+                    processes.add(pid)
+                mapped_name, end = mappings.pop((pid, base), (None, base))
+                if name == mapped_name:
+                    images[pid][path.lower()] = (name, base, end)
+            elif channel in ('module', 'loaddll') and function == 'free_modref' and (match := UNLOADED.search(message)):
+                images[pid].pop(match[1].lower(), None)
             if pid not in processes or pid in fault:
                 continue
             if channel == 'seh':
                 if AV.match(message):
-                    exceptions[phase.get(pid, 'before'), tid == active.get(pid)] += 1
+                    stage, same_thread = phase.get(pid, 'before'), tid == active.get(pid)
+                    exceptions[stage, same_thread] += 1
+                    module, offset = exception_site(message, images[pid])
+                    sites[pid, tid, stage, same_thread, module, offset] += 1
                 if match := FATAL.match(message):
                     fault[pid] = (match[1].lower(), tid)
             if channel != 'file' or function != 'NtCreateFile':
@@ -98,6 +145,21 @@ def scan(log, probe):
     for stage in ('before', 'call', 'after_return'):
         print(f'access_violation_phase={stage} messages={exceptions[stage, False] + exceptions[stage, True]} '
               f'call_thread={exceptions[stage, True]}')
+    site_counts, site_call, site_fault = Counter(), Counter(), Counter()
+    for (pid, tid, stage, same_thread, module, offset), count in sites.items():
+        site = stage, module, offset
+        site_counts[site] += count
+        if same_thread:
+            site_call[site] += count
+        if pid in fault and tid == fault[pid][1]:
+            site_fault[site] += count
+    order = sorted(site_counts, key=lambda site: (site[0] == 'before', not site_call[site], -site_counts[site], site))
+    for stage, module, offset in order[:12]:
+        site = stage, module, offset
+        print(f'access_violation_site={stage} module={module} offset={offset} messages={site_counts[site]} '
+              f'call_thread={site_call[site]} fault_thread={site_fault[site]}')
+    if len(order) > 12:
+        print(f'access_violation_site_omitted={len(order) - 12}')
 
 
 def main():
