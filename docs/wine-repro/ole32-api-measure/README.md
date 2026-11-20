@@ -71,3 +71,18 @@ configured Windows version in that field.
 This synthetic pilot tests Ole32 independently of AutoCAD. Agreement
 establishes coverage for the listed cases. Relating a discrepancy to
 the desktop Save As failure requires a separate product test.
+
+## First reference run
+
+On 2026-11-20, the Windows 10 VM reported build `19045`. Both executables
+from [MEASURE build 44812294927](https://github.com/Harvi654/winum/actions/runs/44812294927)
+completed with exit status 0. The 12 export observations and 18 case-step
+records were identical across x86_64 and i686. In particular, the
+HGLOBAL stream's short and end-of-stream reads both returned `S_OK`,
+with four bytes and zero bytes respectively.
+
+A preliminary x86_64 run on Winum 11.22 (`ba856f8`) produced the same
+30 records using a locally compiled executable from the same probe
+source. The comparison with the exact CI executables on both Linux
+runtimes remains to be run. A local i686 launch failed before entering
+the probe. An independent i686 control failed in the same environment.
