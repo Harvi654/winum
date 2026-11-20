@@ -1456,6 +1456,20 @@ zero afterward. The test outcome was unchanged with tiering disabled.
 Continue with the matched newer Wine comparison below. On 2026-11-20,
 the WineHQ 11.23 source archive and upstream tag were unavailable.
 
+#### Native Ole32 startup control
+
+On a disposable copy of the reduced Wine 11.22 prefix, a local trial
+loaded the native `ole32.dll` with builtin `combase.dll`, `oleaut32.dll`
+and `rpcrt4.dll` in the same `acad.exe` process. AutoCAD exited with
+launcher status 1 during Ole32 initialization, before the save command.
+The loader reported Wine's `EXCEPTION_WINE_STUB` (`0x80000100`).
+The saved log named calls to `combase.dll.CleanupOleStateInAllTls` and
+`ntdll.dll.RtlGetNtSystemRoot`. The filtered output does not establish
+their order. Wine 11.22 marks the former as a stub and does not export
+the latter. A Combase-only substitution would leave the Ntdll export
+unresolved. This trial identifies a startup incompatibility in the
+mixed configuration. The original Save As fault remains unresolved.
+
 [dwg-urlmon-startup]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-2027-status.md#fixed-along-the-way
 
 ### winum patch review
