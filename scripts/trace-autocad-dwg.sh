@@ -168,6 +168,7 @@ save_dwg=
 open_events=
 file_subject=
 recovery_subject=
+api_subject=
 event_label=open_event
 if [[ $# == 3 && ( ! -f "$3" || ! -s "$3" ) ]]; then
     echo 'A nonempty local DWG is required.' >&2
@@ -204,6 +205,14 @@ if [[ "${ACAD_DWG_RECOVERY_TRACE:-0}" == 1 ]]; then
     fi
     recovery_subject="${probe_dir##*/}"
     export WINEDEBUG="$WINEDEBUG,$acad_image:+file,$acad_image:+reg"
+fi
+if [[ "${ACAD_DWG_API_TRACE:-0}" == 1 ]]; then
+    if [[ "$2" != save-events ]]; then
+        echo 'API tracing requires save-events.' >&2
+        exit 2
+    fi
+    api_subject="${probe_dir##*/}"
+    export WINEDEBUG="$WINEDEBUG,$acad_image:fixme+all,$acad_image:err+all,$acad_image:+file"
 fi
 
 if [[ "$2" == core-open ]]; then
@@ -289,7 +298,7 @@ elif [[ "$2" =~ ^(new-document|save-(events|activex)|open-(events|activex|dbx))$
             save_dwg="$probe_dir/saved.dwg"
             event_label=save_event
             printf '(progn (load "%s/open-events.lsp") ' "$probe_slash"
-            if [[ -n "$recovery_subject" ]]; then
+            if [[ -n "$recovery_subject" || -n "$api_subject" ]]; then
                 printf '(setq winum-trace-file-window T) '
             fi
             printf '(winum-save-trace "%s/open-events.txt" "%s/saved.dwg"))\n' "$probe_slash" "$probe_slash"
@@ -445,7 +454,7 @@ fi
 
 # Only print module names and numeric exception fields. In particular,
 # keep the Windows paths and debugger preamble inside the private run directory.
-python3 - "${logs[0]}" "$eventpipe_dir" "$2" "$shell_subject" "$file_subject" "$recovery_subject" <<'PY'
+python3 - "${logs[0]}" "$eventpipe_dir" "$2" "$shell_subject" "$file_subject" "$recovery_subject" "$api_subject" <<'PY'
 from collections import Counter, deque
 import mmap
 import os
@@ -471,6 +480,7 @@ recent_policy_trace = re.compile(r"\s+policy value for NoRecentDocsHistory = 0*1
 shell_subject = sys.argv[4].lower()
 file_subject = sys.argv[5].lower()
 recovery_subject = sys.argv[6].lower()
+api_subject = sys.argv[7].lower()
 recovery_query = re.compile(r':trace:reg:NtQueryValueKey\s+\([^,]+,L"LoggedFileCount",', re.I)
 file_markers = {
     'open-activex': ('activex_open_enter', 'activex_open_return', 'activex_error'),
@@ -486,6 +496,11 @@ idle_trace_types = (
 )
 unhandled = re.compile(r"Unhandled exception code ([0-9a-f]+) flags ([0-9a-f]+) addr (?:0x)?([0-9a-f]+)", re.I)
 exception = re.compile(r"\bcode=(?:0x)?([0-9a-f]+) flags=(?:0x)?([0-9a-f]+) addr=(?:0x)?([0-9a-f]+)", re.I)
+api_message = re.compile(r'(fixme|err):([a-z0-9_]{1,32}):([a-zA-Z_][a-zA-Z0-9_]{0,95})\s')
+api_stub_hint = re.compile(r'\b(?:stub|not implemented|unimplemented|E_NOTIMPL|STATUS_NOT_IMPLEMENTED|'
+                           r'ERROR_CALL_NOT_IMPLEMENTED)\b', re.I)
+api_exception = re.compile(r'\bcode=(?:0x)?(80000100|80004001|80070078|c0000002)'
+                           r'(?: \([a-z_0-9]+\))? flags=', re.I)
 stack = re.compile(r"^\s*(?:=>)?\s*\d+\s+0x[0-9a-f]+.*\bin ([a-z0-9_.-]+)"
                    r"(?: \(\+0x([0-9a-f]+)\))? \(0x[0-9a-f]+\)\s*$", re.I)
 managed_type = re.compile(r"\b(?:System|Microsoft)(?:\.[A-Za-z_][A-Za-z0-9_]*)*"
@@ -579,6 +594,9 @@ file_misses = Counter()
 file_operation_thread = Counter()
 recovery_phase = {}
 recovery_queries = Counter()
+api_phase = {}
+api_counts = Counter()
+api_fault_thread = {}
 
 with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
     for line in log:
@@ -589,6 +607,22 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
                 console_dwg = match.groups()
         ids = prefix.match(line)
         pid, tid = ids.groups() if ids else ("?", "?")
+        if api_subject and ids:
+            if ':trace:file:NtCreateFile ' in line and api_subject in line.lower():
+                if 'open-events.txt.save_command_enter"' in line:
+                    api_phase.setdefault(pid, 'command')
+                elif api_phase.get(pid) == 'command' and 'open-events.txt.save_begin"' in line:
+                    api_phase[pid] = 'saving'
+                elif api_phase.get(pid) in {'command', 'saving'} and 'open-events.txt.save_command_exit"' in line:
+                    api_phase[pid] = 'ended'
+            phase = api_phase.get(pid, 'before')
+            if phase in {'before', 'command', 'saving'}:
+                if match := api_message.match(line, ids.end()):
+                    level, channel, function = match.groups()
+                    kind = 'stub_hint' if api_stub_hint.search(line, match.end()) else level
+                    api_counts[pid, tid, phase, kind, f'{channel}:{function}'] += 1
+                elif ':trace:seh:' in line and (match := api_exception.search(line)):
+                    api_counts[pid, tid, phase, 'exception', f'0x{match[1].lower()}'] += 1
         if recovery_subject and ids:
             if ':trace:file:NtCreateFile ' in line and recovery_subject in line.lower():
                 if 'open-events.txt.save_command_enter"' in line:
@@ -651,6 +685,9 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
                 file_ended.setdefault(pid, 'fault')
             if recovery_phase.get(pid) == 'during':
                 recovery_phase[pid] = 'fault'
+            if api_phase.get(pid) in {'command', 'saving'}:
+                api_phase[pid] = 'fault_after_save_begin' if api_phase[pid] == 'saving' else 'fault_before_save_begin'
+                api_fault_thread[pid] = tid
             code, flags, addr = match.groups()
             ip = int(addr, 16)
             images = [(name, ip - base) for (process, _), (name, base, end) in active.items()
@@ -724,6 +761,30 @@ if recovery_subject:
                     if pid in acad_pids and stage == phase)
         on_fault_thread = recovery_queries[(*fault_thread, phase)] if fault_thread else 0
         print(f"recovery_query=LoggedFileCount phase={phase} count={total} fault_thread={on_fault_thread}")
+if api_subject:
+    observed = {pid: api_phase[pid] for pid in acad_pids if pid in api_phase}
+    window = next(iter(observed.values())) if len(observed) == 1 else 'unconfirmed'
+    print(f"api_save_window={window}")
+    if len(observed) == 1:
+        pid = next(iter(observed))
+        fault_tid = api_fault_thread.get(pid)
+        by_phase = Counter()
+        on_fault = Counter()
+        for (process, tid, phase, kind, label), count in api_counts.items():
+            if process == pid:
+                by_phase[(kind, label), phase] += count
+                if phase != 'before' and tid == fault_tid:
+                    on_fault[kind, label] += count
+        signals = {key for key, phase in by_phase if phase != 'before'}
+        order = sorted(signals, key=lambda key: (
+            not on_fault[key], key[0] not in {'exception', 'stub_hint'},
+            bool(by_phase[key, 'before']), not by_phase[key, 'saving'], key))
+        print(f"api_save_signals={len(order)} shown={min(len(order), 20)}")
+        for key in order[:20]:
+            kind, label = key
+            print(f"api_signal={kind} site={label} before={by_phase[key, 'before']} "
+                  f"command={by_phase[key, 'command']} saving={by_phase[key, 'saving']} "
+                  f"fault_thread={on_fault[key]}")
 for module, offset in frames:
     print(f"frame module={module}" + (f" offset=0x{offset}" if offset else ""))
 for name in dict.fromkeys(managed):

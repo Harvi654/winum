@@ -9,7 +9,7 @@
   (if (and winum-trace-file-window
            (member message '("activex_open_enter" "activex_open_return" "activex_error"
                              "dbx_open_enter" "dbx_open_return" "dbx_error"
-                             "save_command_enter" "save_command_exit"))
+                             "save_command_enter" "save_begin" "save_command_exit"))
            (setq stream (open (strcat path "." message) "w")))
     (close stream))
   (princ))

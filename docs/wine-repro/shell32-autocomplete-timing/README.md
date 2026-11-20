@@ -1277,6 +1277,41 @@ desktop Open with the tested prefix. The three retained patches, the
 copied prefix state and Wine 11.22 remain in scope. System Wine 11.22
 still has only a startup result.
 
+#### Compare the Save As operation window
+
+Use `ACAD_DWG_API_TRACE=1` with `candidate save-events` on the `c5ddcfe`
+Wine 11.22 test copy running .NET 10.0.15. This adds Wine `fixme` and
+`err` lines for `acad.exe` and uses AutoLISP marker files to delimit the
+command. Leave EventPipe, the debugger observer and full relay off
+for this run. The summary reports counts before the command, from
+command entry to `save_begin`, and from `save_begin` to command exit
+or the first reported unhandled exception. It also reports how many
+in-window lines came from the eventual fault thread. The summary prints
+Wine source labels and selected exception codes. `stub_hint` means the
+message contains an implementation-related term. It does not establish
+what the function returned. `before` includes startup and the preparatory
+`REGEN`. Lines that also occur before the command may still matter if
+they have a different caller or inputs during the command.
+
+For the Windows control, put `run-dwg-save-window.bat` and
+`dwg-open-events.lsp` in a fresh folder and double-click the batch file.
+Use the same `FILEDIA=0` Save As command with a blank drawing and one
+line. In Process Monitor, include `Process Name is acad.exe`, clear the
+capture after `REGEN`, and keep file and registry activity through the
+return of Save As. Locate the marker files ending in `save_command_enter`,
+`save_begin`, and `save_command_exit`. They delimit the same phases as on
+Wine. Inspect `saved.dwg` and the nearby temporary files first, looking
+for create, rename and close results. `result-autocad-save-window.txt`
+records the operation events. Keep the raw capture local.
+
+Look first for a new repeatable Wine implementation hint or error in
+the saving phase, especially on the fault thread. Process Monitor can
+verify filesystem and registry behavior. It does not show arbitrary API
+returns. For a lead outside that scope, trace the specific Wine API and
+build a small synthetic test of the same contract on both systems before
+changing Wine. If the logged symptoms provide no lead, the result bounds
+this diagnostic run and leaves silent behavioral differences open.
+
 [dwg-urlmon-startup]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-2027-status.md#fixed-along-the-way
 
 ### winum patch review
