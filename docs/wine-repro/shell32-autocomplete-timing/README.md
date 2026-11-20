@@ -1404,6 +1404,34 @@ in the filtered Wine output. If the recorded Wine miss matches one of
 these names, the successful Windows trial also observed its absence and
 that lookup is a low-priority lead for the failure.
 
+The Wine log identified the missing file as `saved.cloudinfo`. Both
+systems saw it absent after the rename request. The successful Windows
+save lowers the priority of the file's absence as an explanation for
+the crash.
+
+#### Capture COM diagnostics during Save As
+
+Reuse the reduced Wine 11.22 candidate copy with .NET 10.0.15. Set
+`ACAD_DWG_COM_TRACE=1` and run `trace-autocad-dwg.sh candidate save-events`
+with `FILEDIA=0`, one line, and the default DWG format. Keep the recent
+history setting used for the preceding control (`ACAD_DWG_NO_RECENT=1`).
+The runner adds the `ole`, `combase`, `rpc` and `storage` debug channels
+for `acad.exe` and the `file` channel for command and rename landmarks.
+
+~~~bash
+python3 -I scripts/summarize-autocad-file-window.py --save-com "$ACAD_AUTOCOMPLETE_WORK"
+~~~
+
+`save_com_messages` gives in-command counts before and after the rename
+request. `save_com_signal` reports warnings, errors, fixmes and messages
+that explicitly log a failure-shaped status. `save_com_fault_tail`
+lists up to 12 COM messages from the terminal thread after the request.
+The channel name identifies an area of the trace. Several DLLs use the
+`ole` channel. A `status=-` line has no recognized status in the message.
+These channels do not log every call or return. Keep raw logs local and
+compare an individual API's return on both systems if the trace gives
+a candidate.
+
 [dwg-urlmon-startup]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-2027-status.md#fixed-along-the-way
 
 ### winum patch review

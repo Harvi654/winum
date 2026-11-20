@@ -169,6 +169,7 @@ open_events=
 file_subject=
 recovery_subject=
 api_subject=
+com_save_trace="${ACAD_DWG_COM_TRACE:-0}"
 event_label=open_event
 if [[ $# == 3 && ( ! -f "$3" || ! -s "$3" ) ]]; then
     echo 'A nonempty local DWG is required.' >&2
@@ -213,6 +214,13 @@ if [[ "${ACAD_DWG_API_TRACE:-0}" == 1 ]]; then
     fi
     api_subject="${probe_dir##*/}"
     export WINEDEBUG="$WINEDEBUG,$acad_image:fixme+all,$acad_image:err+all,$acad_image:+file"
+fi
+if [[ "$com_save_trace" == 1 ]]; then
+    if [[ "$1" != candidate || "$2" != save-events ]]; then
+        echo 'COM tracing requires candidate save-events.' >&2
+        exit 2
+    fi
+    export WINEDEBUG="$WINEDEBUG,$acad_image:+file,$acad_image:+ole,$acad_image:+combase,$acad_image:+rpc,$acad_image:+storage"
 fi
 
 if [[ "$2" == core-open ]]; then
@@ -298,7 +306,7 @@ elif [[ "$2" =~ ^(new-document|save-(events|activex)|open-(events|activex|dbx))$
             save_dwg="$probe_dir/saved.dwg"
             event_label=save_event
             printf '(progn (load "%s/open-events.lsp") ' "$probe_slash"
-            if [[ -n "$recovery_subject" || -n "$api_subject" ]]; then
+            if [[ -n "$recovery_subject" || -n "$api_subject" || "$com_save_trace" == 1 ]]; then
                 printf '(setq winum-trace-file-window T) '
             fi
             printf '(winum-save-trace "%s/open-events.txt" "%s/saved.dwg"))\n' "$probe_slash" "$probe_slash"
@@ -466,7 +474,8 @@ prefix = re.compile(r"^([0-9a-f]+):([0-9a-f]+):", re.I)
 mapped = re.compile(r'\bmapping PE file L?"[^"]*[\\/]([a-z0-9_.-]+)" at (0x[0-9a-f]+)-(0x[0-9a-f]+)', re.I)
 loaded = re.compile(r'\bLoaded L?"([^"]*[\\/]([a-z0-9_.-]+))" at (?:0x)?([0-9a-f]+): (\w+)', re.I)
 unloaded = re.compile(r'\b(?:unloading|unloaded module) L?"([^"]+)"', re.I)
-known_modules = {"coreclr.dll", "clr.dll", "mscoree.dll", "shell32.dll", "msxml3.dll", "combase.dll", "oleaut32.dll",
+known_modules = {"coreclr.dll", "clr.dll", "mscoree.dll", "shell32.dll", "msxml3.dll", "combase.dll", "ole32.dll",
+                 "oleaut32.dll", "rpcrt4.dll",
                  "d3dcompiler_47.dll", "d3dcompiler_47_cor3.dll", "wpfgfx_cor3.dll"}
 runtime_modules = {"coreclr.dll", "hostfxr.dll", "hostpolicy.dll", "wpfgfx_cor3.dll"}
 runtime_path = re.compile(r'[\\/]+dotnet[\\/]+(?:host[\\/]+fxr|shared[\\/]+'

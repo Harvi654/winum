@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 
 
-LINE = re.compile(r'^([0-9a-f]+):([0-9a-f]+):(trace|warn|err):(\w+):(\w+) (.*)$', re.I)
+LINE = re.compile(r'^([0-9a-f]+):([0-9a-f]+):(trace|warn|err|fixme):(\w+):(\w+) (.*)$', re.I)
 MAPPED = re.compile(r'mapping PE file L?"([^"\n]+)" at (?:0x)?([a-f0-9]+)-(?:0x)?([a-f0-9]+)$', re.I)
 LOADED = re.compile(r'Loaded L?"([^"\n]+)" at (?:0x)?([a-f0-9]+):', re.I)
 UNLOADED = re.compile(r'\b(?:unloading|unloaded module) L?"([^"\n]+)"', re.I)
@@ -30,6 +30,9 @@ SAVE_LOOKUP_WARNINGS = {'NtCreateFile', 'NtQueryAttributesFile', 'NtQueryFullAtt
 SAVE_SCRATCH_SUFFIXES = {'.dwg', '.bak', '.dwl', '.dwl2', '.tmp', '.ac$', '.sv$', '.log', '.txt', '.xml', '.ini'}
 SAVE_PUBLIC_NAMES = {'saved.dwg', 'saved.bak', 'saved.dwl', 'saved.dwl2', 'saved.dwg.bak', 'saved.dwg.tmp',
                      'saved.cloudinfo', '.autodesk.support'}
+COM_CHANNELS = {'ole', 'combase', 'rpc', 'storage'}
+COM_STATUS = re.compile(r'\b(?:hr(?:es(?:ult)?)?|status|result|return(?:ed|ing|s)?|failed(?: with)?)'
+                        r'(?: (?:with|error|hr))*\s*[=:,]?\s*(?:0x)?([89ac][0-9a-f]{7})\b', re.I)
 DISPOSITION = ('supersede', 'open', 'create', 'open_if', 'overwrite', 'overwrite_if')
 CHAIN_RUNS = (
     ('baseline-open', '', 'open-activex'),
@@ -69,12 +72,14 @@ def basename(path):
     return re.split(r'[\\/]', path.lower())[-1]
 
 
-def scan_save_io(log):
+def scan_save_io(log, *, com_only=False):
     processes = set()
     scratch, phase, fault = {}, {}, {}
     rename_requested = set()
     events, target_resolution = Counter(), Counter()
     missing_scratch, missing_paths = Counter(), defaultdict(set)
+    com_messages, com_signals = Counter(), Counter()
+    com_tail = defaultdict(lambda: deque(maxlen=12))
 
     def scope(path, folder):
         if folder in path:
@@ -98,6 +103,16 @@ def scan_save_io(log):
             if channel == 'seh' and pid in phase and (fatal := FATAL.match(message)):
                 fault[pid] = (tid, fatal[1].lower())
                 phase[pid] = 'fault'
+            if com_only and channel in COM_CHANNELS and phase.get(pid) in {'command', 'saving'}:
+                after = pid in rename_requested
+                status = COM_STATUS.search(message)
+                code = f'0x{status[1].lower()}' if status else '-'
+                event = level, channel, function, code
+                com_messages[pid, tid, after] += 1
+                if status or level in {'err', 'warn', 'fixme'}:
+                    com_signals[pid, tid, after, event] += 1
+                if after:
+                    com_tail[pid, tid].append(event)
             if channel != 'file':
                 continue
             paths = [re.sub(r'[\\/]+', '/', path).lower() for path in FILE_PATH.findall(message)]
@@ -112,6 +127,11 @@ def scan_save_io(log):
                     phase[pid] = 'saving' if marker_name == 'save_begin' else 'ended'
                 continue
             if phase.get(pid) not in {'command', 'saving'}:
+                continue
+            if (level == 'trace' and function == 'MoveFileWithProgressW' and len(paths) >= 2 and
+                    scope(paths[1], scratch[pid]) == 'target'):
+                rename_requested.add(pid)
+            if com_only:
                 continue
             scopes = tuple(dict.fromkeys(group for path in paths if (group := scope(path, scratch[pid]))))
             if not scopes:
@@ -130,8 +150,6 @@ def scan_save_io(log):
             else:
                 continue
             events[pid, phase[pid], function, '+'.join(scopes), detail, tid] += 1
-            if function == 'MoveFileWithProgressW' and len(paths) >= 2 and scope(paths[1], scratch[pid]) == 'target':
-                rename_requested.add(pid)
             timing = 'after_request' if pid in rename_requested else 'before_request'
             if function == 'get_nt_and_unix_names' and scopes == ('target',):
                 target_resolution[pid, timing, detail] += 1
@@ -146,11 +164,31 @@ def scan_save_io(log):
                 missing_paths[key].add(path)
 
     if len(phase) != 1:
-        print('save_io_window=unconfirmed')
+        print('save_com_window=unconfirmed' if com_only else 'save_io_window=unconfirmed')
         return
     pid, window = next(iter(phase.items()))
     fault_tid, code = fault.get(pid, (None, None))
     terminal = f'0x{code}' if code else 'none'
+    if com_only:
+        print(f'save_com_window={window} terminal={terminal} rename_request={"seen" if pid in rename_requested else "missing"}')
+        before = sum(count for (process, _, after), count in com_messages.items() if process == pid and not after)
+        after = sum(count for (process, _, after), count in com_messages.items() if process == pid and after)
+        print(f'save_com_messages={after} before_request={before} fault_thread={com_messages[pid, fault_tid, True]}')
+        counts, on_fault = Counter(), Counter()
+        for (process, tid, is_after, event), count in com_signals.items():
+            if process == pid and is_after:
+                counts[event] += count
+                if tid == fault_tid:
+                    on_fault[event] += count
+        order = sorted(counts, key=lambda event: (not on_fault[event], event[3] == '-', -counts[event], event))
+        print(f'save_com_signals={len(counts)} shown={min(len(counts), 20)}')
+        for event in order[:20]:
+            level, channel, function, status = event
+            print(f'save_com_signal={level} site={channel}:{function} status={status} '
+                  f'count={counts[event]} fault_thread={on_fault[event]}')
+        for level, channel, function, status in com_tail[pid, fault_tid]:
+            print(f'save_com_fault_tail={level} site={channel}:{function} status={status}')
+        return
     print(f'save_io_window={window} terminal={terminal}')
     counts, on_fault = Counter(), Counter()
     for (process, stage, function, scopes, detail, tid), count in events.items():
@@ -335,17 +373,19 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--fault-chain', action='store_true', help='show exception dispatches only on the fatal thread')
     mode.add_argument('--save-io', action='store_true', help='summarize file requests from the latest candidate Save As trace')
+    mode.add_argument('--save-com', action='store_true', help='summarize COM messages from the latest candidate Save As trace')
     args = parser.parse_args()
-    if args.save_io:
+    if args.save_io or args.save_com:
+        label = 'save_com_window' if args.save_com else 'save_io_window'
         try:
             logs = args.work.glob('dwg-candidate-save-events.*/acad-*.log')
             log = max(logs, key=lambda path: path.stat().st_mtime_ns, default=None)
             if log is None:
-                print('save_io_window=unconfirmed log=missing')
+                print(f'{label}=unconfirmed log=missing')
             else:
-                scan_save_io(log)
+                scan_save_io(log, com_only=args.save_com)
         except OSError:
-            print('save_io_window=unconfirmed log=unreadable')
+            print(f'{label}=unconfirmed log=unreadable')
         return
     runs = CHAIN_RUNS if args.fault_chain else (('dbx', '', 'open-dbx'), ('activex', '', 'open-activex'))
     label = 'fault_chain' if args.fault_chain else 'file_detail'
