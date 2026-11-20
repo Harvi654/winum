@@ -802,6 +802,19 @@ API and records no absolute addresses. The snapshot is taken in the
 first-chance callback, so it describes the path at the throw and does
 not by itself show subsequent exception handling.
 
+Both v3 controls ran on .NET 10.0.15 and reported
+`AcShareFileData..ctor`, `System.NotImplementedException`, HRESULT
+`0x80004001`, and `phase=saving`. Native Windows recorded
+`save_target_complete` and `:VLR-commandEnded`, wrote a 32,725-byte
+DWG, and exited with status 0. Wine wrote a 31,501-byte `AC1032` DWG
+and failed on the throw's thread at `coreclr.dll+0x1855fd` before save
+completion. The Wine snapshot included `acwindows.dll+0x47c7cd` and
+`acwindows.dll+0x5223a6`. The Windows report contains no native
+frames, so the native call paths cannot be compared from these results.
+The shared exception during saving is compatible with a completed
+native save. Inspect the exception dispatch or unwinding around the
+Wine failure before considering a Wine change for the managed throw.
+
 ### Check creation and activation of a second desktop document
 
 `new-document` calls `Documents.Add` from an already open blank
