@@ -1077,6 +1077,43 @@ Report `variant=`, `open_event=`, `file_window=`, `file_lookup=`,
 Open path is a lead for comparison with the installed files or an
 explicit API measurement.
 
+On 2026-11-20, the ObjectDBX process exited with code 0. The event log
+contains two Open returns, two one-line counts, and two unchanged active
+document checks. The file summary reports zero warnings for the first
+completed ObjectDBX Open window. The maintainer also captured an AutoLISP
+console error reporting `0xc0000005` during the ObjectDBX trial. The
+current markers end at the return from ObjectDBX Open, before model-space
+enumeration and before `vlax-release-object`. They cannot place that error
+relative to cleanup.
+
+Desktop Open reached `0xc0000409` at `coreclr.dll+0x14922d`. Its window
+contained 113 `NtCreateFile` warnings. Of these, 96 were
+`STATUS_OBJECT_NAME_COLLISION` (`0xc0000035`), with 84 on the calling
+thread. The other 17 were `STATUS_OBJECT_NAME_NOT_FOUND` (`0xc0000034`),
+all on other threads. The original summary grouped collisions with
+failed lookups but omitted request dispositions and object types.
+
+### Classify the saved file warnings and ObjectDBX exceptions
+
+Use `scripts/summarize-autocad-file-window.py` on the original test work
+directory. It rereads the two latest saved logs and matches each warning
+to the `NtCreateFile` request by thread and path. It reports disposition,
+file or directory flags, broad location, a distinct-path count, and the
+counts for the calling and failing threads. It prints no file paths or
+names. Each ObjectDBX call gets its own window. The access violation
+counts are SEH messages before the first call, within calls, and after an
+Open return. The last phase also includes later UI actions and shutdown.
+
+~~~bash
+python3 -I scripts/summarize-autocad-file-window.py "$ACAD_AUTOCOMPLETE_WORK"
+~~~
+
+Return `file_detail=`, `file_request=`, `file_request_omitted=`, and
+`access_violation_phase=`. A collision on a create-only request can be an
+ordinary attempt to create an existing directory. Confirm its request
+type before treating these counts as a lead. Investigate ObjectDBX cleanup
+separately if the exception messages cluster after the return.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the
