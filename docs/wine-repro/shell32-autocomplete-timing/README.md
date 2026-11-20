@@ -1378,6 +1378,17 @@ before or after the rename request. These positions do not identify the
 rename return. Look for the equivalent attribute query and result in
 the successful Windows Procmon trace before treating it as an error.
 
+The ordered summary placed all ten successful target resolutions after
+the rename request. The fatal thread logged one name resolution failure
+and one `NtQueryFullAttributesFile` warning for scratch paths after that
+request. These messages may describe the same lookup. The basename fell
+outside the summary's allowlist. Inspect the matching attribute warning
+locally by process and thread from the terminal exception. Find the
+corresponding basename or role in the Windows trace of the same command,
+between the rename and `save_command_exit`. Record the operation and
+result, or that no matching query was observed. Leave unclassified names
+and raw paths out of the shared results.
+
 [dwg-urlmon-startup]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-2027-status.md#fixed-along-the-way
 
 ### winum patch review
