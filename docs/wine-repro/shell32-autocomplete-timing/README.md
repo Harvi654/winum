@@ -874,8 +874,19 @@ order. Each save uses a fresh one-line drawing and a new test path.
 The baseline should reproduce the failure and the 16-byte return.
 Check the candidate for a 32-byte return, `save_target_complete`,
 `:vlr-commandEnded`, and continued operation after `SAVEAS` before
-closing the application. The fix remains a candidate pending this
-comparison.
+closing the application.
+
+The isolated A/B run used the DLL pair from
+[build 44835953469](https://github.com/Harvi654/winum/actions/runs/44835953469).
+On the baseline, the builtin UCRT returned 16 during `saving` on the
+fault thread. AutoCAD wrote a 31,434-byte `AC1032` drawing, reported
+`0xc0000409` at `coreclr.dll+0x1855fd`, and exited with status 9 before
+the save completion event. On the candidate, the builtin UCRT returned
+32 during `saving`. AutoCAD then emitted `save_target_complete` and
+`:vlr-commandEnded`, wrote a 31,467-byte `AC1032` drawing, and exited
+normally with status 0. Both runs
+loaded .NET 10.0.15. This verifies the x64 UCRT candidate for the
+desktop `SAVEAS` failure in AutoCAD 2027 under the tested configuration.
 
 ### Check creation and activation of a second desktop document
 
