@@ -77,7 +77,7 @@ msi-source-directory-component-state.patch
 
 # Inventor: type library cache (3D PDF export) and the pixel format
 # description needed for GPU ray tracing.
-oleaut32-typelib-keep-released.patch
+# AutoCAD DWG comparison against aeb7a59 omits oleaut32-typelib-keep-released.patch.
 opengl32-window-format-color-bits.patch
 ole32-createfromfile-package.patch
 ole32-storage-localdocs.patch
