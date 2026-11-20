@@ -1412,16 +1412,31 @@ native CoreCLR DLL. That address yielded zero matches in the managed
 method ranges and differs from the executable mapping in the earlier
 observer-only trial.
 
-Repeat with the same observer and EventPipe settings and
-`DOTNET_EventPipeEnableStackwalk=0`. This disables EventPipe stack
-collection while retaining exception and method events in .NET 10.0.0.
-A synthetic .NET 10.0.0 run under winum-11.22-1 still matched its known
-managed return address with that setting.
-Compare the stack with the observer-only trial and look for a method
-match for the newly observed return address. Check the exception type
-only for events attributed to the fatal thread. If the stack still
-ends in CoreCLR or the EventPipe recording is incomplete, record the
-remaining gap before changing instrumentation again.
+The maintainer repeated the trial with `DOTNET_EventPipeEnableStackwalk=0`.
+This disables EventPipe stack collection while retaining exception and
+method events in .NET 10.0.0. A synthetic run under winum-11.22-1 still
+matched its known managed return address with that setting.
+
+The AutoCAD run again recorded first-chance `0xe0434352` on the fatal
+thread followed by `0xc0000409` with reason 2. The stack matched the
+observer-only run, with `coreclr+0x14922d` and `coreclr+0x15456b`
+followed by an executable mapping without a resolved module. Its
+allocation offset was `0x9c087`. The partial recording contained
+27,425 method loads and 781 exception events before the format error.
+The return address matched none of the recovered method ranges. The
+reader recovered zero exception events for the fatal thread, while
+the debugger independently confirmed the first-chance CLR exception
+on that thread. The trace therefore leaves both the managed caller and
+the exception type unresolved.
+
+This closes the EventPipe comparison. The observer-only and
+no-stack EventPipe runs reproduce the same signature on .NET 10.0.0.
+The remaining hypothesis is a difference in exception handling or
+stack state during the desktop document operation. There is no specific
+failed Wine API identified for a relay trace. Resume with the
+[matched Wine version comparison](#wine-1122-with-the-autocad-startup-and-profile-fixes)
+or a new reproducible API difference. Wine 11.23 had no public release
+tag or WineHQ source archive when checked on 2026-11-20.
 
 [autocad-eventpipe-stackwalk]: https://github.com/dotnet/runtime/blob/v10.0.0/src/coreclr/vm/eventing/eventpipe/ep-rt-coreclr.cpp#L69-L88
 
