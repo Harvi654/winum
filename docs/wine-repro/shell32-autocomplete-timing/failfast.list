@@ -1,1 +1,1 @@
-autocad-failfast-observer | docs/wine-repro/shell32-autocomplete-timing/failfast-observer.c | -Wextra -static
+autocad-failfast-observer | docs/wine-repro/shell32-autocomplete-timing/failfast-observer.c | -Wextra -static -ldbghelp

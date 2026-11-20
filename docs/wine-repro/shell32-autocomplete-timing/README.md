@@ -1327,31 +1327,49 @@ Wine's x86_64 fast-fail dispatch preserves the numeric reason in the
 first exception parameter. The terminal SEH message omits it. The
 observer reads Win32 debug events to recover that parameter and the
 preceding exception codes on the failing thread. For CLR exception
-events it also reports the first numeric argument. The observer does
-not read process memory or use vendor symbols. Attaching sets the
+events it also reports the first numeric argument. At a last-chance
+fast-fail event it reads the paused thread context and uses `StackWalk64`
+for up to 12 frames. The output includes module names and relative
+offsets. Debug information lookup uses a local search path. Managed JIT
+frames may be unresolved and may stop the walk. Attaching sets the
 process's debugger flag, so compare the resulting fault module and
 offset with the previous run.
 
+The official Windows x64 .NET 10.0.0 and 10.0.15 `coreclr.dll` files
+both invoke [`__fastfail(2)`][autocad-fastfail] at the observed offsets
+(`0x14922d` and `0x1855fd`). The debug event confirmed reason 2 on .NET
+10.0.0. The offsets identify the termination routine. The preceding
+frames are needed to distinguish the caller. For example, an
+[independent .NET 6 report][autocad-fastfail-similar] shows the same
+reason with `CrawlFrame::SetCurGSCookie` in the stack, but the AutoCAD
+stack has yet to identify that path.
+
 Build with `scripts/build-measure-bundle.sh` and the
 `docs/wine-repro/shell32-autocomplete-timing/failfast.list` manifest.
-With no arguments, each executable runs a self-test that observes a
-numeric fail-fast reason from its own child process. On winum-11.22-1,
-the x86_64 self-test and a separate attach to a synthetic process both
-reported reason 7 and the expected exit status. A two-thread synthetic
-check of the updated observer reported only the argument from the
-thread that issued fail-fast. In the offline
-Windows VM, run the two self-tests with `run-measure.bat`. For AutoCAD,
-use the x86_64 executable with the existing trace script:
+With no arguments, each executable observes a synthetic child. The
+x86_64 self-test under winum-11.22-1 reported reason 7 and six frames.
+A separate attach test returned reason 2, the synthetic CLR exception
+from the fatal thread, and five frames. In the offline Windows VM, run
+the two self-tests with `run-measure.bat`. For AutoCAD, start with Save
+As because the earlier `save-0` trial observed a CLR exception on the
+fatal thread. Use the x86_64 observer with the existing trace script:
 
 ~~~bash
 export ACAD_FAILFAST_OBSERVER="$ACAD_OBSERVER_BUNDLE/autocad-failfast-observer-x86_64.exe"
-bash scripts/trace-autocad-dwg.sh baseline open-0
+bash scripts/trace-autocad-dwg.sh baseline save-0
 ~~~
 
 Wait for AutoCAD to reach the start screen before pressing Enter in
-the terminal. After `observer_ready=1`, set FILEDIA to 0 and open the
-same test DWG. The observer detaches after two minutes if the process
-is still running.
+the terminal. After `observer_ready=1`, set `FILEDIA` to 0, start a blank
+drawing, add one line and run `SAVEAS` with a new scratch DWG name.
+Return the `observer_stack_`, `last_chance=`, `fast_fail_reason=` and
+`preceding_exception=` summaries. The observer detaches after two
+minutes if the process is still running. Use a separate, filtered
+Wine relay trial if the stack points to a particular exported Wine API
+whose call and return need verification.
+
+[autocad-fastfail]: https://learn.microsoft.com/en-us/cpp/intrinsics/fastfail
+[autocad-fastfail-similar]: https://github.com/dotnet/runtime/issues/89309
 
 ### Collect runtime exception events
 

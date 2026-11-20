@@ -1,6 +1,7 @@
 /* Original, AI-assisted (Codex), LGPL-2.1-or-later. */
 #define _WIN32_WINNT 0x0601
 #include <windows.h>
+#include <dbghelp.h>
 #include <intrin.h>
 #include <tlhelp32.h>
 #include <stdio.h>
@@ -10,6 +11,7 @@
 #define CLR_EXCEPTION_STATUS 0xe0434352u
 #define AUTOCAD_TIMEOUT_MS 120000u
 #define EXCEPTION_HISTORY_SIZE 128u
+#define STACK_FRAME_LIMIT 12u
 
 struct exception_event
 {
@@ -67,12 +69,89 @@ static void report_preceding(const struct exception_event *history, unsigned int
     }
 }
 
+static void report_frame(HANDLE process, unsigned int index, DWORD64 pc)
+{
+    IMAGEHLP_MODULE64 module = {0};
+
+    module.SizeOfStruct = sizeof(module);
+    if (SymGetModuleInfo64(process, pc, &module) && module.BaseOfImage <= pc &&
+        pc - module.BaseOfImage < module.ImageSize &&
+        module.ModuleName[0] && strspn(module.ModuleName, "abcdefghijklmnopqrstuvwxyz"
+                                      "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-") == strlen(module.ModuleName))
+        printf("observer_stack_frame=%u module=%s offset=0x%llx\n", index, module.ModuleName,
+               (unsigned long long)(pc - module.BaseOfImage));
+    else
+        printf("observer_stack_frame=%u module=unresolved\n", index);
+}
+
+static unsigned int report_stack(HANDLE process, DWORD thread_id)
+{
+    STACKFRAME64 frame = {0};
+    CONTEXT context = {0};
+    DWORD machine;
+    DWORD64 pc, sp;
+    unsigned int attempts, count = 0;
+    HANDLE thread = OpenThread(THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, thread_id);
+
+    if (!thread)
+    {
+        printf("observer_stack_status=thread_error error=%lu\n", (unsigned long)GetLastError());
+        return 0;
+    }
+    context.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
+    if (!GetThreadContext(thread, &context))
+    {
+        printf("observer_stack_status=context_error error=%lu\n", (unsigned long)GetLastError());
+        CloseHandle(thread);
+        return 0;
+    }
+    SymSetOptions(SYMOPT_DEFERRED_LOADS | SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_NO_PROMPTS);
+    if (!SymInitialize(process, ".", TRUE))
+    {
+        printf("observer_stack_status=modules_error error=%lu\n", (unsigned long)GetLastError());
+        CloseHandle(thread);
+        return 0;
+    }
+#ifdef _WIN64
+    machine = IMAGE_FILE_MACHINE_AMD64;
+    frame.AddrPC.Offset = context.Rip;
+    frame.AddrFrame.Offset = context.Rbp;
+    frame.AddrStack.Offset = context.Rsp;
+#else
+    machine = IMAGE_FILE_MACHINE_I386;
+    frame.AddrPC.Offset = context.Eip;
+    frame.AddrFrame.Offset = context.Ebp;
+    frame.AddrStack.Offset = context.Esp;
+#endif
+    frame.AddrPC.Mode = frame.AddrFrame.Mode = frame.AddrStack.Mode = AddrModeFlat;
+    pc = frame.AddrPC.Offset;
+    sp = frame.AddrStack.Offset;
+    report_frame(process, count++, pc);
+    for (attempts = 0; count < STACK_FRAME_LIMIT && attempts < STACK_FRAME_LIMIT; ++attempts)
+    {
+        if (!StackWalk64(machine, process, thread, &frame, &context, NULL, SymFunctionTableAccess64,
+                         SymGetModuleBase64, NULL) || !frame.AddrPC.Offset || frame.AddrStack.Offset < sp)
+            break;
+        if (frame.AddrPC.Offset == pc && frame.AddrStack.Offset == sp) continue;
+        pc = frame.AddrPC.Offset;
+        sp = frame.AddrStack.Offset;
+        report_frame(process, count++, pc);
+    }
+    printf("observer_stack_status=%s frames=%u\n",
+           count == STACK_FRAME_LIMIT ? "limit" : count > 1 ? "walk_ended" : "fault_frame_only", count);
+    SymCleanup(process);
+    CloseHandle(thread);
+    return count;
+}
+
 static int observe(DWORD pid, DWORD timeout, BOOL self_test)
 {
     ULONGLONG end = GetTickCount64() + timeout, now;
     struct exception_event preceding[EXCEPTION_HISTORY_SIZE] = {0};
     unsigned int count = 0;
     BOOL initial_breakpoint = TRUE, saw_termination = FALSE, saw_test_reason = FALSE;
+    HANDLE process = NULL;
+    unsigned int stack_frames = 0;
 
     while ((now = GetTickCount64()) < end)
     {
@@ -88,6 +167,7 @@ static int observe(DWORD pid, DWORD timeout, BOOL self_test)
         switch (event.dwDebugEventCode)
         {
             case CREATE_PROCESS_DEBUG_EVENT:
+                process = event.u.CreateProcessInfo.hProcess;
                 if (event.u.CreateProcessInfo.hFile) CloseHandle(event.u.CreateProcessInfo.hFile);
                 break;
             case LOAD_DLL_DEBUG_EVENT:
@@ -138,6 +218,7 @@ static int observe(DWORD pid, DWORD timeout, BOOL self_test)
 
                         printf("fast_fail_reason=%llu\n", reason);
                         saw_test_reason = reason == FAST_FAIL_FATAL_APP_EXIT;
+                        if (process) stack_frames = report_stack(process, event.dwThreadId);
                     }
                 }
                 break;
@@ -154,7 +235,7 @@ static int observe(DWORD pid, DWORD timeout, BOOL self_test)
         if (event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT)
         {
             printf("target_exit=0x%08lx\n", (unsigned long)event.u.ExitProcess.dwExitCode);
-            return !(self_test ? saw_test_reason && event.u.ExitProcess.dwExitCode == FAIL_FAST_STATUS
+            return !(self_test ? saw_test_reason && stack_frames > 1 && event.u.ExitProcess.dwExitCode == FAIL_FAST_STATUS
                                : saw_termination);
         }
     }
@@ -187,17 +268,19 @@ static int self_test(void)
     return result;
 }
 
+static __declspec(noinline) void self_test_child(void)
+{
+    /* Deliberately terminate only the synthetic child. */
+    __fastfail(FAST_FAIL_FATAL_APP_EXIT);
+}
+
 int main(int argc, char **argv)
 {
     DWORD pid;
 
     setvbuf(stdout, NULL, _IONBF, 0);
     if (argc == 1) return self_test();
-    if (argc == 2 && !strcmp(argv[1], "--self-test-child"))
-    {
-        /* Deliberately terminate only the synthetic child. */
-        __fastfail(FAST_FAIL_FATAL_APP_EXIT);
-    }
+    if (argc == 2 && !strcmp(argv[1], "--self-test-child")) self_test_child();
     if (argc != 2 || strcmp(argv[1], "--autocad")) return 2;
 
     if (!(pid = autocad_pid())) return 2;
