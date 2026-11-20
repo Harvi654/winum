@@ -1448,6 +1448,14 @@ result calls for a repeat with the default setting on the same runtime.
 This control tests sensitivity to the compilation mode and timing. It
 does not identify the failing operation.
 
+The tiering-off trial on 2026-11-20 wrote a 31,467-byte `AC1032` DWG.
+Its last save event was `save_begin`. It reproduced launcher status 9
+and `0xc0000409` at `coreclr.dll+0x1855fd` with .NET 10.0.15. The
+COM trace logged 245 in-command messages before the rename request and
+zero afterward. The test outcome was unchanged with tiering disabled.
+Continue with the matched newer Wine comparison below. On 2026-11-20,
+the WineHQ 11.23 source archive and upstream tag were unavailable.
+
 [dwg-urlmon-startup]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-2027-status.md#fixed-along-the-way
 
 ### winum patch review
