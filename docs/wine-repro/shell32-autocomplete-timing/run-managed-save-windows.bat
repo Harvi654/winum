@@ -20,7 +20,7 @@ set "acadpath=%stage:\=/%"
 
 echo Starting AutoCAD 2027. In a blank drawing set FILEDIA to 0.
 echo Paste this line in AutoCAD:
-echo ^(progn ^(load "%acadpath%/open-events.lsp"^) ^(winum-save-trace "%acadpath%/open-events.txt" "%acadpath%/saved.dwg"^)^)
+echo ^(progn ^(load "%acadpath%/open-events.lsp"^) ^(setq winum-trace-file-window T^) ^(winum-save-trace "%acadpath%/open-events.txt" "%acadpath%/saved.dwg"^)^)
 echo Draw a line and run ._REGEN. Run ._NETLOAD and load this DLL:
 echo "%stage%\managed-save-observer.dll"
 echo Run WINUMEXCEPTIONS, then ._SAVEAS with the default DWG format and this path:
@@ -41,7 +41,7 @@ if not exist "%WINUM_ACAD_EXCEPTION_LOG%" goto missing_log
 set "record_count=0"
 for /f "delims=" %%L in ('findstr /L /C:"managed_exception " "%WINUM_ACAD_EXCEPTION_LOG%"') do set /a record_count+=1 >nul
 >>"%result%" echo managed_probe_records=%record_count%
-findstr /L /C:"managed_probe=" /C:"managed_frame " ^
+findstr /L /C:"managed_probe=" /C:"managed_frame " /C:"managed_native_frame " ^
     /C:" type=System.NotImplementedException hr=0x80004001" ^
     "%WINUM_ACAD_EXCEPTION_LOG%" >>"%result%"
 goto report

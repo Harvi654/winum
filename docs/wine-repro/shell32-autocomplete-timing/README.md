@@ -782,6 +782,26 @@ Windows save shifts the comparison to how the exception is handled.
 A successful, armed control with no matching throw shifts the
 comparison to paths that can produce the throw in Wine.
 
+The Windows 10 `19045.6466` control on 2026-11-20 recorded the same
+`System.NotImplementedException` and `AcShareFileData..ctor` frame on
+thread `0x2d78`. `save_target_complete` and `:VLR-commandEnded` were
+present, and AutoCAD wrote the 32,725-byte DWG and exited with status
+0. The observer was armed, passed its self-test, and reached its
+512-record limit. The record establishes that the exception can be
+observed in a successful native save session. That probe version
+cannot position the throw within the command.
+
+For the next comparison, use the same updated observer DLL on both
+systems. It reads the command and save marker files when it records
+`NotImplementedException` and keeps a separate limit for those throws
+so they can still be observed after the general record limit. Make one
+Save As attempt per session. Compare `phase=` and the managed frame
+first, then use the native module names and relative offsets to compare
+the call paths. The observer uses the public `RtlCaptureStackBackTrace`
+API and records no absolute addresses. The snapshot is taken in the
+first-chance callback, so it describes the path at the throw and does
+not by itself show subsequent exception handling.
+
 ### Check creation and activation of a second desktop document
 
 `new-document` calls `Documents.Add` from an already open blank

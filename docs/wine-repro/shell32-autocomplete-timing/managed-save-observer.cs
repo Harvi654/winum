@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -16,16 +17,30 @@ public static class WinumSaveObserver
 {
     private const int Limit = 512;
     private const int FrameLimit = 12;
+    private const int NativeFrameLimit = 24;
+    private const int TargetLimit = 24;
     private static readonly object LogGate = new();
     private static readonly Regex SymbolName = new(@"\A[A-Za-z0-9_.+`<>$-]{1,240}\z");
     private static StreamWriter output;
+    private static string markerStem;
     private static int records;
+    private static int targetRecords;
     private static bool selfTestSeen;
     [ThreadStatic]
     private static bool writing;
 
     [DllImport("kernel32.dll")]
     private static extern uint GetCurrentThreadId();
+
+    [DllImport("ntdll.dll")]
+    private static extern ushort RtlCaptureStackBackTrace(uint skip, uint count, [Out] IntPtr[] frames, IntPtr hash);
+
+    [DllImport("kernel32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetModuleHandleExW(uint flags, IntPtr address, out IntPtr module);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern uint GetModuleFileNameW(IntPtr module, StringBuilder name, uint capacity);
 
     private static uint NativeThreadId() => OperatingSystem.IsWindows()
         ? GetCurrentThreadId() : (uint)Environment.CurrentManagedThreadId;
@@ -34,6 +49,17 @@ public static class WinumSaveObserver
 
     private static string Symbol(string value) =>
         value != null && SymbolName.IsMatch(value) ? value : "<redacted>";
+
+    private static string SavePhase()
+    {
+        if (File.Exists(markerStem + ".save_command_exit"))
+            return "after_save";
+        if (File.Exists(markerStem + ".save_begin"))
+            return "saving";
+        if (File.Exists(markerStem + ".save_command_enter"))
+            return "command";
+        return "before_save";
+    }
 
     private static void WriteFrames(System.Exception exception)
     {
@@ -57,6 +83,34 @@ public static class WinumSaveObserver
         }
     }
 
+    private static void WriteNativeFrames()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        const uint FromAddress = 0x4;
+        const uint UnchangedRefcount = 0x2;
+        var addresses = new IntPtr[NativeFrameLimit];
+        int count = RtlCaptureStackBackTrace(1, NativeFrameLimit, addresses, IntPtr.Zero);
+        var path = new StringBuilder(1024);
+        for (int i = 0; i < count; i++)
+        {
+            string name = "unresolved";
+            string offset = "-";
+            if (GetModuleHandleExW(FromAddress | UnchangedRefcount, addresses[i], out var module))
+            {
+                path.Clear();
+                uint length = GetModuleFileNameW(module, path, (uint)path.Capacity);
+                if (length > 0 && length < path.Capacity)
+                {
+                    name = Symbol(Path.GetFileName(path.ToString()).ToLowerInvariant());
+                    offset = $"0x{addresses[i].ToInt64() - module.ToInt64():x}";
+                }
+            }
+            output.WriteLine($"managed_native_frame index={i} module={name} offset={offset}");
+        }
+    }
+
 #if !PROBE_SELF_TEST
     [CommandMethod("WINUMEXCEPTIONS")]
 #endif
@@ -66,11 +120,13 @@ public static class WinumSaveObserver
         if (output != null || string.IsNullOrEmpty(path))
             return;
 
+        markerStem = Path.Combine(Path.GetDirectoryName(path), "open-events.txt");
         output = new StreamWriter(new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
         {
             AutoFlush = true,
         };
         output.WriteLine($"managed_probe=armed tid=0x{NativeThreadId():x}");
+        output.WriteLine($"managed_probe=runtime version={Environment.Version}");
         AppDomain.CurrentDomain.FirstChanceException += OnFirstChance;
         try
         {
@@ -96,14 +152,21 @@ public static class WinumSaveObserver
         writing = true;
         try
         {
-            if (records >= Limit)
+            bool target = args.Exception is NotImplementedException;
+            if (target ? targetRecords >= TargetLimit : records >= Limit)
                 return;
+            string phase = target ? SavePhase() : null;
             string type = Symbol(args.Exception.GetType().FullName);
-            output.WriteLine($"managed_exception tid=0x{NativeThreadId():x} type={type} hr=0x{args.Exception.HResult:x8}");
+            string suffix = phase == null ? "" : $" phase={phase}";
+            output.WriteLine($"managed_exception tid=0x{NativeThreadId():x} type={type} hr=0x{args.Exception.HResult:x8}{suffix}");
             if (++records == Limit)
                 output.WriteLine("managed_probe=limit");
-            if (args.Exception is NotImplementedException)
-                WriteFrames(args.Exception);
+            if (!target)
+                return;
+            if (++targetRecords == TargetLimit)
+                output.WriteLine("managed_probe=target_limit");
+            WriteFrames(args.Exception);
+            WriteNativeFrames();
         }
         catch (System.Exception)
         {
@@ -128,6 +191,7 @@ public static class WinumSaveObserver
         Arm();
         try { throw new InvalidOperationException("private test message"); }
         catch (InvalidOperationException) { }
+        File.WriteAllText(markerStem + ".save_begin", "");
         try { StackCheck.Throw(); }
         catch (NotImplementedException) { }
     }
