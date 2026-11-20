@@ -888,6 +888,27 @@ normally with status 0. Both runs
 loaded .NET 10.0.15. This verifies the x64 UCRT candidate for the
 desktop `SAVEAS` failure in AutoCAD 2027 under the tested configuration.
 
+### Combined AutoCAD dialog and Save As test
+
+The latest winum release, 11.22-1, and `main` at `39967cf` have the
+same 66-patch series. The successful CRT comparison already uses that
+series and the MSXML3 profile fix from `aeb7a59`. Prepare a separate
+copy of its candidate prefix and runtime with
+`prepare-autocad-combined-dialog.sh`. Provide the CRT A/B directory,
+the `shell32-autocomplete-candidate` artifact from
+[build 44562084665](https://github.com/Harvi654/winum/actions/runs/44562084665),
+and an empty test directory on NVMe. The script checks the successful
+x64 CRT DLL and installs the tested v2 Shell32 DLLs for both architectures.
+It records their hashes in `COMBINED-BUILDINFO`.
+
+Launch `candidate open-1` from the combined directory with `FILEDIA=1`.
+Open a scratch copy of the successful `SAVEAS` output, type a fresh
+file name in Save As, and save. Add a line, use `QSAVE`, close the
+drawing and open the new file through the dialog. Verify both lines
+are present. Record the step that freezes or fails and the exit summary.
+The earlier UCRT A/B and autocomplete L4 tests validate the components.
+The combined dialog sequence still needs the maintainer's result.
+
 ### Check creation and activation of a second desktop document
 
 `new-document` calls `Documents.Add` from an already open blank
