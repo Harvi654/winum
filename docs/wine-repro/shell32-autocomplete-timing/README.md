@@ -1332,10 +1332,14 @@ fast-fail event it reads the paused thread context and uses `StackWalk64`
 for up to 12 frames. The output includes module names and relative
 offsets. `observer_stack_next_return=` reports the return address the
 walker provided for its last frame, when available. This address is
-separate from the successfully walked frames. Debug information lookup
-uses a local search path. Managed JIT frames may stop the walk. Attaching sets the
-process's debugger flag, so compare the resulting fault module and
-offset with the previous run.
+separate from the successfully walked frames. For addresses outside
+dbghelp's known modules, `VirtualQueryEx` reports the mapping type and
+whether the page permits execution. File-backed regions can also report
+a basename and an allocation-relative offset. Generated managed code
+may be in executable private or mapped memory. Debug information lookup
+uses a local search path. Managed JIT frames may stop the walk. Attaching
+sets the process's debugger flag, so compare the resulting fault module
+and offset with the previous run.
 
 The official Windows x64 .NET 10.0.0 and 10.0.15 `coreclr.dll` files
 both invoke [`__fastfail(2)`][autocad-fastfail] at the observed offsets
@@ -1358,6 +1362,14 @@ The DLL has two direct calls to the helper, ending at `0xee09b` and
 One more return address can distinguish those paths or identify an
 indirect caller. The two reported frames do not identify the caller of
 `DoJITFailFast`.
+
+The repeat with the return-address reporter walked the same two frames
+and reported `observer_stack_next_return=2 module=unresolved`. It also
+observed one earlier CLR exception on the fatal thread. The address
+looked up by dbghelp was outside its known modules or module lookup
+failed. Query its memory mapping to distinguish a loaded image,
+executable memory without a known module, and a nonexecutable or
+unmapped address before choosing a follow-up trace.
 
 Build with `scripts/build-measure-bundle.sh` and the
 `docs/wine-repro/shell32-autocomplete-timing/failfast.list` manifest.

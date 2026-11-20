@@ -3,9 +3,11 @@
 #include <windows.h>
 #include <dbghelp.h>
 #include <intrin.h>
+#include <psapi.h>
 #include <tlhelp32.h>
 #include <stdio.h>
 #include <string.h>
+#include <wchar.h>
 
 #define FAIL_FAST_STATUS 0xc0000409u
 #define CLR_EXCEPTION_STATUS 0xe0434352u
@@ -69,6 +71,56 @@ static void report_preceding(const struct exception_event *history, unsigned int
     }
 }
 
+static void report_unresolved_frame(HANDLE process, LPCVOID address)
+{
+    MEMORY_BASIC_INFORMATION memory;
+    const char *kind;
+    DWORD access;
+    BOOL executable;
+
+    if (!VirtualQueryEx(process, address, &memory, sizeof(memory)))
+    {
+        printf(" memory=query_failed error=%lu\n", (unsigned long)GetLastError());
+        return;
+    }
+    if (memory.State != MEM_COMMIT)
+    {
+        printf(" memory=%s\n", memory.State == MEM_FREE ? "free" : "reserved");
+        return;
+    }
+    switch (memory.Type)
+    {
+        case MEM_IMAGE: kind = "image"; break;
+        case MEM_MAPPED: kind = "mapped"; break;
+        case MEM_PRIVATE: kind = "private"; break;
+        default: kind = "unknown"; break;
+    }
+    access = memory.Protect & 0xff;
+    executable = !(memory.Protect & PAGE_GUARD) &&
+                 (access == PAGE_EXECUTE || access == PAGE_EXECUTE_READ ||
+                  access == PAGE_EXECUTE_READWRITE || access == PAGE_EXECUTE_WRITECOPY);
+    printf(" memory=%s executable=%d allocation_offset=0x%llx", kind, executable,
+           (unsigned long long)((ULONG_PTR)address - (ULONG_PTR)memory.AllocationBase));
+    if (memory.Type == MEM_IMAGE || memory.Type == MEM_MAPPED)
+    {
+        WCHAR path[MAX_PATH];
+        DWORD length = K32GetMappedFileNameW(process, (LPVOID)address, path, MAX_PATH);
+
+        if (length && length < MAX_PATH)
+        {
+            const WCHAR *basename = path, *cursor;
+
+            path[length] = 0;
+            for (cursor = path; *cursor; ++cursor)
+                if (*cursor == '\\' || *cursor == '/') basename = cursor + 1;
+            if (*basename && wcsspn(basename, L"abcdefghijklmnopqrstuvwxyz"
+                                 L"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-") == wcslen(basename))
+                printf(" mapped_file=%ls", basename);
+        }
+    }
+    putchar('\n');
+}
+
 static void report_frame(HANDLE process, const char *record, unsigned int index, DWORD64 pc)
 {
     IMAGEHLP_MODULE64 module = {0};
@@ -81,7 +133,10 @@ static void report_frame(HANDLE process, const char *record, unsigned int index,
         printf("observer_stack_%s=%u module=%s offset=0x%llx\n", record, index, module.ModuleName,
                (unsigned long long)(pc - module.BaseOfImage));
     else
-        printf("observer_stack_%s=%u module=unresolved\n", record, index);
+    {
+        printf("observer_stack_%s=%u module=unresolved", record, index);
+        report_unresolved_frame(process, (LPCVOID)(ULONG_PTR)pc);
+    }
 }
 
 static unsigned int report_stack(HANDLE process, DWORD thread_id)
