@@ -1470,6 +1470,17 @@ the latter. A Combase-only substitution would leave the Ntdll export
 unresolved. This trial identifies a startup incompatibility in the
 mixed configuration. The original Save As fault remains unresolved.
 
+The complementary local trial loaded native `combase.dll` with Wine's
+`ole32.dll`, `oleaut32.dll` and `rpcrt4.dll` in `acad.exe`. It also exited
+with status 1 before reaching Save As. The loader reported failure
+`0x80000100` during Combase initialization and the stub invocation named
+`RPCRT4.dll.1000`. Wine 11.22's RPCRT4 export specification has no ordinal
+1000. The log also reported a missing `combase.CoTreatAsClass` forward
+from builtin Ole32 and other missing exports. The named import messages
+do not identify additional invoked stubs. Together the two trials bound
+what the substitutions measured to startup of mixed Windows and Wine
+components. Neither reached the desktop DWG operation.
+
 [dwg-urlmon-startup]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-2027-status.md#fixed-along-the-way
 
 ### winum patch review
