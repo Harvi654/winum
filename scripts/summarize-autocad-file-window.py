@@ -380,7 +380,7 @@ def keep_dispatch(message, function, images, entries):
     return False
 
 
-def scan(log, probe, fault_only=False):
+def scan(log, probe, fault_only=False, file_markers=True):
     processes = set()
     entered, returned = Counter(), Counter()
     active, phase, fault = {}, {}, {}
@@ -391,6 +391,7 @@ def scan(log, probe, fault_only=False):
     chain = defaultdict(lambda: deque(maxlen=8))
     dispatches = Counter()
     termination = {}
+    initial_phase = 'before' if file_markers else 'unmarked'
     with log.open(encoding='utf-8', errors='replace') as stream:
         for line in stream:
             match = LINE.match(line.rstrip('\r\n'))
@@ -416,7 +417,7 @@ def scan(log, probe, fault_only=False):
                 if fault_only and keep_dispatch(message, function, images[pid], chain[pid, tid]):
                     dispatches[pid, tid] += 1
                 if AV.match(message):
-                    stage, same_thread = phase.get(pid, 'before'), tid == active.get(pid)
+                    stage, same_thread = phase.get(pid, initial_phase), tid == active.get(pid)
                     exceptions[stage, same_thread] += 1
                     module, offset = exception_site(message, images[pid])
                     sites[pid, tid, stage, same_thread, module, offset] += 1
@@ -424,7 +425,7 @@ def scan(log, probe, fault_only=False):
                     fault[pid] = (match[1].lower(), tid)
                     if fault_only:
                         termination[pid] = exception_site(message, images[pid])
-            if fault_only or channel != 'file' or function != 'NtCreateFile':
+            if fault_only or not file_markers or channel != 'file' or function != 'NtCreateFile':
                 continue
             if level == 'trace' and (match := REQUEST.search(message)):
                 raw_path, disposition, options = match.groups()
@@ -465,7 +466,10 @@ def scan(log, probe, fault_only=False):
         return
 
     codes = ','.join(sorted({f'0x{code}' for code, _ in fault.values()})) or 'none'
-    print(f'file_detail={probe} started={sum(entered.values())} returned={sum(returned.values())} fatal={codes}')
+    if file_markers:
+        print(f'file_detail={probe} started={sum(entered.values())} returned={sum(returned.values())} fatal={codes}')
+    else:
+        print(f'file_detail={probe} fatal={codes} phases=unavailable')
     counts, on_call, on_fault = Counter(), Counter(), Counter()
     for (pid, tid, same_thread, event), count in lookups.items():
         counts[event] += count
@@ -479,7 +483,8 @@ def scan(log, probe, fault_only=False):
               f'count={count} paths={len(paths[event])} call_thread={on_call[event]} fault_thread={on_fault[event]}')
     if len(counts) > 12:
         print(f'file_request_omitted={len(counts) - 12}')
-    for stage in ('before', 'call', 'after_return'):
+    stages = ('before', 'call', 'after_return') if file_markers else ('unmarked',)
+    for stage in stages:
         print(f'access_violation_phase={stage} messages={exceptions[stage, False] + exceptions[stage, True]} '
               f'call_thread={exceptions[stage, True]}')
     site_counts, site_call, site_fault = Counter(), Counter(), Counter()
@@ -507,6 +512,7 @@ def main():
     mode.add_argument('--save-io', action='store_true', help='summarize file requests from the latest candidate Save As trace')
     mode.add_argument('--save-com', action='store_true', help='summarize COM messages from the latest candidate Save As trace')
     mode.add_argument('--save-relay', action='store_true', help='summarize relay calls from the latest candidate Save As trace')
+    mode.add_argument('--dbx-save', action='store_true', help='summarize access violation sites from the latest ObjectDBX Save As trace')
     mode.add_argument('--inventor-export', action='store_true', help='summarize the Inventor AutoCAD DWG export control')
     args = parser.parse_args()
     if args.inventor_export:
@@ -527,7 +533,12 @@ def main():
         except OSError:
             print(f'{label}=unconfirmed log=unreadable')
         return
-    runs = CHAIN_RUNS if args.fault_chain else (('dbx', '', 'open-dbx'), ('activex', '', 'open-activex'))
+    if args.fault_chain:
+        runs = CHAIN_RUNS
+    elif args.dbx_save:
+        runs = (('save-dbx', '', 'save-dbx'),)
+    else:
+        runs = (('dbx', '', 'open-dbx'), ('activex', '', 'open-activex'))
     label = 'fault_chain' if args.fault_chain else 'file_detail'
     for probe, directory, trial in runs:
         logs = (args.work / directory).glob(f'dwg-baseline-{trial}.*/acad-*.log')
@@ -536,7 +547,7 @@ def main():
             if log is None:
                 print(f'{label}={probe} log=missing')
                 continue
-            scan(log, probe, args.fault_chain)
+            scan(log, probe, fault_only=args.fault_chain, file_markers=not args.dbx_save)
         except OSError:
             print(f'{label}={probe} log=unreadable')
 

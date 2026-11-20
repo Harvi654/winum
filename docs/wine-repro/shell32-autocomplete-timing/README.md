@@ -709,6 +709,21 @@ with two lines and a new `AC1032` file shows that the desktop process
 can also save the fixture through its side database. If the probe
 stops earlier, use the last stage marker to locate the failing call.
 
+On 2026-11-20, two ObjectDBX saves returned and reported two lines
+and the original active drawing. The output was a 31,217-byte `AC1032`
+DWG. The desktop process loaded CoreCLR 10.0.15 and exited with status
+0 when closed by the maintainer. AutoLISP displayed `0xc0000005` after
+the call. The last marker precedes release of the ObjectDBX object,
+so cleanup is a candidate. The saved trace has no file markers for
+timing the exception around `SaveAs` and release. Run the summary on
+the saved log to identify sites, and reopen the saved output in Core
+Console to count the persisted lines.
+
+~~~bash
+python3 -I scripts/summarize-autocad-file-window.py --dbx-save "$ACAD_AUTOCOMPLETE_WORK"
+bash scripts/trace-autocad-dwg.sh baseline core-open "$DBX_SAVED_DWG"
+~~~
+
 ### Check creation and activation of a second desktop document
 
 `new-document` calls `Documents.Add` from an already open blank
