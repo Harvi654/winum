@@ -1034,6 +1034,49 @@ noise reference, also for runs using the newer runtime. These reports
 cover the whole captured run up to the exception. An event unique to
 one trial needs a more focused trace to identify its timing or effect.
 
+On 2026-11-20, the idle run recorded 235 loader messages and 94 distinct
+signatures. The four faulting runs recorded 243 to 248 messages and 94
+to 95 distinct signatures. All listed signatures on a failing thread
+also appeared in the idle run. That includes `crypt32.dll` and
+`sspicli.dll` probes. The `imm32.dll` probes and `user32.dll` lookups of
+`GetCursorPosW` and `SetMessageExtraInfoW` were on other threads.
+Wine exports `GetCursorPos` and `SetMessageExtraInfo` without suffixes,
+matching the documented API names. The suffixed probes alone do not
+identify a missing API or a cause of the crash.
+[GetCursorPos](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getcursorpos)
+· [SetMessageExtraInfo](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setmessageextrainfo)
+
+### Compare file lookups during ObjectDBX and desktop Open
+
+Use the baseline prefix and the same 2018 line fixture for both runs.
+`ACAD_DWG_FILE_TRACE=1` enables Wine's `file` channel only for `acad.exe`.
+The printed AutoLISP setup opts into separate marker files immediately
+before and after the call. The summary counts Wine's `NtCreateFile`
+name-resolution warnings from the entry marker to the return, caught
+error, or unhandled exception. It reports the location class, selected
+program basenames, status, and count. Paths in user directories stay
+private. This covers those explicit file lookup warnings. A successful
+name resolution can still be followed by a failed file open.
+
+~~~bash
+(
+    export ACAD_OPEN_EVENTS_LISP="$PWD/docs/wine-repro/shell32-autocomplete-timing/dwg-open-events.lsp"
+    export ACAD_DWG_FILE_TRACE=1
+    unset ACAD_DWG_IO ACAD_EVENTPIPE ACAD_FAILFAST_OBSERVER ACAD_DWG_SHELL_TRACE ACAD_DWG_NO_RECENT
+    bash scripts/trace-autocad-dwg.sh baseline open-dbx "$ACAD_DWG_CONTROLS/line-2018.dwg" || exit 1
+    bash scripts/trace-autocad-dwg.sh baseline open-activex "$ACAD_DWG_CONTROLS/line-2018.dwg"
+)
+~~~
+
+Use the same blank drawing setup for both trials, run `._REGEN` and
+paste the second printed line once. After the ObjectDBX run returns,
+close AutoCAD normally. Compare `file_window=return` with
+`file_window=fault`; a missing marker means the window was not captured.
+Report `variant=`, `open_event=`, `file_window=`, `file_lookup=`,
+`file_omitted=` and `fault_module=`. A lookup specific to the desktop
+Open path is a lead for comparison with the installed files or an
+explicit API measurement.
+
 ### Capture the fail-fast reason
 
 Wine's x86_64 fast-fail dispatch preserves the numeric reason in the

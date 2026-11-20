@@ -166,6 +166,7 @@ launcher_script=scripts/launch-autocad.sh
 probe_dwg=
 save_dwg=
 open_events=
+file_subject=
 event_label=open_event
 if [[ $# == 3 && ( ! -f "$3" || ! -s "$3" ) ]]; then
     echo 'A nonempty local DWG is required.' >&2
@@ -181,6 +182,19 @@ if [[ $# == 3 ]]; then
     probe_hash="$(sha256sum < "$probe_dwg")"
     probe_path="C:\\${probe_dir##*/}\\probe.dwg"
     print_dwg_info "$probe_dwg"
+fi
+
+if [[ "${ACAD_DWG_FILE_TRACE:-0}" == 1 ]]; then
+    case "$2" in
+        open-activex|open-dbx)
+            file_subject="${probe_dir##*/}"
+            export WINEDEBUG="$WINEDEBUG,$acad_image:+file"
+            ;;
+        *)
+            echo 'File tracing requires open-activex or open-dbx.' >&2
+            exit 2
+            ;;
+    esac
 fi
 
 if [[ "$2" == core-open ]]; then
@@ -244,7 +258,11 @@ elif [[ "$2" =~ ^(new-document|save-(events|activex)|open-(events|activex|dbx))$
     probe_slash="C:/${probe_dir##*/}"
     echo 'Create a blank drawing, set FILEDIA to 0, then paste this AutoLISP line:'
     if [[ "$2" != save-* ]]; then
-        printf '(progn (load "%s/open-events.lsp") (winum-open-trace "%s/open-events.txt"))\n' "$probe_slash" "$probe_slash"
+        printf '(progn (load "%s/open-events.lsp") ' "$probe_slash"
+        if [[ -n "$file_subject" ]]; then
+            printf '(setq winum-trace-file-window T) '
+        fi
+        printf '(winum-open-trace "%s/open-events.txt"))\n' "$probe_slash"
     fi
     case "$2" in
         open-events)
@@ -411,9 +429,10 @@ fi
 
 # Only print module names and numeric exception fields. In particular,
 # keep the Windows paths and debugger preamble inside the private run directory.
-python3 - "${logs[0]}" "$eventpipe_dir" "$2" "$shell_subject" <<'PY'
+python3 - "${logs[0]}" "$eventpipe_dir" "$2" "$shell_subject" "$file_subject" <<'PY'
 from collections import Counter, deque
 import mmap
+import os
 from pathlib import Path
 import re
 import sys
@@ -434,6 +453,14 @@ shell_functions = ("SHAddToRecentDocs", "SHChangeNotify", "SHCreateItemFromParsi
 shell_call = re.compile(r"(?:trace|warn|fixme|err):shell:(" + "|".join(shell_functions) + r")\b")
 recent_policy_trace = re.compile(r"\s+policy value for NoRecentDocsHistory = 0*1\s*$")
 shell_subject = sys.argv[4].lower()
+file_subject = sys.argv[5].lower()
+file_markers = {
+    'open-activex': ('activex_open_enter', 'activex_open_return', 'activex_error'),
+    'open-dbx': ('dbx_open_enter', 'dbx_open_return', 'dbx_error'),
+}
+file_miss = re.compile(r':warn:file:NtCreateFile L"([^"\r\n]+)" not found \(([a-f0-9]{8})\)', re.I)
+file_basename = re.compile(r'[a-z0-9_.+-]{1,96}\.(?:dll|exe|arx|dbx|crx|hdi|ocx|tlb|ini|json|xml|config|manifest|dwt|aws|resx)')
+file_private_names = {name.lower() for name in (os.getenv('USER'), os.getenv('LOGNAME'), Path.home().name) if name}
 idle_trace_types = (
     "System.IO.FileNotFoundException",
     "System.ServiceModel.EndpointNotFoundException",
@@ -445,6 +472,25 @@ stack = re.compile(r"^\s*(?:=>)?\s*\d+\s+0x[0-9a-f]+.*\bin ([a-z0-9_.-]+)"
                    r"(?: \(\+0x([0-9a-f]+)\))? \(0x[0-9a-f]+\)\s*$", re.I)
 managed_type = re.compile(r"\b(?:System|Microsoft)(?:\.[A-Za-z_][A-Za-z0-9_]*)*"
                           r"\.(?:[A-Za-z_][A-Za-z0-9_]*)?Exception\b")
+
+def summarize_file_path(raw):
+    path = re.sub(r'[\\/]+', '/', raw.lower())
+    if file_subject in path:
+        return 'scratch', '<redacted>'
+    if '/program files/autodesk/' in path or '/program files (x86)/common files/autodesk shared/' in path:
+        scope = 'autodesk'
+    elif '/program files/dotnet/' in path:
+        scope = 'dotnet'
+    elif '/windows/system32/' in path or '/windows/syswow64/' in path:
+        scope = 'system'
+    elif '/appdata/' in path:
+        return 'appdata', '<redacted>'
+    else:
+        return 'other', '<redacted>'
+    name = path.rsplit('/', 1)[-1]
+    if not file_basename.fullmatch(name) or any(private in name for private in file_private_names):
+        name = '<redacted>'
+    return scope, name
 
 def eventpipe_summary(folder, pid):
     print(f"eventpipe_files={sum(1 for _ in folder.glob('events-*.nettrace'))}")
@@ -509,6 +555,10 @@ eventlog_lines = 0
 stack_dispatch_failed = False
 debugger_unhandled = False
 console_dwg = None
+file_started = {}
+file_ended = {}
+file_misses = Counter()
+file_operation_thread = Counter()
 
 with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
     for line in log:
@@ -519,6 +569,21 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
                 console_dwg = match.groups()
         ids = prefix.match(line)
         pid, tid = ids.groups() if ids else ("?", "?")
+        if file_subject and pid in acad_pids:
+            if ':trace:file:NtCreateFile ' in line and file_subject in line.lower():
+                enter, returned, failed = file_markers[sys.argv[3]]
+                if 'open-events.txt.' + enter + '"' in line:
+                    file_started.setdefault(pid, tid)
+                elif pid in file_started:
+                    if 'open-events.txt.' + returned + '"' in line:
+                        file_ended.setdefault(pid, 'return')
+                    elif 'open-events.txt.' + failed + '"' in line:
+                        file_ended.setdefault(pid, 'error')
+            if pid in file_started and pid not in file_ended and (miss := file_miss.search(line)):
+                entry = (*summarize_file_path(miss[1]), miss[2].lower())
+                file_misses[entry] += 1
+                if tid == file_started[pid]:
+                    file_operation_thread[entry] += 1
         if shell_subject and ids and (match := shell_call.match(line, ids.end())):
             name = match[1]
             shell_lines[pid, tid, name] += 1
@@ -554,6 +619,8 @@ with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
             if match := unloaded.search(line):
                 active.pop((pid, match[1].lower()), None)
         if ":seh:" in line and (match := unhandled.search(line)):
+            if pid in file_started:
+                file_ended.setdefault(pid, 'fault')
             code, flags, addr = match.groups()
             ip = int(addr, 16)
             images = [(name, ip - base) for (process, _), (name, base, end) in active.items()
@@ -608,6 +675,16 @@ if shell_subject:
         thread_lines = shell_lines[(*fault_thread, name)] if fault_thread else 0
         print(f"shell_api={name} process_lines={process_lines} fault_thread_lines={thread_lines} "
               f"scratch_path_lines={path_lines}")
+if file_subject:
+    windows = ','.join(file_ended.get(pid, 'unconfirmed') for pid in sorted(file_started)) or 'missing'
+    print(f"file_window={windows} lookups={sum(file_misses.values())} distinct={len(file_misses)}")
+    order = sorted(file_misses, key=lambda item: (not file_operation_thread[item], -file_misses[item], item))
+    for scope, name, status in order[:10]:
+        entry = scope, name, status
+        print(f"file_lookup={scope} file={name} status=0x{status} count={file_misses[entry]} "
+              f"operation_thread={file_operation_thread[entry]}")
+    if len(order) > 10:
+        print(f"file_omitted={len(order) - 10}")
 for module, offset in frames:
     print(f"frame module={module}" + (f" offset=0x{offset}" if offset else ""))
 for name in dict.fromkeys(managed):

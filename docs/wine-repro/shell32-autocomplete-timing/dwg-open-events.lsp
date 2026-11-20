@@ -6,6 +6,11 @@
     (progn
       (write-line message stream)
       (close stream)))
+  (if (and winum-trace-file-window
+           (member message '("activex_open_enter" "activex_open_return" "activex_error"
+                             "dbx_open_enter" "dbx_open_return" "dbx_error"))
+           (setq stream (open (strcat path "." message) "w")))
+    (close stream))
   (princ))
 
 (defun winum-open-event (reactor arguments)
