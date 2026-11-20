@@ -5,13 +5,13 @@ umask 077
 
 usage() {
     echo 'Usage: trace-autocad-dwg.sh candidate|baseline idle|save-0|open-0|save-1|open-1|new-document|save-events|save-activex' >&2
-    echo '       trace-autocad-dwg.sh candidate|baseline startup-open|startup-safe|startup-wpf-software|core-open KNOWN_GOOD_DWG' >&2
+    echo '       trace-autocad-dwg.sh candidate|baseline startup-open|startup-safe|startup-wpf-software|core-open|core-save KNOWN_GOOD_DWG' >&2
     echo '       trace-autocad-dwg.sh candidate|baseline open-events|open-activex|open-dbx|open-0 KNOWN_GOOD_DWG' >&2
     exit 2
 }
 
-[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|new-document|save-(events|activex)|(save|open)-[01]|startup-(open|safe|wpf-software)|core-open|open-(events|activex|dbx))$ ]] || usage
-if [[ "$2" =~ ^(startup-.*|core-open|open-(events|activex|dbx))$ ]]; then
+[[ $# -ge 2 && $# -le 3 && "$1" =~ ^(candidate|baseline)$ && "$2" =~ ^(idle|new-document|save-(events|activex)|(save|open)-[01]|startup-(open|safe|wpf-software)|core-(open|save)|open-(events|activex|dbx))$ ]] || usage
+if [[ "$2" =~ ^(startup-.*|core-(open|save)|open-(events|activex|dbx))$ ]]; then
     [[ $# == 3 ]] || usage
 elif [[ $# == 3 && "$2" != open-0 ]]; then
     usage
@@ -33,7 +33,7 @@ test "$(realpath -e "$ACAD_PREFIX")" = "$ACAD_PREFIX"
 acad_dir="$ACAD_PREFIX/drive_c/Program Files/Autodesk/AutoCAD 2027"
 test -f "$acad_dir/acad.exe"
 acad_image=acad.exe
-if [[ "$2" == core-open ]]; then
+if [[ "$2" == core-* ]]; then
     acad_image=accoreconsole.exe
     if [[ ! -f "$acad_dir/$acad_image" ]]; then
         echo 'core_console=not_installed' >&2
@@ -262,7 +262,7 @@ if [[ "$save_relay_trace" == 1 ]]; then
     export WINEDEBUG="$WINEDEBUG,$acad_image:+relay,$acad_image:+file,$acad_image:+commdlg,$acad_image:+shell,$acad_image:+ole"
 fi
 
-if [[ "$2" == core-open ]]; then
+if [[ "$2" == core-* ]]; then
     # Reuse the launcher's prefix setup and service startup in a private copy.
     if [[ "$(grep -c '^wine acad\.exe ' "$launcher_script")" != 1 ]]; then
         echo 'core_console=unsupported_launcher' >&2
@@ -273,11 +273,25 @@ if [[ "$2" == core-open ]]; then
     ln -s -- "$(realpath -e scripts/common-env.sh)" "$launcher_dir/common-env.sh"
     sed 's/^wine acad\.exe /wine accoreconsole.exe /' "$launcher_script" > "$launcher_dir/launch.sh"
     launcher_script="$launcher_dir/launch.sh"
-    printf '%s\r\n' \
-        '(progn (setq winum-lines (ssget "_X" (quote ((0 . "LINE"))))) (princ (strcat "\nWINUM_DWG_OPEN=" (if (= (strcase (getvar "DWGNAME")) "PROBE.DWG") "1" "0") " LINES=" (itoa (if winum-lines (sslength winum-lines) 0)) "\n")) (princ))' \
-        '_.QUIT' > "$probe_dir/probe.scr"
     launch_args=(/i "$probe_path" /s "C:\\${probe_dir##*/}\\probe.scr" /l en-US)
-    echo 'Opening the scratch DWG in AutoCAD Core Console.'
+    if [[ "$2" == core-save ]]; then
+        save_dwg="$probe_dir/saved.dwg"
+        printf '%s\r\n' \
+            '(defun winum-count-lines (/ lines) (setq lines (ssget "_X" (quote ((0 . "LINE"))))) (if lines (sslength lines) 0))' \
+            '(progn (princ (strcat "\nWINUM_DWG_OPEN=" (if (= (strcase (getvar "DWGNAME")) "PROBE.DWG") "1" "0") " LINES=" (itoa (winum-count-lines)) "\n")) (princ))' \
+            '(entmake (quote ((0 . "LINE") (10 17.0 23.0 0.0) (11 31.0 23.0 0.0))))' \
+            '(setvar "FILEDIA" 0)' \
+            '(progn (princ "\nWINUM_CORE_SAVE_START\n") (princ))' \
+            "(command-s \"_.SAVEAS\" \"\" \"C:/${probe_dir##*/}/saved.dwg\")" \
+            '(progn (princ (strcat "\nWINUM_DWG_SAVED=" (if (= (strcase (getvar "DWGNAME")) "SAVED.DWG") "1" "0") " LINES=" (itoa (winum-count-lines)) "\n")) (princ))' \
+            '_.QUIT' '_N' > "$probe_dir/probe.scr"
+        echo 'Adding one line and saving a new DWG in AutoCAD Core Console.'
+    else
+        printf '%s\r\n' \
+            '(progn (setq winum-lines (ssget "_X" (quote ((0 . "LINE"))))) (princ (strcat "\nWINUM_DWG_OPEN=" (if (= (strcase (getvar "DWGNAME")) "PROBE.DWG") "1" "0") " LINES=" (itoa (if winum-lines (sslength winum-lines) 0)) "\n")) (princ))' \
+            '_.QUIT' > "$probe_dir/probe.scr"
+        echo 'Opening the scratch DWG in AutoCAD Core Console.'
+    fi
 elif [[ "$2" == startup-safe ]]; then
     launch_args=("$probe_path" /safemode)
     echo 'Opening the scratch DWG in desktop AutoCAD with /safemode.'
@@ -638,6 +652,8 @@ eventlog_lines = 0
 stack_dispatch_failed = False
 debugger_unhandled = False
 console_dwg = None
+console_save_started = False
+console_saved = None
 file_started = {}
 file_ended = {}
 file_misses = Counter()
@@ -650,11 +666,16 @@ api_fault_thread = {}
 
 with open(sys.argv[1], encoding="utf-8", errors="replace") as log:
     for line in log:
-        if sys.argv[3] == "core-open":
+        if sys.argv[3] in {"core-open", "core-save"}:
+            console_line = line.replace("\x00", "").strip().lstrip("\ufeff")
             match = re.fullmatch(r"WINUM_DWG_OPEN=([01]) LINES=([0-9]+)",
-                                 line.replace("\x00", "").strip().lstrip("\ufeff"))
+                                 console_line)
             if match:
                 console_dwg = match.groups()
+            elif console_line == "WINUM_CORE_SAVE_START":
+                console_save_started = True
+            elif match := re.fullmatch(r"WINUM_DWG_SAVED=([01]) LINES=([0-9]+)", console_line):
+                console_saved = match.groups()
         ids = prefix.match(line)
         pid, tid = ids.groups() if ids else ("?", "?")
         if api_subject and ids:
@@ -762,11 +783,17 @@ for (pid, module), (base, kind) in sorted(modules.items()):
 for pid, module, version in sorted(runtime_versions):
     if pid in acad_pids:
         print(f"dotnet_loaded={module} version={version}")
-if sys.argv[3] == "core-open":
+if sys.argv[3] in {"core-open", "core-save"}:
     if console_dwg:
         print(f"core_console_dwg={console_dwg[0]} core_console_lines={console_dwg[1]}")
     else:
         print("core_console_dwg=unconfirmed")
+if sys.argv[3] == "core-save":
+    print(f"core_console_save_started={int(console_save_started)}")
+    if console_saved:
+        print(f"core_console_saved={console_saved[0]} core_console_saved_lines={console_saved[1]}")
+    else:
+        print("core_console_saved=unconfirmed")
 print(f"trueview_processes={len(trueview_pids)}")
 print(f"reg_load_appkey_acad={sum(reg_loads[pid] for pid in acad_pids)} "
       f"reg_load_appkey_trueview={sum(reg_loads[pid] for pid in trueview_pids)}")

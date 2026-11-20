@@ -483,6 +483,25 @@ desktop AutoCAD. This shows the file can load on this Wine installation
 through the console path. The process comparison leaves the failing
 desktop component open.
 
+### Compare desktop and Core Console Save As
+
+Run `core-save` on the 2018 line fixture with the same `aeb7a59` test
+prefix used for the desktop Save As trial with .NET 10.0.15. Core
+Console opens a scratch copy, adds a LINE, calls `SAVEAS` with the
+default DWG format, and reports the resulting drawing name and line
+count. It writes `saved.dwg` beside the scratch copy.
+
+~~~bash
+bash scripts/trace-autocad-dwg.sh baseline core-save "$ACAD_DWG_CONTROLS/line-2018.dwg"
+~~~
+
+A completed console save has an unchanged input copy, an `AC1032`
+output, `core_console_save_started=1`, `core_console_saved=1`, and two
+lines after the save. A file alone does not establish command completion
+because the desktop trial also wrote a DWG before it failed. If the
+console returns successfully, use the desktop work after entering the
+save command to guide the next comparison.
+
 ### Repeat desktop loading with AutoCAD safe mode
 
 Use the same 2018 fixture, prefix and Wine runtime. The `startup-safe`
@@ -1545,6 +1564,16 @@ the exporter can add. The summary omits file paths and call arguments.
 The test establishes which steps are observable in a successful Inventor
 export. Comparing an individual return with AutoCAD requires the same
 Wine build and comparable inputs to that operation.
+
+On 2026-11-20, two exports on `aeb7a59` produced `AC1032` drawings of
+202,728 and 202,791 bytes. The first Wine trace recorded target-path
+lookups and two read-only opens in `Inventor.exe`. A second run with
+Linux `strace` recorded one successful `openat` with
+`O_RDWR|O_CREAT|O_NONBLOCK` in the filtered export trace. The filter
+returned no rename for that destination. The summary did not identify
+the Linux process image. The different file-operation sequences limit
+the use of Inventor as a control for AutoCAD Save As. Use the Core
+Console comparison in the same AutoCAD installation for the next test.
 
 #### Native Ole32 startup control
 
