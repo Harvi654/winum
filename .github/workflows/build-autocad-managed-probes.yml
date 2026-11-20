@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/build-autocad-managed-probes.yml'
       - 'docs/wine-repro/shell32-autocomplete-timing/managed-open-probe.cs'
+      - 'docs/wine-repro/shell32-autocomplete-timing/managed-save-observer.cs'
       - 'scripts/run-autocad-managed-probes.sh'
   workflow_dispatch:
 
@@ -60,4 +61,47 @@ jobs:
         with:
           name: autocad-managed-open-probes
           path: out/
+          retention-days: 30
+      - name: Build and test the managed Save As observer
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          base=https://api.nuget.org/v3-flatcontainer
+          for package in autocad.net autocad.net.core autocad.net.model; do
+            curl -fsSL --retry 2 --max-time 40 -o "$package.nupkg" \
+              "$base/$package/26.0.0/$package.26.0.0.nupkg"
+          done
+          sha256sum -c <<'SUMS'
+          b7c1cccab7eb8bf6e3fa1205a30feb7ef535a7d7b9966fb8ae354fc7a9d2df07  autocad.net.nupkg
+          63ecff3a523c01bfaf6dd1f8d67ebabb7c2672dc2907d14eea08483b5894801c  autocad.net.core.nupkg
+          8a94d3b41f6e3a955fdb0451c0ff11c2428305fcd9d1843064812d21b5650713  autocad.net.model.nupkg
+          SUMS
+          unzip -jq autocad.net.nupkg 'lib/net10.0/AcMgd.dll'
+          unzip -jq autocad.net.core.nupkg 'lib/net10.0/AcCoreMgd.dll'
+          unzip -jq autocad.net.model.nupkg 'lib/net10.0/AcDbMgd.dll'
+
+          refs=()
+          for dll in sdk/packs/Microsoft.NETCore.App.Ref/10.0.0/ref/net10.0/*.dll; do
+            refs+=(-r:"$dll")
+          done
+          source="$GITHUB_WORKSPACE/docs/wine-repro/shell32-autocomplete-timing/managed-save-observer.cs"
+          out="$GITHUB_WORKSPACE/save-observer"
+          mkdir -- "$out"
+          csc=(./sdk/dotnet ./sdk/sdk/10.0.100/Roslyn/bincore/csc.dll -nologo -nostdlib+ \
+            -warnaserror -optimize+ "${refs[@]}" "$source")
+          "${csc[@]}" -target:library -out:"$out/managed-save-observer.dll" \
+            -r:AcMgd.dll -r:AcCoreMgd.dll -r:AcDbMgd.dll
+          "${csc[@]}" -target:exe -define:PROBE_SELF_TEST -out:self-test.dll
+          cp "$GITHUB_WORKSPACE/out/console.runtimeconfig.json" self-test.runtimeconfig.json
+          WINUM_ACAD_EXCEPTION_LOG="$PWD/self-test.txt" ./sdk/dotnet self-test.dll
+          grep -Fx 'managed_probe=self_test ok=1' self-test.txt
+          grep -E '^managed_exception tid=0x[0-9a-f]+ type=System.InvalidOperationException hr=0x80131509$' self-test.txt
+          cp "$GITHUB_WORKSPACE/LICENSE" "$out/"
+          cd "$out"
+          sha256sum LICENSE managed-save-observer.dll > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: autocad-managed-save-observer
+          path: save-observer/
           retention-days: 30

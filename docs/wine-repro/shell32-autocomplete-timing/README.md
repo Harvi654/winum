@@ -724,6 +724,32 @@ python3 -I scripts/summarize-autocad-file-window.py --dbx-save "$ACAD_AUTOCOMPLE
 bash scripts/trace-autocad-dwg.sh baseline core-open "$DBX_SAVED_DWG"
 ~~~
 
+The retained Save As trace contained 24 access-violation messages at
+`oleaut32.dll+0x1a481` and one at `adwindows.dll+0x303edb`. Core
+Console reopened the ObjectDBX output and found both LINE entities.
+These sites also appeared in returning calls. The remaining desktop
+fail-fast investigation should follow the last-chance thread.
+
+### Observe managed exceptions during desktop Save As
+
+The native debugger observed a first-chance CLR exception on the thread
+that later reported `0xc0000409`. The partial EventPipe trace did not
+contain a matching event on that thread. The managed Save As observer
+uses the public `AppDomain.FirstChanceException` event and records
+exception types, HRESULTs, and Windows thread IDs from within AutoCAD.
+[FirstChanceException event](https://learn.microsoft.com/en-us/dotnet/api/system.appdomain.firstchanceexception?view=net-10.0)
+
+Build the observer through the managed-probes workflow and verify the
+`autocad-managed-save-observer` artifact checksums. Set
+`ACAD_MANAGED_SAVE_PROBE` to `managed-save-observer.dll`, run
+`baseline save-events` on the same test prefix, and follow the
+runner's `NETLOAD` and `WINUMEXCEPTIONS` prompts after the drawing is
+ready. The self-test confirms that the callback observed a managed
+exception. The summary reports the total captured records and up to
+twelve records on the thread that reported `0xc0000409`. A record is a
+candidate for further analysis. Thread identity alone does not make it
+the cause, and an empty result can reflect a missed callback.
+
 ### Check creation and activation of a second desktop document
 
 `new-document` calls `Documents.Add` from an already open blank

@@ -202,6 +202,8 @@ recovery_subject=
 api_subject=
 com_save_trace="${ACAD_DWG_COM_TRACE:-0}"
 save_relay_trace="${ACAD_DWG_RELAY_TRACE:-0}"
+managed_save_probe="${ACAD_MANAGED_SAVE_PROBE:-}"
+managed_exception_log=
 event_label=open_event
 if [[ $# == 3 && ( ! -f "$3" || ! -s "$3" ) ]]; then
     echo 'A nonempty local DWG is required.' >&2
@@ -217,6 +219,15 @@ if [[ $# == 3 ]]; then
     probe_hash="$(sha256sum < "$probe_dwg")"
     probe_path="C:\\${probe_dir##*/}\\probe.dwg"
     print_dwg_info "$probe_dwg"
+fi
+if [[ -n "$managed_save_probe" ]]; then
+    if [[ "$2" != save-events || ! -s "$managed_save_probe" ]]; then
+        echo 'The managed Save As observer requires save-events and an observer DLL.' >&2
+        exit 2
+    fi
+    cp -- "$managed_save_probe" "$probe_dir/managed-save-observer.dll"
+    managed_exception_log="$probe_dir/managed-exceptions.txt"
+    export WINUM_ACAD_EXCEPTION_LOG="C:\\${probe_dir##*/}\\managed-exceptions.txt"
 fi
 
 if [[ "${ACAD_DWG_FILE_TRACE:-0}" == 1 ]]; then
@@ -374,8 +385,15 @@ elif [[ "$2" =~ ^(new-document|save-(events|activex|dbx)|open-(events|activex|db
                 echo 'Draw one line, run ._REGEN, then paste the ActiveX save call once:'
                 printf '(winum-save-activex "%s/open-events.txt" "%s/saved.dwg")\n' "$probe_slash" "$probe_slash"
             else
-                printf 'Draw one line, run ._REGEN, then ._SAVEAS with the default DWG format and this path: C:\\%s\\saved.dwg\n' \
-                    "${probe_dir##*/}"
+                if [[ -n "$managed_exception_log" ]]; then
+                    printf 'Draw one line and run ._REGEN. Run ._NETLOAD and load C:\\%s\\managed-save-observer.dll.\n' \
+                        "${probe_dir##*/}"
+                    echo 'Run WINUMEXCEPTIONS, then ._SAVEAS with the default DWG format and the path below.'
+                    printf 'C:\\%s\\saved.dwg\n' "${probe_dir##*/}"
+                else
+                    printf 'Draw one line, run ._REGEN, then ._SAVEAS with the default DWG format and this path: C:\\%s\\saved.dwg\n' \
+                        "${probe_dir##*/}"
+                fi
             fi
             ;;
     esac
@@ -524,7 +542,7 @@ fi
 
 # Only print module names and numeric exception fields. In particular,
 # keep the Windows paths and debugger preamble inside the private run directory.
-python3 - "${logs[0]}" "$eventpipe_dir" "$2" "$shell_subject" "$file_subject" "$recovery_subject" "$api_subject" <<'PY'
+python3 - "${logs[0]}" "$eventpipe_dir" "$2" "$shell_subject" "$file_subject" "$recovery_subject" "$api_subject" "$managed_exception_log" <<'PY'
 from collections import Counter, deque
 import mmap
 import os
@@ -815,6 +833,27 @@ for pid, tid, code, flags, addr, image in fatal:
             print("matches_prior_fault=d3dcompiler_47_cor3.dll+0x11922d")
     else:
         print("fault_module=unknown")
+if sys.argv[8]:
+    observer = Path(sys.argv[8])
+    if not observer.is_file():
+        print("managed_probe=log_missing")
+    else:
+        fault_tid = next((int(tid, 16) for pid, tid, code, *_ in reversed(fatal)
+                          if pid in acad_pids and code.lower() == "c0000409"), None)
+        records = 0
+        related = []
+        record = re.compile(r"managed_exception tid=0x([0-9a-f]+) type=([A-Za-z0-9_.+`]{1,180}|<redacted>) hr=0x([0-9a-f]{8})")
+        for entry in observer.read_text(encoding="utf-8", errors="replace").splitlines():
+            if re.fullmatch(r"managed_probe=(?:armed tid=0x[0-9a-f]+|self_test ok=[01]|limit)", entry):
+                print(entry)
+            elif (match := record.fullmatch(entry)):
+                records += 1
+                if int(match[1], 16) == fault_tid:
+                    related.append(entry)
+        print(f"managed_probe_records={records} on_fault_thread={len(related)} "
+              f"fault_thread_confirmed={int(fault_tid is not None)}")
+        for entry in related[-12:]:
+            print(entry)
 if shell_subject:
     fault_thread = next(((pid, tid) for pid, tid, *_ in reversed(fatal) if pid in acad_pids), None)
     print(f"shell_trace_acad_processes={len(acad_pids)} shell_trace_fault_thread={int(fault_thread is not None)}")
