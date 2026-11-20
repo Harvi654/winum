@@ -1288,14 +1288,29 @@ the full comparison runtime for its candidate copy. The two DLL-only
 comparisons above continue to select the reference runtime with a DLL
 substitution.
 
-If the candidate reaches the same Open failure, the omitted patches
-are unnecessary to reproduce it in this setup. This leaves the three
-retained patches, the prefix state, and Wine 11.22 behavior in scope.
-If Open succeeds, reinstate related patches in groups to find the first
-one that restores the failure. Failure to reach Open is a startup result
-and leaves the question open. If the comparison yields no lead, stop
-removing patches and resume with a comparable newer Wine build or a
-specific observed API difference.
+On 2026-11-20, the maintainer verified both archive checksums and the
+candidate patch manifest. AutoCAD 2027 reached a blank drawing and then
+`activex_open_enter` with both the full series (`aeb7a59`) and the three
+retained patches (`c5ddcfe`). Both runs used .NET `10.0.0` and the same
+2018 DWG fixture. Both ended with launcher status 9 and exception
+`0xc0000409` at `coreclr.dll+0x14922d` before `activex_open_return`.
+The input DWG stayed unchanged in both copies.
+
+The patches omitted from `c5ddcfe` are unnecessary to reproduce this
+desktop Open failure in the copied prefix, including the COM stub
+activation context and type library cache. The three retained patches,
+the copied prefix state, and Wine 11.22 behavior remain in scope. Save As
+was outside this paired run. The best remaining hypothesis is a
+compatibility difference in the desktop document lifecycle. The terminal
+CoreCLR offset identifies where the failure was reported. Its trigger
+remains unknown.
+
+This closes the three patch comparisons. For a newer Wine comparison,
+use `c5ddcfe` as the 11.22 control. Keep the three patches, the source
+prefix, the fixture and the .NET version matched when repeating
+`open-activex`. If the newer runtime changes the result, use a separate
+matched pair for `save-activex`. Resume individual patch work if a trace
+identifies a specific API difference.
 
 [dwg-review-series]: https://github.com/Harvi654/winum/blob/aeb7a59/patches/series
 [dwg-review-history]: https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/135b273/docs/autocad-experiment-2026-11.md#2026-11-17-quick-try-on-the-desktop-pc-installer-v040-winum-1122-1
