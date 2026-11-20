@@ -815,6 +815,27 @@ The shared exception during saving is compatible with a completed
 native save. Inspect the exception dispatch or unwinding around the
 Wine failure before considering a Wine change for the managed throw.
 
+The retained Wine trace showed `__CxxExceptionFilter`,
+`__CxxRegisterExceptionObject`, `_CreateFrameInfo`,
+`__CxxUnregisterExceptionObject`, and `_FindAndUnlinkFrame` on the
+fail-fast thread before `NtRaiseException`. These entries locate CRT
+exception handling. In Wine 11.22, builtin `vcruntime140` forwards
+these helpers to `ucrtbase`. On x64, the Wine implementation of
+`__CxxQueryExceptionSize` returns the 16-byte C++ exception type
+descriptor size. The related registration code writes a frame record
+with four pointer-sized fields, occupying 32 bytes on x64. The trace
+does not yet show a size query from AutoCAD.
+[Wine CRT exception helpers](https://gitlab.winehq.org/wine/wine/-/blob/wine-11.22/dlls/msvcrt/except.c)
+
+Run `run-crt-exception-size.bat` from the x64 Windows VM probe bundle.
+It uses the installed .NET 10 runtime to query `__CxxQueryExceptionSize`
+from three System32 modules, reports the returned numbers, and exits.
+It does not exercise registration or AutoCAD. A local Wine 11.22
+probe with the three builtin DLLs returned 16 for `vcruntime140.dll`,
+`ucrtbase.dll`, and `msvcrt.dll`. If Windows returns a different
+number, trace AutoCAD's size query and registration on the same
+thread before tying that difference to the failure.
+
 ### Check creation and activation of a second desktop document
 
 `new-document` calls `Documents.Add` from an already open blank
