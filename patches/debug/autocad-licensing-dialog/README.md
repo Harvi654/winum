@@ -20,6 +20,13 @@ service-summary.txt after a reproduction with the Windows VM AutoCAD
 closed. Proprietary modules are identified only by the running process's
 loader information and offsets.
 
+Use the current preparation script from the test branch with the existing
+artifact. An existing prefix can hold a WinSxS copy installed by an older
+Wine build. If the cached Common Controls DLL differs from the matched
+runtime, the script checks its Wine builtin marker and records the cache
+difference in `COMBINED-BUILDINFO`. The diagnostic DLL is installed in the
+new copy. Setup failures are printed to standard error.
+
 [The component observer](../../../scripts/observe-autocad-components.py)
 can wrap the same run. It samples known Wine and Autodesk processes in
 the diagnostic prefix and reports the startup configuration of relevant
