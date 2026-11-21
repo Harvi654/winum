@@ -1,0 +1,68 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [DEBUG PATCH] comctl32_v6: Record the licensing dialog's entry stack.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+An established socket and a running Autodesk service are visible during
+the AutoCAD notice. Collect only module names, offsets and memory
+classification at this specific TaskDialogIndirect call. Capture
+before entering the modal loop, without relay thunks or title/text
+output from the diagnostic itself. Keep this patch outside the series.
+
+diff --git a/dlls/comctl32_v6/taskdialog.c b/dlls/comctl32_v6/taskdialog.c
+--- a/dlls/comctl32_v6/taskdialog.c
++++ b/dlls/comctl32_v6/taskdialog.c
+@@ -1373,6 +1373,43 @@
+     return TRUE;
+ }
+
++static void trace_licensing_frame( const char *kind, unsigned int index, const void *pc )
++{
++    MEMORY_BASIC_INFORMATION info;
++    HMODULE module;
++    WCHAR path[MAX_PATH];
++    DWORD length;
++
++    if (GetModuleHandleExW( GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
++                            GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, pc, &module ) &&
++        (length = GetModuleFileNameW( module, path, ARRAY_SIZE(path) )) && length < ARRAY_SIZE(path))
++    {
++        const WCHAR *base_name = wcsrchr( path, '\\' );
++        TRACE( "licensing_dialog %s=%u module=%s offset=%#Ix\n", kind, index,
++               debugstr_w(base_name ? base_name + 1 : path), (UINT_PTR)pc - (UINT_PTR)module );
++    }
++    else if (VirtualQuery( pc, &info, sizeof(info) ) && info.State == MEM_COMMIT)
++        TRACE( "licensing_dialog %s=%u region_type=%#lx region_protect=%#lx\n",
++               kind, index, info.Type, info.Protect );
++    else
++        TRACE( "licensing_dialog %s=%u mapping=unavailable\n", kind, index );
++}
++
++static void trace_licensing_dialog( const TASKDIALOGCONFIG *config, const void *caller )
++{
++    const WCHAR *title = config->pszWindowTitle;
++    void *frames[16];
++    unsigned int count, index;
++
++    if (!title || IS_INTRESOURCE(title) || lstrcmpiW( title, L"Desktop Licensing Service - Connection Lost" ))
++        return;
++
++    trace_licensing_frame( "caller", 0, caller );
++    count = CaptureStackBackTrace( 1, ARRAY_SIZE(frames), frames, NULL );
++    for (index = 0; index < count; ++index)
++        trace_licensing_frame( "frame", index, frames[index] );
++}
++
+ /***********************************************************************
+  * TaskDialogIndirect [COMCTL32.@]
+  */
+@@ -1388,6 +1425,9 @@
+     if (!taskconfig || taskconfig->cbSize != sizeof(TASKDIALOGCONFIG))
+         return E_INVALIDARG;
+
++    if (TRACE_ON(taskdialog))
++        trace_licensing_dialog( taskconfig, __builtin_extract_return_addr(__builtin_return_address(0)) );
++
+     dialog_info.taskconfig = taskconfig;
+
+     template = create_taskdialog_template(taskconfig);

@@ -75,6 +75,9 @@ start_autocad_scm() {
 }
 export -f start_autocad_scm
 export WINEDEBUG='-all,+pid,+timestamp,services.exe:+service,adsklicensingservice.exe:+service,adsklicensingservice.exe:+winsock,adsklicensingservice.exe:+dnsapi,adsklicensingservice.exe:+winhttp,adsklicensingservice.exe:warn+secur32,adsklicensingservice.exe:warn+crypt,adsklicensingservice.exe:err+all'
+if grep -Fxq 'dialog_origin_trace=1' "$work/COMBINED-BUILDINFO"; then
+    export WINEDEBUG="$WINEDEBUG,acad.exe:+taskdialog"
+fi
 
 bash -c "$modified" "$launcher" &
 launcher_pid=$!
@@ -217,6 +220,10 @@ for path in sorted(service_logs.glob("AdskLicensingService*.log")):
     print(f"\n{path.name} entries_around_marker={count}")
     print("\n".join(hits) or "no selected events")
 PY
+    if grep -Fxq 'dialog_origin_trace=1' "$work/COMBINED-BUILDINFO"; then
+        grep -hE ':taskdialog:.* licensing_dialog (caller|frame)=' "$ACAD_LOGDIR"/acad-*.log \
+            | tee -a "$ACAD_LOGDIR/service-summary.txt" || true
+    fi
     printf 'Summary: %s/service-summary.txt\n' "$ACAD_LOGDIR"
 fi
 printf 'Output directory: %s\n' "$ACAD_LOGDIR"
