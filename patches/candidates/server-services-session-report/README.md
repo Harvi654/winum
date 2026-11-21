@@ -1,0 +1,7 @@
+# Service manager session reporting
+
+AutoCAD 2027 stayed usable for five minutes on Windows with the registered Autodesk licensing service running. In the Winum reference, the registered service returned error 1053 ten seconds after the start request. The service manager was reported in console session 1. Starting its executable directly allowed AutoCAD to open, followed by the Connection Lost dialog after 2 minutes and 21 seconds. These are separate milestones for testing.
+
+The candidate adapts the service-manager enumeration experiment from [Lorenzo Cozzaglio](https://github.com/lori28167/autocad-wine-linux/blob/ec02824/wine-autocad.patch). Go's [Windows service detection](https://github.com/golang/sys/blob/master/windows/svc/security.go) checks the parent process name and the session field in the process list. The change reports zero for services.exe in the list. It leaves actual session membership, tokens and the PID-specific query untouched. A conforming session-zero implementation would need broader validation. The candidate tests whether this field is enough for sc start to reach RUNNING in the maintainer's prefix.
+
+Use the x64 and i686 MEASURE executables to compare list_session and direct_session on Windows and both Wine builds. Run trace-autocad-licensing-scm.sh with the candidate server in a separate test runtime and record the SCM status. If it reaches RUNNING, leave one blank AutoCAD drawing open for at least five minutes. App behavior, native measurements and normal series validation are pending.

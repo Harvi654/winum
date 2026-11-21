@@ -1,0 +1,124 @@
+name: Build AutoCAD service manager comparison
+
+on:
+  push:
+    branches: ['topic/autocad-scm-session']
+    paths:
+      - '.github/workflows/build-autocad-scm-session.yml'
+      - 'patches/candidates/server-services-session-report/*.patch'
+      - 'docs/wine-repro/server-services-session/**'
+      - 'scripts/prepare-autocad-scm-session.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  comparison:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 25
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm --needed git mingw-w64-gcc xorg-server-xvfb \
+            libx11 libxext libxi libxrandr libxrender libxcursor libxcomposite libxinerama \
+            libxxf86vm libxkbcommon fontconfig freetype2 ttf-dejavu libglvnd mesa \
+            wayland gnutls alsa-lib libpulse krb5 dbus
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Build the Windows measurement programs
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash scripts/build-measure-bundle.sh out/windows docs/wine-repro/server-services-session/measure.list
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: autocad-scm-session-measure
+          path: out/windows/
+          retention-days: 30
+      - name: Build baseline and candidate wineserver
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=aeb7a59084c3fd84fa6aeaa1f0f16a551abafcb0
+          reference="$RUNNER_TEMP/reference"
+          mkdir -- "$reference"
+          git archive "$base" patches wine/version.env | tar -x -C "$reference"
+          source "$reference/wine/version.env"
+          source scripts/lib/wine-source.sh
+          source scripts/lib/wine-patches.sh
+          export WINE_PINNED_VERSION="$WINE_VERSION"
+          test "$WINE_VERSION" = 11.22
+          src="$RUNNER_TEMP/wine-$WINE_VERSION"
+          bundle="$GITHUB_WORKSPACE/out/comparison"
+          patch_file="$GITHUB_WORKSPACE/patches/candidates/server-services-session-report/server-services-session-report.patch"
+          curl -fLsS --retry 3 -o "$src.tar.xz" "https://dl.winehq.org/wine/source/11.x/wine-$WINE_VERSION.tar.xz"
+          wine_verify_tarball "$src.tar.xz" "$WINE_VERSION"
+          tar -xJf "$src.tar.xz" -C "$RUNNER_TEMP"
+          wine_apply_patches "$src" "$reference/patches" "$GITHUB_WORKSPACE" "$base"
+          mkdir -p -- "$src/build" "$bundle/baseline" "$bundle/candidate"
+          cd "$src/build"
+          ../configure --enable-archs=x86_64,i386 --disable-tests \
+            --without-x --without-wayland --without-vulkan --without-opengl \
+            --without-freetype --without-fontconfig --without-alsa --without-pulse \
+            > configure.log 2>&1 || { tail -n 50 configure.log; exit 1; }
+          make -j"$(nproc)" server/wineserver > baseline.log 2>&1 || { tail -n 70 baseline.log; exit 1; }
+          cp -- server/wineserver "$bundle/baseline/"
+          patch -d "$src" -p1 --fuzz=0 < "$patch_file"
+          make -j"$(nproc)" server/wineserver > candidate.log 2>&1 || { tail -n 70 candidate.log; exit 1; }
+          cp -- server/wineserver "$bundle/candidate/"
+          if cmp -s "$bundle/baseline/wineserver" "$bundle/candidate/wineserver"; then
+            echo 'The server build pair is identical.' >&2
+            exit 1
+          fi
+          cp -- "$src/COPYING.LIB" "$src/PATCHES.txt" "$patch_file" "$GITHUB_WORKSPACE/scripts/prepare-autocad-scm-session.sh" "$bundle/"
+          printf 'wine_version=%s\nreference_commit=%s\ncandidate_commit=%s\n' "$WINE_VERSION" "$base" "$GITHUB_SHA" > "$bundle/BUILDINFO"
+          cd "$bundle"
+          sha256sum BUILDINFO COPYING.LIB PATCHES.txt ./*.patch ./*.sh {baseline,candidate}/wineserver > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - name: Compare session reporting on x64 and i686
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GITHUB_WORKSPACE/out"
+          runtime=winum-11.22-1-x86_64
+          curl -fLsS --retry 3 -o "$RUNNER_TEMP/$runtime.tar.xz" \
+            "https://github.com/Harvi654/winum/releases/download/winum-11.22-1/$runtime.tar.xz"
+          printf '%s  %s\n' 058051281c876d3bb0919c93f9143c20667f5c3ef35365eb97f35d5efeb76299 \
+            "$RUNNER_TEMP/$runtime.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/$runtime.tar.xz" -C "$RUNNER_TEMP"
+          Xvfb -displayfd 3 -screen 0 1024x768x24 -nolisten tcp 3>"$RUNNER_TEMP/display" &
+          server_display=$!
+          trap 'kill "$server_display" 2>/dev/null || true' EXIT
+          for _ in $(seq 50); do
+            [[ -s "$RUNNER_TEMP/display" ]] && break
+            sleep .2
+          done
+          test -s "$RUNNER_TEMP/display"
+          export DISPLAY=":$(<"$RUNNER_TEMP/display")"
+          export WINELOADER="$RUNNER_TEMP/$runtime/lib/wine/x86_64-unix/wine"
+          export WINEDEBUG=-all WINEDLLOVERRIDES='mscoree,mshtml='
+          for variant in baseline candidate; do
+            (
+              export WINEPREFIX="$RUNNER_TEMP/$variant-prefix"
+              export WINESERVER="$root/comparison/$variant/wineserver"
+              trap 'timeout 8s "$WINESERVER" -k >/dev/null 2>&1 || true' EXIT
+              timeout -k 5 100 "$WINELOADER" wineboot -i >"$root/comparison/wineboot-$variant.log" 2>&1
+              expected=1
+              if [[ "$variant" == candidate ]]; then expected=0; fi
+              for arch in x86_64 i686; do
+                output="$root/comparison/measure-$variant-$arch.txt"
+                timeout -k 5 35 "$WINELOADER" "$root/windows/services-session-$arch.exe" > "$output"
+                cat "$output"
+                grep -Eq "^process=services.exe list_session=$expected direct_session=1" "$output"
+                grep -F 'process=probe list_session=1 direct_session=1' "$output"
+              done
+            )
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: autocad-scm-session-ab
+          path: out/comparison/
+          retention-days: 30
