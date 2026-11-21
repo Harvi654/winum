@@ -79,6 +79,43 @@ if grep -Fxq 'dialog_origin_trace=1' "$work/COMBINED-BUILDINFO"; then
     export WINEDEBUG="$WINEDEBUG,acad.exe:+taskdialog"
 fi
 
+if [[ ${ACAD_CLIENT_RELAY:-0} == 1 ]]; then
+    key='HKCU\Software\Wine\Debug'
+    config_log="$ACAD_LOGDIR/client-relay-config.txt"
+    query_rc=0
+    WINEDEBUG=-all timeout 15s "$WINELOADER" reg query "$key" /v RelayInclude > "$config_log" 2>&1 || query_rc=$?
+    case "$query_rc" in
+        0)
+            prior=$(awk '$1 == "RelayInclude" && ($2 == "REG_SZ" || $2 == "REG_EXPAND_SZ") {
+                sub(/\r$/, ""); sub(/^[[:space:]]*RelayInclude[[:space:]]+/, ""); print; exit
+            }' "$config_log")
+            [[ -n "$prior" ]] || { echo 'Could not back up the prior RelayInclude value.' >&2; exit 2; }
+            prior_type=${prior%%[[:space:]]*}
+            prior_value=$(sed -E 's/^[^[:space:]]+[[:space:]]*//' <<< "$prior")
+            restore=(reg add "$key" /v RelayInclude /t "$prior_type" /d "$prior_value" /f)
+            ;;
+        1) restore=(reg delete "$key" /v RelayInclude /f) ;;
+        *) echo 'Could not query RelayInclude.' >&2; exit 2 ;;
+    esac
+    restore_client_relay() {
+        if WINEDEBUG=-all timeout 15s "$WINELOADER" "${restore[@]}" >> "$config_log" 2>&1; then
+            echo 'client_relay_filter=restored'
+        else
+            echo 'client_relay_filter=restore_failed' >&2
+        fi
+    }
+    trap restore_client_relay EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    apis='ws2_32.connect;ws2_32.WSAConnect;ws2_32.recv;ws2_32.send;ws2_32.WSARecv;ws2_32.WSASend;ws2_32.shutdown;ws2_32.closesocket;ws2_32.WSAGetOverlappedResult'
+    if ! WINEDEBUG=-all timeout 15s "$WINELOADER" reg add "$key" /v RelayInclude /t REG_SZ /d "$apis" /f >> "$config_log" 2>&1; then
+        echo 'Could not configure the AutoCAD client relay filter.' >&2
+        exit 2
+    fi
+    export WINEDEBUG="$WINEDEBUG,acad.exe:+relay,acad.exe:+winsock"
+    echo 'client_relay_filter=enabled'
+fi
+
 bash -c "$modified" "$launcher" &
 launcher_pid=$!
 printf '%s\n' 'When Connection Lost appears, leave the dialog open and press Enter here.' \

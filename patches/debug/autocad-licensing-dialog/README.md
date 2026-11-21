@@ -34,3 +34,16 @@ SCM entries. It records changes around the marker up to the trace cutoff.
 The component-summary.txt report contains executable names, counts and
 relative timestamps. The sampled transitions can miss subsecond tasks.
 [The diagnostic build and simulated dialog check passed in Actions.](https://github.com/Harvi654/winum/actions/runs/44919240519)
+
+For a client-side transport test on the same diagnostic copy, export
+`ACAD_CLIENT_RELAY=1` before running `trace-autocad-licensing-service.sh`.
+The runner enables relay for `acad.exe` with an allowlist of connect,
+send, receive, completion and shutdown calls in `ws2_32`. It restores
+the saved `RelayInclude` value on exit. The Winsock debug channel has the
+endpoint and status information needed to associate calls with sockets.
+Run `summarize-autocad-client-relay.py TRACE_DIRECTORY` on the output.
+It matches loopback connects against sockets successfully bound and
+listening in the licensing service process. The summary reports numeric
+statuses and timing relative to the dialog, with 15-second windows on
+both sides. An unresolved listener or unmatched socket leaves the
+transport question open. Keep the original trace local.
