@@ -25,8 +25,8 @@ cp -aT --reflink=auto -- "$(realpath -e "$baseline/wine")" "$work/wine"
 test "$(realpath -e "$work/candidate-prefix/dosdevices/c:")" = "$work/candidate-prefix/drive_c"
 test "$(realpath -e "$work/wine/bin")" = "$work/wine/bin"
 cp --remove-destination -- "$bundle/candidate/wineserver" "$work/wine/bin/wineserver"
+chmod 0755 -- "$work/wine/bin/wineserver"
 cmp -- "$bundle/candidate/wineserver" "$work/wine/bin/wineserver"
-test -x "$work/wine/bin/wineserver"
 {
     cat "$baseline/COMBINED-BUILDINFO"
     printf 'wineserver_variant=services_session_report\nwineserver_sha256=%s\n' \

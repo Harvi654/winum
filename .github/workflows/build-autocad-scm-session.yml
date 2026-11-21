@@ -98,18 +98,24 @@ jobs:
           test -s "$RUNNER_TEMP/display"
           export DISPLAY=":$(<"$RUNNER_TEMP/display")"
           export WINELOADER="$RUNNER_TEMP/$runtime/lib/wine/x86_64-unix/wine"
+          export WINESERVER="$RUNNER_TEMP/$runtime/bin/wineserver"
           export WINEDEBUG=-all WINEDLLOVERRIDES='mscoree,mshtml='
           for variant in baseline candidate; do
+            cp --remove-destination -- "$root/comparison/$variant/wineserver" "$WINESERVER"
             (
               export WINEPREFIX="$RUNNER_TEMP/$variant-prefix"
-              export WINESERVER="$root/comparison/$variant/wineserver"
+              export XDG_CACHE_HOME="$RUNNER_TEMP/$variant-cache"
               trap 'timeout 8s "$WINESERVER" -k >/dev/null 2>&1 || true' EXIT
-              timeout -k 5 100 "$WINELOADER" wineboot -i >"$root/comparison/wineboot-$variant.log" 2>&1
+              boot="$root/comparison/wineboot-$variant.log"
+              timeout -k 5 100 "$WINELOADER" wineboot -i >"$boot" 2>&1 ||
+                { cat "$boot"; exit 1; }
+              timeout -k 4 45 "$WINESERVER" -w
               expected=1
               if [[ "$variant" == candidate ]]; then expected=0; fi
               for arch in x86_64 i686; do
                 output="$root/comparison/measure-$variant-$arch.txt"
-                timeout -k 5 35 "$WINELOADER" "$root/windows/services-session-$arch.exe" > "$output"
+                timeout -k 5 35 "$WINELOADER" "$root/windows/services-session-$arch.exe" > "$output" 2>&1 ||
+                  { cat "$output"; exit 1; }
                 cat "$output"
                 grep -Eq "^process=services.exe list_session=$expected direct_session=1" "$output"
                 grep -F 'process=probe list_session=1 direct_session=1' "$output"
