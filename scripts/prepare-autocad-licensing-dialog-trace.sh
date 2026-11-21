@@ -9,8 +9,9 @@ if [[ $# != 2 ]]; then
 fi
 session="$(realpath -e -- "$1")"
 bundle="$(realpath -e -- "$2")"
+runtime="$(realpath -e -- "$session/wine")"
 grep -Fxq 'wineserver_variant=services_session_report' "$session/COMBINED-BUILDINFO"
-grep -Eq '^commit:[[:space:]]+aeb7a59[[:xdigit:]]*[[:space:]]*$' "$session/wine/BUILDINFO"
+grep -Eq '^commit:[[:space:]]+aeb7a59[[:xdigit:]]*[[:space:]]*$' "$runtime/BUILDINFO"
 test -f "$session/candidate-prefix/drive_c/Program Files/Autodesk/AutoCAD 2027/acad.exe"
 (
     cd "$bundle"
@@ -20,12 +21,12 @@ test -f "$session/candidate-prefix/drive_c/Program Files/Autodesk/AutoCAD 2027/a
 
 runtime_dll=lib/wine/x86_64-windows/comctl32_v6.dll
 sxs_dll=drive_c/windows/winsxs/amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.2600.2982_none_deadbeef/comctl32.dll
-cmp -- "$session/wine/$runtime_dll" "$session/candidate-prefix/$sxs_dll"
+cmp -- "$runtime/$runtime_dll" "$session/candidate-prefix/$sxs_dll"
 
 work="$(mktemp -d "$(dirname -- "$session")/.acad-licensing-dialog-entry.XXXXXXXX")"
 printf 'Test directory: %s\n' "$work"
 cp -aT --reflink=auto -- "$session/candidate-prefix" "$work/candidate-prefix"
-cp -aT --reflink=auto -- "$session/wine" "$work/wine"
+cp -aT --reflink=auto -- "$runtime" "$work/wine"
 test "$(realpath -e "$work/candidate-prefix/dosdevices/c:")" = "$work/candidate-prefix/drive_c"
 for target in "$work/wine/$runtime_dll" "$work/candidate-prefix/$sxs_dll"; do
     directory="$(dirname -- "$target")"
