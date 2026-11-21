@@ -10,6 +10,9 @@ cxx_frame_info record with four pointers.
 
 Return the size of that record on the measured UCRT architecture.
 
+v2 (2026-11-21): Exclude ARM64EC explicitly after independent review.
+The x86-64 code path used in the AutoCAD A/B test is the same.
+
 diff --git a/dlls/msvcrt/except.c b/dlls/msvcrt/except.c
 --- a/dlls/msvcrt/except.c
 +++ b/dlls/msvcrt/except.c
@@ -17,7 +20,7 @@ diff --git a/dlls/msvcrt/except.c b/dlls/msvcrt/except.c
   */
  unsigned int CDECL __CxxQueryExceptionSize(void)
  {
-+#if _MSVCR_VER >= 140 && defined(__x86_64__)
++#if _MSVCR_VER >= 140 && defined(__x86_64__) && !defined(__arm64ec__)
 +    return sizeof(cxx_frame_info);
 +#else
      return sizeof(cxx_exception_type);
