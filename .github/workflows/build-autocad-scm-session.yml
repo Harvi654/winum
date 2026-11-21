@@ -100,11 +100,12 @@ jobs:
           export WINELOADER="$RUNNER_TEMP/$runtime/lib/wine/x86_64-unix/wine"
           export WINESERVER="$RUNNER_TEMP/$runtime/bin/wineserver"
           export WINEDEBUG=-all WINEDLLOVERRIDES='mscoree,mshtml='
+          work="$(mktemp -d /tmp/winum-scm.XXXXXXXX)"
           for variant in baseline candidate; do
             cp --remove-destination -- "$root/comparison/$variant/wineserver" "$WINESERVER"
             (
-              export WINEPREFIX="$RUNNER_TEMP/$variant-prefix"
-              export XDG_CACHE_HOME="$RUNNER_TEMP/$variant-cache"
+              export WINEPREFIX="$work/$variant-prefix"
+              export XDG_CACHE_HOME="$work/$variant-cache"
               trap 'timeout 8s "$WINESERVER" -k >/dev/null 2>&1 || true' EXIT
               boot="$root/comparison/wineboot-$variant.log"
               timeout -k 5 100 "$WINELOADER" wineboot -i >"$boot" 2>&1 ||
