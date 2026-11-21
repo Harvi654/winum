@@ -74,16 +74,41 @@ def relay_result(api, args, result):
     return "success" if result == 0 else f"return_0x{result:x}"
 
 
-def client_events(path, pid, dialog_tick, ports):
+def print_cadence(socket, traffic):
+    bursts = []
+    for tick, api, size in sorted(traffic):
+        if not bursts or tick - bursts[-1]["end"] > 1000:
+            bursts.append({"begin": tick, "end": tick, "recv": 0, "send": 0})
+        bursts[-1]["end"] = tick
+        bursts[-1][api] += size
+
+    start = max(0, len(bursts) - 12)
+    print(f"socket_cadence socket={socket} bursts={len(bursts)} shown={len(bursts) - start}")
+    for index in range(start, len(bursts)):
+        burst = bursts[index]
+        begin, end = burst["begin"], burst["end"]
+        gap = f"{(begin - bursts[index - 1]['end']) / 1000:.3f}" if index else "-"
+        print(f"socket_burst begin_from_dialog={begin / 1000:+.3f}s "
+              f"end_from_dialog={end / 1000:+.3f}s gap_s={gap} "
+              f"rx_bytes={burst['recv']} tx_bytes={burst['send']}")
+
+
+def client_events(path, pid, dialog_tick, ports, cadence_socket=None):
     sockets, calls, pending = {}, defaultdict(list), {}
     counts, last_time = Counter(), {}
+    traffic = []
     next_socket = relay_calls = 0
 
-    def add(tick, sock, api, outcome):
+    def add(tick, sock, api, outcome, value=0):
         if not sock:
             return
-        delta = ((tick - dialog_tick + 2**31) % 2**32 - 2**31) / 1000
-        if delta <= 15:
+        offset = (tick - dialog_tick + 2**31) % 2**32 - 2**31
+        if offset <= 15000:
+            if cadence_socket is not None:
+                if sock == cadence_socket and outcome in {"bytes_read", "bytes_sent"}:
+                    traffic.append((offset, api, value))
+                return
+            delta = offset / 1000
             phase = "earlier" if delta < -15 else "before_15s" if delta < 0 else "after_15s"
             key = sock, phase, api, outcome
             counts[key] += 1
@@ -128,10 +153,13 @@ def client_events(path, pid, dialog_tick, ports):
             value = int(result[1], 16) & 0xffffffff
             if api in {"connect", "wsaconnect"}:
                 sock = sockets.get(handle)
-            add(tick, sock, api, relay_result(api, args, value))
+            add(tick, sock, api, relay_result(api, args, value), value)
             if api == "closesocket" and value == 0:
                 sockets.pop(handle, None)
     print(f"client_relay_calls={relay_calls} matched_socket_attempts={next_socket}")
+    if cadence_socket is not None:
+        print_cadence(cadence_socket, traffic)
+        return
     for key, count in sorted(counts.items(), key=lambda item: (item[0][0], last_time[item[0]], item[0])):
         socket, phase, api, outcome = key
         print(f"socket_event socket={socket} phase={phase} api={api} result={outcome} "
@@ -141,7 +169,12 @@ def client_events(path, pid, dialog_tick, ports):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("trace_directory", type=Path)
-    run = parser.parse_args().trace_directory
+    parser.add_argument("--cadence-socket", type=int, metavar="N",
+                        help="show successful send and recv bursts for socket N")
+    args = parser.parse_args()
+    if args.cadence_socket is not None and args.cadence_socket < 1:
+        parser.error("--cadence-socket requires a positive socket number")
+    run = args.trace_directory
     matches = [(path, pid, tick) for path in sorted(run.glob("acad-*.log"))
                for tick, pid, _, text in records(path) if text.startswith("trace:taskdialog:") and CALLER in text]
     if len(matches) != 1:
@@ -155,7 +188,7 @@ def main():
         logs.append(run / "sc-start.txt")
     ports = listen_ports(logs, service_pids)
     print(f"client_relay_dialog=found service_processes={len(service_pids)} service_listeners={len(ports)}")
-    client_events(path, pid, tick, ports)
+    client_events(path, pid, tick, ports, args.cadence_socket)
 
 
 if __name__ == "__main__":
