@@ -9,6 +9,9 @@ struct cancellation
     BOOL result;
     DWORD error;
     BOOL create_queue;
+    BOOL create_own_timer;
+    UINT_PTR own_id;
+    unsigned int own_messages;
 };
 
 static unsigned int callbacks;
@@ -25,16 +28,35 @@ static void CALLBACK timer_callback(HWND window, UINT message, UINT_PTR id, DWOR
 static DWORD WINAPI cancel_timer(void *argument)
 {
     struct cancellation *request = argument;
+    ULONGLONG deadline;
     MSG message;
 
     if (request->create_queue) PeekMessageW(&message, NULL, 0, 0, PM_NOREMOVE);
+    if (request->create_own_timer)
+    {
+        request->own_id = SetTimer(NULL, 0, 100, NULL);
+        if (!request->own_id) return 1;
+    }
     SetLastError(0xdeadbeef);
     request->result = KillTimer(NULL, request->id);
     request->error = GetLastError();
+    if (request->own_id)
+    {
+        deadline = GetTickCount64() + 500;
+        while (GetTickCount64() < deadline)
+        {
+            while (PeekMessageW(&message, NULL, WM_TIMER, WM_TIMER, PM_REMOVE))
+            {
+                if (!message.hwnd && message.wParam == request->own_id) ++request->own_messages;
+            }
+            Sleep(5);
+        }
+        KillTimer(NULL, request->own_id);
+    }
     return 0;
 }
 
-static int measure(const char *name, BOOL cross_thread, BOOL create_queue)
+static int measure(const char *name, BOOL cross_thread, BOOL create_queue, BOOL create_own_timer)
 {
     struct cancellation request = {0};
     unsigned int messages = 0;
@@ -43,6 +65,7 @@ static int measure(const char *name, BOOL cross_thread, BOOL create_queue)
     MSG message;
 
     request.create_queue = create_queue;
+    request.create_own_timer = create_own_timer;
     callbacks = 0;
     request.id = SetTimer(NULL, 0, 150, timer_callback);
     if (!request.id)
@@ -69,6 +92,13 @@ static int measure(const char *name, BOOL cross_thread, BOOL create_queue)
     }
     else cancel_timer(&request);
 
+    if (create_own_timer && !request.own_id)
+    {
+        KillTimer(NULL, request.id);
+        fprintf(stderr, "case=%s setup=worker_set_timer_failed\n", name);
+        return 1;
+    }
+
     deadline = GetTickCount64() + 600;
     while (GetTickCount64() < deadline)
     {
@@ -83,12 +113,17 @@ static int measure(const char *name, BOOL cross_thread, BOOL create_queue)
     KillTimer(NULL, request.id);
     printf("case=%s kill=%u last_error=0x%08lx timer_messages=%u callbacks=%u\n",
            name, !!request.result, (unsigned long)request.error, messages, callbacks);
+    if (create_own_timer)
+        printf("timer_ids_same=%u worker_timer_messages=%u\n",
+               request.id == request.own_id, request.own_messages);
     return 0;
 }
 
 int main(void)
 {
-    return measure("same_thread", FALSE, FALSE) |
-           measure("cross_thread_no_queue", TRUE, FALSE) |
-           measure("cross_thread_with_queue", TRUE, TRUE);
+    int result = measure("cross_thread_with_own_timer", TRUE, TRUE, TRUE);
+    result |= measure("same_thread", FALSE, FALSE, FALSE);
+    result |= measure("cross_thread_no_queue", TRUE, FALSE, FALSE);
+    result |= measure("cross_thread_with_queue", TRUE, TRUE, FALSE);
+    return result;
 }
