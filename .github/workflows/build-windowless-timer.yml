@@ -123,7 +123,7 @@ jobs:
                   grep -Eq '^timer_ids_same=0 worker_timer_messages=[1-9][0-9]*' "$output"
                 else
                   grep -Eq '^case=cross_thread_no_queue kill=0 .*timer_messages=[1-9]' "$output"
-                  grep -Fx 'timer_ids_same=1 worker_timer_messages=0' "$output"
+                  grep -Eq '^timer_ids_same=1 worker_timer_messages=0[[:space:]]*$' "$output"
                 fi
               done
             )
