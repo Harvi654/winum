@@ -27,3 +27,20 @@ and verified OPEN, SAVE, SAVEAS and opening an existing DWG. The full
 Wine test suites and Inventor smoke test are still pending.
 
 [Paired CI probe](https://github.com/Harvi654/winum/actions/runs/45042604192) · [AutoCAD validation](https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/main/docs/autocad-experiment-2026-11.md#2026-11-22-cross-thread-timer-cancellation)
+
+## Cross review (second model)
+
+Claude Opus 5.5, 2026-11-22: approved; patch and test read in full
+against Wine 11.22's `server/queue.c`. Windowless timer IDs move from the
+queue to the process and `kill_win_timer` with no window looks the ID up
+in every queue of the calling process, then frees it on the queue that
+owns it - matching the measured Windows behaviour (distinct IDs across
+threads, cross-thread cancel of the target only). Delivery stays on the
+creating thread, window timers are untouched, and replacing a timer by
+ID still needs the creating queue (unmeasured, left as Wine had it). No
+request or reply structure changes, so the server protocol is the same.
+`free_timer` on another thread's queue is safe in the single-threaded
+server (it reschedules that queue's timeout). Notes: the new user32 test
+uses 100 ms timers and a 500 ms wait - fine, but watch it for flakiness
+on a loaded CI; L1 of that test on Windows 10 and the Inventor L4 are
+still needed before the series.
