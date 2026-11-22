@@ -17,4 +17,13 @@ keeps delivery on the creating thread. It retains the existing scope
 for replacing timers with SetTimer and for timers associated with an
 HWND. The candidate includes a user32 regression test alongside the
 standalone probe. Cross-process behavior and cross-thread replacement
-are outside the measured cases. AutoCAD validation remains pending.
+are outside the measured cases.
+
+The paired standalone probe reproduced the baseline failures and passed
+with the candidate on x64 and i686. The AutoCAD 2027 smoke test passed
+with the combined runtime. The maintainer retained sign-in across a
+restart, reported two intervals of 16 and 10 minutes without the alert,
+and verified OPEN, SAVE, SAVEAS and opening an existing DWG. The full
+Wine test suites and Inventor smoke test are still pending.
+
+[Paired CI probe](https://github.com/Harvi654/winum/actions/runs/45042604192) · [AutoCAD validation](https://github.com/Harvi654/Autodesk-AutoCAD-on-Linux/blob/main/docs/autocad-experiment-2026-11.md#2026-11-22-cross-thread-timer-cancellation)
