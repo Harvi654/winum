@@ -95,3 +95,6 @@ shell32-background-menu.patch
 
 # Responsive filename editing with the recorded provider-thread deviation.
 shell32-autocomplete-responsive.patch
+
+# DWG TrueView and AutoCAD Profile.aws: replaceChild with the same node (Lukas10999, #4).
+msxml3-replacechild-same-node.patch

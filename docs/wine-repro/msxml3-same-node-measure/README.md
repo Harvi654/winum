@@ -1,0 +1,246 @@
+# MSXML3 same-node validation for winum PR #4
+
+[PR #4](https://github.com/Harvi654/winum/pull/4), reviewed at
+`126157d`, supplies a Wine regression test and an Inventor 2027
+reproducer. The contributor ran Wine 11.20 x86_64 with and without
+the patch. The Inventor sketch preview completed with the patched
+runtime and the TrueView profile stayed at about 21 KB. The PR
+contains no Windows result or runnable offline VM bundle.
+
+## Offline Windows 10
+
+Use the [MEASURE artifact](https://github.com/Harvi654/winum/actions/runs/44529214420/artifacts/14532423469).
+On Linux, extract the artifact and run `sha256sum -c SHA256SUMS` in
+the resulting folder. Copy the folder into the offline Windows 10
+snapshot and double-click `run-measure.bat`. Return `exitcodes.txt`,
+`result-msxml3-same-node-x86_64.txt` and
+`result-msxml3-same-node-i686.txt`. The fixture uses a synthetic DOM
+and writes no user data or paths to its results.
+
+The two operations each get a fresh tree. The program records the
+HRESULT and returned COM identity with and without an output pointer.
+It uses both the same interface and two requests for the same
+underlying child. The parent is either an element or the document
+whose child is the root. It records parent, last child, length and
+XML equality. These lines are observations for deciding the expected
+test values. A watchdog bounds execution if a child-list walk hangs.
+
+To rebuild the standalone bundle with MinGW:
+
+```bash
+export MSXML3_MEASURE_OUT="$PWD/msxml3-same-node-vm"
+bash scripts/build-measure-bundle.sh "$MSXML3_MEASURE_OUT" \
+    docs/wine-repro/msxml3-same-node-measure/measure.list
+(cd "$MSXML3_MEASURE_OUT" && sha256sum -c SHA256SUMS)
+```
+
+The Windows-informed Wine test was built for x86_64 and i386 in
+[run 44534917242](https://github.com/Harvi654/winum/actions/runs/44534917242).
+The [L1 artifact](https://github.com/Harvi654/winum/actions/runs/44534917242/artifacts/14539207303)
+contains `run-tests.bat`. The standalone MEASURE establishes Windows
+behavior, and the domdoc suite checks the assertions based on it.
+
+## Windows 10 result (2026-11-19)
+
+The maintainer ran the offline bundle from `81a3a91`. x86_64 and
+i686 both exited 0. All 16 case records are identical after the
+architecture banner.
+
+| Parent | Operation | Return | Tree after the call |
+| --- | --- | --- | --- |
+| Element | replaceChild | `S_OK` | Two children, same last child, parent and XML |
+| Element | insertBefore | `S_OK` | Two children, same last child, parent and XML |
+| Document | replaceChild on the root element | `S_OK` | One child, same root, parent and XML |
+| Document | insertBefore on the root element | `E_FAIL` | One child, same root, parent and XML |
+
+For successful calls with an output pointer, the returned object has the
+child's COM identity. With separately retrieved interfaces, Windows gave
+different `IXMLDOMNode` pointers for the same child and the same
+`IUnknown` identity. Wine uses independent wrapper identities for
+element accesses. The revised regression test checks that the return
+matches the relevant input wrapper and verifies the same tree outcome.
+Leaving the insertBefore same-child guard after the type check preserves
+the measured `E_FAIL` for the root. The runtime hunks are unchanged.
+### L1 of the revised Wine test (2026-11-19)
+
+The maintainer ran the revised `msxml3:domdoc` bundle from `e2b2162`
+in the offline Windows 10 VM. Both binaries ran 37,156 checks with
+zero failures or todos and exit 0. Each had three skips for unsupported
+MSXML 4.0 classes. None of the same-node checks was skipped.
+
+| Architecture | Checks | Failures | Skipped | Exit |
+| --- | ---: | ---: | ---: | ---: |
+| x86_64 | 37,156 | 0 | 3 | 0 |
+| i386 | 37,156 | 0 | 3 | 0 |
+
+## AutoCAD 2027 comparison on Arch
+
+Use the installed winum 11.22-1 for the baseline and the
+[PR #4 runtime artifact](https://github.com/Harvi654/winum/actions/runs/44528762825/artifacts/14533394848)
+for the candidate. Build `aeb7a59` completed on Wine 11.22 with WoW64. The baseline Wine patch set is identical to
+`winum-11.22-1`. The test branch adds only the contributor's MSXML
+patch to the normal runtime. The candidate tarball uses the same
+filename as the stable build, so unpack it in a separate directory.
+
+Run this from your winum checkout:
+
+```bash
+export MSXML_BASE="$HOME/.local/share/winum/winum-11.22-1-x86_64"
+export MSXML_BUILD_DIR="$(mktemp -d "$HOME/.winum-msxml3-pr4.XXXXXXXX")"
+export MSXML_BUILD_NAME=winum-11.22-1-x86_64
+export MSXML_CANDIDATE="$MSXML_BUILD_DIR/$MSXML_BUILD_NAME"
+
+(
+    set -eu
+    gh run download 44528762825 --repo Harvi654/winum \
+        -n winum-11.22-1-binary -D "$MSXML_BUILD_DIR"
+    cd "$MSXML_BUILD_DIR"
+    sha256sum -c "$MSXML_BUILD_NAME.tar.xz.sha256"
+    tar -xJf "$MSXML_BUILD_NAME.tar.xz"
+    grep -E '^commit:[[:space:]]+aeb7a59$|msxml3-replacechild-same-node\.patch$' \
+        "$MSXML_CANDIDATE/BUILDINFO"
+    grep -Eq '^commit:[[:space:]]+aeb7a59$' "$MSXML_CANDIDATE/BUILDINFO"
+    grep -q 'msxml3-replacechild-same-node.patch' "$MSXML_CANDIDATE/BUILDINFO"
+)
+```
+
+Close AutoCAD, then check free space and the prefix size. Make two
+copies beside your regular prefix on the same filesystem. Each
+copy can need the full prefix size on filesystems without reflinks.
+The copies contain sign-in data.
+
+```bash
+export ACAD_SOURCE="$HOME/.wine-autocad2027"
+export ACAD_BASE_PREFIX="$HOME/.wine-autocad2027.msxml3-base"
+export ACAD_PR4_PREFIX="$HOME/.wine-autocad2027.msxml3-pr4"
+df -h "$HOME" "$ACAD_SOURCE"
+du -sh -- "$ACAD_SOURCE"
+
+(
+    set -eu
+    umask 077
+    test -d "$ACAD_SOURCE/drive_c"
+    for prefix in "$ACAD_BASE_PREFIX" "$ACAD_PR4_PREFIX"; do
+        if [ -e "$prefix" ] || [ -L "$prefix" ]; then
+            printf '%s\n' 'A test prefix already exists. Check it before copying.' >&2
+            exit 1
+        fi
+    done
+    cp -aT --reflink=auto -- "$ACAD_SOURCE" "$ACAD_BASE_PREFIX"
+    cp -aT --reflink=auto -- "$ACAD_SOURCE" "$ACAD_PR4_PREFIX"
+)
+```
+
+Run the same operation in each copy. Reproduce the earlier affected
+startup or profile action if you remember it. Also check a disposable
+drawing, save/reopen, close AutoCAD, and restart. Do not reset the
+profile before the first paired test. If the existing launcher
+normally starts prerequisites, keep those settings for both runs.
+The standalone watcher starts `acad.exe` via the selected Wine.
+
+```bash
+git fetch origin topic/msxml3-same-node-measure
+export ACAD_PROFILE_WATCH="$(mktemp "$HOME/.acad-profile-watch.XXXXXXXX.py")"
+git show FETCH_HEAD:docs/wine-repro/msxml3-same-node-measure/watch-autocad.py \
+    > "$ACAD_PROFILE_WATCH"
+python3 -I "$ACAD_PROFILE_WATCH" "$ACAD_BASE_PREFIX" "$MSXML_BASE"
+python3 -I "$ACAD_PROFILE_WATCH" "$ACAD_PR4_PREFIX" "$MSXML_CANDIDATE"
+```
+
+The maintainer's local `scripts/launch-autocad.sh` reads
+`common-env.sh`, sources Inventor's `scripts/lib/common.sh`, starts
+the Autodesk services and redirects Wine into `$ACAD_LOGDIR/acad-*.log`.
+On the maintainer's machine, the setup replaced the requested prefix
+and both Wine paths. Give the watcher both
+`--launcher "$HOME/autocad-on-linux/scripts/launch-autocad.sh"` and
+`--log-dir` with a fresh directory. It runs the reviewed launcher
+with test-specific values after `common-env.sh` and before the common
+library derives paths. It verifies the effective prefix, C: directory,
+Wine executables and log directory before running the startup commands.
+The launcher file on disk stays as supplied. A missing MSXML load
+trace leaves the DLL selection unverified.
+
+The watcher reports size counts for `Profile.aws`, the largest size,
+growth from the starting state, the exit code and selected MSXML
+trace counts. It samples every 0.75 s. At 64 MiB additional growth it
+requests shutdown of that copy's wineserver. Ctrl+C does the same
+for a hang. No full paths or raw traces are written. Return only the
+two summaries and say what happened in the UI. A native MSXML load
+does not exercise the patched Wine DLL. If the baseline does not
+reproduce the issue, the comparison is a smoke test. If it does
+reproduce, the same file name and a stack in MSXML parsing are still
+insufficient to identify the same write loop. Compare the behavior,
+the trace counts and the size change.
+
+## AutoCAD 2027 observation (2026-11-19)
+
+The maintainer's first comparison started from an already enlarged
+profile (11,453,600 bytes). Both variants retained that size and
+exited 1. This pair does not test whether the candidate prevents
+growth on a healthy profile.
+
+A separate copy of the after-install backup was started three times
+with the candidate runtime `aeb7a59`. Runtime selection was verified
+and Wine's builtin msxml3 was loaded each time.
+
+| Start | Initial bytes | Final and peak bytes | Profile saves in trace | Replace calls in trace | Exit |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | 25,501 | 49,311 | 3 | 1 | 9 |
+| 2 | 49,311 | 49,311 | 6 | 2 | 255 |
+| 3 | 49,311 | 49,311 | 0 | 0 | 1 |
+
+The maintainer reported that the application reached a more normal UI
+and felt faster. No sustained profile growth was observed despite
+recorded saves on the first two starts. The trace counts calls and
+does not identify whether their two arguments are aliases. This is
+a positive application observation for the profile, with no paired
+healthy baseline and with the saving failures still open. The
+after-install reference was never launched. Read-only verification
+found valid XML in both profiles. The after-install reference
+(25,501 bytes) has zero `AcApData` elements. The candidate copy
+(49,311 bytes) has one. Neither file contained malformed XML at the
+time of the check.
+
+To see whether the reference and test copy are both readable XML and
+whether their `AcApData` counts differ, run the watcher in read-only
+mode. Send only the summaries. Keep the full profile files private.
+
+```bash
+python3 -I "$ACAD_PROFILE_WATCH" "$ACAD_CLEAN_SOURCE" --profile-only
+python3 -I "$ACAD_PROFILE_WATCH" "$ACAD_CLEAN_TEST" --profile-only
+```
+
+## Wine 11.22 result for the first test build
+
+[Run 44528763253](https://github.com/Harvi654/winum/actions/runs/44528763253)
+at `aeb7a59` found no new failures across 14 suite/architecture pairs.
+On both x86_64 and i386, domdoc changed from six failures in the
+submitted regression checks to zero. Each variant reported two
+existing xmlview failures per architecture. This run used the
+contributor's original regression test. The Windows-informed test
+revision is covered by the separate
+[run 44534917242](https://github.com/Harvi654/winum/actions/runs/44534917242).
+
+## Review and merge gates
+
+- The guard compares the underlying Wine DOM object and explains the
+  observed TrueView child-list cycle. Each mutating call should be
+  tested on a separate tree. The submitted test currently runs
+  insertBefore after replaceChild on a potentially damaged tree.
+- At the document root, node_insert_before checks child type before
+  the new same-node guard. The existing single-element check sees the
+  root already in the document and can reject inserting it before
+  itself. The Windows fixture confirms that this check must remain
+  before the guard.
+- A generated `__pycache__/check.cpython-311.pyc` from another topic
+  appears in the PR diff and should be excluded. The current commit
+  author uses the contributor's handle and GitHub noreply address.
+- Windows measurement and L1 passed for the test revision on
+  `test-run/msxml3-replacechild-same-node-2`. The PR should carry the
+  reviewed test revision and validation record before promotion.
+  Check final paired L2 on the full Wine 11.22 series and the
+  maintainer's Inventor preview and smoke tests. The AutoCAD
+  profile observation is recorded above. Add the patch page and
+  L1 marker and use the standard patch header with attribution
+  preserved. The PR's normal build did not include the candidate,
+  which is outside its series.
