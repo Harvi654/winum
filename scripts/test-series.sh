@@ -45,10 +45,16 @@ TARBALL="$WORK/wine-$WINE_VERSION.tar.xz"
 [ -s "$TARBALL" ] || curl -fL --retry 3 -o "$TARBALL" "https://dl.winehq.org/wine/source/$SUB/wine-$WINE_VERSION.tar.xz"
 wine_verify_tarball "$TARBALL" "$WINE_VERSION" >/dev/null || exit 1
 tar -xf "$TARBALL" -C "$WORK"
-if [ "$VARIANT" = series ]; then
-    say "Applying patches/series"
-    # shellcheck disable=SC1091
-    source "$HERE/scripts/lib/wine-patches.sh"
+say "Applying release series (KillTimer runtime only in the candidate)"
+# shellcheck disable=SC1091
+source "$HERE/scripts/lib/wine-patches.sh"
+if [ "$VARIANT" = vanilla ]; then
+    baseline_patches="$WORK/baseline-patches"
+    mkdir -p "$baseline_patches"
+    cp -a "$HERE"/patches/*.patch "$baseline_patches/"
+    sed '/^server-cross-thread-killtimer\.patch$/d' "$HERE/patches/series" > "$baseline_patches/series"
+    wine_apply_patches "$SRC" "$baseline_patches" "$HERE" HEAD
+else
     wine_apply_patches "$SRC" "$HERE/patches" "$HERE" HEAD
 fi
 if [ -f "$HERE/patches/tests-first/series" ]; then

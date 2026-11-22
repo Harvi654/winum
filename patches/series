@@ -95,3 +95,4 @@ shell32-background-menu.patch
 
 # Responsive filename editing with the recorded provider-thread deviation.
 shell32-autocomplete-responsive.patch
+server-cross-thread-killtimer.patch

@@ -1,0 +1,81 @@
+diff --git a/dlls/user32/tests/msg.c b/dlls/user32/tests/msg.c
+--- a/dlls/user32/tests/msg.c
++++ b/dlls/user32/tests/msg.c
+@@ -12151,6 +12151,69 @@
+     ok(GetLastError()==ERROR_NO_MORE_USER_HANDLES || broken(GetLastError()==0xdeadbeef),
+             "GetLastError() = %ld\n", GetLastError());
+     while (i > 0) KillTimer(NULL, ids[--i]);
++}
++
++struct cross_thread_timer
++{
++    UINT_PTR target;
++    UINT_PTR own;
++    BOOL killed;
++    BOOL own_delivered;
++};
++
++static DWORD WINAPI cancel_timer_thread(void *arg)
++{
++    struct cross_thread_timer *timer = arg;
++    DWORD start;
++    MSG msg;
++
++    timer->own = SetTimer(NULL, 0, 100, NULL);
++    timer->killed = KillTimer(NULL, timer->target);
++
++    if (timer->own)
++    {
++        start = GetTickCount();
++        while (GetTickCount() - start < 500 && !timer->own_delivered)
++        {
++            while (PeekMessageW(&msg, NULL, WM_TIMER, WM_TIMER, PM_REMOVE))
++                if (!msg.hwnd && msg.wParam == timer->own) timer->own_delivered = TRUE;
++            if (!timer->own_delivered) Sleep(10);
++        }
++        KillTimer(NULL, timer->own);
++    }
++    return 0;
++}
++
++static void test_cross_thread_killtimer(void)
++{
++    struct cross_thread_timer timer = {0};
++    HANDLE worker;
++    BOOL delivered = FALSE;
++    DWORD err;
++    MSG msg;
++
++    timer.target = SetTimer(NULL, 0, 100, NULL);
++    ok(!!timer.target, "could not create the target timer.\n");
++    if (!timer.target) return;
++
++    worker = CreateThread(NULL, 0, cancel_timer_thread, &timer, 0, NULL);
++    ok(!!worker, "could not create the cancellation thread.\n");
++    if (worker)
++    {
++        err = WaitForSingleObject(worker, INFINITE);
++        ok(err == WAIT_OBJECT_0, "unexpected wait result %#lx.\n", err);
++        CloseHandle(worker);
++
++        ok(!!timer.own, "could not create the worker timer.\n");
++        ok(timer.target != timer.own, "both live timers have ID %#Ix.\n", timer.target);
++        ok(timer.killed, "cancelling the other thread's timer failed.\n");
++        ok(timer.own_delivered, "the worker did not receive its own timer.\n");
++        Sleep(200);
++        while (PeekMessageW(&msg, NULL, WM_TIMER, WM_TIMER, PM_REMOVE))
++            if (!msg.hwnd && msg.wParam == timer.target) delivered = TRUE;
++        ok(!delivered, "the cancelled timer was delivered.\n");
++    }
++    KillTimer(NULL, timer.target);
+ }
+
+ static void test_timers_exception(DWORD code)
+@@ -21933,6 +21996,7 @@
+     test_accelerators();
+     test_timers();
+     test_timers_no_wnd();
++    test_cross_thread_killtimer();
+     test_timers_exceptions();
+     if (hCBT_hook)
+     {

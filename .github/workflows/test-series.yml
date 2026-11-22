@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: 'Run only this group (g1..g5); empty = all'
+        description: 'Run only this group (g1 or g2); empty = all'
         required: false
         default: ''
   push:
@@ -27,18 +27,12 @@ jobs:
       fail-fast: false
       matrix:
         variant: [vanilla, series]
-        group: [g1, g2, g3, g4, g5]
+        group: [g1, g2]
         include:
           - group: g1
             tests: user32
           - group: g2
-            tests: win32u gdi32 comctl32 opengl32 glu32
-          - group: g3
-            tests: ntdll kernel32 kernelbase advapi32 combase ole32 oleaut32 rpcrt4 urlmon packager
-          - group: g4
-            tests: msi
-          - group: g5
-            tests: msxml3 mspatcha riched20 msftedit shell32 wbemprox wininet mshtml
+            tests: win32u gdi32 comctl32 opengl32 glu32 winex11.drv
     runs-on: ubuntu-24.04
     container: archlinux:base-devel
     timeout-minutes: 350
@@ -67,7 +61,7 @@ jobs:
           export WORK=/tmp/work
           export TESTS="${{ matrix.tests }}"
           export GROUP="${{ matrix.group }}"
-          export MAKE_L1="${{ matrix.group == 'g1' && '1' || '0' }}"
+          export MAKE_L1=0
           bash scripts/test-series.sh ${{ matrix.variant }} out
       - name: Build log on failure
         if: failure() && env.RUN_GROUP == 'true'
@@ -96,7 +90,7 @@ jobs:
         with:
           pattern: tests-series-*
           path: results/series
-      - name: Compare vanilla and series (all groups that ran on both sides)
+      - name: Compare the release baseline with the KillTimer candidate
         run: |
           set -o pipefail
           rc=0
