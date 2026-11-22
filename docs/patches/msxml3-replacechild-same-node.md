@@ -3,7 +3,7 @@
 <!-- winum-test: l1 -->
 
 - **DLL:** `msxml3`
-- **Status:** In the series on `topic/next-release` (2026-11-22).
+- **Status:** In the series (merged into `main` 2026-11-22).
 - **Base:** winum-11.22-1 (Wine 11.22)
 - **Contributed by:** Lukas10999 ([pull request #4](https://github.com/Harvi654/winum/pull/4)) - the fix, the first regression test and the Inventor reproducer. The test revision from the Windows measurement is by Codex (`e2b2162`).
 
@@ -34,7 +34,8 @@ checks, so the document root keeps Windows' `E_FAIL`.
 | L1 | Windows 10 (offline VM, build 10.0.19045.6466), `msxml3:domdoc` of the test revision `e2b2162`: 37,156 checks, 0 failures, 0 todos, exit 0, on x86_64 and i386 (maintainer, 2026-11-19). Expected values from the MEASURE program, [docs/wine-repro/msxml3-same-node-measure](../wine-repro/msxml3-same-node-measure/README.md) |
 | L2 | Paired msxml3 suites with and without the patch, x86_64 and i386, [run 44534917242](https://github.com/Harvi654/winum/actions/runs/44534917242): passed |
 | L3 | Standalone MEASURE on independent trees (element and document root, with and without an output pointer) |
-| L4 | Lukas10999: Inventor 2027 sketch preview with DWG TrueView finished, profile stayed at about 21 KB (Wine 11.20). Maintainer: AutoCAD 2027 profile starts with the patch on 11.22 ([record](https://github.com/Harvi654/winum/blob/62fb3dc/docs/wine-repro/msxml3-same-node-measure/README.md)). **Pending:** the Inventor smoke test with the `topic/next-release` build, together with the shell32 patches |
+| L4 | Lukas10999: Inventor 2027 sketch preview with DWG TrueView finished, profile stayed at about 21 KB (Wine 11.20). Maintainer: AutoCAD 2027 profile starts with the patch on 11.22 ([record](https://github.com/Harvi654/winum/blob/62fb3dc/docs/wine-repro/msxml3-same-node-measure/README.md)). Inventor smoke test with the release build: see the next row |
+| L4 (release build) | `topic/next-release` at `3785565`, full series built in [run 45052921398](https://github.com/Harvi654/winum/actions/runs/45052921398) (winum-11.22-2 test build): Inventor 2027 on a copy of the maintainer's prefix - Open dialog breadcrumb names, New Folder and Enter in the name editor, typing a file name in Save As, start, part, assembly, drawing, save/reopen, restart: passed (maintainer, 2026-11-22). |
 | L5 | Pending |
 | Cross review | Codex reviewed the contributor's patch (`126157d`). Claude Opus 5.5 (2026-11-22) read the runtime hunks and the test in full against Wine 11.22's `node.c` and approves: the same-node guard in `node_insert_before` skips an unlink/relink that cancels out in the reference counts; the `node_replace_child` guard comes after all validation; the document-root case keeps `E_FAIL`. Note: the contributor's patch was also written with Claude, so the Codex review is the one by a different model family. |
 
