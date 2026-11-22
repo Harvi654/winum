@@ -1,0 +1,1 @@
+killtimer | docs/wine-repro/user32-cross-thread-killtimer/measure.c | -luser32
