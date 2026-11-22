@@ -6,6 +6,7 @@ umask 077
 
 [[ $# == 1 ]] || { echo 'Usage: bash trace-autocad-licensing-service.sh SESSION_TEST_DIRECTORY' >&2; exit 2; }
 work="$(realpath -e -- "$1")"
+rpc_summary="$(dirname -- "$(realpath -e -- "${BASH_SOURCE[0]}")")/summarize-autocad-rpc-waits.py"
 grep -Fxq 'wineserver_variant=services_session_report' "$work/COMBINED-BUILDINFO"
 export ACAD_PREFIX="$work/candidate-prefix"
 export ACAD_WINE_BIN="$work/wine/bin"
@@ -79,7 +80,11 @@ if grep -Fxq 'dialog_origin_trace=1' "$work/COMBINED-BUILDINFO"; then
     export WINEDEBUG="$WINEDEBUG,acad.exe:+taskdialog"
 fi
 
-if [[ ${ACAD_CLIENT_RELAY:-0} == 1 ]]; then
+if [[ ${ACAD_RPC_WAIT_TRACE:-0} == 1 ]]; then
+    test -f "$rpc_summary"
+    grep -Fxq 'dialog_origin_trace=1' "$work/COMBINED-BUILDINFO"
+fi
+if [[ ${ACAD_CLIENT_RELAY:-0} == 1 || ${ACAD_RPC_WAIT_TRACE:-0} == 1 ]]; then
     key='HKCU\Software\Wine\Debug'
     config_log="$ACAD_LOGDIR/client-relay-config.txt"
     query_rc=0
@@ -108,11 +113,17 @@ if [[ ${ACAD_CLIENT_RELAY:-0} == 1 ]]; then
     trap 'exit 130' INT
     trap 'exit 143' TERM
     apis='ws2_32.connect;ws2_32.WSAConnect;ws2_32.recv;ws2_32.send;ws2_32.WSARecv;ws2_32.WSASend;ws2_32.shutdown;ws2_32.closesocket;ws2_32.WSAGetOverlappedResult'
+    if [[ ${ACAD_RPC_WAIT_TRACE:-0} == 1 ]]; then
+        apis='kernelbase.WaitForSingleObject;kernelbase.WaitForSingleObjectEx;kernelbase.WaitForMultipleObjects;kernelbase.WaitForMultipleObjectsEx;kernelbase.SignalObjectAndWait;user32.MsgWaitForMultipleObjects;user32.MsgWaitForMultipleObjectsEx;rpcrt4.RpcEpResolveBinding;rpcrt4.RpcBindingSetOption'
+        export WINEDEBUG="$WINEDEBUG,acad.exe:warn+rpc,acad.exe:err+all"
+    else
+        export WINEDEBUG="$WINEDEBUG,acad.exe:+winsock"
+    fi
     if ! WINEDEBUG=-all timeout 15s "$WINELOADER" reg add "$key" /v RelayInclude /t REG_SZ /d "$apis" /f >> "$config_log" 2>&1; then
         echo 'Could not configure the AutoCAD client relay filter.' >&2
         exit 2
     fi
-    export WINEDEBUG="$WINEDEBUG,acad.exe:+relay,acad.exe:+winsock"
+    export WINEDEBUG="$WINEDEBUG,acad.exe:+relay"
     echo 'client_relay_filter=enabled'
 fi
 
@@ -262,6 +273,9 @@ PY
             | tee -a "$ACAD_LOGDIR/service-summary.txt" || true
     fi
     printf 'Summary: %s/service-summary.txt\n' "$ACAD_LOGDIR"
+fi
+if [[ ${ACAD_RPC_WAIT_TRACE:-0} == 1 ]]; then
+    python3 -I "$rpc_summary" "$ACAD_LOGDIR" | tee "$ACAD_LOGDIR/rpc-wait-summary.txt"
 fi
 printf 'Output directory: %s\n' "$ACAD_LOGDIR"
 exit "$rc"
