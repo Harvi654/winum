@@ -1,0 +1,43 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [TEST] ucrtbase: Test the x86-64 exception frame size.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Windows 10 x86-64 returns 32 from the UCRT export. Check the size
+directly without constructing an exception record.
+
+diff --git a/dlls/ucrtbase/tests/cpp.c b/dlls/ucrtbase/tests/cpp.c
+--- a/dlls/ucrtbase/tests/cpp.c
++++ b/dlls/ucrtbase/tests/cpp.c
+@@ -403,6 +403,21 @@
+ }
+ #endif
+
++#if defined(__x86_64__) && !defined(__arm64ec__)
++static void test_exception_frame_size(void)
++{
++    unsigned int (CDECL *query)(void);
++    unsigned int size;
++
++    query = (void *)GetProcAddress(GetModuleHandleW(L"ucrtbase.dll"), "__CxxQueryExceptionSize");
++    ok(!!query, "Missing __CxxQueryExceptionSize export\n");
++    if (!query) return;
++
++    size = query();
++    ok(size == 32, "__CxxQueryExceptionSize returned %u, expected 32\n", size);
++}
++#endif
++
+ START_TEST(cpp)
+ {
+     if (!init()) return;
+@@ -410,6 +425,9 @@
+     test___std_type_info();
+     test___unDName();
+     test___DestructExceptionObject();
++#if defined(__x86_64__) && !defined(__arm64ec__)
++    test_exception_frame_size();
++#endif
+ #ifdef __x86_64__
+     test___C_specific_handler();
+ #endif

@@ -1,0 +1,137 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: shell32: Handle SIGDN_PARENTRELATIVEFORUI display names
+
+Windows 10 build 19045.6466 returned the parent-relative display name for all four measured items on both architectures. In particular, the drive-root UI name differs from its address-bar name. Wine logged an unsupported SIGDN, returned E_FAIL and left the name NULL after binding to the parent.
+
+Reuse the parent-relative name path for this SIGDN only. IShellItem already delegates to SHGetNameFromIDList.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+diff --git a/dlls/shell32/pidl.c b/dlls/shell32/pidl.c
+index 4cf052e..277730b 100644
+--- a/dlls/shell32/pidl.c
++++ b/dlls/shell32/pidl.c
+@@ -1415,6 +1415,9 @@ HRESULT WINAPI SHGetNameFromIDList(PCIDLIST_ABSOLUTE pidl, SIGDN sigdnName, PWST
+         switch(sigdnName)
+         {
+                                                 /* sigdnName & 0xffff */
++        case SIGDN_PARENTRELATIVEFORUI:
++            sigdnName = SIGDN_PARENTRELATIVE;
++            /* fall through */
+         case SIGDN_NORMALDISPLAY:               /* SHGDN_NORMAL */
+         case SIGDN_PARENTRELATIVEPARSING:       /* SHGDN_INFOLDER | SHGDN_FORPARSING */
+         case SIGDN_PARENTRELATIVEEDITING:       /* SHGDN_INFOLDER | SHGDN_FOREDITING */
+diff --git a/dlls/shell32/tests/shlfolder.c b/dlls/shell32/tests/shlfolder.c
+index 08c8c73..4b29acf 100644
+--- a/dlls/shell32/tests/shlfolder.c
++++ b/dlls/shell32/tests/shlfolder.c
+@@ -2928,6 +2928,102 @@ static void test_SHGetNameFromIDList(void)
+     ILFree(pidl);
+ }
+ 
++static void test_parentrelativeforui_item(const WCHAR *path, int csidl, BOOL drive)
++{
++    WCHAR *relative = NULL, *address = NULL, *name = NULL;
++    PIDLIST_ABSOLUTE pidl;
++    IShellItem *item;
++    HRESULT hr;
++
++    if (path)
++        hr = SHParseDisplayName(path, NULL, &pidl, 0, NULL);
++    else
++        hr = SHGetSpecialFolderLocation(NULL, csidl, &pidl);
++    ok(hr == S_OK, "Failed to get item PIDL, hr %#lx.\n", hr);
++    if (FAILED(hr)) return;
++
++    hr = pSHGetNameFromIDList(pidl, SIGDN_PARENTRELATIVE, &relative);
++    ok(hr == S_OK && relative && *relative, "Got relative name %s, hr %#lx.\n",
++       wine_dbgstr_w(relative), hr);
++
++    if (drive)
++    {
++        hr = pSHGetNameFromIDList(pidl, SIGDN_PARENTRELATIVEFORADDRESSBAR, &address);
++        ok(hr == S_OK && address && *address, "Got address bar name %s, hr %#lx.\n",
++           wine_dbgstr_w(address), hr);
++    }
++
++    hr = pSHGetNameFromIDList(pidl, SIGDN_PARENTRELATIVEFORUI, &name);
++    ok(hr == S_OK && name && *name, "Got UI name %s, hr %#lx.\n",
++       wine_dbgstr_w(name), hr);
++    if (name && relative)
++        ok(!wcscmp(name, relative), "Got %s, expected %s.\n",
++           wine_dbgstr_w(name), wine_dbgstr_w(relative));
++    if (name && address)
++        ok(wcscmp(name, address), "UI name equals address bar name %s.\n", wine_dbgstr_w(name));
++    CoTaskMemFree(name);
++
++    hr = pSHCreateItemFromIDList(pidl, &IID_IShellItem, (void **)&item);
++    ok(hr == S_OK, "Failed to create shell item, hr %#lx.\n", hr);
++    if (SUCCEEDED(hr))
++    {
++        name = NULL;
++        hr = IShellItem_GetDisplayName(item, SIGDN_PARENTRELATIVEFORUI, &name);
++        ok(hr == S_OK && name && *name, "Got shell item UI name %s, hr %#lx.\n",
++           wine_dbgstr_w(name), hr);
++        if (name && relative)
++            ok(!wcscmp(name, relative), "Got %s, expected %s.\n",
++               wine_dbgstr_w(name), wine_dbgstr_w(relative));
++        if (name && address)
++            ok(wcscmp(name, address), "Shell item UI name equals address bar name %s.\n",
++               wine_dbgstr_w(name));
++        CoTaskMemFree(name);
++        IShellItem_Release(item);
++    }
++
++    CoTaskMemFree(address);
++    CoTaskMemFree(relative);
++    CoTaskMemFree(pidl);
++}
++
++static void test_parentrelativeforui(void)
++{
++    WCHAR folder[MAX_PATH], windows[MAX_PATH], root[4];
++    DWORD len;
++
++    if (!pSHGetNameFromIDList || !pSHCreateItemFromIDList)
++    {
++        win_skip("Shell name or item API unavailable.\n");
++        return;
++    }
++
++    winetest_push_context("folder");
++    len = GetTempPathW(ARRAY_SIZE(folder), folder);
++    ok(len && len < ARRAY_SIZE(folder), "Failed to get temp path, length %lu.\n", len);
++    if (len && len < ARRAY_SIZE(folder))
++        test_parentrelativeforui_item(folder, 0, FALSE);
++    winetest_pop_context();
++
++    winetest_push_context("drive root");
++    len = GetWindowsDirectoryW(windows, ARRAY_SIZE(windows));
++    ok(len >= 3 && len < ARRAY_SIZE(windows) && windows[1] == ':', "Invalid Windows directory.\n");
++    if (len >= 3 && len < ARRAY_SIZE(windows) && windows[1] == ':')
++    {
++        memcpy(root, windows, 3 * sizeof(WCHAR));
++        root[3] = 0;
++        test_parentrelativeforui_item(root, 0, TRUE);
++    }
++    winetest_pop_context();
++
++    winetest_push_context("Documents");
++    test_parentrelativeforui_item(NULL, CSIDL_PERSONAL, FALSE);
++    winetest_pop_context();
++
++    winetest_push_context("This PC");
++    test_parentrelativeforui_item(NULL, CSIDL_DRIVES, FALSE);
++    winetest_pop_context();
++}
++
+ static void test_SHGetItemFromDataObject(void)
+ {
+     IShellFolder *psfdesktop;
+@@ -6336,6 +6432,7 @@ START_TEST(shlfolder)
+     test_SHSimpleIDListFromPath();
+     test_ParseDisplayNamePBC();
+     test_SHGetNameFromIDList();
++    test_parentrelativeforui();
+     test_SHGetItemFromDataObject();
+     test_SHGetIDListFromObject();
+     test_SHGetItemFromObject();

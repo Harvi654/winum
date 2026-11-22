@@ -1,0 +1,32 @@
+name: Build shell32 label edit Enter MEASURE
+
+on:
+  push:
+    branches: ['topic/shell32-label-edit-enter']
+    paths:
+      - 'docs/wine-repro/shell32-label-edit-enter/**'
+      - 'scripts/build-measure-shell32-label-edit-enter.sh'
+      - '.github/workflows/build-shell32-label-edit-enter-measure.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    steps:
+      - name: MinGW (official Arch repositories)
+        run: pacman -Syu --noconfirm --needed git mingw-w64-gcc
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build
+        run: |
+          bash scripts/build-measure-shell32-label-edit-enter.sh out
+          cd out
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: shell32-label-edit-enter-measure
+          path: out/
+          retention-days: 30

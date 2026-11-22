@@ -1,0 +1,381 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: shell32/tests: Test the autocomplete enumerator callback thread
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Windows 10 called Next once on another thread after typing into an edit
+with an empty enumerator in both architectures. Wine 11.22 fetches the
+list on the edit thread inside the input handler. Limit the test to an
+empty enumerator so it checks the callback thread without a timing
+threshold for processing the keystroke or a long-running COM call.
+
+
+2026-11-19: The Windows 10 proxy and lifecycle probe observed that
+disabling autocomplete or destroying the edit returns while the
+first Next call is outstanding. In those two cases the old result
+does not trigger another Next call or replace the user's input.
+Use an event to hold the first call instead of asserting a duration.
+
+diff --git a/dlls/shell32/tests/Makefile.in b/dlls/shell32/tests/Makefile.in
+index b7bc535..0fa644c 100644
+--- a/dlls/shell32/tests/Makefile.in
++++ b/dlls/shell32/tests/Makefile.in
+@@ -5,6 +5,7 @@ SOURCES = \
+ 	appbar.c \
+ 	assoc.c \
+ 	autocomplete.c \
++	autocomplete_thread.c \
+ 	brsfolder.c \
+ 	ebrowser.c \
+ 	generated.c \
+diff --git a/dlls/shell32/tests/autocomplete_thread.c b/dlls/shell32/tests/autocomplete_thread.c
+new file mode 100644
+index 0000000..4020f0d
+--- /dev/null
++++ b/dlls/shell32/tests/autocomplete_thread.c
+@@ -0,0 +1,345 @@
++/*
++ * Shell autocomplete callback threading test
++ *
++ * Original, AI-assisted (Codex), LGPL-2.1-or-later.
++ */
++
++#define COBJMACROS
++#include "windows.h"
++#include "shldisp.h"
++#include "shlguid.h"
++#include "wine/test.h"
++
++static DWORD edit_thread;
++static LONG source_refs = 1;
++static LONG next_calls, next_on_ui;
++
++static HRESULT WINAPI source_QueryInterface(IEnumString *iface, REFIID iid, void **out)
++{
++    *out = NULL;
++    if (!IsEqualIID(iid, &IID_IUnknown) && !IsEqualIID(iid, &IID_IEnumString))
++        return E_NOINTERFACE;
++    *out = iface;
++    IEnumString_AddRef(iface);
++    return S_OK;
++}
++
++static ULONG WINAPI source_AddRef(IEnumString *iface)
++{
++    return InterlockedIncrement(&source_refs);
++}
++
++static ULONG WINAPI source_Release(IEnumString *iface)
++{
++    return InterlockedDecrement(&source_refs);
++}
++
++static HRESULT WINAPI source_Next(IEnumString *iface, ULONG count, LPOLESTR *strings, ULONG *fetched)
++{
++    if (!strings || (!fetched && count != 1)) return E_POINTER;
++    if (fetched) *fetched = 0;
++    if (GetCurrentThreadId() == edit_thread) InterlockedIncrement(&next_on_ui);
++    InterlockedIncrement(&next_calls);
++    return count ? S_FALSE : S_OK;
++}
++
++static HRESULT WINAPI source_Skip(IEnumString *iface, ULONG count)
++{
++    return count ? S_FALSE : S_OK;
++}
++
++static HRESULT WINAPI source_Reset(IEnumString *iface)
++{
++    return S_OK;
++}
++
++static HRESULT WINAPI source_Clone(IEnumString *iface, IEnumString **out)
++{
++    *out = NULL;
++    return E_NOTIMPL;
++}
++
++static IEnumStringVtbl source_vtbl =
++{
++    source_QueryInterface,
++    source_AddRef,
++    source_Release,
++    source_Next,
++    source_Skip,
++    source_Reset,
++    source_Clone,
++};
++
++static IEnumString source = { &source_vtbl };
++
++static void test_enumeration_thread(void)
++{
++    IAutoComplete2 *autocomplete;
++    LONG calls, ui_calls, inline_calls;
++    HWND parent, edit;
++    DWORD start;
++    MSG msg;
++    HRESULT hr;
++
++    hr = CoCreateInstance(&CLSID_AutoComplete, NULL, CLSCTX_INPROC_SERVER,
++                          &IID_IAutoComplete2, (void **)&autocomplete);
++    ok(hr == S_OK, "CoCreateInstance failed: %#lx\n", hr);
++    if (hr != S_OK) return;
++    parent = CreateWindowW(L"Static", L"Autocomplete threading", WS_OVERLAPPEDWINDOW,
++                           CW_USEDEFAULT, CW_USEDEFAULT, 450, 180, NULL, NULL, NULL, NULL);
++    ok(!!parent, "Failed to create parent window\n");
++    if (!parent) goto done;
++    edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"Edit", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
++                           20, 20, 340, 28, parent, NULL, NULL, NULL);
++    ok(!!edit, "Failed to create edit control\n");
++    if (!edit) goto done;
++    ShowWindow(parent, SW_SHOW);
++    SetForegroundWindow(parent);
++    SetActiveWindow(parent);
++    SetFocus(edit);
++    ok(GetFocus() == edit, "Edit control did not receive focus\n");
++    if (GetFocus() != edit) goto done;
++
++    hr = IAutoComplete2_SetOptions(autocomplete, ACO_AUTOSUGGEST | ACO_AUTOAPPEND);
++    ok(hr == S_OK, "IAutoComplete2_SetOptions failed: %#lx\n", hr);
++    if (hr != S_OK) goto done;
++    hr = IAutoComplete2_Init(autocomplete, edit, (IUnknown *)&source, NULL, NULL);
++    ok(hr == S_OK, "IAutoComplete2_Init failed: %#lx\n", hr);
++    if (hr != S_OK) goto done;
++
++    calls = InterlockedCompareExchange(&next_calls, 0, 0);
++    ok(!calls, "Got %ld Next calls before input\n", calls);
++    SendMessageW(edit, WM_CHAR, 'a', 1);
++    inline_calls = InterlockedCompareExchange(&next_on_ui, 0, 0);
++
++    start = GetTickCount();
++    while (!(calls = InterlockedCompareExchange(&next_calls, 0, 0))
++           && GetTickCount() - start < 3000)
++    {
++        if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
++        {
++            TranslateMessage(&msg);
++            DispatchMessageW(&msg);
++        }
++        else MsgWaitForMultipleObjects(0, NULL, FALSE, 25, QS_ALLINPUT);
++    }
++    ok(calls == 1, "Expected one Next call, got %ld\n", calls);
++    if (calls)
++    {
++        ui_calls = InterlockedCompareExchange(&next_on_ui, 0, 0);
++        todo_wine
++        ok(!ui_calls, "Got %ld Next calls on the edit thread, %ld before WM_CHAR returned\n",
++           ui_calls, inline_calls);
++    }
++
++done:
++    if (parent) DestroyWindow(parent);
++    IAutoComplete2_Release(autocomplete);
++}
++
++#define WM_TEST_STOP_AUTOCOMPLETE (WM_APP + 1)
++
++struct held_source
++{
++    IEnumString IEnumString_iface;
++    LONG refs, calls, active;
++    HWND parent;
++    HANDLE release_next, next_done;
++};
++
++struct edit_action
++{
++    IAutoComplete2 *autocomplete;
++    struct held_source *source;
++    HWND edit;
++    HRESULT hr;
++    BOOL destroy, ran, entered_during_next, returned_during_next;
++};
++
++static ULONG WINAPI held_source_AddRef(IEnumString *iface)
++{
++    struct held_source *source = CONTAINING_RECORD(iface, struct held_source, IEnumString_iface);
++    return InterlockedIncrement(&source->refs);
++}
++
++static ULONG WINAPI held_source_Release(IEnumString *iface)
++{
++    struct held_source *source = CONTAINING_RECORD(iface, struct held_source, IEnumString_iface);
++    ULONG refs = InterlockedDecrement(&source->refs);
++
++    if (!refs)
++    {
++        if (source->release_next) CloseHandle(source->release_next);
++        if (source->next_done) CloseHandle(source->next_done);
++        HeapFree(GetProcessHeap(), 0, source);
++    }
++    return refs;
++}
++
++static HRESULT WINAPI held_source_Next(IEnumString *iface, ULONG count, LPOLESTR *strings, ULONG *fetched)
++{
++    struct held_source *source = CONTAINING_RECORD(iface, struct held_source, IEnumString_iface);
++
++    if (!strings || (!fetched && count != 1)) return E_POINTER;
++    if (fetched) *fetched = 0;
++    if (!count) return S_OK;
++    if (InterlockedIncrement(&source->calls) != 1) return S_FALSE;
++
++    strings[0] = CoTaskMemAlloc(sizeof(L"abc"));
++    if (!strings[0]) return E_OUTOFMEMORY;
++    lstrcpyW(strings[0], L"abc");
++    if (fetched) *fetched = 1;
++
++    InterlockedExchange(&source->active, TRUE);
++    PostMessageW(source->parent, WM_TEST_STOP_AUTOCOMPLETE, 0, 0);
++    WaitForSingleObject(source->release_next, 1500);
++    InterlockedExchange(&source->active, FALSE);
++    SetEvent(source->next_done);
++    return count == 1 ? S_OK : S_FALSE;
++}
++
++static IEnumStringVtbl held_source_vtbl =
++{
++    source_QueryInterface,
++    held_source_AddRef,
++    held_source_Release,
++    held_source_Next,
++    source_Skip,
++    source_Reset,
++    source_Clone,
++};
++
++static LRESULT CALLBACK lifecycle_wndproc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam)
++{
++    struct edit_action *action = (struct edit_action *)GetWindowLongPtrW(window, GWLP_USERDATA);
++
++    if (msg == WM_TEST_STOP_AUTOCOMPLETE && action && !action->ran)
++    {
++        action->ran = TRUE;
++        action->entered_during_next = InterlockedCompareExchange(&action->source->active, 0, 0);
++        if (action->destroy)
++            action->hr = DestroyWindow(action->edit) ? S_OK : E_FAIL;
++        else
++            action->hr = IAutoComplete2_Enable(action->autocomplete, FALSE);
++        action->returned_during_next = InterlockedCompareExchange(&action->source->active, 0, 0);
++        SetEvent(action->source->release_next);
++        return 0;
++    }
++    return DefWindowProcW(window, msg, wparam, lparam);
++}
++
++static void test_stop_during_next(BOOL destroy)
++{
++    struct edit_action action = {0};
++    struct held_source *source;
++    BOOL edit_ok;
++    WCHAR text[16] = {0};
++    DWORD elapsed, start;
++    MSG msg;
++    LONG calls;
++    HRESULT hr;
++
++    winetest_push_context("%s during Next", destroy ? "Destroy edit" : "Disable autocomplete");
++    source = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(*source));
++    ok(!!source, "Failed to allocate enumerator\n");
++    if (!source) goto done;
++    source->IEnumString_iface.lpVtbl = &held_source_vtbl;
++    source->refs = 1;
++    source->release_next = CreateEventW(NULL, TRUE, FALSE, NULL);
++    source->next_done = CreateEventW(NULL, TRUE, FALSE, NULL);
++    ok(!!source->release_next && !!source->next_done, "Failed to create event handles\n");
++    if (!source->release_next || !source->next_done) goto done;
++
++    hr = CoCreateInstance(&CLSID_AutoComplete, NULL, CLSCTX_INPROC_SERVER,
++                          &IID_IAutoComplete2, (void **)&action.autocomplete);
++    ok(hr == S_OK, "CoCreateInstance failed: %#lx\n", hr);
++    if (hr != S_OK) goto done;
++    source->parent = CreateWindowW(L"AutocompleteLifecycleTest", L"Autocomplete lifecycle",
++                                   WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 450, 180,
++                                   NULL, NULL, GetModuleHandleW(NULL), NULL);
++    ok(!!source->parent, "Failed to create parent window\n");
++    if (!source->parent) goto done;
++    action.edit = CreateWindowW(L"Edit", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
++                                20, 20, 340, 28, source->parent, NULL, NULL, NULL);
++    ok(!!action.edit, "Failed to create edit control\n");
++    if (!action.edit) goto done;
++    action.source = source;
++    action.destroy = destroy;
++    SetWindowLongPtrW(source->parent, GWLP_USERDATA, (LONG_PTR)&action);
++    ShowWindow(source->parent, SW_SHOW);
++    SetForegroundWindow(source->parent);
++    SetActiveWindow(source->parent);
++    SetFocus(action.edit);
++    ok(GetFocus() == action.edit, "Edit control did not receive focus\n");
++    if (GetFocus() != action.edit) goto done;
++
++    hr = IAutoComplete2_SetOptions(action.autocomplete, ACO_AUTOSUGGEST | ACO_AUTOAPPEND);
++    ok(hr == S_OK, "IAutoComplete2_SetOptions failed: %#lx\n", hr);
++    if (hr != S_OK) goto done;
++    hr = IAutoComplete2_Init(action.autocomplete, action.edit, (IUnknown *)&source->IEnumString_iface, NULL, NULL);
++    ok(hr == S_OK, "IAutoComplete2_Init failed: %#lx\n", hr);
++    if (hr != S_OK) goto done;
++
++    SendMessageW(action.edit, WM_CHAR, 'a', 1);
++    start = GetTickCount();
++    while ((elapsed = GetTickCount() - start) < 3000)
++    {
++        if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
++        {
++            TranslateMessage(&msg);
++            DispatchMessageW(&msg);
++        }
++        else
++        {
++            if (elapsed >= 500 && action.ran && WaitForSingleObject(source->next_done, 0) == WAIT_OBJECT_0)
++                break;
++            MsgWaitForMultipleObjects(0, NULL, FALSE, 25, QS_ALLINPUT);
++        }
++    }
++    ok(action.ran, "Edit action was not dispatched\n");
++    if (!action.ran) goto done;
++    ok(action.hr == S_OK, "Edit action returned %#lx\n", action.hr);
++    ok(WaitForSingleObject(source->next_done, 0) == WAIT_OBJECT_0, "Next did not finish\n");
++    calls = InterlockedCompareExchange(&source->calls, 0, 0);
++    if (destroy)
++        edit_ok = !IsWindow(action.edit);
++    else
++    {
++        GetWindowTextW(action.edit, text, ARRAY_SIZE(text));
++        edit_ok = !lstrcmpW(text, L"a");
++    }
++    todo_wine
++    ok(action.entered_during_next && action.returned_during_next && calls == 1 && edit_ok,
++       "action entered=%d returned=%d while Next was held, calls=%ld, edit expected=%d\n",
++       action.entered_during_next, action.returned_during_next, calls, edit_ok);
++
++done:
++    if (source && source->release_next) SetEvent(source->release_next);
++    if (source && source->parent) DestroyWindow(source->parent);
++    if (action.autocomplete) IAutoComplete2_Release(action.autocomplete);
++    if (source) IEnumString_Release(&source->IEnumString_iface);
++    winetest_pop_context();
++}
++
++START_TEST(autocomplete_thread)
++{
++    WNDCLASSW klass = {0};
++    HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
++
++    ok(hr == S_OK, "CoInitializeEx failed: %#lx\n", hr);
++    if (hr != S_OK) return;
++    edit_thread = GetCurrentThreadId();
++    test_enumeration_thread();
++
++    klass.lpfnWndProc = lifecycle_wndproc;
++    klass.hInstance = GetModuleHandleW(NULL);
++    klass.lpszClassName = L"AutocompleteLifecycleTest";
++    if (RegisterClassW(&klass))
++    {
++        test_stop_during_next(FALSE);
++        test_stop_during_next(TRUE);
++        UnregisterClassW(klass.lpszClassName, klass.hInstance);
++    }
++    else ok(0, "Failed to register autocomplete window class\n");
++    CoUninitialize();
++}

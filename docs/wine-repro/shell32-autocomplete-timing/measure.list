@@ -1,0 +1,1 @@
+shell32-autocomplete-timing | docs/wine-repro/shell32-autocomplete-timing/measure.c | -Wextra -lole32 -luuid -luser32 -static

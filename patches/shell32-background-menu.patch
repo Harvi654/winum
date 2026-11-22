@@ -1,0 +1,232 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: shell32: Keep New in filesystem background menus
+
+The Inventor Open shell view queries command IDs 0 through 0x7fff. Windows 10 build 19045.6466 showed an enabled New submenu in that range on both architectures. Wine rebases the resource IDs by -0x7000, so the old popup ID 0x42 wraps out of range before its children can be merged.
+
+Move only the New popup into the background command ID range. Require a creation helper and a filesystem-backed parent. Do not use a missing PIDL when creation fails. Leave the other popups and the shared menu merge function alone.
+
+v2 (2026-11-18): Cross review found that Recycle Bin implements ISFHelper with stub creation methods. Require a filesystem path and exercise that Wine-specific virtual-folder case. Skip the measured English caption check in other UI languages.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+diff --git a/dlls/shell32/shell32.rc b/dlls/shell32/shell32.rc
+index 6738ba8..049c69f 100644
+--- a/dlls/shell32/shell32.rc
++++ b/dlls/shell32/shell32.rc
+@@ -63,7 +63,7 @@ BEGIN
+ 	  MENUITEM "Paste",		FCIDM_SHVIEW_INSERT
+ 	  MENUITEM "Paste as Link",	FCIDM_SHVIEW_INSERTLINK
+ 	  MENUITEM SEPARATOR
+-	  POPUP "New",                  0x42
++	  POPUP "New",                  IDM_BACKGROUND_NEW
+ 	  BEGIN
+ 	    MENUITEM "New &Folder",	FCIDM_SHVIEW_NEWFOLDER
+ 	    MENUITEM "New &Link",	FCIDM_SHVIEW_NEWLINK
+diff --git a/dlls/shell32/shlview_cmenu.c b/dlls/shell32/shlview_cmenu.c
+index e579547..2578b49 100644
+--- a/dlls/shell32/shlview_cmenu.c
++++ b/dlls/shell32/shlview_cmenu.c
+@@ -1417,9 +1417,27 @@ static HRESULT WINAPI BackgroundMenu_QueryContextMenu(
+     }
+     else
+     {
+-        Shell_MergeMenus (hMenu, GetSubMenu(hMyMenu,0), indexMenu,
+-                          idCmdFirst - FCIDM_BASE, idCmdLast, MM_SUBMENUSHAVEIDS);
+-        idMax = max_menu_id(GetSubMenu(hMyMenu, 0), idCmdFirst - FCIDM_BASE, idCmdLast);
++        HMENU ourMenu = GetSubMenu(hMyMenu, 0);
++        BOOL can_create = FALSE;
++        PIDLIST_ABSOLUTE pidl;
++        ISFHelper *helper;
++        WCHAR path[MAX_PATH];
++
++        if (SUCCEEDED(IShellFolder_QueryInterface(This->parent, &IID_ISFHelper, (void **)&helper)))
++        {
++            if (SUCCEEDED(SHGetIDListFromObject((IUnknown *)This->parent, &pidl)))
++            {
++                can_create = pidl && SHGetPathFromIDListW(pidl, path);
++                CoTaskMemFree(pidl);
++            }
++            ISFHelper_Release(helper);
++        }
++        if (!can_create)
++            DeleteMenu(ourMenu, IDM_BACKGROUND_NEW, MF_BYCOMMAND);
++
++        Shell_MergeMenus(hMenu, ourMenu, indexMenu, idCmdFirst - FCIDM_BASE,
++                         idCmdLast, MM_SUBMENUSHAVEIDS);
++        idMax = max_menu_id(ourMenu, idCmdFirst - FCIDM_BASE, idCmdLast);
+         hr =  MAKE_HRESULT(SEVERITY_SUCCESS, FACILITY_NULL, idMax-idCmdFirst);
+     }
+     DestroyMenu(hMyMenu);
+@@ -1436,17 +1454,13 @@ static void DoNewFolder(ContextMenu *This, IShellView *view)
+     if (helper)
+     {
+         WCHAR nameW[MAX_PATH];
+-        LPITEMIDLIST pidl;
+-
+-        ISFHelper_GetUniqueName(helper, nameW, MAX_PATH);
+-        ISFHelper_AddFolder(helper, 0, nameW, &pidl);
++        LPITEMIDLIST pidl = NULL;
+ 
+-        if (view)
++        if (SUCCEEDED(ISFHelper_GetUniqueName(helper, nameW, ARRAY_SIZE(nameW))) &&
++            SUCCEEDED(ISFHelper_AddFolder(helper, 0, nameW, &pidl)) && pidl && view)
+         {
+-	    /* if we are in a shellview do labeledit */
+-	    IShellView_SelectItem(view,
+-                    pidl,(SVSI_DESELECTOTHERS | SVSI_EDIT | SVSI_ENSUREVISIBLE
+-                    |SVSI_FOCUSED|SVSI_SELECT));
++            IShellView_SelectItem(view, pidl, SVSI_DESELECTOTHERS | SVSI_EDIT | SVSI_ENSUREVISIBLE |
++                                             SVSI_FOCUSED | SVSI_SELECT);
+         }
+ 
+         SHFree(pidl);
+diff --git a/dlls/shell32/shresdef.h b/dlls/shell32/shresdef.h
+index 64763f8..b03ba9d 100644
+--- a/dlls/shell32/shresdef.h
++++ b/dlls/shell32/shresdef.h
+@@ -116,6 +116,8 @@
+ #define IDS_CANTTRASH_TEXT          140
+ #define IDS_OVERWRITEFOLDER_TEXT    141
+ 
++#define IDM_BACKGROUND_NEW 0x7054
++
+ #define IDS_NEWFOLDER 142
+ 
+ #define IDS_CPANEL_TITLE            143
+diff --git a/dlls/shell32/tests/shlfolder.c b/dlls/shell32/tests/shlfolder.c
+index 08c8c73..b7b1b8a 100644
+--- a/dlls/shell32/tests/shlfolder.c
++++ b/dlls/shell32/tests/shlfolder.c
+@@ -26,6 +26,8 @@
+ 
+ #include "windef.h"
+ #include "winbase.h"
++#include "wincon.h"
++#include "winnls.h"
+ #include "wtypes.h"
+ #include "shellapi.h"
+ 
+@@ -4836,6 +4838,108 @@ static void test_GetUIObject(void)
+     Cleanup();
+ }
+ 
++static BOOL has_new_submenu(HMENU menu)
++{
++    int i, count = GetMenuItemCount(menu);
++
++    for (i = 0; i < count; ++i)
++    {
++        WCHAR caption[64], *src, *dst;
++        MENUITEMINFOW item = {sizeof(item), MIIM_SUBMENU | MIIM_STATE | MIIM_STRING};
++
++        item.dwTypeData = caption;
++        item.cch = ARRAY_SIZE(caption);
++        if (!GetMenuItemInfoW(menu, i, TRUE, &item) || !item.hSubMenu ||
++            (item.fState & MFS_DISABLED))
++            continue;
++
++        for (src = dst = caption; *src; ++src)
++            if (*src != '&') *dst++ = *src;
++        *dst = 0;
++        if (!lstrcmpiW(caption, L"New")) return TRUE;
++    }
++
++    return FALSE;
++}
++
++static void test_background_new_submenu(IShellFolder *folder)
++{
++    static const UINT first_ids[] = {0, 1, 0x7000};
++    unsigned int i;
++    HRESULT hr;
++
++    if (PRIMARYLANGID(GetThreadUILanguage()) != LANG_ENGLISH)
++    {
++        skip("The measured New caption requires an English UI.\n");
++        return;
++    }
++
++    for (i = 0; i < ARRAY_SIZE(first_ids); ++i)
++    {
++        IContextMenu *context;
++        HMENU menu;
++
++        hr = IShellFolder_CreateViewObject(folder, GetConsoleWindow(), &IID_IContextMenu, (void **)&context);
++        ok(hr == S_OK, "Failed to get background menu, hr %#lx.\n", hr);
++        if (FAILED(hr)) return;
++
++        menu = CreatePopupMenu();
++        ok(!!menu, "Failed to create popup menu, error %lu.\n", GetLastError());
++        if (menu)
++        {
++            hr = IContextMenu_QueryContextMenu(context, menu, 0, first_ids[i], 0x7fff, CMF_NORMAL);
++            ok(SUCCEEDED(hr), "Failed to query background menu, hr %#lx.\n", hr);
++            if (SUCCEEDED(hr))
++                ok(has_new_submenu(menu), "Missing enabled New submenu for first ID %#x.\n", first_ids[i]);
++            DestroyMenu(menu);
++        }
++        IContextMenu_Release(context);
++    }
++}
++
++static void test_recycle_bin_background_menu(void)
++{
++    PIDLIST_ABSOLUTE pidl;
++    IShellFolder *folder;
++    IShellView *view;
++    IContextMenu *context;
++    HMENU menu;
++    HRESULT hr;
++
++    /* Check that Wine's shared background menu does not gain a nonfunctional New in Recycle Bin. */
++    if (!winetest_platform_is_wine || PRIMARYLANGID(GetThreadUILanguage()) != LANG_ENGLISH)
++        return;
++
++    hr = SHGetSpecialFolderLocation(NULL, CSIDL_BITBUCKET, &pidl);
++    ok(hr == S_OK, "Failed to get Recycle Bin PIDL, hr %#lx.\n", hr);
++    if (FAILED(hr)) return;
++    hr = SHBindToObject(NULL, pidl, NULL, &IID_IShellFolder, (void **)&folder);
++    CoTaskMemFree(pidl);
++    ok(hr == S_OK, "Failed to bind Recycle Bin, hr %#lx.\n", hr);
++    if (FAILED(hr)) return;
++    hr = IShellFolder_CreateViewObject(folder, NULL, &IID_IShellView, (void **)&view);
++    IShellFolder_Release(folder);
++    ok(hr == S_OK, "Failed to create Recycle Bin view, hr %#lx.\n", hr);
++    if (FAILED(hr)) return;
++    hr = IShellView_GetItemObject(view, SVGIO_BACKGROUND, &IID_IContextMenu, (void **)&context);
++    ok(hr == S_OK, "Failed to get Recycle Bin background menu, hr %#lx.\n", hr);
++    if (SUCCEEDED(hr))
++    {
++        menu = CreatePopupMenu();
++        ok(!!menu, "Failed to create popup menu, error %lu.\n", GetLastError());
++        if (menu)
++        {
++            hr = IContextMenu_QueryContextMenu(context, menu, 0, 0, 0x7fff, CMF_NORMAL);
++            ok(SUCCEEDED(hr), "Failed to query Recycle Bin background menu, hr %#lx.\n", hr);
++            if (SUCCEEDED(hr))
++                ok(!has_new_submenu(menu), "Recycle Bin offered an enabled New submenu.\n");
++            DestroyMenu(menu);
++        }
++        IContextMenu_Release(context);
++    }
++    IShellView_Release(view);
++}
++
+ static void test_CreateViewObject_contextmenu(void)
+ {
+     IShellFolder *desktop;
+@@ -4894,6 +4998,7 @@ static void test_CreateViewObject_contextmenu(void)
+     ok(hr == S_OK, "got 0x%08lx\n", hr);
+     if (SUCCEEDED(hr))
+         IContextMenu_Release(cmenu);
++    test_background_new_submenu(folder);
+     IShellFolder_Release(folder);
+     ILFree(pidl);
+     IShellFolder_Release(desktop);
+@@ -6333,6 +6438,7 @@ START_TEST(shlfolder)
+     test_IShellItemImageFactory();
+     test_GetUIObject();
+     test_CreateViewObject_contextmenu();
++    test_recycle_bin_background_menu();
+     test_SHSimpleIDListFromPath();
+     test_ParseDisplayNamePBC();
+     test_SHGetNameFromIDList();
