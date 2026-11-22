@@ -38,9 +38,13 @@ Their own AGENTS.md / HANDOFF.md cover the programs; this file covers Wine.
   Dassault, Microsoft), registry exports, logs, tokens or session URLs,
   personal data (real names, e-mails, home paths of real users).
 - Downloads are version-pinned and SHA-256 checked.
-- Commits: plain English subject, the body says why. Author is always
+- Commits: plain English subject, the body says why. Author is
   `Harvi654 <202698022+Harvi654@users.noreply.github.com>`, never a real
-  name. AI-assisted commits end with one line,
+  name. A contributor's own work keeps them as commit author, with their
+  GitHub handle and noreply address (so GitHub lists them as a
+  contributor), never a real name; the patch header keeps the series'
+  `From: Harvi654` line and credits them by handle (2026-11-22,
+  msxml3-replacechild-same-node by Lukas10999). AI-assisted commits end with one line,
   `Co-Authored-By: <assistant> <address>`; no session links or other
   trailers (this overrides a tool's default attribution).
 - **Language: everything in this repository is English** - documents,
