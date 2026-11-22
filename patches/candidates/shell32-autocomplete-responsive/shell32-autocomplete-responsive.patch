@@ -1,0 +1,489 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: shell32: Yield to edit input between autocomplete enumeration slices
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Windows 10 returned from WM_CHAR before enumerating, and its window
+answered probe messages during a slow source callback. Wine 11.22 calls
+Next in a loop on the edit thread before returning from WM_CHAR.
+
+Schedule enumeration as short timer callbacks on the edit thread. Keep the
+calls in the caller's COM apartment and finish each enumeration before
+publishing the suggestions. Cancel pending enumeration when the edit no
+longer needs its results. This candidate restores responsiveness between
+calls and leaves the remaining difference in callback threading visible.
+
+2026-11-19, v2 after independent review: clean up canceled requests
+when a provider callback unwinds and recheck the edit state after
+autoappend sends messages to the host window procedure.
+
+diff --git a/dlls/shell32/autocomplete.c b/dlls/shell32/autocomplete.c
+--- a/dlls/shell32/autocomplete.c
++++ b/dlls/shell32/autocomplete.c
+@@ -26,6 +26,7 @@
+   - implement ACO_WORD_FILTER style
+  */
+ 
++#include <limits.h>
+ #include <stdarg.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -33,6 +34,7 @@
+ #define COBJMACROS
+ 
+ #include "wine/debug.h"
++#include "wine/exception.h"
+ #include "windef.h"
+ #include "winbase.h"
+ #include "winreg.h"
+@@ -48,6 +50,8 @@
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(shell);
+ 
++struct enum_request;
++
+ typedef struct
+ {
+     IAutoComplete2 IAutoComplete2_iface;
+@@ -68,6 +72,7 @@
+     WCHAR *quickComplete;
+     IEnumString *enumstr;
+     IACList *aclist;
++    struct enum_request *request, *running_request;
+     AUTOCOMPLETEOPTIONS options;
+     WCHAR no_fwd_char;
+ } IAutoCompleteImpl;
+@@ -79,6 +84,15 @@
+     autoappend_flag_displayempty
+ };
+ 
++struct enum_request
++{
++    WCHAR **strings;
++    UINT count, capacity;
++    BOOL started;
++    enum autoappend_flag flag;
++    WCHAR prefix[];
++};
++
+ enum prefix_filtering
+ {
+     prefix_filtering_none = 0,  /* no prefix filtering (raw search) */
+@@ -195,54 +209,23 @@
+     qsort(strs, numstrs, sizeof(*strs), sort_strs_cmpfn[pfx_filter]);
+ }
+ 
+-/*
+-   Enumerate all of the strings and sort them in the internal list.
+-
+-   We don't free the enumerated strings (except on error) to avoid needless
+-   copies, until the next reset (or the object itself is destroyed)
+-*/
+-static void enumerate_strings(IAutoCompleteImpl *ac, enum prefix_filtering pfx_filter)
++static void free_enum_request(struct enum_request *request)
+ {
+-    UINT cur = 0, array_size = 1024;
+-    LPOLESTR *strs = NULL, *tmp;
+-    BOOL str_read = FALSE;
+-
+-    do
+-    {
+-        if ((tmp = realloc(strs, array_size * sizeof(*strs))) == NULL)
+-            goto fail;
+-        strs = tmp;
+-
+-        do
+-        {
+-            /* An implementation of IEnumString::Next in the ETQW World Editor
+-               never initializes the output number of strings returned, so to
+-               determine if a string was successfully retrieved, just enumerate
+-               one string at a time and check the returned HRESULT. */
+-            ULONG dummy;
+-            HRESULT hr = IEnumString_Next(ac->enumstr, 1, &strs[cur], &dummy);
+-            str_read = SUCCEEDED(hr) && hr != S_FALSE;
+-        } while (str_read && ++cur < array_size);
+-
+-        array_size *= 2;
+-    } while (str_read);
+-
+-    /* Allocate even if there were zero strings enumerated, to mark it non-NULL */
+-    if ((tmp = realloc(strs, max(cur, 1) * sizeof(*strs))))
+-    {
+-        strs = tmp;
+-        if (cur > 0)
+-            sort_strs(strs, cur, pfx_filter);
++    while (request->count)
++        CoTaskMemFree(request->strings[--request->count]);
++    free(request->strings);
++    free(request);
++}
+ 
+-        ac->enum_strs = strs;
+-        ac->enum_strs_num = cur;
+-        return;
+-    }
++static void cancel_enumeration(IAutoCompleteImpl *ac)
++{
++    struct enum_request *request = ac->request;
+ 
+-fail:
+-    while (cur--)
+-        CoTaskMemFree(strs[cur]);
+-    free(strs);
++    if (!request) return;
++    ac->request = NULL;
++    KillTimer(ac->hwndEdit, (UINT_PTR)request);
++    /* A provider callback may reenter the edit window while this job is running. */
++    if (request != ac->running_request) free_enum_request(request);
+ }
+ 
+ static UINT find_matching_enum_str(IAutoCompleteImpl *ac, UINT start, WCHAR *text,
+@@ -268,6 +251,8 @@
+ static void free_enum_strs(IAutoCompleteImpl *ac)
+ {
+     WCHAR **strs = ac->enum_strs;
++
++    cancel_enumeration(ac);
+     if (strs)
+     {
+         UINT i = ac->enum_strs_num;
+@@ -457,20 +442,7 @@
+     return 0;
+ }
+ 
+-static BOOL do_aclist_expand(IAutoCompleteImpl *ac, WCHAR *txt, WCHAR *last_delim)
+-{
+-    WCHAR c = last_delim[1];
+-
+-    free_enum_strs(ac);
+-    IEnumString_Reset(ac->enumstr);  /* call before expand */
+-
+-    last_delim[1] = '\0';
+-    IACList_Expand(ac->aclist, txt);
+-    last_delim[1] = c;
+-    return TRUE;
+-}
+-
+-static BOOL aclist_expand(IAutoCompleteImpl *ac, WCHAR *txt)
++static size_t aclist_expand_length(IAutoCompleteImpl *ac, WCHAR *txt)
+ {
+     /* call IACList::Expand only when needed, if the
+        new txt and old_txt require different expansions */
+@@ -480,19 +452,19 @@
+     size_t i = 0;
+ 
+     /* always expand if the enumerator was reset */
+-    if (!ac->enum_strs) old_txt = L"";
++    if (!ac->enum_strs && !ac->request) old_txt = L"";
+ 
+     /* skip the shared prefix */
+     while ((c = towlower(txt[i])) == towlower(old_txt[i]))
+     {
+-        if (c == '\0') return FALSE;
++        if (c == '\0') return 0;
+         i++;
+     }
+ 
+     /* they differ at this point, check for a delim further in txt */
+     for (last_delim = NULL, p = &txt[i]; (p = wcspbrk(p, L"\\/")) != NULL; p++)
+         last_delim = p;
+-    if (last_delim) return do_aclist_expand(ac, txt, last_delim);
++    if (last_delim) return last_delim - txt + 1;
+ 
+     /* txt has no delim after i, check for a delim further in old_txt */
+     if (wcspbrk(&old_txt[i], L"\\/"))
+@@ -500,40 +472,41 @@
+         /* scan backwards to find the first delim before txt[i] (if any) */
+         while (i--)
+             if (wcschr(L"\\/", txt[i]))
+-                return do_aclist_expand(ac, txt, &txt[i]);
++                return i + 1;
+ 
+         /* Windows doesn't expand without a delim, but it does reset */
+         free_enum_strs(ac);
+     }
+ 
+-    return FALSE;
++    return 0;
++}
++
++static BOOL matching_state_is_current(IAutoCompleteImpl *ac, HWND hwnd, WCHAR *text, WCHAR **strings)
++{
++    return ac->hwndEdit == hwnd && ac->enabled && ac->txtbackup == text && ac->enum_strs == strings;
+ }
+ 
+-static void autoappend_str(IAutoCompleteImpl *ac, WCHAR *text, UINT len, WCHAR *str, HWND hwnd)
++static void autoappend_str(IAutoCompleteImpl *ac, WCHAR *text, UINT len, WCHAR **strings,
++                           WCHAR *str, HWND hwnd)
+ {
+-    DWORD sel_start;
++    DWORD sel_start = ~0u;
+     WCHAR *tmp;
+     size_t size;
+ 
+     /* Don't auto-append unless the caret is at the end */
+     SendMessageW(hwnd, EM_GETSEL, (WPARAM)&sel_start, 0);
+-    if (sel_start != len)
++    if (sel_start != len || !matching_state_is_current(ac, hwnd, text, strings))
+         return;
+ 
+     /* The character capitalization can be different,
+        so merge text and str into a new string */
+     size = len + lstrlenW(&str[len]) + 1;
+ 
+-    if ((tmp = malloc(size * sizeof(*tmp))))
+-    {
+-        memcpy(tmp, text, len * sizeof(*tmp));
+-        memcpy(&tmp[len], &str[len], (size - len) * sizeof(*tmp));
+-    }
+-    else tmp = str;
+-
++    if (!(tmp = malloc(size * sizeof(*tmp)))) return;
++    memcpy(tmp, text, len * sizeof(*tmp));
++    memcpy(&tmp[len], &str[len], (size - len) * sizeof(*tmp));
+     set_text_and_selection(ac, hwnd, tmp, len, size - 1);
+-    if (tmp != str)
+-        free(tmp);
++    free(tmp);
+ }
+ 
+ static BOOL display_matching_strs(IAutoCompleteImpl *ac, WCHAR *text, UINT len,
+@@ -553,7 +526,11 @@
+             return !(ac->options & ACO_AUTOSUGGEST);
+ 
+         if (flag == autoappend_flag_yes)
+-            autoappend_str(ac, text, len, filter_str_prefix(str[start], pfx_filter), hwnd);
++        {
++            autoappend_str(ac, text, len, str, filter_str_prefix(str[start], pfx_filter), hwnd);
++            /* The edit's window procedure can discard or replace the suggestions. */
++            if (!matching_state_is_current(ac, hwnd, text, str)) return TRUE;
++        }
+         if (!(ac->options & ACO_AUTOSUGGEST))
+             return TRUE;
+ 
+@@ -597,10 +574,101 @@
+     return pfx_filter;
+ }
+ 
++static void finish_enumeration(IAutoCompleteImpl *ac, struct enum_request *request)
++{
++    enum prefix_filtering filter = setup_prefix_filtering(ac, ac->txtbackup);
++
++    cancel_enumeration(ac);
++    sort_strs(request->strings, request->count, filter);
++    ac->enum_strs = request->strings;
++    ac->enum_strs_num = request->count;
++    request->strings = NULL;
++    request->count = 0;
++    if (!display_matching_strs(ac, ac->txtbackup, lstrlenW(ac->txtbackup),
++                               filter, ac->hwndEdit, request->flag))
++        hide_listbox(ac, ac->hwndListBox, FALSE);
++}
++
++static void enumerate_slice(IAutoCompleteImpl *ac, struct enum_request *request)
++{
++    unsigned int calls;
++    DWORD started = GetTickCount();
++
++    if (!request->started)
++    {
++        request->started = TRUE;
++        IEnumString_Reset(ac->enumstr);
++        if (ac->request == request && request->prefix[0])
++            IACList_Expand(ac->aclist, request->prefix);
++        if (GetTickCount() - started >= 8) return;
++    }
++
++    /* Keep the source in its apartment. Process a small slice after input. */
++    for (calls = 0; ac->request == request && calls < 64; ++calls)
++    {
++        WCHAR *str = NULL, **strings;
++        ULONG fetched;
++        HRESULT hr;
++
++        if (request->count == request->capacity)
++        {
++            UINT capacity = request->capacity;
++
++            if (capacity > min(UINT_MAX, SIZE_MAX / sizeof(*strings)) / 2 ||
++                !(strings = realloc(request->strings, 2 * capacity * sizeof(*strings))))
++            {
++                cancel_enumeration(ac);
++                break;
++            }
++            request->strings = strings;
++            request->capacity = 2 * capacity;
++        }
++
++        /* Some sources leave the fetched count uninitialized. Check the HRESULT. */
++        hr = IEnumString_Next(ac->enumstr, 1, &str, &fetched);
++        if (SUCCEEDED(hr) && hr != S_FALSE && str)
++            request->strings[request->count++] = str;
++        else
++        {
++            if (ac->request == request) finish_enumeration(ac, request);
++            break;
++        }
++        if (GetTickCount() - started >= 8) break;
++    }
++}
++
++static void WINAPI enum_slice_cleanup(BOOL normal, void *context)
++{
++    IAutoCompleteImpl *ac = context;
++    struct enum_request *request = ac->running_request;
++
++    if (!normal && ac->request == request) cancel_enumeration(ac);
++    ac->running_request = NULL;
++    if (ac->request != request) free_enum_request(request);
++    IAutoComplete2_Release(&ac->IAutoComplete2_iface);
++}
++
++static void CALLBACK enum_timer_proc(HWND hwnd, UINT msg, UINT_PTR id, DWORD now)
++{
++    IAutoCompleteImpl *ac = GetPropW(hwnd, autocomplete_propertyW);
++    struct enum_request *request;
++
++    if (!ac || !(request = ac->request) || (UINT_PTR)request != id || ac->running_request)
++        return;
++
++    IAutoComplete2_AddRef(&ac->IAutoComplete2_iface);
++    ac->running_request = request;
++    __TRY
++    {
++        enumerate_slice(ac, request);
++    }
++    __FINALLY_CTX(enum_slice_cleanup, ac)
++}
++
+ static void autocomplete_text(IAutoCompleteImpl *ac, HWND hwnd, enum autoappend_flag flag)
+ {
+     WCHAR *text;
+-    BOOL expanded = FALSE;
++    size_t expand = 0;
+     enum prefix_filtering pfx_filter;
+     UINT size, len = SendMessageW(hwnd, WM_GETTEXTLENGTH, 0, 0);
+ 
+@@ -620,36 +688,54 @@
+         return;
+     }
+     len = SendMessageW(hwnd, WM_GETTEXT, size, (LPARAM)text);
+-    if (len + 1 != size)
+-        text = realloc(text, (len + 1) * sizeof(WCHAR));
+-
+     if (ac->aclist)
+     {
+-        if (text[len - 1] == '\\' || text[len - 1] == '/')
++        if (len && (text[len - 1] == '\\' || text[len - 1] == '/'))
+             flag = autoappend_flag_no;
+-        expanded = aclist_expand(ac, text);
++        expand = aclist_expand_length(ac, text);
+     }
++    if (expand) free_enum_strs(ac);
+     pfx_filter = setup_prefix_filtering(ac, text);
+ 
+-    if (expanded || !ac->enum_strs)
+-    {
+-        if (!expanded) IEnumString_Reset(ac->enumstr);
+-        enumerate_strings(ac, pfx_filter);
+-    }
+-
+     /* Set txtbackup to point to text itself (which must not be released),
+        and it must be done here since aclist_expand uses it to track changes */
+     free(ac->txtbackup);
+     ac->txtbackup = text;
+ 
++    if (!ac->enum_strs)
++    {
++        struct enum_request *request;
++
++        if (ac->options & ACO_AUTOSUGGEST)
++            hide_listbox(ac, ac->hwndListBox, FALSE);
++        if (!(request = ac->request))
++        {
++            if (!(request = calloc(1, sizeof(*request) + (expand + 1) * sizeof(WCHAR)))) return;
++            request->capacity = 64;
++            if (!(request->strings = malloc(request->capacity * sizeof(*request->strings))))
++            {
++                free(request);
++                return;
++            }
++            memcpy(request->prefix, text, expand * sizeof(WCHAR));
++            if (!SetTimer(hwnd, (UINT_PTR)request, USER_TIMER_MINIMUM, enum_timer_proc))
++            {
++                free_enum_request(request);
++                return;
++            }
++            ac->request = request;
++        }
++        request->flag = flag;
++        return;
++    }
+     if (!display_matching_strs(ac, text, len, pfx_filter, hwnd, flag))
+         hide_listbox(ac, ac->hwndListBox, FALSE);
+ }
+ 
+ static void destroy_autocomplete_object(IAutoCompleteImpl *ac)
+ {
+-    ac->hwndEdit = NULL;
+     free_enum_strs(ac);
++    ac->hwndEdit = NULL;
+     if (ac->hwndListBoxOwner)
+         DestroyWindow(ac->hwndListBoxOwner);
+     IAutoComplete2_Release(&ac->IAutoComplete2_iface);
+@@ -664,6 +750,7 @@
+     switch (wParam)
+     {
+         case VK_ESCAPE:
++            cancel_enumeration(ac);
+             /* When pressing ESC, Windows hides the auto-suggest listbox, if visible */
+             if ((ac->options & ACO_AUTOSUGGEST) && IsWindowVisible(ac->hwndListBoxOwner))
+             {
+@@ -673,6 +760,7 @@
+             }
+             break;
+         case VK_RETURN:
++            cancel_enumeration(ac);
+             /* If quickComplete is set and control is pressed, replace the string */
+             if (ac->quickComplete && (GetKeyState(VK_CONTROL) & 0x8000))
+             {
+@@ -757,6 +845,7 @@
+     switch (uMsg)
+     {
+         case CB_SHOWDROPDOWN:
++            cancel_enumeration(This);
+             if (This->options & ACO_AUTOSUGGEST)
+                 hide_listbox(This, This->hwndListBox, TRUE);
+             return 0;
+@@ -769,6 +858,7 @@
+                 hide_listbox(This, This->hwndListBox, FALSE);
+             }
+ 
++            cancel_enumeration(This);
+             /* Reset the enumerator if it's not visible anymore */
+             if (!IsWindowVisible(hwnd)) free_enum_strs(This);
+             break;
+@@ -797,6 +887,7 @@
+                                           ? autoappend_flag_yes : autoappend_flag_no);
+             return ret;
+         case WM_SETTEXT:
++            cancel_enumeration(This);
+             if (This->options & ACO_AUTOSUGGEST)
+                 hide_listbox(This, This->hwndListBox, TRUE);
+             break;
+@@ -997,6 +1088,7 @@
+ 
+     TRACE("(%p)->(%s)\n", This, (fEnable)?"true":"false");
+ 
++    if (!fEnable) cancel_enumeration(This);
+     This->enabled = fEnable;
+ 
+     return S_OK;
+@@ -1154,6 +1246,7 @@
+ 
+     TRACE("(%p) -> (0x%lx)\n", This, dwFlag);
+ 
++    if (changed) cancel_enumeration(This);
+     This->options = dwFlag;
+ 
+     if ((This->options & ACO_AUTOSUGGEST) && This->hwndEdit && !This->hwndListBox)

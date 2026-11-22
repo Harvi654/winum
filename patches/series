@@ -83,3 +83,18 @@ ole32-createfromfile-package.patch
 ole32-storage-localdocs.patch
 ole32-propset-null-strings.patch
 packager-save-view-advise.patch
+
+# Inventor Open breadcrumb labels.
+shell32-parentrelativeforui.patch
+
+# Inventor Open inline folder name confirmation.
+shell32-label-edit-enter.patch
+
+# Inventor Open New Folder command.
+shell32-background-menu.patch
+
+# Responsive filename editing with the recorded provider-thread deviation.
+shell32-autocomplete-responsive.patch
+
+# DWG TrueView and AutoCAD Profile.aws: replaceChild with the same node (Lukas10999, #4).
+msxml3-replacechild-same-node.patch

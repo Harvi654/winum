@@ -1,0 +1,180 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: shell32: Handle Enter in the focused shell view label editor
+
+Inventor delegates Enter to the shell view and opens the selected folder after the Wine stub returns S_FALSE. Windows 10 build 19045.6466 consumes this message, commits the label and closes the editor on x86_64 and i686.
+
+Dispatch only WM_KEYDOWN VK_RETURN addressed to the focused inline editor. Reuse the existing list-view end-edit behavior and leave the other keys and targets on the unhandled path.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+diff --git a/dlls/shell32/shlview.c b/dlls/shell32/shlview.c
+index af09787..dd02679 100644
+--- a/dlls/shell32/shlview.c
++++ b/dlls/shell32/shlview.c
+@@ -1915,23 +1915,26 @@ static HRESULT WINAPI IShellView_fnContextSensitiveHelp(IShellView3 *iface, BOOL
+ 
+ /**********************************************************
+ * IShellView_TranslateAccelerator
+-*
+-* FIXME:
+-*  use the accel functions
+ */
+ static HRESULT WINAPI IShellView_fnTranslateAccelerator(IShellView3 *iface, MSG *lpmsg)
+ {
+-#if 0
+-	IShellViewImpl *This = (IShellViewImpl *)iface;
++    IShellViewImpl *This = impl_from_IShellView3(iface);
++    HWND edit;
+ 
+-	FIXME("(%p)->(%p: hwnd=%x msg=%x lp=%x wp=%x) stub\n",This,lpmsg, lpmsg->hwnd, lpmsg->message, lpmsg->lParam, lpmsg->wParam);
+-#endif
++    if (lpmsg->message >= WM_KEYFIRST && lpmsg->message <= WM_KEYLAST)
++        TRACE("key %#Ix in message %#x targeting %p\n", lpmsg->wParam, lpmsg->message, lpmsg->hwnd);
+ 
+-	if ((lpmsg->message>=WM_KEYFIRST) && (lpmsg->message<=WM_KEYLAST))
+-	{
+-	  TRACE("-- key=0x04%Ix\n",lpmsg->wParam) ;
+-	}
+-	return S_FALSE; /* not handled */
++    if (This->hWndList && lpmsg->message == WM_KEYDOWN && lpmsg->wParam == VK_RETURN)
++    {
++        edit = (HWND)SendMessageW(This->hWndList, LVM_GETEDITCONTROL, 0, 0);
++        if (edit && lpmsg->hwnd == edit && GetFocus() == edit)
++        {
++            DispatchMessageW(lpmsg);
++            return S_OK;
++        }
++    }
++
++    return S_FALSE;
+ }
+ 
+ static HRESULT WINAPI IShellView_fnEnableModeless(IShellView3 *iface, BOOL fEnable)
+diff --git a/dlls/shell32/tests/ebrowser.c b/dlls/shell32/tests/ebrowser.c
+index ed85576..8e28ce5 100644
+--- a/dlls/shell32/tests/ebrowser.c
++++ b/dlls/shell32/tests/ebrowser.c
+@@ -1760,6 +1760,116 @@ static void test_folder_settings(void)
+     IExplorerBrowser_Release(browser);
+ }
+ 
++static void test_label_edit_enter(void)
++{
++    WCHAR temp[MAX_PATH], sample[MAX_PATH], original[MAX_PATH], renamed[MAX_PATH], class_name[64];
++    FOLDERSETTINGS settings = {FVM_LIST, FWF_NONE};
++    PIDLIST_ABSOLUTE parent = NULL, child = NULL;
++    IExplorerBrowser *browser = NULL;
++    IShellView *view = NULL;
++    HWND view_window, edit;
++    MSG msg = {0};
++    RECT rect;
++    DWORD len;
++    BOOL ret;
++    HRESULT hr;
++
++    winetest_subtest("label_edit_enter");
++
++    len = GetTempPathW(ARRAY_SIZE(temp), temp);
++    ok(len && len < ARRAY_SIZE(temp), "Failed to get temp path.\n");
++    if (!len || len >= ARRAY_SIZE(temp)) return;
++    ret = !!GetTempFileNameW(temp, L"ebv", 0, sample);
++    ok(ret, "Failed to reserve sample name, error %lu.\n", GetLastError());
++    if (!ret) return;
++    ret = DeleteFileW(sample) && CreateDirectoryW(sample, NULL);
++    ok(ret, "Failed to create sample directory, error %lu.\n", GetLastError());
++    if (!ret) return;
++
++    if (!PathCombineW(original, sample, L"OriginalProbe") ||
++        !PathCombineW(renamed, sample, L"RenamedProbe"))
++    {
++        ok(0, "Sample paths are too long.\n");
++        RemoveDirectoryW(sample);
++        return;
++    }
++    ret = CreateDirectoryW(original, NULL);
++    ok(ret, "Failed to create child directory, error %lu.\n", GetLastError());
++    if (!ret) goto cleanup;
++
++    hr = SHParseDisplayName(sample, NULL, &parent, 0, NULL);
++    ok(hr == S_OK, "Failed to parse parent, hr %#lx.\n", hr);
++    if (FAILED(hr)) goto cleanup;
++    hr = SHParseDisplayName(original, NULL, &child, 0, NULL);
++    ok(hr == S_OK, "Failed to parse child, hr %#lx.\n", hr);
++    if (FAILED(hr)) goto cleanup;
++
++    hr = ebrowser_instantiate(&browser);
++    ok(hr == S_OK, "Failed to create browser, hr %#lx.\n", hr);
++    if (FAILED(hr)) goto cleanup;
++    ShowWindow(hwnd, SW_SHOWNORMAL);
++    GetClientRect(hwnd, &rect);
++    hr = IExplorerBrowser_Initialize(browser, hwnd, &rect, &settings);
++    ok(hr == S_OK, "Failed to initialize browser, hr %#lx.\n", hr);
++    if (FAILED(hr)) goto cleanup;
++    SetActiveWindow(hwnd);
++
++    hr = IExplorerBrowser_BrowseToIDList(browser, parent, SBSP_ABSOLUTE);
++    ok(hr == S_OK, "Failed to browse to parent, hr %#lx.\n", hr);
++    if (FAILED(hr)) goto cleanup;
++    process_msgs();
++    hr = IExplorerBrowser_GetCurrentView(browser, &IID_IShellView, (void **)&view);
++    ok(hr == S_OK, "Failed to get shell view, hr %#lx.\n", hr);
++    if (FAILED(hr)) goto cleanup;
++    hr = IShellView_GetWindow(view, &view_window);
++    ok(hr == S_OK, "Failed to get shell view window, hr %#lx.\n", hr);
++    if (FAILED(hr)) goto cleanup;
++    IShellView_UIActivate(view, SVUIA_ACTIVATE_FOCUS);
++    hr = IShellView_SelectItem(view, ILFindLastID(child), SVSI_DESELECTOTHERS | SVSI_EDIT |
++                              SVSI_ENSUREVISIBLE | SVSI_FOCUSED | SVSI_SELECT);
++    ok(hr == S_OK, "Failed to start editing the label, hr %#lx.\n", hr);
++    if (FAILED(hr)) goto cleanup;
++    process_msgs();
++
++    edit = GetFocus();
++    ret = IsChild(view_window, edit) && GetClassNameW(edit, class_name, ARRAY_SIZE(class_name)) &&
++          !lstrcmpiW(class_name, L"Edit");
++    ok(ret, "Expected the inline editor to have focus.\n");
++    if (!ret) goto cleanup;
++    ret = SetWindowTextW(edit, L"RenamedProbe");
++    ok(ret, "Failed to set the edit text, error %lu.\n", GetLastError());
++    if (!ret) goto cleanup;
++
++    msg.hwnd = edit;
++    msg.message = WM_KEYDOWN;
++    msg.wParam = VK_RETURN;
++    msg.lParam = 0x001c0001;
++    msg.time = GetTickCount();
++    hr = IShellView_TranslateAccelerator(view, &msg);
++    ok(hr == S_OK, "Enter accelerator returned %#lx.\n", hr);
++    process_msgs();
++
++    ok(GetFileAttributesW(original) == INVALID_FILE_ATTRIBUTES, "Original name still exists.\n");
++    len = GetFileAttributesW(renamed);
++    ok(len != INVALID_FILE_ATTRIBUTES && (len & FILE_ATTRIBUTE_DIRECTORY),
++       "Expected the renamed folder, got attributes %#lx.\n", len);
++    ok(!IsWindow(edit), "The inline editor is still open.\n");
++
++cleanup:
++    if (view) IShellView_Release(view);
++    if (browser)
++    {
++        IExplorerBrowser_Destroy(browser);
++        IExplorerBrowser_Release(browser);
++        ShowWindow(hwnd, SW_HIDE);
++    }
++    CoTaskMemFree(child);
++    CoTaskMemFree(parent);
++    RemoveDirectoryW(original);
++    RemoveDirectoryW(renamed);
++    RemoveDirectoryW(sample);
++}
++
+ START_TEST(ebrowser)
+ {
+     OleInitialize(NULL);
+@@ -1784,6 +1894,7 @@ START_TEST(ebrowser)
+     test_SetSite();
+     test_InputObject();
+     test_folder_settings();
++    test_label_edit_enter();
+ 
+     DestroyWindow(hwnd);
+     OleUninitialize();

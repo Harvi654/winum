@@ -1,0 +1,47 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [TEST PATCH] server: Report the service manager in session zero.
+
+AI-assisted (Codex); LGPL-2.1-or-later. Not submitted upstream.
+Based on the session-reporting experiment by Lorenzo Cozzaglio in
+lori28167/autocad-wine-linux, commit ec02824ab92c548202636d889e94f3ea14e9ff85.
+
+The Winum AutoCAD reference reports services.exe in session 1 and the
+registered Autodesk service times out while connecting to the service
+manager. Go's Windows service detection reads the parent's session
+from the process list. Test the effect of reporting services.exe in
+session 0 there. This diagnostic candidate leaves tokens and the
+service's actual session unchanged. Windows process-list measurement
+and the AutoCAD service-start comparison are pending.
+
+diff --git a/server/process.c b/server/process.c
+--- a/server/process.c
++++ b/server/process.c
+@@ -1986,6 +1986,19 @@
+     }
+ }
+
++/* Scope the service-manager session experiment to process enumeration. */
++static unsigned int reported_process_session( const struct process *process )
++{
++    static const WCHAR suffix[] = {'\\','s','e','r','v','i','c','e','s','.','e','x','e'};
++    const size_t len = sizeof(suffix);
++
++    if (process->image && process->imagelen >= len &&
++        !memicmp_strW( process->image + (process->imagelen - len) / sizeof(WCHAR), suffix, len ))
++        return 0;
++
++    return process->session_id;
++}
++
+ /* Get a list of processes and threads currently running */
+ DECL_HANDLER(list_processes)
+ {
+@@ -2044,7 +2057,7 @@
+         process_info->priority = process->priority;
+         process_info->pid = process->id;
+         process_info->parent_pid = process->parent_id;
+-        process_info->session_id = process->session_id;
++        process_info->session_id = reported_process_session( process );
+         process_info->handle_count = get_handle_table_count(process);
+         process_info->unix_pid = process->unix_pid;
+         pos += sizeof(*process_info);
