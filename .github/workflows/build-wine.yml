@@ -25,7 +25,7 @@ on:
         required: false
         default: ''
   push:
-    branches: [main, 'topic/**']
+    branches: [main, 'topic/**', 'test-run/release-11.22-2']
     tags: ['winum-*']
     paths:
       - 'patches/**'
@@ -101,7 +101,10 @@ jobs:
             . wine/version.env
             name="winum-$WINE_VERSION-$WINUM_BUILD" ref="$GITHUB_SHA"
             # a test build of a topic branch is labelled with the branch
-            case "$GITHUB_REF_NAME" in topic/*) name="$name-${GITHUB_REF_NAME#topic/}" ;; esac
+            case "$GITHUB_REF_NAME" in
+              topic/*) name="$name-${GITHUB_REF_NAME#topic/}" ;;
+              test-run/release-11.22-2) name="$name-candidate" ;;
+            esac
           fi
           { echo "name=$name"; echo "ref=$ref"; echo "build=$build"; echo "source=$source"; echo "publish=$publish"; } >> "$GITHUB_OUTPUT"
           echo "name=$name ref=$ref build=$build source=$source publish=$publish"
@@ -134,6 +137,10 @@ jobs:
       - name: Build
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if [ "$GITHUB_REF_NAME" = test-run/release-11.22-2 ]; then
+            export WINUM_TEST_PATCH_DIR="$RUNNER_TEMP/release-candidate-patches"
+            bash scripts/stage-11.22-2-candidates.sh "$WINUM_TEST_PATCH_DIR"
+          fi
           JOBS=$(nproc) WORK=/tmp/work bash scripts/build-wine.sh dist
 
       - name: Logs on failure
@@ -161,11 +168,43 @@ jobs:
       - name: Source archive
         env:
           REF: ${{ needs.plan.outputs.ref }}
-        run: bash scripts/make-wine-source.sh --ref "$REF" dist
+        run: |
+          if [ "$GITHUB_REF_NAME" = test-run/release-11.22-2 ]; then
+            export WINUM_TEST_PATCH_DIR="$RUNNER_TEMP/release-candidate-patches"
+            bash scripts/stage-11.22-2-candidates.sh "$WINUM_TEST_PATCH_DIR"
+          fi
+          bash scripts/make-wine-source.sh --ref "$REF" dist
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ needs.plan.outputs.name }}-source
           path: dist/*
+          retention-days: 30
+
+  l1:
+    if: github.ref == 'refs/heads/test-run/release-11.22-2'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install the cross-compilers and Wine build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 gcc-mingw-w64-i686 bison flex llvm
+      - name: Build the Windows 10 test bundles
+        run: bash scripts/build-l1-release-11.22-2.sh "$RUNNER_TEMP/l1"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: winum-11.22-2-l1-ucrtbase
+          path: ${{ runner.temp }}/l1/ucrtbase/
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: winum-11.22-2-l1-user32
+          path: ${{ runner.temp }}/l1/user32/
+          if-no-files-found: error
           retention-days: 30
 
   release:

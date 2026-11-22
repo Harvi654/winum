@@ -16,7 +16,7 @@ on:
         required: false
         default: ''
   push:
-    branches: ['test-run/**']
+    branches: ['test-run/**', '!test-run/release-11.22-2']
 
 permissions:
   contents: read

@@ -54,7 +54,7 @@ say "Applying patches/series"
 # scripts/make-wine-source.sh publishes exactly this tree as the release's source
 # shellcheck disable=SC1091
 source "$HERE/scripts/lib/wine-patches.sh"
-wine_apply_patches "$SRC" "$HERE/patches" "$HERE" HEAD || die "patches do not apply to Wine $WINE_VERSION"
+wine_apply_patches "$SRC" "${WINUM_TEST_PATCH_DIR:-$HERE/patches}" "$HERE" HEAD || die "patches do not apply to Wine $WINE_VERSION"
 cd "$SRC"
 
 say "Configuring"

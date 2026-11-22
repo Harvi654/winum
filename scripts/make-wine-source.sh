@@ -53,6 +53,9 @@ for p in patches wine/version.env scripts/build-wine.sh scripts/lib/wine-patches
     git -C "$HERE" cat-file -e "$COMMIT:$p" 2>/dev/null && paths+=("$p")
 done
 git -C "$HERE" archive --format=tar "$COMMIT" -- "${paths[@]}" | tar -x -C "$EXP"
+if [ -n "${WINUM_TEST_PATCH_DIR:-}" ]; then
+    cp -- "$WINUM_TEST_PATCH_DIR"/series "$WINUM_TEST_PATCH_DIR"/*.patch "$EXP/patches/"
+fi
 # only series and the patches it names are part of the build (not candidates/, debug/, ...)
 # shellcheck disable=SC1091
 source "$HERE/scripts/lib/wine-patches.sh"
