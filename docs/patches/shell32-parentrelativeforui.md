@@ -45,6 +45,7 @@ See the [trace and Windows results](../wine-repro/shell32-parentrelativeforui/RE
 | L4 | Passed in Inventor 2027 and 2026 on Arch/KDE, candidate `9cd7d88` (maintainer, 2026-11-18). The Open breadcrumb works in both versions and the maintainer reported no regression in the L4 smoke test. SOLIDWORKS and AutoCAD deferred under AGENTS.md. |
 | L5 | Pending |
 | Cross review | Approved by an independent Codex reviewer (2026-11-18). Both candidate diffs were read in full. |
+| Cross review (second model) | Approved by Claude Opus 5.5 (2026-11-22), patch and test read in full. The fix maps only `SIGDN_PARENTRELATIVEFORUI` onto the existing `SIGDN_PARENTRELATIVE` branch of `SHGetNameFromIDList` (`SHGDN_INFOLDER`), which matches the four measured items; `IShellItem::GetDisplayName` reaches it through the same function. The test compares against names Wine already returns for the same item, not English strings, and keeps the drive-root distinction from `PARENTRELATIVEFORADDRESSBAR`. Open, not blocking: only folders were measured - a file item (extension shown or hidden) is not covered; the breadcrumb itself only shows folders. |
 
 ## Inventor 2027 Stress Analysis smoke check
 

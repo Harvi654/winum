@@ -45,3 +45,4 @@ and filesystem state. See the
 | L4 | Passed on candidate `c440f0e` (maintainer, 2026-11-18). Enter commits the name in the Open dialog. SOLIDWORKS and AutoCAD deferred under AGENTS.md. |
 | L5 | Pending |
 | Cross review | Approved by an independent Codex reviewer (2026-11-18). Both candidate diffs were read in full. |
+| Cross review (second model) | Approved by Claude Opus 5.5 (2026-11-22), patch and test read in full. `TranslateAccelerator` now consumes only `WM_KEYDOWN VK_RETURN` addressed to the list view's focused label editor and dispatches it there, so comctl32's existing end-edit path commits the name; the caller then sends no `WM_CHAR` and Inventor no longer opens the folder. Every other key and target keeps returning `S_FALSE`, as before. Follow-up worth measuring (not blocking): what Windows returns for `VK_ESCAPE` in the same editor - if it consumes it too, Escape in Inventor's Open dialog would cancel the rename instead of reaching the dialog. |
