@@ -48,8 +48,20 @@ beginning with `cscript kind=` already record the process status.
 | --- | --- | --- |
 | Offline Windows 10 | Pending | Pending |
 | Vanilla Wine 11.22 | CI | CI |
-| Winum 11.22-2 | CI | CI |
+| Winum 11.22-2 | [Text](results/winum-11.22-2/result-x86_64.txt) | [Text](results/winum-11.22-2/result-i686.txt) |
 
 The Windows results supply the expectations for any Wine test. Record
 cscript behaviour separately from wbemdisp, including on the deliberate
 runtime error.
+
+### Wine baseline
+
+The C columns count the Invoke HRESULTs across the 13 calls per flag.
+The cscript columns are the process exit codes for the two scripts.
+
+| Runtime | Architecture | METHOD | METHOD + PROPERTYGET | Direct script | Intentional error |
+| --- | --- | --- | --- | --- | --- |
+| winum-11.22-2 | x86_64 | `0x80004001` × 13 | `0x80041002` × 13 | 0 | 0 |
+| winum-11.22-2 | i686 | `0x80004001` × 13 | `0x80041002` × 13 | 0 | 0 |
+
+[CI run](https://github.com/Harvi654/winum/actions/runs/45257510865).
