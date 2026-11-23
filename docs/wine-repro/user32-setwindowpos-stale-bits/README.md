@@ -119,3 +119,53 @@ a repaint in C or E_direct on any of the measured runtimes.
 are byte-identical to the matching Winum result files for both architectures.
 A regression test for the Inventor symptom still needs a sequence with an
 observable Windows versus Wine difference.
+
+## Round 3: H, frame-painted ribbon and nested child
+
+The added trace review found no ribbon child over the frame's top 146 pixels.
+The frame had no WS_CLIPCHILDREN. The visible 350 × 868 container sat at
+(0,0), contained a 230 × 230 child, and received FRAMECHANGED before a
+plain move. There was no intervening container WM_PAINT in the trace.
+
+The current bundle runs H by default. The 20 A–G cases above can still be
+run by passing `--previous` directly to either EXE. For H, use an
+unobstructed desktop of at least 1920 × 1080 at 96 DPI. CI uses 2048 × 1152
+Xvfb. The frame's client is 1920 × 1040. The container moves to (1570,146),
+with X shifted left only if necessary to keep the full destination on screen.
+An H setup line records the actual geometry.
+
+The frame paints a red 146-pixel band and a gray background in WM_PAINT.
+The blue container and its green child paint once before the sequence. The
+12 combinations cross three child ownership modes with all/default redraw
+and pending/clean container updates:
+
+- **same** keeps the nested child on the frame thread.
+- **held** keeps the nested child on a worker that handles sent messages but
+  leaves its posted queue undrained through the move.
+- **live** lets the nested worker dispatch queued messages through the move.
+  Snapshots can see concurrent nested paint. The frame and blue container
+  always stay on the calling thread.
+
+The pending variant invalidates the container-local rectangle
+(250,0)–(350,240) before calling RedrawWindow on the frame. The clean variant
+starts with a validated container update region. RedrawWindow uses
+RDW_INVALIDATE | RDW_UPDATENOW, with RDW_ALLCHILDREN in the all variant.
+After each call the harness takes a snapshot. It follows the frame redraw
+with SetWindowPos(FRAMECHANGED | NOMOVE | NOSIZE | NOZORDER | NOACTIVATE),
+then SetWindowPos(NOZORDER | NOACTIVATE) to the new position. The main
+thread drains its posted queue only after these calls. The final snapshot
+follows a drain on both owners.
+
+H samples six points, in this order: (10,10), (260,10), (10,180),
+(260,180), (10,760), (260,760). Each is sampled at the old and new
+positions. The region membership array uses the same order. Gray is
+`00404040`. Frame and nested-child counts and the nested child's update
+rectangle are printed alongside the container's measurements. An H
+completion marker reports 12 cases. Return only the two text results and
+the exit codes, as for the previous offline run.
+
+| Runtime | x86_64 | i686 |
+|---|---|---|
+| Vanilla Wine 11.22 | Pending CI | Pending CI |
+| Winum 11.22-2 test build | Pending CI | Pending CI |
+| Offline Windows 10 | Pending | Pending |

@@ -20,8 +20,8 @@ for arch in x86_64 i686; do
         timeout -k 5s 60s "$WINESERVER" -w
         timeout -k 5s 90s "$wine" "$bundle/stale-bits-$arch.exe" |
             tr -d '\r' > "$out/result-$arch.txt"
-        grep -Fxq 'measure_complete cases=20' "$out/result-$arch.txt"
-        [[ $(grep -c ' step=after_pump ' "$out/result-$arch.txt") == 20 ]]
+        grep -Fxq 'measure_complete cases=12' "$out/result-$arch.txt"
+        [[ $(grep -c ' step=after_pump ' "$out/result-$arch.txt") == 12 ]]
         if grep -q ' error=' "$out/result-$arch.txt"; then
             grep ' error=' "$out/result-$arch.txt"
             exit 1

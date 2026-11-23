@@ -2,9 +2,20 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <stdio.h>
+#include <string.h>
 
 enum { width = 180, height = 150, target_x = 320, target_y = 70 };
-enum { paint_queue = 1, stop_worker };
+enum { paint_queue = 1, stop_worker, pump_live, hold_queue };
+enum { h_width = 350, h_height = 868, h_band = 146, h_nested = 230 };
+static const POINT old_probes[] = {{width / 4, height / 2}, {3 * width / 4, height / 2}};
+static const POINT h_probes[] = {{10, 10}, {260, 10}, {10, 180}, {260, 180}, {10, 760}, {260, 760}};
+
+struct geometry
+{
+    int x, y;
+    const POINT *probes;
+    unsigned count;
+};
 static const char class_name[] = "WinumStaleBitsMeasure";
 
 struct counts
@@ -19,6 +30,7 @@ struct pane
 {
     HWND hwnd;
     BOOL root, red_origin;
+    int red_band;
     COLORREF color;
     CRITICAL_SECTION lock;
     struct counts counts;
@@ -29,7 +41,8 @@ struct worker
     const char *name;
     struct pane *container;
     HWND parent;
-    BOOL visible;
+    DWORD style;
+    int width, height;
     HANDLE thread, ready, request, done;
     LONG command;
 };
@@ -71,7 +84,12 @@ static LRESULT CALLBACK pane_proc(HWND window, UINT message, WPARAM wp, LPARAM l
         if (dc && GetClientRect(window, &rect))
         {
             fill(dc, &rect, pane->color);
-            if (pane->root && pane->red_origin)
+            if (pane->root && pane->red_band)
+            {
+                rect.bottom = pane->red_band;
+                fill(dc, &rect, RGB(255, 0, 0));
+            }
+            else if (pane->root && pane->red_origin)
             {
                 SetRect(&rect, 0, 0, width, height);
                 fill(dc, &rect, RGB(255, 0, 0));
@@ -138,23 +156,34 @@ static DWORD WINAPI worker_proc(void *arg)
     struct worker *worker = arg;
     MSG msg;
     DWORD status;
-    worker->container->hwnd = make_child(worker->container, worker->parent,
-                                         WS_CLIPCHILDREN | WS_CLIPSIBLINGS |
-                                         (worker->visible ? WS_VISIBLE : 0), 0, width);
+    BOOL live = FALSE;
+    worker->container->hwnd = CreateWindowExA(0, class_name, "", WS_CHILD | worker->style,
+                                              0, 0, worker->width, worker->height, worker->parent,
+                                              NULL, GetModuleHandleA(NULL), worker->container);
     record_call(worker->name, "CreateWindowEx(container worker)", !!worker->container->hwnd);
     if (!SetEvent(worker->ready)) return 1;
     for (;;)
     {
-        status = MsgWaitForMultipleObjectsEx(1, &worker->request, INFINITE, QS_SENDMESSAGE,
+        status = MsgWaitForMultipleObjectsEx(1, &worker->request, INFINITE,
+                                            live ? QS_ALLINPUT : QS_SENDMESSAGE,
                                             MWMO_INPUTAVAILABLE);
         if (status == WAIT_OBJECT_0)
         {
-            if (InterlockedCompareExchange(&worker->command, 0, 0) == stop_worker) break;
-            drain(worker->name);
+            LONG command = InterlockedCompareExchange(&worker->command, 0, 0);
+            if (command == stop_worker) break;
+            if (command == paint_queue) drain(worker->name);
+            else live = command == pump_live;
             if (!SetEvent(worker->done)) break;
         }
         else if (status == WAIT_OBJECT_0 + 1)
-            PeekMessageW(&msg, NULL, 0, 0, PM_NOREMOVE | PM_QS_SENDMESSAGE);
+        {
+            if (live)
+            {
+                if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE) && msg.message != WM_QUIT)
+                    DispatchMessageW(&msg);
+            }
+            else PeekMessageW(&msg, NULL, 0, 0, PM_NOREMOVE | PM_QS_SENDMESSAGE);
+        }
         else break;
     }
     if (worker->container->hwnd)
@@ -183,14 +212,53 @@ static void wait_without_paint(const char *name, const char *step, HANDLE event)
     ExitProcess(0);
 }
 
+static BOOL start_worker(struct worker *worker, const char *name, struct pane *pane,
+                         HWND parent, DWORD style, int w, int h)
+{
+    worker->name = name;
+    worker->container = pane;
+    worker->parent = parent;
+    worker->style = style;
+    worker->width = w;
+    worker->height = h;
+    worker->ready = CreateEventA(NULL, FALSE, FALSE, NULL);
+    worker->request = CreateEventA(NULL, FALSE, FALSE, NULL);
+    worker->done = CreateEventA(NULL, FALSE, FALSE, NULL);
+    if (!record_call(name, "CreateEvent(worker)", worker->ready && worker->request && worker->done))
+        return FALSE;
+    worker->thread = CreateThread(NULL, 0, worker_proc, worker, 0, NULL);
+    if (!record_call(name, "CreateThread", !!worker->thread)) return FALSE;
+    wait_without_paint(name, "worker create", worker->ready);
+    return !!pane->hwnd;
+}
+
+static void set_worker(const char *name, struct worker *worker, LONG command)
+{
+    InterlockedExchange(&worker->command, command);
+    if (record_call(name, "SetEvent(worker command)", SetEvent(worker->request)))
+        wait_without_paint(name, "worker command", worker->done);
+}
+
+static void stop_and_close_worker(const char *name, struct worker *worker)
+{
+    if (worker->thread)
+    {
+        InterlockedExchange(&worker->command, stop_worker);
+        record_call(name, "SetEvent(stop)", SetEvent(worker->request));
+        wait_without_paint(name, "worker exit", worker->thread);
+        CloseHandle(worker->thread);
+    }
+    if (worker->done) CloseHandle(worker->done);
+    if (worker->request) CloseHandle(worker->request);
+    if (worker->ready) CloseHandle(worker->ready);
+}
+
 static void pump_case(const char *name, struct worker *worker)
 {
     drain(name);
     if (worker->thread)
     {
-        InterlockedExchange(&worker->command, paint_queue);
-        if (!record_call(name, "SetEvent(drain)", SetEvent(worker->request))) return;
-        wait_without_paint(name, "worker drain", worker->done);
+        set_worker(name, worker, paint_queue);
         drain(name);
     }
 }
@@ -207,7 +275,17 @@ static DWORD pixel(HDC dc, int x, int y)
     return ((DWORD)GetRValue(color) << 16) | ((DWORD)GetGValue(color) << 8) | GetBValue(color);
 }
 
-static void observe(const char *name, const char *step, HWND parent, struct pane *container)
+static struct counts snapshot_counts(struct pane *pane)
+{
+    struct counts counts;
+    EnterCriticalSection(&pane->lock);
+    counts = pane->counts;
+    LeaveCriticalSection(&pane->lock);
+    return counts;
+}
+
+static void observe_layout(const char *name, const char *step, HWND parent, struct pane *container,
+                           const struct geometry *geometry, struct pane *root, struct pane *nested)
 {
     POINT client = {0, 0};
     RECT frame = {0}, rect = {0}, update = {0}, bounds = {0};
@@ -215,51 +293,53 @@ static void observe(const char *name, const char *step, HWND parent, struct pane
     HWND window = container->hwnd;
     BOOL frame_ok, origin_ok, rect_ok, has_update;
     HRGN region;
-    int region_type = ERROR, left_in_update = -1, right_in_update = -1;
-    DWORD source_left = 0xffffffff, source_right = 0xffffffff;
-    DWORD dest_left = 0xffffffff, dest_right = 0xffffffff;
+    int region_type = ERROR;
+    unsigned i;
     HDC dc;
 
     frame_ok = record_call(name, "GetWindowRect(top)", GetWindowRect(parent, &frame));
     origin_ok = record_call(name, "ClientToScreen(top)", ClientToScreen(parent, &client));
     dc = GetDCEx(parent, NULL, DCX_WINDOW | DCX_CACHE);
     record_call(name, "GetDCEx(top)", !!dc);
-    if (dc && frame_ok && origin_ok)
-    {
-        int x = client.x - frame.left;
-        int y = client.y - frame.top;
-        GdiFlush();
-        source_left = pixel(dc, x + width / 4, y + height / 2);
-        source_right = pixel(dc, x + 3 * width / 4, y + height / 2);
-        dest_left = pixel(dc, x + target_x + width / 4, y + target_y + height / 2);
-        dest_right = pixel(dc, x + target_x + 3 * width / 4, y + target_y + height / 2);
-    }
-    if (dc) record_call(name, "ReleaseDC(top)", ReleaseDC(parent, dc) != 0);
+    GdiFlush();
     rect_ok = record_call(name, "GetWindowRect(container)", GetWindowRect(window, &rect));
     has_update = GetUpdateRect(window, &update, FALSE);
     region = CreateRectRgn(0, 0, 0, 0);
     if (record_call(name, "CreateRectRgn", !!region))
     {
         region_type = GetUpdateRgn(window, region, FALSE);
-        if (record_call(name, "GetUpdateRgn", region_type != ERROR))
-        {
-            GetRgnBox(region, &bounds);
-            left_in_update = PtInRegion(region, width / 4, height / 2);
-            right_in_update = PtInRegion(region, 3 * width / 4, height / 2);
-        }
-        DeleteObject(region);
+        if (record_call(name, "GetUpdateRgn", region_type != ERROR)) GetRgnBox(region, &bounds);
     }
-    EnterCriticalSection(&container->lock);
-    counts = container->counts;
-    LeaveCriticalSection(&container->lock);
+    counts = snapshot_counts(container);
 
-    printf("case=%s step=%s source=%08lx,%08lx dest=%08lx,%08lx update=%d:", name, step,
-           source_left, source_right, dest_left, dest_right, has_update);
+    printf("case=%s step=%s source=", name, step);
+    for (i = 0; i < geometry->count; ++i)
+    {
+        const POINT *point = &geometry->probes[i];
+        printf("%s%08lx", i ? "," : "", pixel(frame_ok && origin_ok ? dc : NULL,
+               client.x - frame.left + point->x, client.y - frame.top + point->y));
+    }
+    printf(" dest=");
+    for (i = 0; i < geometry->count; ++i)
+    {
+        const POINT *point = &geometry->probes[i];
+        printf("%s%08lx", i ? "," : "", pixel(frame_ok && origin_ok ? dc : NULL,
+               client.x - frame.left + geometry->x + point->x,
+               client.y - frame.top + geometry->y + point->y));
+    }
+    printf(" update=%d:", has_update);
     print_rect(&update);
     printf(" region=%d:", region_type);
     print_rect(&bounds);
-    printf(" region_samples=%d,%d paint=%u erase=%u nccalc=%u nccalc_true=%d",
-           left_in_update, right_in_update, counts.paint, counts.erase, counts.nccalc, counts.has_rects);
+    printf(" region_samples=");
+    for (i = 0; i < geometry->count; ++i)
+    {
+        const POINT *point = &geometry->probes[i];
+        printf("%s%d", i ? "," : "", region_type != ERROR ? PtInRegion(region, point->x, point->y) : -1);
+    }
+    if (region) DeleteObject(region);
+    printf(" paint=%u erase=%u nccalc=%u nccalc_true=%d",
+           counts.paint, counts.erase, counts.nccalc, counts.has_rects);
     if (counts.has_rects)
     {
         unsigned i;
@@ -270,7 +350,25 @@ static void observe(const char *name, const char *step, HWND parent, struct pane
     }
     printf(" rect_ok=%d window=", rect_ok);
     print_rect(&rect);
+    if (nested)
+    {
+        struct counts root_counts = snapshot_counts(root), nested_counts = snapshot_counts(nested);
+        RECT nested_update = {0};
+        BOOL nested_pending = GetUpdateRect(nested->hwnd, &nested_update, FALSE);
+        printf(" frame_paint=%u frame_erase=%u frame_nccalc=%u nested_paint=%u nested_erase=%u"
+               " nested_nccalc=%u nested_update=%d:", root_counts.paint, root_counts.erase,
+               root_counts.nccalc, nested_counts.paint, nested_counts.erase, nested_counts.nccalc,
+               nested_pending);
+        print_rect(&nested_update);
+    }
     putchar('\n');
+    if (dc) record_call(name, "ReleaseDC(top)", ReleaseDC(parent, dc) != 0);
+}
+
+static void observe(const char *name, const char *step, HWND parent, struct pane *container)
+{
+    static const struct geometry geometry = {target_x, target_y, old_probes, ARRAYSIZE(old_probes)};
+    observe_layout(name, step, parent, container, &geometry, NULL, NULL);
 }
 
 static void change_pos(const char *name, const char *step, HWND window, int x, int y, UINT flags)
@@ -314,18 +412,8 @@ static void run_case(const struct scenario *test)
 
     if (test->threaded)
     {
-        worker.name = test->name;
-        worker.container = &container;
-        worker.parent = parent;
-        worker.visible = !test->hidden;
-        worker.ready = CreateEventA(NULL, FALSE, FALSE, NULL);
-        worker.request = CreateEventA(NULL, FALSE, FALSE, NULL);
-        worker.done = CreateEventA(NULL, FALSE, FALSE, NULL);
-        if (!record_call(test->name, "CreateEvent(worker)", worker.ready && worker.request && worker.done))
-            goto cleanup;
-        worker.thread = CreateThread(NULL, 0, worker_proc, &worker, 0, NULL);
-        if (!record_call(test->name, "CreateThread", !!worker.thread)) goto cleanup;
-        wait_without_paint(test->name, "worker create", worker.ready);
+        if (!start_worker(&worker, test->name, &container, parent, WS_CLIPCHILDREN | WS_CLIPSIBLINGS |
+                          (test->hidden ? 0 : WS_VISIBLE), width, height)) goto cleanup;
     }
     else
         container.hwnd = make_child(&container, parent, WS_CLIPCHILDREN | WS_CLIPSIBLINGS |
@@ -370,16 +458,7 @@ static void run_case(const struct scenario *test)
     observe(test->name, "after_pump", top.hwnd, &container);
 
 cleanup:
-    if (worker.thread)
-    {
-        InterlockedExchange(&worker.command, stop_worker);
-        record_call(test->name, "SetEvent(stop)", SetEvent(worker.request));
-        wait_without_paint(test->name, "worker exit", worker.thread);
-        CloseHandle(worker.thread);
-    }
-    if (worker.done) CloseHandle(worker.done);
-    if (worker.request) CloseHandle(worker.request);
-    if (worker.ready) CloseHandle(worker.ready);
+    stop_and_close_worker(test->name, &worker);
     if (top.hwnd) record_call(test->name, "DestroyWindow(top)", DestroyWindow(top.hwnd));
     DeleteCriticalSection(&ribbon.lock);
     DeleteCriticalSection(&container.lock);
@@ -387,7 +466,9 @@ cleanup:
     DeleteCriticalSection(&top.lock);
 }
 
-int main(void)
+#include "measure-h.inc"
+
+int main(int argc, char **argv)
 {
     static const struct scenario cases[] = {
         {"G_full_same", width, TRUE, FALSE, FALSE, FALSE, FALSE, 0},
@@ -424,7 +505,27 @@ int main(void)
     klass.hInstance = GetModuleHandleA(NULL);
     klass.lpszClassName = class_name;
     if (!record_call("setup", "RegisterClass", !!RegisterClassA(&klass))) return 0;
-    for (i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) run_case(&cases[i]);
-    printf("measure_complete cases=%u\n", i);
+    if (argc == 2 && !strcmp(argv[1], "--previous"))
+    {
+        for (i = 0; i < ARRAYSIZE(cases); ++i) run_case(&cases[i]);
+        printf("measure_complete cases=%u\n", i);
+    }
+    else
+    {
+        static const LONG owners[] = {0, hold_queue, pump_live};
+        static const char *const modes[] = {"same", "held", "live"};
+        unsigned all, pending, count = 0;
+        char name[64];
+        for (i = 0; i < ARRAYSIZE(owners); ++i)
+            for (all = 0; all < 2; ++all)
+                for (pending = 0; pending < 2; ++pending)
+                {
+                    snprintf(name, sizeof(name), "H_%s_%s_%s", modes[i], all ? "all" : "default",
+                             pending ? "pending" : "clean");
+                    run_h(name, all, pending, owners[i]);
+                    ++count;
+                }
+        printf("measure_complete cases=%u\n", count);
+    }
     return 0;
 }

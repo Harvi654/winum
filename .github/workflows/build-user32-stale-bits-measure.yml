@@ -5,6 +5,7 @@ on:
     branches: ['topic/user32-stale-bits-measure']
     paths:
       - 'docs/wine-repro/user32-setwindowpos-stale-bits/measure.c'
+      - 'docs/wine-repro/user32-setwindowpos-stale-bits/measure-h.inc'
       - 'docs/wine-repro/user32-setwindowpos-stale-bits/measure.list'
       - 'docs/wine-repro/user32-setwindowpos-stale-bits/run-wine.sh'
       - '.github/workflows/build-user32-stale-bits-measure.yml'
@@ -96,7 +97,7 @@ jobs:
             loader=/tmp/winum-11.22-2-x86_64/bin/wine
             server=/tmp/winum-11.22-2-x86_64/bin/wineserver
           fi
-          xvfb-run -a -s '-screen 0 1280x800x24 -dpi 96 -nolisten tcp' bash             docs/wine-repro/user32-setwindowpos-stale-bits/run-wine.sh "$loader" "$server" bundle results
+          xvfb-run -a -s '-screen 0 2048x1152x24 -dpi 96 -nolisten tcp' bash             docs/wine-repro/user32-setwindowpos-stale-bits/run-wine.sh "$loader" "$server" bundle results
       - name: Report measurements
         if: always()
         run: |
