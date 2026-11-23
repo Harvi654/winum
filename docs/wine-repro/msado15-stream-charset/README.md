@@ -54,9 +54,28 @@ cp "$probe/stream.vbs" out/
 | --- | --- | --- |
 | Offline Windows 10 | Pending | Pending |
 | Vanilla Wine 11.22 | CI | CI |
-| Winum 11.22-2 | CI | CI |
+| Winum 11.22-2 | [Text](results/winum-11.22-2/result-x86_64.txt) | [Text](results/winum-11.22-2/result-i686.txt) |
 
 The offline Windows results supply the Wine test expectations. Existing
 Unicode behavior is the compatibility control. Promotion requires the
 Wine unit on Windows, paired Wine validation and a Nastran run with both
 the msado15 and wbemdisp candidates in a fresh Inventor 2027.2 prefix copy.
+
+
+### Winum 11.22-2 baseline
+
+Both architectures returned the same operation statuses. The C
+Automation call reported DISP_E_EXCEPTION with E_NOTIMPL in
+EXCEPINFO.scode for the operations below. VBScript reported 0x1BD for
+the unsupported calls.
+
+| Operation | Winum 11.22-2 observation |
+| --- | --- |
+| WriteText with adWriteChar | Unicode succeeded. UTF-8 in both spellings, US-ASCII, Windows-1252 and ISO-8859-1 returned E_NOTIMPL. |
+| WriteText with adWriteLine, ReadText with adReadLine | E_NOTIMPL for the exercised separators. |
+| SaveToFile, LoadFromFile, CopyTo | E_NOTIMPL in the measured calls. |
+| Position zero and SetEOS | SetEOS succeeded. |
+
+These rows distinguish the charset failure in the Nastran trace from
+other stream operations that can be measured independently.
+[CI run](https://github.com/Harvi654/winum/actions/runs/45267251197).
