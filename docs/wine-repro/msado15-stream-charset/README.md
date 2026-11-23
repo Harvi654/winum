@@ -114,3 +114,7 @@ VM in a fresh directory with `run-tests.bat`. Return the two
 This step checks the Wine assertions against the native reference before
 the runtime candidate is written.
 [L1 artifact](https://github.com/Harvi654/winum/actions/runs/45269501050/artifacts/14864795757).
+
+The offline unit passed on x86_64 and i686 with 335 checks each and
+zero failures, todos or skips. Both processes exited zero.
+[Offline L1 results](results/l1-windows-10/).
