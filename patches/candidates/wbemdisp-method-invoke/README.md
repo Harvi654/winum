@@ -62,3 +62,43 @@ Manager, its loaded module path as observed externally, any 0x80040154
 dialogs, and whether mesh, run and results work. Use selected installer
 trace lines with identifiers removed. Do not include vendor script
 contents or the full logs.
+
+## Cross review (Claude Opus 5.5, 2026-11-23)
+
+Read in full: the `dlls/wbemdisp/locator.c` part of
+`wbemdisp-method-invoke.patch` against Wine 11.22. Skimmed: the test hunk,
+the MEASURE program and its result tables.
+
+**Approved for L4**, with these notes:
+
+1. The route is right and narrow: only method members, called with
+   `DISPATCH_METHOD` (alone or with `PROPERTYGET`), go through the method
+   signature and `IWbemServices::ExecMethod`; properties and the type
+   library members keep their paths. Positional arguments map to the input
+   parameters in signature order (by `ID` qualifier when every parameter
+   has a distinct one, else in the provider's order - inputs before
+   outputs, as Wine's built-in signatures enumerate); missing trailing
+   inputs take the signature's default (StdRegProv's `hDefKey`), and a
+   missing required one raises `WBEM_E_INVALID_PARAMETER` through
+   `DISP_E_EXCEPTION`. By-reference outputs are written back, the provider
+   status comes back as the result - all as measured.
+2. **One part is in the wrong DLL:** the mapping of `ERROR_UNSUPPORTED_TYPE`
+   to `WBEM_E_TYPE_MISMATCH` for `StdRegProv.GetStringValue` sits in
+   `wbemdisp`, but the value comes from the provider (`wbemprox`, the
+   StdRegProv implementation). Through `ExecMethod_()` or a native
+   `IWbemServices::ExecMethod` caller Wine would still return the old code.
+   If Windows returns `WBEM_E_TYPE_MISMATCH` there for every caller (measure
+   it with `ExecMethod` directly), it belongs in a separate `wbemprox`
+   patch; if only this path matters for the measured case, keep it out of
+   this patch and record it as open. Nastran's script does not need it for
+   L4.
+3. `VT_I4` hive values are accepted for `uint32` parameters by retyping
+   (no value change) - right for the predefined `HKEY` constants VBScript
+   passes as negative `Long`.
+4. On promotion: the test moves into the patch, a page in `docs/patches/`
+   with the `l1` marker, the open point from note 2, and the bug-report
+   note (Wine bug 39463: a VBScript custom action calling
+   `StdRegProv.GetStringValue` directly).
+5. L4 by the maintainer as described above (fresh copy of a 2027.2 prefix
+   without Nastran; `Register_Addin`, the Add-In Manager, no `0x80040154`,
+   mesh/run/results).
