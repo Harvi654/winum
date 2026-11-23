@@ -50,7 +50,7 @@ bash docs/wine-repro/combase-per-user-classes/build-bundle.sh out
 | --- | --- | --- |
 | Offline Windows 10 | Pending | Pending |
 | Vanilla Wine 11.22 | CI | CI |
-| Winum 11.22-2 | CI | CI |
+| Winum 11.22-2 | [Text](results/winum-11.22-2/result-x86_64.txt) | [Text](results/winum-11.22-2/result-i686.txt) |
 
 Wine CI uses direct setup of the temporary machine class in an isolated
 prefix. Native Windows measurements supply the expectations for the
@@ -61,3 +61,14 @@ Joint L4 requires a fresh Inventor 2027.2 prefix copy with all three
 candidates. Record the 0x80040154 dialog, the separate functionality
 message, and Nastran mesh, solve and results. The Inventor smoke test
 covers start, part, assembly, drawing, save and reopen, and restart.
+
+
+### Winum 11.22-2 baseline
+
+Both architectures returned 0x80040154 for CoGetClassObject and
+CoCreateInstance in the user-only cases. CLSIDFromProgID returned
+0x800401f3, ProgIDFromCLSID returned 0x80040154, and CoGetTreatAsClass
+returned S_FALSE. The same-CLSID conflict activated the machine server
+with marker 264 on x86_64 and 232 on i686. In these synthetic cases
+the raw HKCR lookup saw the machine registration in the matching view.
+Both cleanup checks passed. [CI](https://github.com/Harvi654/winum/actions/runs/45275509058).
