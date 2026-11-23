@@ -97,3 +97,9 @@ change and a registry type change. Probe v2 adds the two calls while the
 value is still a string. Their case labels are `read_no_out_string` and
 `read_extra_string`. Keep the v1 observations for comparison. The
 initial Wine test covers the v1 sequence. Its native L1 is pending.
+
+The v2 Winum run still rejects the two added cases on both architectures.
+The return values for the method flags are unchanged from v1.
+[Winum x86_64](results/round-2/winum-11.22-2/result-x86_64.txt) ·
+[Winum i686](results/round-2/winum-11.22-2/result-i686.txt) ·
+[Round 2 CI](https://github.com/Harvi654/winum/actions/runs/45258932265).
