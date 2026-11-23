@@ -118,3 +118,18 @@ the runtime candidate is written.
 The offline unit passed on x86_64 and i686 with 335 checks each and
 zero failures, todos or skips. Both processes exited zero.
 [Offline L1 results](results/l1-windows-10/).
+
+
+### Candidate comparison (L3)
+
+The 335-check runtime unit passed on both architectures. C and VBScript
+on the candidate match the native transcripts for the five measured
+non-Unicode charset cases and the UTF-8 file fixtures. The comparison
+equates I4 and I8 Size and Position variants with the same numeric value.
+Unicode is covered by the existing Wine path and remains in the raw
+transcripts for comparison. The first CI comparator escaped its x64
+replacement incorrectly. The verified raw result was rechecked with
+the corrected comparator.
+
+[Candidate output](results/candidate/) ·
+[Corrected CI comparison](https://github.com/Harvi654/winum/actions/runs/45271185530).
