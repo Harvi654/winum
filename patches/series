@@ -98,3 +98,9 @@ shell32-autocomplete-responsive.patch
 
 # DWG TrueView and AutoCAD Profile.aws: replaceChild with the same node (Lukas10999, #4).
 msxml3-replacechild-same-node.patch
+
+# AutoCAD 2027 Save As (CoreCLR fail fast): x86-64 UCRT exception frame size.
+ucrtbase-cxx-exception-size.patch
+
+# AutoCAD 2027 "Connection Lost": cancelling a windowless timer from another thread.
+server-cross-thread-killtimer.patch

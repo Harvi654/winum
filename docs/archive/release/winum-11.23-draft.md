@@ -1,3 +1,6 @@
+> **Superseded** (2026-11-23): this draft became [winum-11.22-2](../../release/winum-11.22-2.md);
+> the build stayed on Wine 11.22. Kept as the record.
+
 # Winum 11.23 release draft
 
 The release-preparation branch still uses the pinned, verified Wine

@@ -9,21 +9,17 @@ and published as versioned releases.
 
 *Winum* is how the Romans pronounced *vinum*, wine.
 
-> **Status (16 November 2026).** Current release:
-> [`winum-11.22-1`](docs/release/winum-11.22-1.md) - Wine 11.22 with 66
-> patches: the series of
-> [`winum-11.20-2`](docs/release/winum-11.20-2.md) (the Inventor project's
-> former `wine-11.20-6` series, the SOLIDWORKS fixes, 17 MSI
-> feature-selection fixes, four patches for Inventor's Import CAD
-> contributed by @krokosik, with v6 of `ole32-createfromfile-package`)
-> moved to Wine 11.22. Validation of 11.22: L0 both architectures with
-> `--fuzz=0`; L2 paired against vanilla 11.22 with only known flaky
-> failures; L4 in Inventor 2027 (import, parts, assemblies); SOLIDWORKS
-> and AutoCAD L4 deferred. Every patch in `patches/series` has a Wine test
-> that passed on Windows 10 (L1) or a recorded reason why not;
-> `scripts/check-series.sh` checks it. The Inventor project moves to
-> 11.22 after its own v0.4 release. Next: the candidate
-> `wldap32-winsock-cleanup` (L0 and L2 done, L1 and cross review open).
+> **Status (23 November 2026).** Current release:
+> [`winum-11.22-2`](docs/release/winum-11.22-2.md) - Wine 11.22 with 73
+> patches: the 66 of [`winum-11.22-1`](docs/release/winum-11.22-1.md)
+> plus Inventor's Open and Save dialog fixes (four in shell32), the
+> msxml3 same-node fix contributed by @Lukas10999, and two AutoCAD 2027
+> fixes (Save As crash in ucrtbase, "Connection Lost" from a timer in
+> wineserver). Validation: L0 both architectures with `--fuzz=0`; L1 and
+> L2 per patch; L4 in Inventor 2027 and AutoCAD 2027; SOLIDWORKS L4
+> deferred. Every patch in `patches/series` has a Wine test that passed on
+> Windows 10 (L1) or a recorded reason why not; `scripts/check-series.sh`
+> checks it. Next: Wine 11.23 (expected around 27 November).
 
 ## Who uses it
 
