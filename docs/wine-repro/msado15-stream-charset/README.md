@@ -100,3 +100,17 @@ runs saved the same bytes for each charset and file case.
 
 The Unicode transcript keeps a native comparison point. Existing Wine
 Unicode behavior remains the compatibility control for the candidate.
+
+### Offline Wine unit (L1)
+
+The first Wine unit covers five non-Unicode charset spellings and
+encodings, bounded and line reads, file bytes, both UTF-8 fixture forms,
+truncation and both CopyTo directions. The original Wine msado15 suite
+continues to cover its Unicode path.
+
+Run the checksum-verified L1 artifact on the same offline Windows 10
+VM in a fresh directory with `run-tests.bat`. Return the two
+`result-msado15-stream-charset-*.txt` files and `exitcodes.txt`.
+This step checks the Wine assertions against the native reference before
+the runtime candidate is written.
+[L1 artifact](https://github.com/Harvi654/winum/actions/runs/45269501050/artifacts/14864795757).
