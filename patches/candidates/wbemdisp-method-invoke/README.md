@@ -33,25 +33,28 @@ checkout. Run the following from this Winum checkout. The new directory
 needs space for the prefix and the Winum runtime.
 
 ~~~bash
-work=$(mktemp -d -- "$(dirname -- "$prefix")/wbemdisp-l4.XXXXXXXX")
-gh run download 45260888480 --repo Harvi654/winum \
-    --name wbemdisp-method-invoke-overlay --dir "$work/overlay"
-gh release download winum-11.22-2 --repo Harvi654/winum \
-    --pattern winum-11.22-2-x86_64.tar.xz --dir "$work"
-bash docs/wine-repro/wbemdisp-method-invoke/prepare-inventor-l4.sh \
-    "$prefix" "$work/winum-11.22-2-x86_64.tar.xz" "$work/overlay" "$work/test"
+(
+    set -euo pipefail
+    work=$(mktemp -d -- "$(dirname -- "$prefix")/wbemdisp-l4.XXXXXXXX")
+    gh run download 45260888480 --repo Harvi654/winum \
+        --name wbemdisp-method-invoke-overlay --dir "$work/overlay"
+    gh release download winum-11.22-2 --repo Harvi654/winum \
+        --pattern winum-11.22-2-x86_64.tar.xz --dir "$work"
+    bash docs/wine-repro/wbemdisp-method-invoke/prepare-inventor-l4.sh \
+        "$prefix" "$work/winum-11.22-2-x86_64.tar.xz" "$work/overlay" "$work/test"
 
-trial="$work/test"
-runtime="$trial/winum-11.22-2-x86_64"
-export PATH="$runtime/bin:$PATH"
-export WINE="$runtime/bin/wine" WINESERVER="$runtime/bin/wineserver" WINELOADER="$runtime/bin/wine"
-export INV_PREFIX="$trial/prefix" INV_LOGDIR="$trial/logs"
-export WINEDLLOVERRIDES=wbemdisp=b
+    trial="$work/test"
+    runtime="$trial/winum-11.22-2-x86_64"
+    export PATH="$runtime/bin:$PATH"
+    export WINE="$runtime/bin/wine" WINESERVER="$runtime/bin/wineserver" WINELOADER="$runtime/bin/wine"
+    export INV_PREFIX="$trial/prefix" INV_LOGDIR="$trial/logs"
+    export WINEDLLOVERRIDES=wbemdisp=b
 
-WINEDEBUG=+msi,+wbemdisp python3 "$inventor_repo/scripts/install-from-image.py" \
-    "$image" --prefix "$INV_PREFIX"
-INV_WINE_HOME="$trial" INV_WINE=bundled INV_YEAR=2027 \
-    bash "$inventor_repo/scripts/launch-inventor.sh"
+    WINEDEBUG=+msi,+wbemdisp python3 "$inventor_repo/scripts/install-from-image.py" \
+        "$image" --prefix "$INV_PREFIX"
+    WINEDEBUG=+loaddll INV_WINE_HOME="$trial" INV_WINE=bundled INV_YEAR=2027 \
+        bash "$inventor_repo/scripts/launch-inventor.sh"
+)
 ~~~
 
 Report the Register_Addin result, whether Nastran appears in the Add-In
