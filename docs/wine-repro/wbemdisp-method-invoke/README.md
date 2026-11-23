@@ -106,6 +106,11 @@ The return values for the method flags are unchanged from v1.
 [Winum i686](results/round-2/winum-11.22-2/result-i686.txt) ·
 [Round 2 CI](https://github.com/Harvi654/winum/actions/runs/45258932265).
 
+Vanilla Wine 11.22 and Winum 11.22-2 produced identical measurements in
+both rounds on both architectures.
+[Vanilla x86_64, v2](results/round-2/vanilla-11.22/result-x86_64.txt) ·
+[Vanilla i686, v2](results/round-2/vanilla-11.22/result-i686.txt).
+
 
 On offline Windows 10, both flags and both architectures returned
 S_OK with a VT_I4 zero for the two added cases. The extra-argument case
