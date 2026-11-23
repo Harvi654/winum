@@ -1,3 +1,7 @@
+> **Promoted** to `patches/series` for winum-11.22-2 (2026-11-23); the
+> current patch and its page are `patches/ucrtbase-cxx-exception-size.patch` and
+> `docs/patches/ucrtbase-cxx-exception-size.md`. This folder stays as the record.
+
 # x86-64 UCRT C++ exception frame size
 
 Windows 10 x86-64 returns 32 from `__CxxQueryExceptionSize` in `ucrtbase` and `vcruntime140`. The export is absent from its legacy `msvcrt.dll`. Wine 11.22 returns 16 from all three. The UCRT candidate returns `sizeof(cxx_frame_info)`, the four-pointer record used by `__CxxRegisterExceptionObject`, for x86-64 UCRT. Independent review checked the shared CRT implementation and the `vcruntime140` forwarder. V2 explicitly excludes ARM64EC. The x86-64 code is identical to the first candidate tested in AutoCAD.

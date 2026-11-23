@@ -1,0 +1,233 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] server: Allow cross-thread cancellation of windowless timers.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Windows 10 x64 assigns distinct IDs to live windowless timers on different
+threads of a process. KillTimer(NULL, id) cancels the requested timer even
+from another thread, without cancelling the caller's timer.
+
+Wine only searched the calling queue, which could either reject a valid
+ID or cancel the wrong timer when two queues assigned the same ID.
+
+Make windowless ID allocation and cancellation process-wide. Leave
+delivery on the owner queue, leave replacement on the creating queue,
+and keep the existing behavior for windowed timers.
+
+v1 2026-11-22: Matches the measured same-process Win32 cases.
+
+v2 (2026-11-23): No code change. Its user32 test passed on Windows 10
+(L1); promoted to the normal series after cross review and the AutoCAD
+and Inventor smoke tests.
+
+diff --git a/server/process.h b/server/process.h
+--- a/server/process.h
++++ b/server/process.h
+@@ -40,6 +40,7 @@
+     struct list          entry;           /* entry in system-wide process list */
+     process_id_t         parent_id;       /* parent process id (at the time of creation) */
+     struct list          thread_list;     /* thread list */
++    unsigned int         next_timer_id;   /* next windowless timer identifier */
+     struct debug_obj    *debug_obj;       /* debug object debugging this process */
+     struct debug_event  *debug_event;     /* debug event being sent to debugger */
+     struct handle_table *handles;         /* handle entries */
+diff --git a/server/process.c b/server/process.c
+--- a/server/process.c
++++ b/server/process.c
+@@ -644,6 +644,7 @@
+     list_init( &process->rawinput_entry );
+     list_init( &process->kernel_object );
+     list_init( &process->thread_list );
++    process->next_timer_id = 0x7fff;
+     list_init( &process->locks );
+     list_init( &process->asyncs );
+     list_init( &process->classes );
+diff --git a/server/queue.c b/server/queue.c
+--- a/server/queue.c
++++ b/server/queue.c
+@@ -141,7 +141,6 @@
+     struct message_result *recv_result;     /* stack of received messages waiting for result */
+     struct list            pending_timers;  /* list of pending timers */
+     struct list            expired_timers;  /* list of expired timers */
+-    lparam_t               next_timer_id;   /* id for the next timer with a 0 window */
+     struct timeout_user   *timeout;         /* timeout for next timer to expire */
+     struct thread_input   *input;           /* thread input descriptor */
+     struct hook_table     *hooks;           /* hook table */
+@@ -281,7 +280,6 @@
+         queue->quit_message    = 0;
+         queue->cursor_count    = 0;
+         queue->recv_result     = NULL;
+-        queue->next_timer_id   = 0x7fff;
+         queue->timeout         = NULL;
+         queue->input           = (struct thread_input *)grab_object( input );
+         queue->hooks           = NULL;
+@@ -1513,6 +1511,17 @@
+         if (timer->win == win && timer->msg == msg && timer->id == id) return timer;
+     LIST_FOR_EACH_ENTRY( timer, &queue->expired_timers, struct timer, entry )
+         if (timer->win == win && timer->msg == msg && timer->id == id) return timer;
++    return NULL;
++}
++
++/* Windowless timer IDs belong to the process, but delivery stays on the creating queue. */
++static struct msg_queue *find_windowless_timer_queue( struct process *process, unsigned int msg,
++                                                       lparam_t id )
++{
++    struct thread *thread;
++
++    LIST_FOR_EACH_ENTRY( thread, &process->thread_list, struct thread, proc_entry )
++        if (thread->queue && find_timer( thread->queue, 0, msg, id )) return thread->queue;
+     return NULL;
+ }
+
+@@ -3487,8 +3496,8 @@
+     }
+     else
+     {
+-        queue = get_current_queue();
+-        /* look for a timer with this id */
++        if (!(queue = get_current_queue())) return;
++        /* Replacing an existing timer still requires the creating queue. */
+         if (id && (timer = find_timer( queue, 0, req->msg, id )))
+         {
+             /* free and reuse id */
+@@ -3496,16 +3505,17 @@
+         }
+         else
+         {
+-            lparam_t end_id = queue->next_timer_id;
+-
+-            /* find a free id for it */
++            struct process *process = current->process;
++            lparam_t end_id = process->next_timer_id;
++
++            /* Keep live windowless IDs distinct across the process. */
+             while (1)
+             {
+-                id = queue->next_timer_id;
+-                if (--queue->next_timer_id <= 0x100) queue->next_timer_id = 0x7fff;
+-
+-                if (!find_timer( queue, 0, req->msg, id )) break;
+-                if (queue->next_timer_id == end_id)
++                id = process->next_timer_id;
++                if (--process->next_timer_id <= 0x100) process->next_timer_id = 0x7fff;
++
++                if (!find_windowless_timer_queue( process, req->msg, id )) break;
++                if (process->next_timer_id == end_id)
+                 {
+                     set_win32_error( ERROR_NO_MORE_USER_HANDLES );
+                     return;
+@@ -3529,7 +3539,8 @@
+ DECL_HANDLER(kill_win_timer)
+ {
+     struct timer *timer;
+-    struct thread *thread;
++    struct msg_queue *queue;
++    struct thread *thread = NULL;
+     user_handle_t win = 0;
+
+     if (req->win)
+@@ -3545,15 +3556,14 @@
+             set_error( STATUS_ACCESS_DENIED );
+             return;
+         }
+-    }
+-    else thread = (struct thread *)grab_object( current );
+-
+-    if (thread->queue && (timer = find_timer( thread->queue, win, req->msg, req->id )))
+-        free_timer( thread->queue, timer );
+-    else
+-        set_error( STATUS_INVALID_PARAMETER );
+-
+-    release_object( thread );
++        queue = thread->queue;
++    }
++    else queue = find_windowless_timer_queue( current->process, req->msg, req->id );
++
++    if (queue && (timer = find_timer( queue, win, req->msg, req->id ))) free_timer( queue, timer );
++    else set_error( STATUS_INVALID_PARAMETER );
++
++    if (thread) release_object( thread );
+ }
+
+ DECL_HANDLER(register_hotkey)
+diff --git a/dlls/user32/tests/msg.c b/dlls/user32/tests/msg.c
+--- a/dlls/user32/tests/msg.c
++++ b/dlls/user32/tests/msg.c
+@@ -12151,6 +12151,69 @@
+     ok(GetLastError()==ERROR_NO_MORE_USER_HANDLES || broken(GetLastError()==0xdeadbeef),
+             "GetLastError() = %ld\n", GetLastError());
+     while (i > 0) KillTimer(NULL, ids[--i]);
++}
++
++struct cross_thread_timer
++{
++    UINT_PTR target;
++    UINT_PTR own;
++    BOOL killed;
++    BOOL own_delivered;
++};
++
++static DWORD WINAPI cancel_timer_thread(void *arg)
++{
++    struct cross_thread_timer *timer = arg;
++    DWORD start;
++    MSG msg;
++
++    timer->own = SetTimer(NULL, 0, 100, NULL);
++    timer->killed = KillTimer(NULL, timer->target);
++
++    if (timer->own)
++    {
++        start = GetTickCount();
++        while (GetTickCount() - start < 500 && !timer->own_delivered)
++        {
++            while (PeekMessageW(&msg, NULL, WM_TIMER, WM_TIMER, PM_REMOVE))
++                if (!msg.hwnd && msg.wParam == timer->own) timer->own_delivered = TRUE;
++            if (!timer->own_delivered) Sleep(10);
++        }
++        KillTimer(NULL, timer->own);
++    }
++    return 0;
++}
++
++static void test_cross_thread_killtimer(void)
++{
++    struct cross_thread_timer timer = {0};
++    HANDLE worker;
++    BOOL delivered = FALSE;
++    DWORD err;
++    MSG msg;
++
++    timer.target = SetTimer(NULL, 0, 100, NULL);
++    ok(!!timer.target, "could not create the target timer.\n");
++    if (!timer.target) return;
++
++    worker = CreateThread(NULL, 0, cancel_timer_thread, &timer, 0, NULL);
++    ok(!!worker, "could not create the cancellation thread.\n");
++    if (worker)
++    {
++        err = WaitForSingleObject(worker, INFINITE);
++        ok(err == WAIT_OBJECT_0, "unexpected wait result %#lx.\n", err);
++        CloseHandle(worker);
++
++        ok(!!timer.own, "could not create the worker timer.\n");
++        ok(timer.target != timer.own, "both live timers have ID %#Ix.\n", timer.target);
++        ok(timer.killed, "cancelling the other thread's timer failed.\n");
++        ok(timer.own_delivered, "the worker did not receive its own timer.\n");
++        Sleep(200);
++        while (PeekMessageW(&msg, NULL, WM_TIMER, WM_TIMER, PM_REMOVE))
++            if (!msg.hwnd && msg.wParam == timer.target) delivered = TRUE;
++        ok(!delivered, "the cancelled timer was delivered.\n");
++    }
++    KillTimer(NULL, timer.target);
+ }
+
+ static void test_timers_exception(DWORD code)
+@@ -21933,6 +21996,7 @@
+     test_accelerators();
+     test_timers();
+     test_timers_no_wnd();
++    test_cross_thread_killtimer();
+     test_timers_exceptions();
+     if (hCBT_hook)
+     {

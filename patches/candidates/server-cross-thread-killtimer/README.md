@@ -1,3 +1,7 @@
+> **Promoted** to `patches/series` for winum-11.22-2 (2026-11-23); the
+> current patch and its page are `patches/server-cross-thread-killtimer.patch` and
+> `docs/patches/server-cross-thread-killtimer.md`. This folder stays as the record.
+
 # Cross-thread cancellation of windowless timers
 
 AutoCAD 2027 registers a windowless 120-second timer on its UI thread.

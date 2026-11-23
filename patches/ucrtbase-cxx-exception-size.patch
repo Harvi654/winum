@@ -1,0 +1,69 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ucrtbase: Return the x86-64 C++ exception frame size.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+On Windows 10 x86-64, __CxxQueryExceptionSize returns 32 in both
+ucrtbase and vcruntime140. Wine's UCRT returns the 16-byte size of the
+exception type descriptor, while __CxxRegisterExceptionObject uses a
+cxx_frame_info record with four pointers.
+
+Return the size of that record on the measured UCRT architecture.
+
+v2 (2026-11-21): Exclude ARM64EC explicitly after independent review.
+The x86-64 code path used in the AutoCAD A/B test is the same.
+
+v3 (2026-11-23): The Wine test from patches/tests-first
+(ucrtbase-tests-cxx-exception-size.patch) moved into this patch for the
+normal series. It passed on Windows 10 x86-64 and i686 (L1).
+
+diff --git a/dlls/msvcrt/except.c b/dlls/msvcrt/except.c
+--- a/dlls/msvcrt/except.c
++++ b/dlls/msvcrt/except.c
+@@ -814,7 +814,11 @@
+  */
+ unsigned int CDECL __CxxQueryExceptionSize(void)
+ {
++#if _MSVCR_VER >= 140 && defined(__x86_64__) && !defined(__arm64ec__)
++    return sizeof(cxx_frame_info);
++#else
+     return sizeof(cxx_exception_type);
++#endif
+ }
+
+ /*********************************************************************
+diff --git a/dlls/ucrtbase/tests/cpp.c b/dlls/ucrtbase/tests/cpp.c
+--- a/dlls/ucrtbase/tests/cpp.c
++++ b/dlls/ucrtbase/tests/cpp.c
+@@ -403,6 +403,21 @@
+ }
+ #endif
+
++#if defined(__x86_64__) && !defined(__arm64ec__)
++static void test_exception_frame_size(void)
++{
++    unsigned int (CDECL *query)(void);
++    unsigned int size;
++
++    query = (void *)GetProcAddress(GetModuleHandleW(L"ucrtbase.dll"), "__CxxQueryExceptionSize");
++    ok(!!query, "Missing __CxxQueryExceptionSize export\n");
++    if (!query) return;
++
++    size = query();
++    ok(size == 32, "__CxxQueryExceptionSize returned %u, expected 32\n", size);
++}
++#endif
++
+ START_TEST(cpp)
+ {
+     if (!init()) return;
+@@ -410,6 +425,9 @@
+     test___std_type_info();
+     test___unDName();
+     test___DestructExceptionObject();
++#if defined(__x86_64__) && !defined(__arm64ec__)
++    test_exception_frame_size();
++#endif
+ #ifdef __x86_64__
+     test___C_specific_handler();
+ #endif

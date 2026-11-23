@@ -3,7 +3,7 @@
 <!-- winum-test: l1 -->
 
 - **DLL:** `shell32`
-- **Status:** In the winum-11.22-2 series on `topic/next-release`. [Candidate history](https://github.com/Harvi654/winum/blob/43693a2/patches/candidates/shell32-parentrelativeforui/README.md)
+- **Status:** In the winum-11.22-2 series (merged into `main` 2026-11-22). [Candidate history](https://github.com/Harvi654/winum/blob/43693a2/patches/candidates/shell32-parentrelativeforui/README.md)
 - **Base:** winum-11.22-1 (Wine 11.22)
 
 ## Problem as the user saw it
