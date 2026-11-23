@@ -1,0 +1,118 @@
+name: Build and measure the combase per-user classes candidate
+
+on:
+  push:
+    branches: ['topic/combase-per-user-classes-measure']
+    paths:
+      - 'patches/candidates/combase-per-user-classes/*.patch'
+      - '.github/workflows/build-combase-per-user-classes-candidate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Dependencies (official Arch repositories)
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed git mingw-w64-gcc curl xz \
+            xorg-server-xvfb xorg-xauth libx11 libxext libxi libxrandr libxrender \
+            libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
+            fontconfig freetype2 ttf-dejavu alsa-lib libpulse gnutls krb5 dbus \
+            wayland mesa libglvnd vulkan-icd-loader gst-plugins-base-libs sdl2 \
+            libcups libgphoto2 sane libpcap v4l-utils pcsclite unixodbc giflib
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build both candidate DLLs with zero fuzz
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          source wine/version.env
+          source scripts/lib/wine-source.sh
+          source scripts/lib/wine-patches.sh
+          export WINE_PINNED_VERSION="$WINE_VERSION"
+          test "$WINE_VERSION" = 11.22
+          src="/tmp/wine-$WINE_VERSION"
+          curl -fLsS --retry 3 -o "$src.tar.xz" \
+            "https://dl.winehq.org/wine/source/11.x/wine-$WINE_VERSION.tar.xz"
+          wine_verify_tarball "$src.tar.xz" "$WINE_VERSION"
+          tar -xJf "$src.tar.xz" -C /tmp
+          wine_apply_patches "$src" "$GITHUB_WORKSPACE/patches" "$GITHUB_WORKSPACE" HEAD
+          patch -d "$src" -p1 --fuzz=0 < patches/candidates/combase-per-user-classes/combase-per-user-classes.patch
+          bash scripts/build-l1-combase-per-user-classes.sh unit "$src.tar.xz"
+          bash docs/wine-repro/combase-per-user-classes/build-bundle.sh bundle
+          mkdir "$src/build"
+          cd "$src/build"
+          ../configure --enable-archs=x86_64,i386 --disable-tests --without-x \
+            --without-wayland --without-vulkan --without-opengl --without-freetype \
+            --without-fontconfig --without-alsa --without-pulse > configure.log 2>&1 ||
+            { tail -n 60 configure.log; exit 1; }
+          make -j"$(nproc)" dlls/combase/{x86_64,i386}-windows/combase.dll > build.log 2>&1 ||
+            { tail -n 80 build.log; exit 1; }
+      - name: Assemble the test runtime from Winum 11.22-2
+        run: |
+          artifact=winum-11.22-2-x86_64.tar.xz
+          cd /tmp
+          curl -fLsS --retry 3 -O "https://github.com/Harvi654/winum/releases/download/winum-11.22-2/$artifact"
+          printf '%s  %s\n' 0523b2615596cbb66e7e9ed95a5024008a25f5141ba2e4483e862a47db0c9980 "$artifact" | sha256sum -c -
+          tar -xJf "$artifact"
+          out="$GITHUB_WORKSPACE/overlay"
+          mkdir -p "$out"
+          for arch in x86_64 i386; do
+            mkdir -p "$out/$arch-windows"
+            dll="/tmp/wine-11.22/build/dlls/combase/$arch-windows/combase.dll"
+            cp "$dll" "winum-11.22-2-x86_64/lib/wine/$arch-windows/combase.dll"
+            cp "$dll" "$out/$arch-windows/"
+          done
+          cp /tmp/wine-11.22/{COPYING.LIB,PATCHES.txt} "$out/"
+          cp "$GITHUB_WORKSPACE/patches/candidates/combase-per-user-classes/combase-per-user-classes.patch" "$out/"
+          cd "$out"
+          printf 'combase overlay for Winum 11.22-2\nCommit %s\n' "$GITHUB_SHA" > BUILDINFO
+          sha256sum BUILDINFO COPYING.LIB PATCHES.txt ./*.patch ./*-windows/combase.dll > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - name: Run the candidate Wine test and the measurement
+        run: |
+          export runtime=/tmp/winum-11.22-2-x86_64
+          export WINESERVER="$runtime/bin/wineserver"
+          export WINEPREFIX=/tmp/combase-unit-prefix WINEDEBUG=-all WINEDLLOVERRIDES='mscoree,mshtml='
+          export WINETEST_PLATFORM=windows
+          mkdir -p results
+          unit_failed=0
+          xvfb-run -a bash -eu -c '
+            timeout 150 "$runtime/bin/wine" wineboot -i
+            "$WINESERVER" -w
+            trap "\"$WINESERVER\" -k; \"$WINESERVER\" -w" EXIT
+            failed=0
+            for arch in x86_64 i686; do
+              timeout 120 "$runtime/bin/wine" "unit/combase-per-user-classes-$arch.exe" per_user_classes > "results/unit-$arch.txt" 2>&1 ||
+                failed=1
+              cat "results/unit-$arch.txt"
+              grep -E "[0-9]+ tests executed .*0 failures.*0 skipped" "results/unit-$arch.txt" || failed=1
+            done
+            exit "$failed"
+          ' || unit_failed=1
+          xvfb-run -a bash docs/wine-repro/combase-per-user-classes/run-wine.sh \
+            "$runtime/bin/wine" "$WINESERVER" bundle results
+          for arch in x86_64 i686; do
+            diff -u \
+              <(sed -n -E '/^(case=|com )/{s/ machine_setup=.*//;p;}' "docs/wine-repro/combase-per-user-classes/results/windows-10/result-$arch.txt") \
+              <(sed -n -E '/^(case=|com )/{s/ machine_setup=.*//;p;}' "results/result-$arch.txt")
+          done
+          test "$unit_failed" -eq 0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: combase-per-user-classes-candidate-results
+          path: results/
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: combase-per-user-classes-overlay
+          path: overlay/
+          if-no-files-found: error

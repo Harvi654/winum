@@ -1,0 +1,115 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] combase: Look up per-user in-process classes.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Non-elevated Windows 10 selected the user registration over the machine
+registration when both named the same in-process class. It also resolved
+the per-user ProgID and TreatAs keys. Search the current user's classes
+before the existing machine lookup for those reads. Keep explicit registry
+view selection and preserve other HKCR callers.
+
+--- a/dlls/combase/combase.c
++++ b/dlls/combase/combase.c
+@@ -304,5 +304,37 @@
+ }
+ 
+-HRESULT open_key_for_clsid(REFCLSID clsid, const WCHAR *keyname, REGSAM access, HKEY *subkey)
++static BOOL classes_key_missing(LSTATUS ret)
++{
++    return ret == ERROR_FILE_NOT_FOUND || ret == ERROR_PATH_NOT_FOUND;
++}
++
++static LSTATUS open_user_classes_key(const WCHAR *name, const WCHAR *leaf, REGSAM access, HKEY *key)
++{
++    static const WCHAR prefix[] = L"Software\\Classes\\";
++    SIZE_T count = ARRAY_SIZE(prefix) + lstrlenW(name);
++    WCHAR *path;
++    HKEY user;
++    LSTATUS ret;
++
++    if (leaf) count += 1 + lstrlenW(leaf);
++    if (!(path = malloc(count * sizeof(*path)))) return ERROR_NOT_ENOUGH_MEMORY;
++    lstrcpyW(path, prefix);
++    lstrcatW(path, name);
++    if (leaf)
++    {
++        lstrcatW(path, L"\\");
++        lstrcatW(path, leaf);
++    }
++    if (!(ret = RegOpenCurrentUser(KEY_READ, &user)))
++    {
++        ret = RegOpenKeyExW(user, path, 0, access, key);
++        RegCloseKey(user);
++    }
++    free(path);
++    return ret;
++}
++
++static HRESULT open_class_key(REFCLSID clsid, const WCHAR *keyname, REGSAM access, HKEY *subkey,
++                              BOOL user_first)
+ {
+     static const WCHAR clsidW[] = L"CLSID\\";
+@@ -313,4 +345,11 @@
+     lstrcpyW(path, clsidW);
+     StringFromGUID2(clsid, path + lstrlenW(clsidW), CHARS_IN_GUID);
++    if (user_first)
++    {
++        res = open_user_classes_key(path, keyname, access, subkey);
++        if (res == ERROR_SUCCESS) return S_OK;
++        if (!classes_key_missing(res))
++            return res == ERROR_NOT_ENOUGH_MEMORY ? E_OUTOFMEMORY : REGDB_E_READREGDB;
++    }
+     res = open_classes_key(HKEY_CLASSES_ROOT, path, access, &key);
+     if (res == ERROR_FILE_NOT_FOUND)
+@@ -335,4 +374,9 @@
+ }
+ 
++HRESULT open_key_for_clsid(REFCLSID clsid, const WCHAR *keyname, REGSAM access, HKEY *subkey)
++{
++    return open_class_key(clsid, keyname, access, subkey, FALSE);
++}
++
+ /* open HKCR\\AppId\\{string form of appid clsid} key */
+ HRESULT open_appidkey_from_clsid(REFCLSID clsid, REGSAM access, HKEY *subkey)
+@@ -1188,5 +1232,5 @@
+     *clsidNew = *clsidOld;
+ 
+-    hr = open_key_for_clsid(clsidOld, L"TreatAs", KEY_READ, &hkey);
++    hr = open_class_key(clsidOld, L"TreatAs", KEY_READ, &hkey, TRUE);
+     if (FAILED(hr))
+     {
+@@ -1304,8 +1348,8 @@
+     }
+ 
+-    hr = open_key_for_clsid(clsid, L"ProgID", KEY_READ, &hkey);
++    hr = open_class_key(clsid, L"ProgID", KEY_READ, &hkey, TRUE);
+     if (FAILED(hr) && (opposite == KEY_WOW64_32KEY || (IsWow64Process(GetCurrentProcess(), &is_wow64) && is_wow64)))
+     {
+-        hr = open_key_for_clsid(clsid, L"ProgID", opposite | KEY_READ, &hkey);
++        hr = open_class_key(clsid, L"ProgID", opposite | KEY_READ, &hkey, TRUE);
+         if (FAILED(hr))
+             return hr;
+@@ -1416,4 +1460,5 @@
+     LONG buf2len = sizeof(buf2);
+     HKEY xhkey;
++    LSTATUS ret;
+     WCHAR *buf;
+ 
+@@ -1424,5 +1469,8 @@
+     lstrcpyW(buf, progid);
+     lstrcatW(buf, L"\\CLSID");
+-    if (open_classes_key(HKEY_CLASSES_ROOT, buf, MAXIMUM_ALLOWED, &xhkey))
++    ret = open_user_classes_key(buf, NULL, KEY_READ, &xhkey);
++    if (classes_key_missing(ret))
++        ret = open_classes_key(HKEY_CLASSES_ROOT, buf, MAXIMUM_ALLOWED, &xhkey);
++    if (ret)
+     {
+         free(buf);
+@@ -1800,5 +1848,5 @@
+         HKEY hkey;
+ 
+-        hr = open_key_for_clsid(rclsid, L"InprocServer32", KEY_READ, &hkey);
++        hr = open_class_key(rclsid, L"InprocServer32", KEY_READ, &hkey, TRUE);
+         if (FAILED(hr))
+         {
