@@ -1,0 +1,1 @@
+stale-bits|docs/wine-repro/user32-setwindowpos-stale-bits/measure.c|-luser32 -lgdi32
