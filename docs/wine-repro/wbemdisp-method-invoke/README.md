@@ -119,3 +119,13 @@ The offline Windows 10 Wine unit executed 135 checks per architecture
 with zero failures, todos, or skips. Both executables exited zero.
 [Native unit results](results/l1-windows-10/) ·
 [L1 bundle](https://github.com/Harvi654/winum/actions/runs/45258770226/artifacts/14858028728).
+
+### Candidate L3
+
+Both architectures matched all 30 native C calls, including their
+HRESULTs, Automation result types and by-reference output values.
+Both VBScript transcripts and process exit codes also matched. The
+candidate passed the 135-check Wine unit on both architectures.
+
+[Candidate results](results/round-2/candidate/) ·
+[CI run](https://github.com/Harvi654/winum/actions/runs/45260888480).
