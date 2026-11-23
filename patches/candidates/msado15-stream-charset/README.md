@@ -27,7 +27,10 @@ the ADO illegal-operation status.
 Close Inventor and wait for Wine to finish using the original prefix.
 Start from a 2027.2 prefix with Inventor installed and Nastran absent.
 Set `prefix`, `image` and `inventor_repo` to your source prefix, Nastran
-image and Inventor checkout. Run from this Winum checkout.
+image and Inventor checkout. Run from the Winum checkout of
+`topic/msado15-stream-charset-measure`.
+[msado15 overlay](https://github.com/Harvi654/winum/actions/runs/45271185530/artifacts/14866335284) ·
+[wbemdisp overlay](https://github.com/Harvi654/winum/actions/runs/45260888480/artifacts/14860665980).
 
 ~~~bash
 (
