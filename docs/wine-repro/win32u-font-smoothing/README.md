@@ -133,3 +133,38 @@ checks), no failures, todos or skips, and exit 0. The
 is staged separately. Required candidate gates are L0, offline L1, paired
 gdi32/win32u/user32 L2, Inventor 2027 L4 and Claude cross review. Record
 AutoCAD L4 as deferred if it is skipped.
+
+The isolated [test-run branch](https://github.com/Harvi654/winum/tree/test-run/win32u-font-smoothing-1)
+runs [paired L2](https://github.com/Harvi654/winum/actions/runs/45209934774)
+against the same release series without the runtime change. The exact
+native-tested assertions are applied to both sides. The gdi32 job also
+runs the eight-setting matrix for both fontconfig profiles, with fresh
+prefixes. The [candidate runtime job](https://github.com/Harvi654/winum/actions/runs/45209934855)
+builds the corresponding WoW64 binary and source artifacts.
+
+### Inventor 2027 L4
+
+Use copies of the same test prefix with smoothing enabled and type 2,
+the same desktop fontconfig, scaling and DPI, and the usual Inventor
+launcher. Boot each copy with its own Wine runtime and close each session
+before starting the next. Capture the ribbon, a menu and the status bar on
+the 4K fractional-scale display, without account names, and note any
+jagged edges, color fringes or blur.
+
+After the candidate runtime job succeeds, download it to a separate
+directory and verify its checksum before using it:
+
+```bash
+candidate=$(mktemp -d)
+gh run download 45209934855 -R Harvi654/winum \
+  -n winum-11.22-2-binary -D "$candidate"
+(
+  cd "$candidate" &&
+  sha256sum -c winum-11.22-2-x86_64.tar.xz.sha256 &&
+  tar -xf winum-11.22-2-x86_64.tar.xz
+)
+```
+
+With `INV_PREFIX` pointing to the candidate test copy, select this build
+by prepending `$candidate/winum-11.22-2-x86_64/bin` to PATH and setting
+`INV_WINE=system` and `INV_YEAR=2027` for `scripts/launch-inventor.sh`.
