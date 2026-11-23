@@ -17,7 +17,7 @@ the ADO illegal-operation status.
 | L1 | Offline Windows 10 passed 335 checks on x86_64 and i686 with zero failures, todos or skips. [Results](../../../docs/wine-repro/msado15-stream-charset/results/l1-windows-10/) |
 | L2 | Paired msado15 suite is running. [CI](https://github.com/Harvi654/winum/actions/runs/45270694368) |
 | L3 | The candidate passed 335 Wine checks per architecture. C and VBScript results match the offline reference for the changed charsets after normalizing the integer width of Size and Position. [Results](../../../docs/wine-repro/msado15-stream-charset/results/candidate/) |
-| L4 | Pending Nastran 2027 with both wbemdisp and msado15 in a fresh Inventor 2027.2 prefix copy. |
+| L4 | 2026-11-23: joint registration completed and NEiInventor.dll loaded from the installed path. Nastran UI startup still reported 0x80040154 on per-user COM activation. |
 | Cross review | Pending. |
 
 [Measurement and exact reference bytes](../../../docs/wine-repro/msado15-stream-charset/README.md).
@@ -65,3 +65,10 @@ Use a test assembly to mesh, solve and display results. Include any
 0x80040154 dialogs or the next observed Wine diagnostic if registration
 stops again. Share only the relevant external observations with
 identifiers removed.
+
+On 2026-11-23 the maintainer reported that Register_Addin completed with
+both overlays and that NEiInventor.dll loaded from its installed path.
+The UI startup still reported 0x80040154 for a class registered under
+HKCU\Software\Classes. The next joint run depends on the combase
+per-user class candidate. Mesh, solver and results remain open for that
+run, along with the Inventor smoke test.
