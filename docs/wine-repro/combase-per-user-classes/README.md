@@ -109,3 +109,16 @@ The Wine runtime candidate follows a passing native unit.
 The native unit passed with 54 checks on x86_64 and 59 on i686. Both
 exited zero with zero failures, todos or skips.
 [Offline L1 results](results/l1-windows-10/).
+
+### Candidate round 1 on a fresh Wine prefix
+
+The patched Winum matches the tested native COM outcomes on i686 and
+selects the HKCU registration in both architectures' conflict cases.
+The x86_64 exception is the explicit 32-bit registration. Trying its
+opposite-bitness server produces 0x80070005 rather than 0x80040154.
+In the unit, the same-bitness control server registered through that
+opposite view is erroneously activated. Both failures are consistent
+with Wine writing the 32-bit user class into the default x86_64 view
+when the HKCU Classes WOW64 subtree has yet to be created.
+[Round 1 results](results/candidate-round-1/) ·
+[CI](https://github.com/Harvi654/winum/actions/runs/45278159284).
