@@ -1,0 +1,97 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] win32u: Respect GDI quality and desktop smoothing over fontconfig.
+
+Diagnosis and original DIB probe by @krokosik, Inventor issue #13 and
+PR #18. AI-assisted (Codex), original code; LGPL-2.1-or-later. Not
+submitted upstream.
+
+Offline Windows 10 draws 12 px Tahoma with colored edges for
+CLEARTYPE_QUALITY and CLEARTYPE_NATURAL_QUALITY even when system
+smoothing is off. DEFAULT_QUALITY follows the desktop mode. Wine
+11.22 used the face's fontconfig flags before either request, hiding
+subpixel rendering with rgba=none and enabling it against an explicit
+system opt-out with rgba=rgb.
+
+Resolve explicit ClearType first and honor configured desktop smoothing
+for default-quality fonts. Use fontconfig's subpixel order when the
+desktop has no order and retain its existing LCD filter. Keep existing
+driver overrides, explicit grayscale and monochrome, foreign quality
+priority and the backend's glyph/format checks.
+
+--- a/dlls/win32u/font.c
++++ b/dlls/win32u/font.c
+@@ -191,8 +191,8 @@
+     '\\','F','o','n','t','A','s','s','o','c'
+ };
+ 
+-static UINT font_smoothing = GGO_BITMAP;
+-static UINT subpixel_orientation = GGO_GRAY4_BITMAP;
++static UINT font_smoothing;
++static UINT subpixel_orientation;
+ static BOOL antialias_fakes = TRUE;
+ static struct font_gamma_ramp font_gamma_ramp;
+ 
+@@ -4518,6 +4518,21 @@
+     return font;
+ }
+ 
++static UINT select_subpixel_orientation( UINT aa_flags )
++{
++    if (subpixel_orientation) return subpixel_orientation;
++    switch (aa_flags)
++    {
++    case WINE_GGO_HRGB_BITMAP:
++    case WINE_GGO_HBGR_BITMAP:
++    case WINE_GGO_VRGB_BITMAP:
++    case WINE_GGO_VBGR_BITMAP:
++        return aa_flags;
++    default:
++        return WINE_GGO_HRGB_BITMAP;
++    }
++}
++
+ /*************************************************************
+  * font_SelectFont
+  */
+@@ -4587,13 +4602,15 @@
+ 
+         if (font)
+         {
+-            if (!*aa_flags) *aa_flags = font->aa_flags;
+             if (!*aa_flags)
+             {
+                 if (lf.lfQuality == CLEARTYPE_QUALITY || lf.lfQuality == CLEARTYPE_NATURAL_QUALITY)
+-                    *aa_flags = subpixel_orientation;
++                    *aa_flags = select_subpixel_orientation( font->aa_flags );
++                else if (font_smoothing && (lf.lfQuality == DEFAULT_QUALITY || !font->aa_flags))
++                    *aa_flags = font_smoothing == WINE_GGO_HRGB_BITMAP
++                              ? select_subpixel_orientation( font->aa_flags ) : font_smoothing;
+                 else
+-                    *aa_flags = font_smoothing;
++                    *aa_flags = font->aa_flags ? font->aa_flags : GGO_BITMAP;
+             }
+             *aa_flags = font_funcs->get_aa_flags( font, *aa_flags, antialias_fakes );
+         }
+@@ -4744,12 +4761,17 @@
+                 break;
+             }
+         }
+-        if (get_key_value( key, "FontSmoothing", &val ) && val /* enabled */)
+         {
+-            if (get_key_value( key, "FontSmoothingType", &val ) && val == 2 /* FE_FONTSMOOTHINGCLEARTYPE */)
+-                font_smoothing = subpixel_orientation;
+-            else
+-                font_smoothing = GGO_GRAY4_BITMAP;
++            DWORD smoothing = 2, type = FE_FONTSMOOTHINGSTANDARD;
++            BOOL have_smoothing = get_key_value( key, "FontSmoothing", &smoothing );
++            BOOL have_type = get_key_value( key, "FontSmoothingType", &type );
++
++            if (have_smoothing || have_type)
++            {
++                if (!smoothing) font_smoothing = GGO_BITMAP;
++                else if (type == FE_FONTSMOOTHINGCLEARTYPE) font_smoothing = WINE_GGO_HRGB_BITMAP;
++                else font_smoothing = GGO_GRAY4_BITMAP;
++            }
+         }
+         if (get_key_value( key, "FontSmoothingGamma", &val ) && val)
+         {

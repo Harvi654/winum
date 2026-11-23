@@ -126,8 +126,10 @@ These observations do not justify an exact channel-swap assertion.
 checks colored-edge presence at 12 px with system Tahoma. The ordinary font
 unit uses current desktop settings. Explicit `font smoothing` runs all eight
 settings in separate children and restores the original settings. The L1
-artifact runs this mode on both architectures in the offline VM. Native L1
-must establish that the actual Wine test passes before writing the runtime
-candidate. Required candidate gates are L0, offline L1, paired
+artifact runs this mode on both architectures in the offline VM. [Offline L1 results](results/l1-windows-10/) show 301 checks on each
+architecture (eight children with 34 checks apiece plus 29 controller
+checks), no failures, todos or skips, and exit 0. The
+[win32u runtime candidate](../../../patches/candidates/win32u-font-smoothing/README.md)
+is staged separately. Required candidate gates are L0, offline L1, paired
 gdi32/win32u/user32 L2, Inventor 2027 L4 and Claude cross review. Record
 AutoCAD L4 as deferred if it is skipped.

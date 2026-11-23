@@ -1,0 +1,17 @@
+font.c:8057: font-smoothing settings on=0 type=1 orientation=0
+0f58:font: 34 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+font.c:8057: font-smoothing settings on=0 type=1 orientation=1
+1a40:font: 34 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+font.c:8057: font-smoothing settings on=0 type=2 orientation=0
+25d8:font: 34 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+font.c:8057: font-smoothing settings on=0 type=2 orientation=1
+0a88:font: 34 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+font.c:8057: font-smoothing settings on=1 type=1 orientation=0
+0f90:font: 34 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+font.c:8057: font-smoothing settings on=1 type=1 orientation=1
+1dc8:font: 34 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+font.c:8057: font-smoothing settings on=1 type=2 orientation=0
+279c:font: 34 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+font.c:8057: font-smoothing settings on=1 type=2 orientation=1
+0ba4:font: 34 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
+0d70:font: 29 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
