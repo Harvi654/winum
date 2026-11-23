@@ -94,3 +94,14 @@ its default InprocServer32 value. In the conflict it reported the user
 marker. A lookup in the opposite view returned ERROR_FILE_NOT_FOUND
 for the classes created solely in the default view. HKCR is an
 observation here and has no fix expectation in the COM unit.
+
+### Wine test on native Windows (L1)
+
+The standalone Wine unit includes its own architecture-matched COM
+fixture and machine registration helper. It tests activation, view
+isolation, per-user precedence over HKLM, ProgID and TreatAs. Run
+`run-tests.bat` on offline Windows in a fresh folder from the normal
+desktop and accept UAC for the two helpers. Return both
+`result-combase-per-user-classes-*.txt` files and `exitcodes.txt`.
+The Wine runtime candidate follows a passing native unit.
+[L1 artifact](https://github.com/Harvi654/winum/actions/runs/45277142410/artifacts/14867891933).
