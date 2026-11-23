@@ -105,3 +105,7 @@ desktop and accept UAC for the two helpers. Return both
 `result-combase-per-user-classes-*.txt` files and `exitcodes.txt`.
 The Wine runtime candidate follows a passing native unit.
 [L1 artifact](https://github.com/Harvi654/winum/actions/runs/45277142410/artifacts/14867891933).
+
+The native unit passed with 54 checks on x86_64 and 59 on i686. Both
+exited zero with zero failures, todos or skips.
+[Offline L1 results](results/l1-windows-10/).
