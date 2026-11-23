@@ -168,7 +168,7 @@ the exit codes, as for the previous offline run.
 |---|---|---|
 | Vanilla Wine 11.22 | Pending CI | Pending CI |
 | [Winum 11.22-2 test build](results/h/winum-11.22-2/) | 12/12 | 12/12 |
-| Offline Windows 10 | Pending | Pending |
+| [Offline Windows 10](results/h/windows-10/) | 12/12, exit 0 | 12/12, exit 0 |
 
 Winum's default redraw cases with the nested child on the frame thread
 or held on its worker moved red to the first destination sample (10,10)
@@ -177,6 +177,22 @@ The drain repainted that sample green. The live child's queued paint
 changes the timing. In the i686 live/all/clean observation the first
 sample stayed red even after the drain, with no pending container
 update and unchanged container and nested paint counts. The x86_64
-observation of that same variant ended green. This difference needs to
-be read as a concurrent paint observation. The native results determine
-whether the synthetic behavior differs from Windows. [Winum CI](https://github.com/Harvi654/winum/actions/runs/45103150334/job/137458573685)
+observation of that same variant ended green. This split is a concurrent paint observation. [Winum CI](https://github.com/Harvi654/winum/actions/runs/45103150334/job/137458573685)
+
+The offline Windows desktop was 1920 × 1080 at 96 DPI. Its client origin
+shifted the destination X from 1570 to 1562 to keep the full pane on screen.
+All local probe positions and pane dimensions matched CI.
+
+| Observation in H | Windows 10, both architectures | Winum 11.22-2, both architectures |
+|---|---|---|
+| Default redraw, same or held child, clean or pending | During RedrawWindow the container paint count rises from 1 to 2, its update region clears, and the nested paint count stays at 1. After the move the first sample is red with no pending container update. It remains red after dispatch. | During RedrawWindow the container paint count stays at 1 and the whole pane is invalidated. After the move the first sample is red with a pending update. After dispatch it is green and both windows have painted again. |
+| Default redraw, live child, clean or pending | First sample red after move and after dispatch. No pending container update after move. | First sample green after move in both runs. The container repaints during the final drain. |
+| ALLCHILDREN, same or held child, clean or pending | Blue/green pixels at all six destination samples after the move and after dispatch. | Same outcome. |
+| ALLCHILDREN, live child, clean or pending | First sample red after move and after dispatch in both variants in these runs. | First sample green after dispatch except for one i686 clean observation. Queue timing can affect this comparison. |
+
+The reliable difference in these runs is the default redraw's paint timing
+and update region, visible before FRAMECHANGED, including on one thread.
+Seeing red copy alone does not identify a Wine defect. Windows also copies
+red in H. Which redraw flags and child update regions Inventor has in the
+traced interval, whether the other pane updates influence them, and why the
+real Inventor pane remains stale under Wine are still open.
