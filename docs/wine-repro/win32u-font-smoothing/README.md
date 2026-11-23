@@ -66,7 +66,7 @@ system height are reported so differences in UI font selection are visible.
 
 | Runtime | none | rgb |
 |---|---|---|
-| Vanilla Wine 11.22 | Pending CI | Pending CI |
+| [Vanilla Wine 11.22](results/vanilla-11.22/) | 2,064 cases per architecture | 2,064 cases per architecture |
 | [Winum 11.22-2](results/winum-11.22-2/) | 2,064 cases per architecture | 2,064 cases per architecture |
 | Offline Windows 10 | Pending native reference (fontconfig does not apply) | Same reference |
 
@@ -76,6 +76,22 @@ Tahoma produces bi-level output for DEFAULT, CLEARTYPE and CLEARTYPE_NATURAL
 with rgba=none, and subpixel output for those three with rgba=rgb. The
 message, menu and stock UI samples in this run also change from bi-level
 to subpixel. [Winum CI](https://github.com/Harvi654/winum/actions/runs/45198628536/job/137777473702)
+
+All case rows match exactly between vanilla Wine 11.22 and Winum 11.22-2
+for each profile and architecture. The counts below are per architecture
+and per build. Each run verified and restored its smoothing settings.
+[Vanilla Wine CI](https://github.com/Harvi654/winum/actions/runs/45198628536/job/137777473542)
+
+| Fontconfig profile | Bi-level | Greyscale | Subpixel |
+|---|---:|---:|---:|
+| rgba=none | 1,008 | 1,056 | 0 |
+| rgba=rgb | 552 | 264 | 1,248 |
+
+At 12 px, DEFAULT quality for the renamed Tahoma is bi-level for every
+SPI tuple with rgba=none, and subpixel for every tuple with rgba=rgb.
+Disabling smoothing through SPI therefore did not disable that observed
+subpixel output with rgba=rgb. The offline native results are still
+needed to determine the expected behavior for the eight settings.
 
 After native comparison, derive a Wine test only from stable measured cases.
 L0, offline L1, paired gdi32/win32u/user32 L2, Inventor 2027 L4 and Claude
