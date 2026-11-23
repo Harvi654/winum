@@ -124,6 +124,15 @@ when the HKCU Classes WOW64 subtree has yet to be created.
 [Round 1 results](results/candidate-round-1/) ·
 [CI](https://github.com/Harvi654/winum/actions/runs/45278159284).
 
+A separate registry control with the Winum 11.22-2 runtime confirmed
+the key placement. It used `reg add /reg:32` for a fresh synthetic CLSID,
+then checked the two physical paths with `reg query /reg:64`.
+
+| Wine prefix | `Classes\CLSID` | `Classes\Wow6432Node\CLSID` |
+| --- | --- | --- |
+| Fresh | Found | Missing |
+| After preparing the empty WOW64 subtree | Missing | Found |
+
 ### Candidate round 2 with the WOW64 test subtree
 
 CI creates the empty `HKCU\Software\Classes\Wow6432Node\CLSID` subtree in
