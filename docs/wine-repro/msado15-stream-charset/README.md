@@ -52,7 +52,7 @@ cp "$probe/stream.vbs" out/
 
 | Runtime | x86_64 | i686 |
 | --- | --- | --- |
-| Offline Windows 10 | Pending | Pending |
+| Offline Windows 10 | [Text](results/windows-10/result-x86_64.txt) | [Text](results/windows-10/result-i686.txt) |
 | Vanilla Wine 11.22 | CI | CI |
 | Winum 11.22-2 | [Text](results/winum-11.22-2/result-x86_64.txt) | [Text](results/winum-11.22-2/result-i686.txt) |
 
@@ -79,3 +79,24 @@ the unsupported calls.
 These rows distinguish the charset failure in the Nastran trace from
 other stream operations that can be measured independently.
 [CI run](https://github.com/Harvi654/winum/actions/runs/45267251197).
+
+
+### Offline Windows 10 reference
+
+The two architecture reports match apart from the architecture header.
+Both probes and both cscript processes exited zero. The C and VBScript
+runs saved the same bytes for each charset and file case.
+
+| Operation | Measured Windows 10 behavior |
+| --- | --- |
+| Empty first write | UTF-8 emits EF BB BF, Unicode emits FF FE, and the three single-byte charsets emit no bytes. |
+| UTF-8 spellings | Both spellings have byte positions 3, 13, 16, 18 after the empty write, sample, CRLF line and LF line. Saved hex is efbbbf41c48de282acf09f9883420d0a430a. |
+| Single-byte encodings | US-ASCII and ISO-8859-1 save 41633f3f3f420d0a430a. Windows-1252 saves 4163803f3f420d0a430a. The sample demonstrates best-fit c for U+010D and one question mark per surrogate code unit. |
+| Bounded ReadText | In UTF-8, reading one unit from position zero returns A at position 4. Reading the next three returns U+010D, U+20AC and the high surrogate at position 12. |
+| UTF-8 LoadFromFile | Both input files become streams of 18 bytes at position 0. CRLF read returns the sample at position 15, LF read returns Z at position 17, and ReadText(-1) returns Q at position 18. |
+| Charset after Open | Succeeds at position zero. At the measured nonzero positions C reports DISP_E_EXCEPTION with 0x800a0c93, while VBScript reports error 3219. |
+| SetEOS | Position zero and SetEOS leave a zero-byte stream and zero-byte saved file. |
+| CopyTo | Text to binary copies the saved bytes. Binary to text raises 0x800a0c93. |
+
+The Unicode transcript keeps a native comparison point. Existing Wine
+Unicode behavior remains the compatibility control for the candidate.
