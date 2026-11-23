@@ -51,6 +51,7 @@ bash docs/wine-repro/combase-per-user-classes/build-bundle.sh out
 | Offline Windows 10 | [Text](results/windows-10/result-x86_64.txt) | [Text](results/windows-10/result-i686.txt) |
 | Vanilla Wine 11.22 | CI | CI |
 | Winum 11.22-2 | [Text](results/winum-11.22-2/result-x86_64.txt) | [Text](results/winum-11.22-2/result-i686.txt) |
+| Winum 11.22-2, combase candidate with prepared WOW64 subtree | [Text](results/candidate/result-x86_64.txt) | [Text](results/candidate/result-i686.txt) |
 
 Wine CI uses direct setup of the temporary machine class in an isolated
 prefix. Native Windows measurements supply the expectations for the
@@ -122,3 +123,15 @@ with Wine writing the 32-bit user class into the default x86_64 view
 when the HKCU Classes WOW64 subtree has yet to be created.
 [Round 1 results](results/candidate-round-1/) ·
 [CI](https://github.com/Harvi654/winum/actions/runs/45278159284).
+
+### Candidate round 2 with the WOW64 test subtree
+
+CI creates the empty `HKCU\Software\Classes\Wow6432Node\CLSID` subtree in
+fresh Wine prefixes before executing the unit and MEASURE. Both
+architectures then match every native COM result in the reference table.
+The focused Wine unit passed 51 checks on x86_64 and 56 on i686 with
+zero failures or skips. It sets up the temporary machine class directly
+and has three fewer assertions per architecture than the UAC-helper run.
+Plain HKCR remains a separate observation.
+[Round 2 results](results/candidate/) ·
+[CI](https://github.com/Harvi654/winum/actions/runs/45278822590).
