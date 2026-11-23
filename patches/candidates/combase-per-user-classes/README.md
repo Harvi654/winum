@@ -84,3 +84,35 @@ model. For the Inventor smoke test, create a part, assembly and drawing,
 save and reopen them, then restart Inventor in the same trial prefix.
 If a step fails, share its exact dialog or filtered Wine diagnostics
 with identifiers removed.
+
+## Cross review (Claude Opus 5.5, 2026-11-23)
+
+Read in full: the `dlls/combase/combase.c` part of
+`combase-per-user-classes.patch` against Wine 11.22. Skimmed: the test, the
+MEASURE program and results.
+
+**Approved for L4**, with these notes:
+
+1. Narrow and in the right place: only COM's own lookups read the user's
+   classes first - `InprocServer32` during activation, `ProgID` and
+   `TreatAs` of a CLSID, and `CLSIDFromProgID`. A key missing in HKCU falls
+   back to the existing HKLM lookup; any other HKCU error is reported, not
+   hidden. `open_key_for_clsid` keeps its old behaviour for the other
+   callers, and the plain registry API's HKCR (bug 17019 proper) is left
+   alone - right for a first patch.
+2. **Watch at L4: the class here is served by `mscoree.dll`.** Combase will
+   now find `InprocServer32 = mscoree.dll` in HKCU, but the .NET Framework
+   shim then reads the class's `Assembly`/`CodeBase`/`RuntimeVersion` itself,
+   through the ordinary registry API under HKEY_CLASSES_ROOT - which in
+   Wine still shows only HKLM. With native `mscoree` (as in Inventor
+   prefixes with .NET 4.8) that lookup may fail the same way
+   (`CLASS_E_CLASSNOTAVAILABLE` or `0x80040154`). If L4 shows that, the
+   next step is measured, not guessed: which HKCR reads the shim does
+   (`+reg` around the activation), and whether a narrow HKCR fallback for
+   `CLSID\{...}` reads is enough.
+3. Not covered (by design, recorded): `LocalServer32`, `InprocHandler32`,
+   `AppID` and per-user type libraries; WOW64 needs the HKCU
+   `Software\Classes\Wow6432Node` branch that a clean Wine prefix may lack
+   (measured and documented above).
+4. combase is used by everything: the Inventor smoke test (part, assembly,
+   drawing, save/reopen, restart) is part of this L4, as the README says.
