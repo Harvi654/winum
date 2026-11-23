@@ -167,5 +167,16 @@ the exit codes, as for the previous offline run.
 | Runtime | x86_64 | i686 |
 |---|---|---|
 | Vanilla Wine 11.22 | Pending CI | Pending CI |
-| Winum 11.22-2 test build | Pending CI | Pending CI |
+| [Winum 11.22-2 test build](results/h/winum-11.22-2/) | 12/12 | 12/12 |
 | Offline Windows 10 | Pending | Pending |
+
+Winum's default redraw cases with the nested child on the frame thread
+or held on its worker moved red to the first destination sample (10,10)
+before the final drain, with the full container update region pending.
+The drain repainted that sample green. The live child's queued paint
+changes the timing. In the i686 live/all/clean observation the first
+sample stayed red even after the drain, with no pending container
+update and unchanged container and nested paint counts. The x86_64
+observation of that same variant ended green. This difference needs to
+be read as a concurrent paint observation. The native results determine
+whether the synthetic behavior differs from Windows. [Winum CI](https://github.com/Harvi654/winum/actions/runs/45103150334/job/137458573685)
