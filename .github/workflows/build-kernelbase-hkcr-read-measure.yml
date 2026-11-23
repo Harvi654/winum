@@ -73,7 +73,11 @@ jobs:
           (cd bundle && sha256sum -c SHA256SUMS)
           mkdir -p results
           xvfb-run -a bash -eu -c '
-            trap "\"$WINESERVER\" -k; \"$WINESERVER\" -w" EXIT
+            stop_wine() {
+              "$WINESERVER" -k >/dev/null 2>&1 || true
+              "$WINESERVER" -w
+            }
+            trap stop_wine EXIT
             timeout 120 "$runtime/bin/wine" wineboot -i
             for arch in x86_64 i686; do
               status=0
@@ -84,9 +88,18 @@ jobs:
               test "$status" -eq 0
               grep -q "^measure_complete=1 user_cleanup=0 machine_cleanup=0" "results/result-$arch.txt"
             done
-            "$WINESERVER" -k
-            "$WINESERVER" -w
-            ! grep -Eq "^\"(WriteProbe|UserOnly|MachineOnly)\"=" "$WINEPREFIX/"{user,system}.reg
+            stop_wine
+            trap - EXIT
+            test -s "$WINEPREFIX/user.reg"
+            test -s "$WINEPREFIX/system.reg"
+            registry_status=0
+            grep -Eq "^\"(WriteProbe|UserOnly|MachineOnly)\"=" "$WINEPREFIX/"{user,system}.reg ||
+              registry_status=$?
+            if [ "$registry_status" -ne 1 ]; then
+              echo "Fixture cleanup scan failed (grep status $registry_status)."
+              exit 1
+            fi
+            echo "No fixture values remain in the saved hives."
           '
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
