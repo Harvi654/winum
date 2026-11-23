@@ -85,17 +85,20 @@ jobs:
           export WINEPREFIX=/tmp/msado15-unit-prefix WINEDEBUG=-all WINEDLLOVERRIDES='mscoree,mshtml='
           export WINETEST_PLATFORM=windows
           mkdir -p results
+          unit_failed=0
           xvfb-run -a bash -eu -c '
             timeout 150 "$runtime/bin/wine" wineboot -i
             "$WINESERVER" -w
             trap "\"$WINESERVER\" -k; \"$WINESERVER\" -w" EXIT
+            failed=0
             for arch in x86_64 i686; do
               timeout 120 "$runtime/bin/wine" "unit/msado15-stream-charset-$arch.exe" stream_charset > "results/unit-$arch.txt" 2>&1 ||
-                { cat "results/unit-$arch.txt"; exit 1; }
+                failed=1
               cat "results/unit-$arch.txt"
-              grep -E "335 tests executed .*0 failures.*0 skipped" "results/unit-$arch.txt"
+              grep -E "335 tests executed .*0 failures.*0 skipped" "results/unit-$arch.txt" || failed=1
             done
-          '
+            exit "$failed"
+          ' || unit_failed=1
           xvfb-run -a bash docs/wine-repro/msado15-stream-charset/run-wine.sh \
             "$runtime/bin/wine" "$WINESERVER" bundle results
           python3 - <<'PY'
@@ -129,6 +132,7 @@ jobs:
                   failed = True
           raise SystemExit(failed)
           PY
+          test "$unit_failed" -eq 0
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

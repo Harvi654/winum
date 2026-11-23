@@ -11,7 +11,6 @@ non-Unicode charsets and preserve the existing Unicode ReadText and
 WriteText paths.
 
 --- a/dlls/msado15/stream.c
---- a/dlls/msado15/stream.c
 +++ b/dlls/msado15/stream.c
 @@ -182,5 +182,5 @@
      {
