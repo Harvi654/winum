@@ -67,8 +67,15 @@ system height are reported so differences in UI font selection are visible.
 | Runtime | none | rgb |
 |---|---|---|
 | Vanilla Wine 11.22 | Pending CI | Pending CI |
-| Winum 11.22-2 | Pending CI | Pending CI |
+| [Winum 11.22-2](results/winum-11.22-2/) | 2,064 cases per architecture | 2,064 cases per architecture |
 | Offline Windows 10 | Pending native reference (fontconfig does not apply) | Same reference |
+
+The Winum run completed all eight settings and restored the original values
+on both architectures. At 12 px with smoothing on and type 2, the renamed
+Tahoma produces bi-level output for DEFAULT, CLEARTYPE and CLEARTYPE_NATURAL
+with rgba=none, and subpixel output for those three with rgba=rgb. The
+message, menu and stock UI samples in this run also change from bi-level
+to subpixel. [Winum CI](https://github.com/Harvi654/winum/actions/runs/45198628536/job/137777473702)
 
 After native comparison, derive a Wine test only from stable measured cases.
 L0, offline L1, paired gdi32/win32u/user32 L2, Inventor 2027 L4 and Claude
