@@ -68,13 +68,13 @@ static IClassFactoryVtbl factory_vtbl =
 };
 static IClassFactory factory = {&factory_vtbl};
 
-__declspec(dllexport) HRESULT WINAPI DllGetClassObject(REFCLSID clsid, REFIID iid, void **out)
+HRESULT WINAPI DllGetClassObject(REFCLSID clsid, REFIID iid, void **out)
 {
     (void)clsid;
     return IClassFactory_QueryInterface(&factory, iid, out);
 }
 
-__declspec(dllexport) HRESULT WINAPI DllCanUnloadNow(void)
+HRESULT WINAPI DllCanUnloadNow(void)
 {
     return S_FALSE;
 }

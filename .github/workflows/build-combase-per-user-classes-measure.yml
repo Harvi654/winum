@@ -6,6 +6,7 @@ on:
     paths:
       - 'docs/wine-repro/combase-per-user-classes/measure.c'
       - 'docs/wine-repro/combase-per-user-classes/server.c'
+      - 'docs/wine-repro/combase-per-user-classes/server.def'
       - 'docs/wine-repro/combase-per-user-classes/build-bundle.sh'
       - 'docs/wine-repro/combase-per-user-classes/measure.list'
       - 'docs/wine-repro/combase-per-user-classes/run-wine.sh'

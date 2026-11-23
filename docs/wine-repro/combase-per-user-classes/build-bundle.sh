@@ -10,9 +10,9 @@ for arch in x86_64 i686; do
     bits=64
     if [[ "$arch" == i686 ]]; then bits=32; fi
     "$arch-w64-mingw32-gcc" -shared -O2 -Wall -Werror -Wl,--kill-at -DMARKER="1$bits" \
-        -o "$out/user-$bits.dll" "$probe/server.c" -luuid
+        -o "$out/user-$bits.dll" "$probe/server.c" "$probe/server.def" -luuid
     "$arch-w64-mingw32-gcc" -shared -O2 -Wall -Werror -Wl,--kill-at -DMARKER="2$bits" \
-        -o "$out/machine-$bits.dll" "$probe/server.c" -luuid
+        -o "$out/machine-$bits.dll" "$probe/server.c" "$probe/server.def" -luuid
 done
 cat >> "$out/README.txt" <<'INFO'
 
