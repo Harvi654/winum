@@ -20,7 +20,7 @@ zero fuzz. The release series does not select it.
 | L1 | Offline Windows 10. 135 checks per architecture, zero failures, todos and skips. |
 | L2 | The paired wbemdisp, wbemprox and vbscript jobs are running. [L2](https://github.com/Harvi654/winum/actions/runs/45261162354) |
 | L3 | The overlay passed 135 Wine checks per architecture. All 30 C calls and the VBScript output and process statuses matched the offline Windows reference on each architecture. [CI](https://github.com/Harvi654/winum/actions/runs/45260888480) · [Results](https://github.com/Harvi654/winum/actions/runs/45260888480/artifacts/14860436546) |
-| L4 | Pending maintainer run of the Nastran 2027 installer and mesh/run/results in a separate copy of the Inventor 2027.2 prefix and runtime. |
+| L4 | 2026-11-23: the maintainer observed StdRegProv dispatch pass. Registration then stopped at ADODB.Stream WriteText with charset UTF-8. Full L4 is pending a fresh-prefix run with the msado15 candidate as well. |
 | Cross review | Pending Claude review. |
 
 ## Inventor Nastran 2027 L4
@@ -62,6 +62,13 @@ Manager, its loaded module path as observed externally, any 0x80040154
 dialogs, and whether mesh, run and results work. Use selected installer
 trace lines with identifiers removed. Do not include vendor script
 contents or the full logs.
+
+On 2026-11-23 the maintainer reported that StdRegProv dispatch proceeded
+without the unsupported Invoke diagnostic. The next observed failure
+was `msado15:stream_WriteText` rejecting the UTF-8 charset. The add-in
+assembly entry still lacked its installation path. The joint follow-up
+covers registration, loading, meshing, solving and results using both
+candidates.
 
 ## Cross review (Claude Opus 5.5, 2026-11-23)
 
