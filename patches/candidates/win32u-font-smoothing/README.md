@@ -35,3 +35,43 @@ settings.
 use the [CI binary](https://github.com/Harvi654/winum/actions/runs/45209934855/artifacts/14839823850).
 SHA-256 of `winum-11.22-2-x86_64.tar.xz`:
 `35579316ea9f0a1c81ba5126264c517fbf3074837bf9e3fa49e6daab45ec88e9`.
+
+## Cross review (Claude Opus 5.5, 2026-11-23)
+
+Read in full: the runtime patch (`win32u-font-smoothing.patch`, 97 lines)
+against `dlls/win32u/font.c` and `freetype.c` of Wine 11.22, and the test
+(`patches/tests-first/win32u-tests-font-smoothing.patch`). Skimmed: the
+MEASURE program and the result matrices.
+
+**Approved for L4**, with these notes:
+
+1. **Scope is right and safe for existing prefixes.** `font_smoothing` and
+   `subpixel_orientation` now start at 0 ("not configured"), and the
+   registry is applied only when `FontSmoothing` or `FontSmoothingType`
+   exists. Wine's `wine.inf` writes neither (its `SPI_GET*` defaults live in
+   `sysparams.c` only), and neither the Inventor scripts nor the flake set
+   them today, so a prefix without these values keeps fontconfig's choice
+   as before. The visible change needs the desktop values; for the L4 they
+   are set by hand, for users later by a migration (Inventor plan, "Fonts").
+2. **Explicit ClearType** now reaches FreeType as a subpixel mode even when
+   the face's fontconfig flags say grey or none; `freetype_get_aa_flags`
+   lets subpixel modes skip the gasp check (only grey is cut by
+   `GASP_DOGRAY`), which matches the measured coloured 12 px Tahoma and
+   krokosik's finding. Without LCD support in FreeType it still falls back
+   to grey there - fine.
+3. `ANTIALIASED_QUALITY` / `NONANTIALIASED_QUALITY` are set earlier in
+   `font_SelectFont` and do not reach the changed branch - unchanged, as the
+   test expects.
+4. **Not measured: `DRAFT_QUALITY` and `PROOF_QUALITY`.** With desktop
+   smoothing configured, the patch applies it to them only when the face has
+   no fontconfig flags; otherwise they keep fontconfig's choice as before.
+   Add both to the MEASURE program (one more Windows run) before promotion,
+   and make the branch follow the measurement; until then the conservative
+   behaviour is acceptable.
+5. On promotion: move the test into the patch (as `ucrtbase` v3), write
+   `docs/patches/win32u-font-smoothing.md` with the `l1` marker, and keep
+   the credit line for @krokosik in the header and on the page.
+6. L2 is open until the paired gdi32/win32u reference finishes; L4 by the
+   maintainer (ribbon, menus, status bar zoomed 8x, before/after with the
+   same registry values; `fc-match` there reports no `rgba`, the case the
+   patch addresses).
