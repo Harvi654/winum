@@ -21,6 +21,20 @@ and published as versioned releases.
 > Windows 10 (L1) or a recorded reason why not; `scripts/check-series.sh`
 > checks it. Next: Wine 11.23 (expected around 27 November).
 
+## Releases
+
+| Release | Wine | Date | Patches | What it added |
+| --- | --- | --- | --- | --- |
+| [winum-11.22-2](docs/release/winum-11.22-2.md) | 11.22 | 2026-11-23 | 73 | Inventor's Open/Save dialogs (shell32), msxml3 same node (@Lukas10999), AutoCAD Save As crash (ucrtbase) and "Connection Lost" (wineserver) |
+| [winum-11.22-1](docs/release/winum-11.22-1.md) | 11.22 | 2026-11-16 | 66 | the 66 patches moved to Wine 11.22 |
+| [winum-11.20-2](docs/release/winum-11.20-2.md) | 11.20 | 2026-11-12 | 66 | Import CAD Reference Model (ole32, packager), contributed by @krokosik |
+| [winum-11.20-1](docs/release/winum-11.20-1.md) | 11.20 | 2026-11-11 | 62 | the first winum: the Inventor project's series, SOLIDWORKS and MSI fixes |
+
+Every patch of the current series, with the release it came in and the
+validation it reached (L0-L5, cross review), is listed in
+[docs/patches/README.md](docs/patches/README.md); each has its own page
+next to it.
+
 ## Who uses it
 
 - [Autodesk Inventor on Linux](https://github.com/Harvi654/Autodesk-Inventor-for-Linux) (2026, 2027)
@@ -68,7 +82,8 @@ Every patch:
    real Windows;
 3. is reviewed by a second reviewer before it goes into `patches/series`;
 4. has a short plain-language write-up in `docs/patches/`, with the
-   validation level it reached (L0 build … L5 a week of real use).
+   validation level it reached (L0 build … L5 a week of real use); the
+   overview of all of them is [docs/patches/README.md](docs/patches/README.md).
 
 Rules for contributors and AI assistants are in [AGENTS.md](AGENTS.md).
 
