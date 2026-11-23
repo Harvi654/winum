@@ -16,12 +16,12 @@ zero fuzz. The release series does not select it.
 
 | Level | Status |
 | --- | --- |
-| L0 | The runtime patch applied with zero fuzz after the release series. Both candidate DLLs built. The full WoW64 build is in the L2 job. |
+| L0 | The runtime patch applied with zero fuzz after the release series. Both candidate DLLs built. The full WoW64 build passed in the paired run. |
 | L1 | Offline Windows 10. 135 checks per architecture, zero failures, todos and skips. |
-| L2 | The paired wbemdisp, wbemprox and vbscript jobs are running. [L2](https://github.com/Harvi654/winum/actions/runs/45261162354) |
+| L2 | The paired wbemdisp, wbemprox and vbscript run covered 18 units with zero regressions. [L2](https://github.com/Harvi654/winum/actions/runs/45261162354) |
 | L3 | The overlay passed 135 Wine checks per architecture. All 30 C calls and the VBScript output and process statuses matched the offline Windows reference on each architecture. [CI](https://github.com/Harvi654/winum/actions/runs/45260888480) · [Results](https://github.com/Harvi654/winum/actions/runs/45260888480/artifacts/14860436546) |
 | L4 | 2026-11-23: the maintainer observed StdRegProv dispatch pass. Registration then stopped at ADODB.Stream WriteText with charset UTF-8. Full L4 is pending a fresh-prefix run with the msado15 candidate as well. |
-| Cross review | Pending Claude review. |
+| Cross review | Claude approved the candidate for L4. The provider status mapping is still open for promotion. |
 
 ## Inventor Nastran 2027 L4
 
