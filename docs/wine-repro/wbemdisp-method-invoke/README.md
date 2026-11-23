@@ -19,7 +19,7 @@ and [Wine bug 39463](https://bugs.winehq.org/show_bug.cgi?id=39463).
 | VBScript runtime error | An unhandled intentional error after a marker. The C wrapper records the cscript process exit code independently of the direct-call script. |
 
 Each architecture uses a unique temporary key under
-\`HKCU\Software\winum-test\`. The C probe removes the unique key and removes
+`HKCU\Software\winum-test`. The C probe removes the unique key and removes
 the parent only when it created the parent. No administrator rights are
 needed. Use the offline Windows 10 snapshot on a 64-bit installation so
 both x86_64 and i686 executables can run.
@@ -34,13 +34,13 @@ cp "$probe"/*.vbs out/
 (cd out && sha256sum ./*.exe ./*.vbs ./README.txt ./measure.manifest ./run-measure.bat > SHA256SUMS)
 ~~~
 
-Download the workflow artifact \`wbemdisp-method-invoke-measure\`, verify its
-\`SHA256SUMS\` before transferring the bundle to the VM, and run
-\`run-measure.bat\` in a fresh folder. Return
-\`result-wbemdisp-method-invoke-x86_64.txt\`,
-\`result-wbemdisp-method-invoke-i686.txt\`, and \`exitcodes.txt\` only.
+Download the workflow artifact `wbemdisp-method-invoke-measure`, verify its
+`SHA256SUMS` before transferring the bundle to the VM, and run
+`run-measure.bat` in a fresh folder. Return
+`result-wbemdisp-method-invoke-x86_64.txt`,
+`result-wbemdisp-method-invoke-i686.txt`, and `exitcodes.txt` only.
 The cscript diagnostic can include the local folder name. The lines
-beginning with \`cscript kind=\` already record the process status.
+beginning with `cscript kind=` already record the process status.
 
 ## Comparison
 

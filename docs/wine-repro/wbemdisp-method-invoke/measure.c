@@ -49,6 +49,7 @@ static void print_variant(const VARIANT *v)
             if (type == (VT_ARRAY | VT_BSTR))
             {
                 V_VT(&entry) = VT_BSTR;
+                V_BSTR(&entry) = NULL;
                 hr = SafeArrayGetElement(array, &i, &V_BSTR(&entry));
             }
             else hr = SafeArrayGetElement(array, &i, &entry);
@@ -219,7 +220,7 @@ int main(void)
     WCHAR display[] = L"winmgmts:{impersonationLevel=impersonate}!\\\\.\\root\\default:StdRegProv";
     WCHAR guid[40], key[100];
     HKEY parent, child;
-    DWORD parent_disp, child_disp;
+    DWORD parent_disp, child_disp, subkeys, values;
     GUID id;
     LONG status;
     HRESULT hr;
@@ -240,7 +241,7 @@ int main(void)
         return 2;
     }
     swprintf(key, COUNT(key), L"%ls\\%ls", TEST_ROOT, guid);
-    status = RegCreateKeyExW(HKEY_CURRENT_USER, TEST_ROOT, 0, NULL, 0, KEY_WRITE,
+    status = RegCreateKeyExW(HKEY_CURRENT_USER, TEST_ROOT, 0, NULL, 0, KEY_READ | KEY_WRITE | DELETE,
                             NULL, &parent, &parent_disp);
     printf("scratch_parent=%ld\n", status);
     if (status != ERROR_SUCCESS)
@@ -290,9 +291,15 @@ int main(void)
 
     status = RegDeleteTreeW(parent, guid);
     printf("scratch_cleanup=%ld\n", status);
-    RegCloseKey(parent);
     if (parent_disp == REG_CREATED_NEW_KEY)
-        printf("scratch_parent_cleanup=%ld\n", RegDeleteKeyW(HKEY_CURRENT_USER, TEST_ROOT));
+    {
+        LONG info = RegQueryInfoKeyW(parent, NULL, NULL, NULL, &subkeys, NULL,
+                                     NULL, &values, NULL, NULL, NULL, NULL);
+        if (info == ERROR_SUCCESS && !subkeys && !values)
+            printf("scratch_parent_cleanup=%ld\n", RegDeleteKeyW(HKEY_CURRENT_USER, TEST_ROOT));
+        else printf("scratch_parent_retained query=%ld\n", info);
+    }
+    RegCloseKey(parent);
     CoUninitialize();
     printf("measure_complete dispatch=%d\n", bound);
     return status != ERROR_SUCCESS;
