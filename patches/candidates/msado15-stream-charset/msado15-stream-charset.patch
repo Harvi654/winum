@@ -1,0 +1,318 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msado15: Handle measured ADODB.Stream text encodings.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+The offline Windows 10 probe measured the UTF-8 preamble, byte positions,
+bounded and line reads, three single-byte encodings, and file/CopyTo calls.
+Wine's stream rejected these charsets and returned E_NOTIMPL for the file
+and copy operations. Use the Windows code-page APIs on the measured
+non-Unicode charsets and preserve the existing Unicode ReadText and
+WriteText paths.
+
+--- a/dlls/msado15/stream.c
+--- a/dlls/msado15/stream.c
++++ b/dlls/msado15/stream.c
+@@ -182,5 +182,5 @@
+     {
+         BYTE *tmp;
+-        LONG new_size = max( size, stream->allocated * 2 );
++        LONG new_size = max( size, stream->allocated <= MAXLONG / 2 ? stream->allocated * 2 : MAXLONG );
+         if (!(tmp = realloc( stream->buf, new_size ))) return E_OUTOFMEMORY;
+         memset( tmp + stream->allocated, 0, new_size - stream->allocated );
+@@ -286,4 +286,16 @@
+ }
+ 
++static const BYTE utf8_bom[] = {0xef, 0xbb, 0xbf};
++
++static UINT stream_codepage( const WCHAR *charset )
++{
++    if (!charset) return 0;
++    if (!wcsicmp( charset, L"utf-8" )) return CP_UTF8;
++    if (!wcsicmp( charset, L"us-ascii" )) return 20127;
++    if (!wcsicmp( charset, L"windows-1252" )) return 1252;
++    if (!wcsicmp( charset, L"iso-8859-1" )) return 28591;
++    return 0;
++}
++
+ static HRESULT WINAPI stream_put_Charset( _Stream *iface, BSTR charset )
+ {
+@@ -293,4 +305,7 @@
+     TRACE( "%p, %s\n", stream, debugstr_w(charset) );
+ 
++    if (stream->pos && (stream_codepage( stream->charset ) || stream_codepage( charset )))
++        return MAKE_ADO_HRESULT( adErrIllegalOperation );
++    if (!charset) return MAKE_ADO_HRESULT( adErrInvalidArgument );
+     if (!(str = wcsdup( charset ))) return E_OUTOFMEMORY;
+     free( stream->charset );
+@@ -412,6 +427,32 @@
+ static HRESULT WINAPI stream_CopyTo( _Stream *iface, _Stream *dst, ADO_LONGPTR size )
+ {
+-    FIXME( "%p, %p, %Id\n", iface, dst, size );
+-    return E_NOTIMPL;
++    struct stream *stream = impl_from_Stream( iface );
++    StreamTypeEnum type;
++    ObjectStateEnum state;
++    HRESULT hr;
++    VARIANT data;
++    LONG count;
++
++    TRACE( "%p, %p, %Id\\n", iface, dst, size );
++    if (stream->state == adStateClosed) return MAKE_ADO_HRESULT( adErrObjectClosed );
++    if (!dst || size < adReadAll) return MAKE_ADO_HRESULT( adErrInvalidArgument );
++    if (dst == iface) return MAKE_ADO_HRESULT( adErrIllegalOperation );
++    if (FAILED(hr = _Stream_get_State( dst, &state ))) return hr;
++    if (state == adStateClosed) return MAKE_ADO_HRESULT( adErrObjectClosed );
++    if (FAILED(hr = _Stream_get_Type( dst, &type ))) return hr;
++    if (type == adTypeText)
++    {
++        if (stream->type == adTypeBinary) return MAKE_ADO_HRESULT( adErrIllegalOperation );
++        return E_NOTIMPL;
++    }
++
++    count = stream->size - stream->pos;
++    if (size != adReadAll && size < count) count = size;
++    if (!count) return S_OK;
++    if (FAILED(hr = create_byte_array( stream->buf + stream->pos, count, &data ))) return hr;
++    hr = _Stream_Write( dst, data );
++    VariantClear( &data );
++    if (SUCCEEDED(hr)) stream->pos += count;
++    return hr;
+ }
+ 
+@@ -424,12 +465,210 @@
+ static HRESULT WINAPI stream_SaveToFile( _Stream *iface, BSTR filename, SaveOptionsEnum options )
+ {
+-    FIXME( "%p, %s, %u\n", iface, debugstr_w(filename), options );
+-    return E_NOTIMPL;
++    struct stream *stream = impl_from_Stream( iface );
++    DWORD written = 0;
++    HANDLE file;
++    HRESULT hr = S_OK;
++
++    TRACE( "%p, %s, %u\\n", iface, debugstr_w(filename), options );
++    if (stream->state == adStateClosed) return MAKE_ADO_HRESULT( adErrObjectClosed );
++    if (!filename || !*filename || (options != adSaveCreateNotExist && options != adSaveCreateOverWrite))
++        return MAKE_ADO_HRESULT( adErrInvalidArgument );
++
++    file = CreateFileW( filename, GENERIC_WRITE, 0, NULL,
++                        options == adSaveCreateOverWrite ? CREATE_ALWAYS : CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL );
++    if (file == INVALID_HANDLE_VALUE) return HRESULT_FROM_WIN32( GetLastError() );
++    if (stream->size && !WriteFile( file, stream->buf, stream->size, &written, NULL ))
++        hr = HRESULT_FROM_WIN32( GetLastError() );
++    else if (written != stream->size) hr = HRESULT_FROM_WIN32( ERROR_WRITE_FAULT );
++    CloseHandle( file );
++    if (SUCCEEDED(hr)) stream->pos = 0;
++    return hr;
+ }
+ 
+ static HRESULT WINAPI stream_LoadFromFile( _Stream *iface, BSTR filename )
+ {
+-    FIXME( "%p, %s\n", iface, debugstr_w(filename) );
+-    return E_NOTIMPL;
++    struct stream *stream = impl_from_Stream( iface );
++    BOOL utf8 = stream->type == adTypeText && stream_codepage( stream->charset ) == CP_UTF8;
++    BYTE *bytes = NULL;
++    LARGE_INTEGER size;
++    DWORD reserve, count = 0;
++    HANDLE file;
++    HRESULT hr = S_OK;
++
++    TRACE( "%p, %s\\n", iface, debugstr_w(filename) );
++    if (stream->state == adStateClosed) return MAKE_ADO_HRESULT( adErrObjectClosed );
++    if (!filename || !*filename) return MAKE_ADO_HRESULT( adErrInvalidArgument );
++    file = CreateFileW( filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
++    if (file == INVALID_HANDLE_VALUE) return HRESULT_FROM_WIN32( GetLastError() );
++    if (!GetFileSizeEx( file, &size ))
++    {
++        hr = HRESULT_FROM_WIN32( GetLastError() );
++        goto done;
++    }
++    reserve = utf8 && size.QuadPart ? sizeof(utf8_bom) : 0;
++    if (size.QuadPart > MAXLONG - (LONG)reserve)
++    {
++        hr = E_OUTOFMEMORY;
++        goto done;
++    }
++    if (size.QuadPart)
++    {
++        if (!(bytes = malloc( size.LowPart + reserve )))
++        {
++            hr = E_OUTOFMEMORY;
++            goto done;
++        }
++        if (!ReadFile( file, bytes, size.LowPart, &count, NULL ))
++        {
++            hr = HRESULT_FROM_WIN32( GetLastError() );
++            goto done;
++        }
++        if (count != size.LowPart)
++        {
++            hr = HRESULT_FROM_WIN32( ERROR_HANDLE_EOF );
++            goto done;
++        }
++        if (reserve && (count < sizeof(utf8_bom) || memcmp( bytes, utf8_bom, sizeof(utf8_bom) )))
++        {
++            memmove( bytes + sizeof(utf8_bom), bytes, count );
++            memcpy( bytes, utf8_bom, sizeof(utf8_bom) );
++            count += sizeof(utf8_bom);
++        }
++    }
++    free( stream->buf );
++    stream->buf = bytes;
++    stream->allocated = stream->size = count;
++    stream->pos = 0;
++    bytes = NULL;
++
++done:
++    free( bytes );
++    CloseHandle( file );
++    return hr;
++}
++
++static unsigned int stream_separator( const struct stream *stream, WCHAR *separator )
++{
++    if (stream->sep == adCRLF)
++    {
++        separator[0] = '\r';
++        separator[1] = '\n';
++        return 2;
++    }
++    separator[0] = stream->sep;
++    return 1;
++}
++
++static HRESULT read_encoded_text( struct stream *stream, UINT codepage, LONG len, BSTR *ret )
++{
++    LONG start = stream->pos, remaining;
++    WCHAR separator[2];
++    unsigned int sep_len, i, end;
++    int count, consumed;
++    BSTR decoded, result;
++
++    if (stream->state == adStateClosed) return MAKE_ADO_HRESULT( adErrObjectClosed );
++    if (stream->type != adTypeText) return MAKE_ADO_HRESULT( adErrIllegalOperation );
++    if (len < adReadLine) return MAKE_ADO_HRESULT( adErrInvalidArgument );
++
++    if (!start && codepage == CP_UTF8 && stream->size >= sizeof(utf8_bom) &&
++        !memcmp( stream->buf, utf8_bom, sizeof(utf8_bom) ))
++        start = sizeof(utf8_bom);
++    remaining = stream->size - start;
++    if (len == 0 || !remaining)
++    {
++        if (!(*ret = SysAllocStringLen( NULL, 0 ))) return E_OUTOFMEMORY;
++        return S_OK;
++    }
++
++    count = MultiByteToWideChar( codepage, 0, (const char *)stream->buf + start, remaining, NULL, 0 );
++    if (!count) return HRESULT_FROM_WIN32( GetLastError() );
++    if (!(decoded = SysAllocStringLen( NULL, count ))) return E_OUTOFMEMORY;
++    if (!MultiByteToWideChar( codepage, 0, (const char *)stream->buf + start, remaining, decoded, count ))
++    {
++        HRESULT hr = HRESULT_FROM_WIN32( GetLastError() );
++        SysFreeString( decoded );
++        return hr;
++    }
++
++    i = end = count;
++    if (len >= 0) i = end = min( len, count );
++    else if (len == adReadLine)
++    {
++        sep_len = stream_separator( stream, separator );
++        for (i = 0; i + sep_len <= count; ++i)
++            if (!memcmp( decoded + i, separator, sep_len * sizeof(WCHAR) )) break;
++        if (i + sep_len <= count) end = i + sep_len;
++        else i = count;
++    }
++
++    if (end == count) consumed = remaining;
++    else
++    {
++        /* ADO counts UTF-16 units but advances by the encoded byte length. */
++        consumed = WideCharToMultiByte( codepage, 0, decoded, end, NULL, 0, NULL, NULL );
++        if (!consumed)
++        {
++            HRESULT hr = HRESULT_FROM_WIN32( GetLastError() );
++            SysFreeString( decoded );
++            return hr;
++        }
++    }
++    result = SysAllocStringLen( decoded, i );
++    SysFreeString( decoded );
++    if (!result) return E_OUTOFMEMORY;
++    stream->pos = start + min( consumed, remaining );
++    *ret = result;
++    return S_OK;
++}
++
++static HRESULT write_encoded_text( struct stream *stream, UINT codepage, BSTR data, StreamWriteEnum options )
++{
++    unsigned int len = SysStringLen( data ), i, sep_len = 0, bom_size = 0;
++    WCHAR separator[2], *text;
++    LONG end;
++    int size = 0;
++    char *bytes = NULL;
++    HRESULT hr = S_OK;
++
++    if (stream->state == adStateClosed) return MAKE_ADO_HRESULT( adErrObjectClosed );
++    if (stream->type != adTypeText) return MAKE_ADO_HRESULT( adErrIllegalOperation );
++    if (options == adWriteLine) sep_len = stream_separator( stream, separator );
++    else if (options != adWriteChar) return MAKE_ADO_HRESULT( adErrInvalidArgument );
++    if (len > MAXLONG / sizeof(WCHAR) - sep_len) return E_OUTOFMEMORY;
++
++    if (len || sep_len)
++    {
++        if (!(text = malloc( (len + sep_len) * sizeof(WCHAR) ))) return E_OUTOFMEMORY;
++        if (len) memcpy( text, data, len * sizeof(WCHAR) );
++        if (sep_len) memcpy( text + len, separator, sep_len * sizeof(WCHAR) );
++        if (codepage != CP_UTF8)
++            for (i = 0; i < len; ++i)
++                if (text[i] >= 0xd800 && text[i] <= 0xdfff) text[i] = '?';
++
++        size = WideCharToMultiByte( codepage, 0, text, len + sep_len, NULL, 0, NULL, NULL );
++        if (!size) hr = HRESULT_FROM_WIN32( GetLastError() );
++        else if (!(bytes = malloc( size ))) hr = E_OUTOFMEMORY;
++        else if (!WideCharToMultiByte( codepage, 0, text, len + sep_len, bytes, size, NULL, NULL ))
++            hr = HRESULT_FROM_WIN32( GetLastError() );
++        free( text );
++        if (FAILED(hr)) goto done;
++    }
++
++    if (!stream->size && codepage == CP_UTF8) bom_size = sizeof(utf8_bom);
++    if (size > MAXLONG - stream->pos - (LONG)bom_size)
++    {
++        hr = E_OUTOFMEMORY;
++        goto done;
++    }
++    end = stream->pos + bom_size + size;
++    if (FAILED(hr = resize_buffer( stream, max( end, stream->size ) ))) goto done;
++    if (bom_size) memcpy( stream->buf + stream->pos, utf8_bom, bom_size );
++    if (size) memcpy( stream->buf + stream->pos + bom_size, bytes, size );
++    stream->pos = end;
++
++done:
++    free( bytes );
++    return hr;
+ }
+ 
+@@ -437,7 +676,9 @@
+ {
+     struct stream *stream = impl_from_Stream( iface );
++    UINT codepage = stream_codepage( stream->charset );
+     BSTR str;
+ 
+     TRACE( "%p, %ld, %p\n", stream, len, ret );
++    if (codepage) return read_encoded_text( stream, codepage, len, ret );
+     if (len == adReadLine)
+     {
+@@ -470,8 +711,10 @@
+ {
+     struct stream *stream = impl_from_Stream( iface );
++    UINT codepage = stream_codepage( stream->charset );
+     HRESULT hr;
+     LONG size;
+ 
+     TRACE( "%p, %s, %u\n", stream, debugstr_w(data), options );
++    if (codepage) return write_encoded_text( stream, codepage, data, options );
+     if (options != adWriteChar)
+     {
