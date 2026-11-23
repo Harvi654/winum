@@ -1,0 +1,58 @@
+measure=v1 bits=64 wow64=0 elevated=0
+ole_init=0x00000000
+case=user_only
+register scope=hkcu status=0
+hkcr view=default open=0 inproc=0 marker=164
+hkcr view=32 open=2 inproc=2 marker=0
+hkcr view=64 open=0 inproc=0 marker=164
+com api=CoGetClassObject hr=0x00000000
+com api=IClassFactory.CreateInstance hr=0x00000000 marker_hr=0x00000000 marker=164
+com api=CoCreateInstance hr=0x00000000 marker_hr=0x00000000 marker=164
+register scope=progid status=0
+com api=CLSIDFromProgID hr=0x00000000 match=1
+com api=ProgIDFromCLSID hr=0x00000000 match=1
+cleanup kind=synthetic_machine_progid status=2
+register scope=treatas status=0
+com api=CoGetTreatAsClass hr=0x00000000 match=1
+cleanup kind=user_treatas status=0
+cleanup kind=user_progid status=0
+cleanup kind=user_class status=0
+case=user_explicit_32
+register scope=hkcu status=0
+hkcr view=default open=2 inproc=2 marker=0
+hkcr view=32 open=0 inproc=0 marker=132
+hkcr view=64 open=2 inproc=2 marker=0
+com api=CoGetClassObject hr=0x80040154
+com api=CoCreateInstance hr=0x80040154 marker_hr=0x8000ffff marker=0
+cleanup kind=user_class status=0
+case=user_explicit_64
+register scope=hkcu status=0
+hkcr view=default open=0 inproc=0 marker=164
+hkcr view=32 open=2 inproc=2 marker=0
+hkcr view=64 open=0 inproc=0 marker=164
+com api=CoGetClassObject hr=0x00000000
+com api=IClassFactory.CreateInstance hr=0x00000000 marker_hr=0x00000000 marker=164
+com api=CoCreateInstance hr=0x00000000 marker_hr=0x00000000 marker=164
+cleanup kind=user_class status=0
+case=user_literal_wow6432node
+register scope=hkcu status=0
+hkcr view=default open=2 inproc=2 marker=0
+hkcr view=32 open=0 inproc=0 marker=132
+hkcr view=64 open=2 inproc=2 marker=0
+com api=CoGetClassObject hr=0x80040154
+com api=CoCreateInstance hr=0x80040154 marker_hr=0x8000ffff marker=0
+cleanup kind=user_class status=0
+case=user_machine_conflict machine_setup=runas_helper
+register scope=hkcu status=0
+machine ready_wait=0
+register scope=hklm status=0
+hkcr view=default open=0 inproc=0 marker=164
+hkcr view=32 open=2 inproc=2 marker=0
+hkcr view=64 open=0 inproc=0 marker=164
+com api=CoGetClassObject hr=0x00000000
+com api=IClassFactory.CreateInstance hr=0x00000000 marker_hr=0x00000000 marker=164
+com api=CoCreateInstance hr=0x00000000 marker_hr=0x00000000 marker=164
+machine conflict_measured=1
+cleanup kind=machine_helper status=0
+cleanup kind=conflict_user status=0
+measure_complete=1 cleanup_errors=0

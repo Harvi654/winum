@@ -48,7 +48,7 @@ bash docs/wine-repro/combase-per-user-classes/build-bundle.sh out
 
 | Runtime | x86_64 | i686 |
 | --- | --- | --- |
-| Offline Windows 10 | Pending | Pending |
+| Offline Windows 10 | [Text](results/windows-10/result-x86_64.txt) | [Text](results/windows-10/result-i686.txt) |
 | Vanilla Wine 11.22 | CI | CI |
 | Winum 11.22-2 | [Text](results/winum-11.22-2/result-x86_64.txt) | [Text](results/winum-11.22-2/result-i686.txt) |
 
@@ -72,3 +72,25 @@ returned S_FALSE. The same-CLSID conflict activated the machine server
 with marker 264 on x86_64 and 232 on i686. In these synthetic cases
 the raw HKCR lookup saw the machine registration in the matching view.
 Both cleanup checks passed. [CI](https://github.com/Harvi654/winum/actions/runs/45275509058).
+
+
+### Offline Windows 10 reference
+
+Both activation processes ran with a non-elevated token. The elevated
+helpers set up the HKLM side of each conflict and reported successful
+cleanup.
+
+| Case | x86_64 | i686 under WOW64 |
+| --- | --- | --- |
+| User-only CLSID in the default view | CoGetClassObject and CoCreateInstance select user marker 164 | Both select user marker 132 |
+| User-only explicit 32-bit view | 0x80040154 | User marker 132 |
+| User-only explicit 64-bit view | User marker 164 | 0x80040154 |
+| User-only literal Wow6432Node | 0x80040154 | User marker 132 |
+| Same CLSID in user and machine hives | User marker 164 | User marker 132 |
+| CLSIDFromProgID, ProgIDFromCLSID, CoGetTreatAsClass | S_OK, all matches | S_OK, all matches |
+
+HKCR opened the matching registration in the same view and returned
+its default InprocServer32 value. In the conflict it reported the user
+marker. A lookup in the opposite view returned ERROR_FILE_NOT_FOUND
+for the classes created solely in the default view. HKCR is an
+observation here and has no fix expectation in the COM unit.

@@ -1,0 +1,2 @@
+combase-per-user-classes x86_64=0
+combase-per-user-classes i686=0
