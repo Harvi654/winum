@@ -47,7 +47,7 @@ beginning with `cscript kind=` already record the process status.
 | Runtime | x86_64 | i686 |
 | --- | --- | --- |
 | Offline Windows 10 | [Text](results/windows-10/result-x86_64.txt) | [Text](results/windows-10/result-i686.txt) |
-| Vanilla Wine 11.22 | CI | CI |
+| Vanilla Wine 11.22 | [Text](results/vanilla-11.22/result-x86_64.txt) | [Text](results/vanilla-11.22/result-i686.txt) |
 | Winum 11.22-2 | [Text](results/winum-11.22-2/result-x86_64.txt) | [Text](results/winum-11.22-2/result-i686.txt) |
 
 The Windows results supply the expectations for any Wine test. Record
@@ -63,6 +63,8 @@ The cscript columns are the process exit codes for the two scripts.
 | --- | --- | --- | --- | --- | --- |
 | winum-11.22-2 | x86_64 | `0x80004001` × 13 | `0x80041002` × 13 | 0 | 0 |
 | winum-11.22-2 | i686 | `0x80004001` × 13 | `0x80041002` × 13 | 0 | 0 |
+| vanilla-11.22 | x86_64 | `0x80004001` × 13 | `0x80041002` × 13 | 0 | 0 |
+| vanilla-11.22 | i686 | `0x80004001` × 13 | `0x80041002` × 13 | 0 | 0 |
 
 [CI run](https://github.com/Harvi654/winum/actions/runs/45257510865).
 
