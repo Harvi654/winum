@@ -116,7 +116,7 @@ jobs:
                       unicode_control = "label=vbs-2-" in line
                   if unicode_control or not line.startswith(("c ", "vbs ", "cscript ", "file ")):
                       continue
-                  lines.append(re.sub(r"( (?:Size|Position)=)20:", r"\\g<1>3:", line))
+                  lines.append(re.sub(r"( (?:Size|Position)=)20:", lambda m: m[1] + "3:", line))
               return lines
 
           failed = False
