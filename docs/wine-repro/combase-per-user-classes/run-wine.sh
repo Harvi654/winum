@@ -17,6 +17,10 @@ cleanup() {
 trap cleanup EXIT
 "$loader" wineboot -i
 "$WINESERVER" -w
+if [[ "${WINUM_COM_TEST_PREPARE_WOW64:-0}" = 1 ]]; then
+    # Model the user registry layout that the offline Windows VM already has.
+    "$loader" reg add 'HKCU\Software\Classes\Wow6432Node\CLSID' /f /reg:64
+fi
 cd "$bundle"
 sha256sum -c SHA256SUMS
 for arch in x86_64 i686; do

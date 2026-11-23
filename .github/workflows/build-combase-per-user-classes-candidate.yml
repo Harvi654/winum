@@ -88,6 +88,7 @@ jobs:
             timeout 150 "$runtime/bin/wine" wineboot -i
             "$WINESERVER" -w
             trap "\"$WINESERVER\" -k; \"$WINESERVER\" -w" EXIT
+            "$runtime/bin/wine" reg add "HKCU\Software\Classes\Wow6432Node\CLSID" /f /reg:64
             failed=0
             for arch in x86_64 i686; do
               timeout 120 "$runtime/bin/wine" "unit/combase-per-user-classes-$arch.exe" per_user_classes > "results/unit-$arch.txt" 2>&1 ||
@@ -97,7 +98,7 @@ jobs:
             done
             exit "$failed"
           ' || unit_failed=1
-          xvfb-run -a bash docs/wine-repro/combase-per-user-classes/run-wine.sh \
+          WINUM_COM_TEST_PREPARE_WOW64=1 xvfb-run -a bash docs/wine-repro/combase-per-user-classes/run-wine.sh \
             "$runtime/bin/wine" "$WINESERVER" bundle results
           for arch in x86_64 i686; do
             diff -u \
