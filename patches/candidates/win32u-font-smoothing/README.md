@@ -23,9 +23,15 @@ settings.
 
 | Level | Status |
 |---|---|
-| L0 | Full patched build queued on the isolated test branch, including x86_64 and i386 Windows modules. |
+| L0 | 2026-11-23, full WoW64 build passed. The source job applied the release series and candidate with zero fuzz. [Build and artifacts](https://github.com/Harvi654/winum/actions/runs/45209934855) |
 | L1 | 2026-11-23 offline Windows 10, x86_64 and i686 each 301 checks, no failures, todos or skips, both exit 0. |
-| L2 | Paired gdi32, win32u and user32 plus targeted pixel tests with both fontconfig profiles on the test branch. |
+| L2 | [Paired gdi32, win32u and user32](https://github.com/Harvi654/winum/actions/runs/45209934774). The candidate passed all 301 targeted checks under each fontconfig profile on both architectures. |
 | L4 Inventor 2027 | Pending 4K fractional scaling check of ribbon, menus and status bar. |
-| L4 AutoCAD | Deferred if the maintainer skips the application check. |
+| L4 AutoCAD | Deferred in this validation round. |
 | Cross review | Claude pending before promotion. |
+
+
+[Inventor L4 instructions](../../../docs/wine-repro/win32u-font-smoothing/README.md#inventor-2027-l4)
+use the [CI binary](https://github.com/Harvi654/winum/actions/runs/45209934855/artifacts/14839823850).
+SHA-256 of `winum-11.22-2-x86_64.tar.xz`:
+`35579316ea9f0a1c81ba5126264c517fbf3074837bf9e3fa49e6daab45ec88e9`.
