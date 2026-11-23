@@ -168,6 +168,8 @@ static void measure(IDispatch *object, WORD flags, const WCHAR *root)
     invoke(object, flags, "read_string", L"GetStringValue", key, COUNT(get_string), get_string);
     invoke(object, flags, "read_string_typed", L"GetStringValue", key, COUNT(get_typed), get_typed);
     invoke(object, flags, "enum", L"EnumKey", key, COUNT(enum_key), enum_key);
+    invoke(object, flags, "read_no_out_string", L"GetStringValue", key, 3, get_string);
+    invoke(object, flags, "read_extra_string", L"GetStringValue", key, COUNT(extra), extra);
     invoke(object, flags, "write_dword", L"SetDWORDValue", key, COUNT(set_dword), set_dword);
     invoke(object, flags, "read_missing", L"GetStringValue", missing, COUNT(get_string), get_string);
     invoke(object, flags, "create_no_args", L"CreateKey", key, 0, key_args);
@@ -231,7 +233,7 @@ int main(void)
     int bound;
 
     setvbuf(stdout, NULL, _IONBF, 0);
-    printf("measure=v1 bits=%u\n", (unsigned int)(sizeof(void *) * 8));
+    printf("measure=v2 bits=%u\n", (unsigned int)(sizeof(void *) * 8));
     hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     printf("ole_init=0x%08lx\n", (unsigned long)hr);
     if (FAILED(hr)) return 2;

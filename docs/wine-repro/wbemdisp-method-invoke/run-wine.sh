@@ -33,7 +33,7 @@ for arch in x86_64 i686; do
     printf 'probe_exit=%s\n' "$status" >> "$file"
     test "$status" -eq 0
     grep -q '^measure_complete dispatch=1$' "$file"
-    test "$(grep -c '^invoke ' "$file")" -eq 26
+    test "$(grep -c '^invoke ' "$file")" -eq 30
     grep -q '^cscript kind=direct exit=' "$file"
     grep -q '^cscript kind=runtime-error exit=' "$file"
     grep -q '^vbs intentional_error_begin$' "$file"

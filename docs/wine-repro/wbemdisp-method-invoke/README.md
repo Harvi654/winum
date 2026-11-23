@@ -54,7 +54,7 @@ The Windows results supply the expectations for any Wine test. Record
 cscript behaviour separately from wbemdisp, including on the deliberate
 runtime error.
 
-### Wine baseline
+### Wine baseline (probe v1)
 
 The C columns count the Invoke HRESULTs across the 13 calls per flag.
 The cscript columns are the process exit codes for the two scripts.
@@ -66,7 +66,7 @@ The cscript columns are the process exit codes for the two scripts.
 
 [CI run](https://github.com/Harvi654/winum/actions/runs/45257510865).
 
-### Offline Windows 10 reference
+### Offline Windows 10 reference (probe v1)
 
 Both architectures produced the same observations and both probes exited
 zero. The table covers both dispatch flag combinations. Out arguments
@@ -80,11 +80,20 @@ retained their sentinels on Winum 11.22-2.
 | EnumKey | S_OK | VT_I4 0, out one-element VT_ARRAY with VT_VARIANT element VT_BSTR leaf |
 | GetStringValue on a missing key | S_OK | VT_I4 2, out VT_NULL |
 | CreateKey with no arguments | DISP_E_EXCEPTION | Empty result, EXCEPINFO.scode 0x80041008 |
-| GetStringValue without out argument | S_OK | VT_I4 0x80041005 |
-| GetStringValue with one extra argument | S_OK | VT_I4 0x80041005, out VT_NULL |
+| GetStringValue without out argument, value now DWORD | S_OK | VT_I4 0x80041005 |
+| GetStringValue with one extra argument, value now DWORD | S_OK | VT_I4 0x80041005, out VT_NULL |
 
 All the direct VBScript methods completed on Windows. Winum returned
 0x1bd for the statement-style call and 0x80041002 for the function-style
 calls. Both Windows and Winum returned process exit status zero for the
 deliberate unhandled VBScript error. This measurement does not justify a
 wscript candidate.
+
+### Round 2
+
+Probe v1 wrote a DWORD over the test string before the two calls with an
+altered argument count. Its results therefore combine an argument-count
+change and a registry type change. Probe v2 adds the two calls while the
+value is still a string. Their case labels are `read_no_out_string` and
+`read_extra_string`. Keep the v1 observations for comparison. The
+initial Wine test covers the v1 sequence. Its native L1 is pending.
