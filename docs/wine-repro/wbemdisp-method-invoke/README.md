@@ -46,7 +46,7 @@ beginning with `cscript kind=` already record the process status.
 
 | Runtime | x86_64 | i686 |
 | --- | --- | --- |
-| Offline Windows 10 | Pending | Pending |
+| Offline Windows 10 | [Text](results/windows-10/result-x86_64.txt) | [Text](results/windows-10/result-i686.txt) |
 | Vanilla Wine 11.22 | CI | CI |
 | Winum 11.22-2 | [Text](results/winum-11.22-2/result-x86_64.txt) | [Text](results/winum-11.22-2/result-i686.txt) |
 
@@ -65,3 +65,26 @@ The cscript columns are the process exit codes for the two scripts.
 | winum-11.22-2 | i686 | `0x80004001` × 13 | `0x80041002` × 13 | 0 | 0 |
 
 [CI run](https://github.com/Harvi654/winum/actions/runs/45257510865).
+
+### Offline Windows 10 reference
+
+Both architectures produced the same observations and both probes exited
+zero. The table covers both dispatch flag combinations. Out arguments
+retained their sentinels on Winum 11.22-2.
+
+| Case | Windows 10 Invoke HRESULT | Windows 10 result and out value |
+| --- | --- | --- |
+| CreateKey and DeleteKey, including leaf | S_OK | VT_I4 0 |
+| SetStringValue and SetDWORDValue | S_OK | VT_I4 0 |
+| GetStringValue, by-reference VARIANT or BSTR | S_OK | VT_I4 0, out VT_BSTR containing winum-value |
+| EnumKey | S_OK | VT_I4 0, out one-element VT_ARRAY with VT_VARIANT element VT_BSTR leaf |
+| GetStringValue on a missing key | S_OK | VT_I4 2, out VT_NULL |
+| CreateKey with no arguments | DISP_E_EXCEPTION | Empty result, EXCEPINFO.scode 0x80041008 |
+| GetStringValue without out argument | S_OK | VT_I4 0x80041005 |
+| GetStringValue with one extra argument | S_OK | VT_I4 0x80041005, out VT_NULL |
+
+All the direct VBScript methods completed on Windows. Winum returned
+0x1bd for the statement-style call and 0x80041002 for the function-style
+calls. Both Windows and Winum returned process exit status zero for the
+deliberate unhandled VBScript error. This measurement does not justify a
+wscript candidate.
