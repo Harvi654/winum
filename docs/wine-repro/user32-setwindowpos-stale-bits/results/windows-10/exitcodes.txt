@@ -1,0 +1,2 @@
+stale-bits x86_64=0
+stale-bits i686=0

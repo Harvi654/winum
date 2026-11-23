@@ -1,0 +1,100 @@
+measure=winum-stale-bits pointer_bits=32 dpi_aware_call=1 dpi=96,96
+case=G_full_same step=initial source=00ff0000,00ff0000 dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=G_full_same op=move flags=0014 ok=1 last_error=0
+case=G_full_same step=after_move source=00ff0000,00ff0000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=1 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_full_same step=after_pump source=00ff0000,00ff0000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=2 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_half_same step=initial source=00ff0000,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=G_half_same op=move flags=0014 ok=1 last_error=0
+case=G_half_same step=after_move source=00ff0000,000000ff dest=00008000,000000ff update=1:0,0,90,150 region=2:0,0,90,150 region_samples=1,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_half_same step=after_pump source=00ff0000,00008000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=2 erase=2 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_none_same step=initial source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=G_none_same op=move flags=0014 ok=1 last_error=0
+case=G_none_same step=after_move source=000000ff,000000ff dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_none_same step=after_pump source=00008000,00008000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_full_unpainted_same step=initial source=00ff0000,00ff0000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=G_full_unpainted_same op=move flags=0014 ok=1 last_error=0
+case=G_full_unpainted_same step=after_move source=00ff0000,00ff0000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_full_unpainted_same step=after_pump source=00ff0000,00ff0000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_half_unpainted_same step=initial source=00ff0000,00008000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=G_half_unpainted_same op=move flags=0014 ok=1 last_error=0
+case=G_half_unpainted_same step=after_move source=00ff0000,00008000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_half_unpainted_same step=after_pump source=00ff0000,00008000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_none_unpainted_same step=initial source=00008000,00008000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=G_none_unpainted_same op=move flags=0014 ok=1 last_error=0
+case=G_none_unpainted_same step=after_move source=00008000,00008000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_none_unpainted_same step=after_pump source=00008000,00008000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_full_other step=initial source=00ff0000,00ff0000 dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=G_full_other op=move flags=0014 ok=1 last_error=0
+case=G_full_other step=after_move source=00ff0000,00ff0000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=1 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_full_other step=after_pump source=00ff0000,00ff0000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=2 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_half_other step=initial source=00ff0000,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=G_half_other op=move flags=0014 ok=1 last_error=0
+case=G_half_other step=after_move source=00ff0000,000000ff dest=00008000,000000ff update=1:0,0,90,150 region=2:0,0,90,150 region_samples=1,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_half_other step=after_pump source=00ff0000,00008000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=2 erase=2 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_none_other step=initial source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=G_none_other op=move flags=0014 ok=1 last_error=0
+case=G_none_other step=after_move source=000000ff,000000ff dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_none_other step=after_pump source=00008000,00008000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_full_unpainted_other step=initial source=00ff0000,00ff0000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=G_full_unpainted_other op=move flags=0014 ok=1 last_error=0
+case=G_full_unpainted_other step=after_move source=00ff0000,00ff0000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_full_unpainted_other step=after_pump source=00ff0000,00ff0000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_half_unpainted_other step=initial source=00ff0000,00008000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=G_half_unpainted_other op=move flags=0014 ok=1 last_error=0
+case=G_half_unpainted_other step=after_move source=00ff0000,00008000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_half_unpainted_other step=after_pump source=00ff0000,00008000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_none_unpainted_other step=initial source=00008000,00008000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=G_none_unpainted_other op=move flags=0014 ok=1 last_error=0
+case=G_none_unpainted_other step=after_move source=00008000,00008000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=G_none_unpainted_other step=after_pump source=00008000,00008000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=A step=initial source=00ff0000,00ff0000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=A op=move flags=0014 ok=1 last_error=0
+case=A step=after_move source=00ff0000,00ff0000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=A step=after_pump source=00ff0000,00ff0000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=B step=initial source=00ff0000,00ff0000 dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=B op=move flags=0014 ok=1 last_error=0
+case=B step=after_move source=00ff0000,00ff0000 dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=B op=show flags=0057 ok=1 last_error=0
+case=B step=after_show source=00ff0000,00ff0000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=B step=after_pump source=00ff0000,00ff0000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=C step=initial source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=C step=redraw_off source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=C op=move flags=0014 ok=1 last_error=0
+case=C step=after_move source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=C step=redraw_on source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=C op=frame_changed flags=0037 ok=1 last_error=0
+case=C step=after_frame source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=2 nccalc_true=1 nccalc_ret=0000 nccalc_in=320,70,500,220/320,70,500,220/320,70,500,220 nccalc_out=320,70,500,220/320,70,500,220/320,70,500,220 rect_ok=1 window=355,128,535,278
+case=C step=after_pump source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=2 nccalc_true=1 nccalc_ret=0000 nccalc_in=320,70,500,220/320,70,500,220/320,70,500,220 nccalc_out=320,70,500,220/320,70,500,220/320,70,500,220 rect_ok=1 window=355,128,535,278
+case=D step=initial source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=D step=redraw_off source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=D op=move_parent flags=0014 ok=1 last_error=0
+case=D step=after_move source=000000ff,000000ff dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=D step=redraw_on source=000000ff,000000ff dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=D op=frame_changed flags=0037 ok=1 last_error=0
+case=D step=after_frame source=000000ff,000000ff dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=2 nccalc_true=1 nccalc_ret=0000 nccalc_in=0,0,180,150/0,0,180,150/0,0,180,150 nccalc_out=0,0,180,150/0,0,180,150/0,0,180,150 rect_ok=1 window=355,128,535,278
+case=D step=after_pump source=00ff0000,00ff0000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=2 nccalc_true=1 nccalc_ret=0000 nccalc_in=0,0,180,150/0,0,180,150/0,0,180,150 nccalc_out=0,0,180,150/0,0,180,150/0,0,180,150 rect_ok=1 window=355,128,535,278
+case=E_direct step=initial source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=E_direct step=redraw_off source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=E_direct op=move flags=0014 ok=1 last_error=0
+case=E_direct step=after_move source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=E_direct step=redraw_on source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=E_direct op=frame_changed flags=0037 ok=1 last_error=0
+case=E_direct step=after_frame source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=2 nccalc_true=1 nccalc_ret=0000 nccalc_in=320,70,500,220/320,70,500,220/320,70,500,220 nccalc_out=320,70,500,220/320,70,500,220/320,70,500,220 rect_ok=1 window=355,128,535,278
+case=E_direct step=after_pump source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=2 nccalc_true=1 nccalc_ret=0000 nccalc_in=320,70,500,220/320,70,500,220/320,70,500,220 nccalc_out=320,70,500,220/320,70,500,220/320,70,500,220 rect_ok=1 window=355,128,535,278
+case=E_parent step=initial source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=E_parent step=redraw_off source=000000ff,000000ff dest=00008000,00008000 update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=E_parent op=move_parent flags=0014 ok=1 last_error=0
+case=E_parent step=after_move source=000000ff,000000ff dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=E_parent step=redraw_on source=000000ff,000000ff dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=E_parent op=frame_changed flags=0037 ok=1 last_error=0
+case=E_parent step=after_frame source=000000ff,000000ff dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=2 nccalc_true=1 nccalc_ret=0000 nccalc_in=0,0,180,150/0,0,180,150/0,0,180,150 nccalc_out=0,0,180,150/0,0,180,150/0,0,180,150 rect_ok=1 window=355,128,535,278
+case=E_parent step=after_pump source=00ff0000,00ff0000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=2 nccalc_true=1 nccalc_ret=0000 nccalc_in=0,0,180,150/0,0,180,150/0,0,180,150 nccalc_out=0,0,180,150/0,0,180,150/0,0,180,150 rect_ok=1 window=355,128,535,278
+case=F_noredraw step=initial source=00ff0000,00ff0000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=F_noredraw op=move flags=001c ok=1 last_error=0
+case=F_noredraw step=after_move source=00ff0000,00ff0000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=F_noredraw step=after_pump source=00ff0000,00ff0000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=F_nocopybits step=initial source=00ff0000,00ff0000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=35,58,215,208
+case=F_nocopybits op=move flags=0114 ok=1 last_error=0
+case=F_nocopybits step=after_move source=00ff0000,00ff0000 dest=00008000,00008000 update=1:0,0,180,150 region=2:0,0,180,150 region_samples=1,1 paint=0 erase=0 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+case=F_nocopybits step=after_pump source=00ff0000,00ff0000 dest=000000ff,000000ff update=0:0,0,0,0 region=1:0,0,0,0 region_samples=0,0 paint=1 erase=1 nccalc=1 nccalc_true=0 rect_ok=1 window=355,128,535,278
+measure_complete cases=20

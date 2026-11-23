@@ -88,15 +88,15 @@ later Wine test.
 
 | Cases | Vanilla Wine 11.22 | Winum 11.22-2 test build | Windows 10 |
 |---|---|---|---|
-| G, initially drained, full cover (both thread layouts) | CI pending | Green/green. Both samples invalidated. Then blue/blue. | Pending |
-| G, initially drained, half cover (both thread layouts) | CI pending | Green/blue. Left sample invalidated. Then blue/blue. | Pending |
-| G, initially drained, no cover (both thread layouts) | CI pending | Blue/blue. No sampled point invalidated. Remains blue/blue. | Pending |
-| G, initially unpumped (all overlaps and thread layouts) | CI pending | Green/green. Both samples invalidated. Then blue/blue. | Pending |
-| A | CI pending | Green until the final drain, then blue. | Pending |
-| B | CI pending | Hidden move leaves green with no update. Show invalidates both samples, then drain paints blue. | Pending |
-| C, E_direct | CI pending | Green through move, FRAMECHANGED and drain. No update or new paint at destination. | Pending |
-| D, E_parent | CI pending | Parent move transfers blue. FRAMECHANGED and drain leave it blue without new container paint. | Pending |
-| F_noredraw, F_nocopybits | CI pending | Green before final drain, then blue. | Pending |
+| G, initially drained, full cover (both thread layouts) | CI pending | Green/green. Both samples invalidated. Then blue/blue. | Matches Winum |
+| G, initially drained, half cover (both thread layouts) | CI pending | Green/blue. Left sample invalidated. Then blue/blue. | Matches Winum |
+| G, initially drained, no cover (both thread layouts) | CI pending | Blue/blue. No sampled point invalidated. Remains blue/blue. | Matches Winum |
+| G, initially unpumped (all overlaps and thread layouts) | CI pending | Green/green. Both samples invalidated. Then blue/blue. | Matches Winum |
+| A | CI pending | Green until the final drain, then blue. | Matches Winum |
+| B | CI pending | Hidden move leaves green with no update. Show invalidates both samples, then drain paints blue. | Matches Winum |
+| C, E_direct | CI pending | Green through move, FRAMECHANGED and drain. No update or new paint at destination. | Matches Winum |
+| D, E_parent | CI pending | Parent move transfers blue. FRAMECHANGED and drain leave it blue without new container paint. | Matches Winum |
+| F_noredraw, F_nocopybits | CI pending | Green before final drain, then blue. | Matches Winum |
 
 For G, each cell gives the two destination pixels immediately after the move,
 update membership at those points and the colors after the final drain.
@@ -104,3 +104,12 @@ update membership at those points and the colors after the final drain.
 [CI](https://github.com/Harvi654/winum/actions/runs/45097935771/job/137441980528)
 agree on these observations. No tested G variant copied red from the ribbon
 into either destination sample.
+
+[Windows 10 results](results/windows-10/) completed all 20 cases at 96 DPI
+on both architectures with exit code 0. Every recorded observation matches
+Winum apart from the absolute screen Y coordinate of the child. It is
+three pixels lower under Winum in these window setups, with the same child
+size and relative movement. The G matrix therefore does not reproduce
+the Inventor stale-ribbon symptom in this setup. The measured sequences
+also show that FRAMECHANGED after enabling redraw does not itself cause
+a repaint in C or E_direct, on either runtime.
