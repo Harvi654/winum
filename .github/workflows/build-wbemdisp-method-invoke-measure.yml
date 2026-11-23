@@ -18,12 +18,18 @@ permissions:
 jobs:
   measure:
     runs-on: ubuntu-24.04
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Install the MinGW compilers
+      - name: Install pinned LLVM MinGW
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-mingw-w64-x86-64 gcc-mingw-w64-i686
+          toolchain=llvm-mingw-20250910-ucrt-ubuntu-22.04-x86_64
+          cd "$RUNNER_TEMP"
+          curl -fLsS --retry 3 --max-time 120 -o "$toolchain.tar.xz" \
+            "https://github.com/mstorsjo/llvm-mingw/releases/download/20250910/$toolchain.tar.xz"
+          printf '%s  %s\n' f83556c9ffa4d4291fadea1a0776c1383332dacdf4d7fbdf974c2928cb32c6f7 "$toolchain.tar.xz" | sha256sum -c -
+          tar -xJf "$toolchain.tar.xz"
+          printf '%s\n' "$RUNNER_TEMP/$toolchain/bin" >> "$GITHUB_PATH"
       - name: Build the Windows bundle
         run: |
           bash scripts/build-measure-bundle.sh out docs/wine-repro/wbemdisp-method-invoke/measure.list
