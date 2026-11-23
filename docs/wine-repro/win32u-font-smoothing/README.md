@@ -68,7 +68,7 @@ system height are reported so differences in UI font selection are visible.
 |---|---|---|
 | [Vanilla Wine 11.22](results/vanilla-11.22/) | 2,064 cases per architecture | 2,064 cases per architecture |
 | [Winum 11.22-2](results/winum-11.22-2/) | 2,064 cases per architecture | 2,064 cases per architecture |
-| Offline Windows 10 | Pending native reference (fontconfig does not apply) | Same reference |
+| [Offline Windows 10](results/windows-10/) | 2,064 cases per architecture (one native reference) | Same reference |
 
 The Winum run completed all eight settings and restored the original values
 on both architectures. At 12 px with smoothing on and type 2, the renamed
@@ -90,10 +90,44 @@ and per build. Each run verified and restored its smoothing settings.
 At 12 px, DEFAULT quality for the renamed Tahoma is bi-level for every
 SPI tuple with rgba=none, and subpixel for every tuple with rgba=rgb.
 Disabling smoothing through SPI therefore did not disable that observed
-subpixel output with rgba=rgb. The offline native results are still
-needed to determine the expected behavior for the eight settings.
+subpixel output with rgba=rgb.
 
-After native comparison, derive a Wine test only from stable measured cases.
-L0, offline L1, paired gdi32/win32u/user32 L2, Inventor 2027 L4 and Claude
-cross review apply to any resulting candidate. Record AutoCAD L4 as
-deferred if it is skipped.
+## Offline Windows comparison
+
+Both architectures completed and returned 0. The native modes agree across
+architectures in all 2,064 cases (886 bi-level, 254 greyscale, 924 subpixel on
+each). The actual family for the native UI menu and message probes is Segoe
+UI, while Wine selects Tahoma. The tables join UI roles by role and desktop
+settings and list the different families and heights.
+
+| Profile (both Wine builds) | Cases whose mode differs from native, per architecture |
+|---|---:|
+| rgba=none | 1,160 |
+| rgba=rgb | 404 |
+
+[Every case on x86_64](results/comparison-x86_64.tsv) · [Every case on i686](results/comparison-i686.tsv)
+
+| Selected cases | Offline Windows 10 | Wine rgba=none | Wine rgba=rgb |
+|---|---|---|---|
+| Tahoma 12 px, explicit CLEARTYPE or CLEARTYPE_NATURAL | Subpixel in all eight settings | Bi-level in all eight settings | Subpixel in all eight settings |
+| Tahoma 12 px, DEFAULT, smoothing off or type 1 | Bi-level | Bi-level | Subpixel |
+| Tahoma 12 px, DEFAULT, smoothing on and type 2 | Subpixel | Bi-level | Subpixel |
+| Message, menu and stock UI DEFAULT, smoothing on and type 2 | Subpixel | Bi-level | Subpixel |
+
+For each of the 462 native subpixel RGB/BGR pairs on x86_64, changing
+the orientation changed the pixel hash. Only 95 are exact red/blue
+channel swaps under this probe. All 624 subpixel pairs in Wine's fixed
+rgba=rgb profile have the same hash before and after the SPI change.
+These observations do not justify an exact channel-swap assertion.
+
+## Regression test first
+
+[The gdi32 font test](../../../patches/tests-first/win32u-tests-font-smoothing.patch)
+checks colored-edge presence at 12 px with system Tahoma. The ordinary font
+unit uses current desktop settings. Explicit `font smoothing` runs all eight
+settings in separate children and restores the original settings. The L1
+artifact runs this mode on both architectures in the offline VM. Native L1
+must establish that the actual Wine test passes before writing the runtime
+candidate. Required candidate gates are L0, offline L1, paired
+gdi32/win32u/user32 L2, Inventor 2027 L4 and Claude cross review. Record
+AutoCAD L4 as deferred if it is skipped.

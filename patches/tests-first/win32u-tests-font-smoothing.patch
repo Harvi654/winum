@@ -1,0 +1,200 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [TEST] gdi32: Measure ClearType selection against desktop settings.
+
+Diagnosis and original pixel probe by @krokosik (Inventor issue #13 and
+PR #18). AI-assisted (Codex), original code; LGPL-2.1-or-later. Not
+submitted upstream.
+
+On offline Windows 10, explicit ClearType and ClearType Natural render
+colored edges even with system smoothing disabled. Default quality
+uses subpixel only with smoothing enabled and type ClearType. Wine
+currently lets the host fontconfig mode take precedence for these
+qualities. Compare color presence at 12 px in Tahoma with opaque ink
+and keep the measured non-subpixel qualities as controls.
+
+--- a/dlls/gdi32/tests/font.c
++++ b/dlls/gdi32/tests/font.c
+@@ -8007,6 +8007,158 @@
+     SetCurrentDirectoryW( cwd );
+ }
+ 
++static BOOL get_smoothing(BOOL *enabled, UINT *type, UINT *order)
++{
++    BOOL ret;
++
++    ret = SystemParametersInfoW(SPI_GETFONTSMOOTHING, 0, enabled, 0) &&
++          SystemParametersInfoW(SPI_GETFONTSMOOTHINGTYPE, 0, type, 0) &&
++          SystemParametersInfoW(SPI_GETFONTSMOOTHINGORIENTATION, 0, order, 0);
++    ok(ret, "Could not read font smoothing settings, error %lu.\n", GetLastError());
++    return ret;
++}
++
++static BOOL set_smoothing(BOOL enabled, UINT type, UINT order)
++{
++    BOOL ret;
++
++    ret = SystemParametersInfoW(SPI_SETFONTSMOOTHINGTYPE, 0, ULongToPtr(type), SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
++    ret &= SystemParametersInfoW(SPI_SETFONTSMOOTHINGORIENTATION, 0, ULongToPtr(order), SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
++    ret &= SystemParametersInfoW(SPI_SETFONTSMOOTHING, enabled, NULL, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
++    ok(ret, "Could not set font smoothing settings, error %lu.\n", GetLastError());
++    return ret;
++}
++
++static void test_font_smoothing(int argc, char **argv)
++{
++    static const BYTE qualities[] = {DEFAULT_QUALITY, ANTIALIASED_QUALITY, CLEARTYPE_QUALITY,
++                                     CLEARTYPE_NATURAL_QUALITY, NONANTIALIASED_QUALITY};
++    static const WCHAR text[] = L"HIllm Aa xy 012";
++    enum { width = 290, height = 38 };
++    BYTE pixels[width * height * 4];
++    BITMAPINFO bi = {0};
++    LOGFONTW lf = {0};
++    WCHAR actual[LF_FACESIZE];
++    BOOL enabled, ret;
++    UINT type, order, i, p, ink, colored;
++    HGDIOBJ old_font, old_bitmap;
++    HBITMAP bitmap;
++    HFONT font;
++    HDC dc;
++    void *bits;
++
++    if (!get_smoothing(&enabled, &type, &order)) return;
++    if (argc == 6)
++    {
++        ret = !!enabled == atoi(argv[3]) && type == (UINT)atoi(argv[4]) && order == (UINT)atoi(argv[5]);
++        ok(ret, "Child read back smoothing %d/%u/%u, expected %s/%s/%s.\n",
++           !!enabled, type, order, argv[3], argv[4], argv[5]);
++        if (!ret) return;
++        trace("font-smoothing settings on=%d type=%u orientation=%u\n", !!enabled, type, order);
++    }
++    if (!is_truetype_font_installed("Tahoma"))
++    {
++        skip("Tahoma is not installed.\n");
++        return;
++    }
++
++    dc = CreateCompatibleDC(NULL);
++    ok(!!dc, "CreateCompatibleDC failed.\n");
++    if (!dc) return;
++    bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
++    bi.bmiHeader.biWidth = width;
++    bi.bmiHeader.biHeight = -height;
++    bi.bmiHeader.biPlanes = 1;
++    bi.bmiHeader.biBitCount = 32;
++    bitmap = CreateDIBSection(dc, &bi, DIB_RGB_COLORS, &bits, NULL, 0);
++    ok(!!bitmap, "CreateDIBSection failed.\n");
++    if (!bitmap) { DeleteDC(dc); return; }
++    SetTextColor(dc, RGB(255, 255, 255));
++    SetBkColor(dc, RGB(0, 0, 0));
++    SetBkMode(dc, TRANSPARENT);
++    lf.lfHeight = -12;
++    lf.lfWeight = FW_NORMAL;
++    lf.lfCharSet = DEFAULT_CHARSET;
++    lstrcpyW(lf.lfFaceName, L"Tahoma");
++
++    for (i = 0; i < ARRAY_SIZE(qualities); ++i)
++    {
++        BOOL subpixel;
++
++        lf.lfQuality = qualities[i];
++        subpixel = lf.lfQuality == CLEARTYPE_QUALITY ||
++                   lf.lfQuality == CLEARTYPE_NATURAL_QUALITY ||
++                   (lf.lfQuality == DEFAULT_QUALITY && enabled && type == FE_FONTSMOOTHINGCLEARTYPE);
++        winetest_push_context("quality %u, smoothing %d/%u/%u", lf.lfQuality, !!enabled, type, order);
++        font = CreateFontIndirectW(&lf);
++        ok(!!font, "CreateFontIndirectW failed.\n");
++        if (!font) { winetest_pop_context(); continue; }
++        old_font = SelectObject(dc, font);
++        old_bitmap = SelectObject(dc, bitmap);
++        memset(bits, 0, sizeof(pixels));
++        ret = TextOutW(dc, 3, 3, text, ARRAY_SIZE(text) - 1);
++        ok(ret, "TextOutW failed.\n");
++        GdiFlush();
++        ret = GetTextFaceW(dc, ARRAY_SIZE(actual), actual) > 0;
++        ok(ret && !lstrcmpiW(actual, L"Tahoma"), "Expected Tahoma, got %s.\n",
++           ret ? wine_dbgstr_w(actual) : "(unknown)");
++        SelectObject(dc, old_bitmap);
++        ret = GetDIBits(dc, bitmap, 0, height, pixels, &bi, DIB_RGB_COLORS) == height;
++        ok(ret, "GetDIBits failed.\n");
++        SelectObject(dc, old_font);
++        DeleteObject(font);
++        if (ret)
++        {
++            ink = colored = 0;
++            for (p = 0; p < sizeof(pixels); p += 4)
++            {
++                ink += !!(pixels[p] | pixels[p + 1] | pixels[p + 2]);
++                colored += (pixels[p] != pixels[p + 1] || pixels[p + 1] != pixels[p + 2]);
++            }
++            ok(ink != 0, "No text drawn.\n");
++            ok(!!colored == subpixel, "Expected subpixel %d, got %u colored pixels.\n", subpixel, colored);
++        }
++        winetest_pop_context();
++    }
++    DeleteObject(bitmap);
++    DeleteDC(dc);
++}
++
++static void test_font_smoothing_matrix(void)
++{
++    char exe[MAX_PATH], command[MAX_PATH + 64];
++    UINT type, order, on, original_type, original_order, read_type, read_order;
++    BOOL original_enabled, read_enabled;
++    STARTUPINFOA startup = {sizeof(startup)};
++    PROCESS_INFORMATION process;
++    DWORD length;
++
++    if (!get_smoothing(&original_enabled, &original_type, &original_order)) return;
++    length = GetModuleFileNameA(NULL, exe, ARRAY_SIZE(exe));
++    ok(length && length < ARRAY_SIZE(exe), "GetModuleFileNameA returned %lu.\n", length);
++    if (!length || length == ARRAY_SIZE(exe)) return;
++
++    for (on = 0; on <= 1; ++on)
++        for (type = FE_FONTSMOOTHINGSTANDARD; type <= FE_FONTSMOOTHINGCLEARTYPE; ++type)
++            for (order = FE_FONTSMOOTHINGORIENTATIONBGR; order <= FE_FONTSMOOTHINGORIENTATIONRGB; ++order)
++            {
++                BOOL ret;
++
++                if (!set_smoothing(on, type, order)) goto restore;
++                sprintf(command, "\"%s\" font smoothing-child %u %u %u", exe, on, type, order);
++                ret = CreateProcessA(exe, command, NULL, NULL, TRUE, 0, NULL, NULL, &startup, &process);
++                ok(ret, "CreateProcessA failed, error %lu.\n", GetLastError());
++                if (!ret) goto restore;
++                wait_child_process(&process);
++            }
++
++restore:
++    set_smoothing(original_enabled, original_type, original_order);
++    if (get_smoothing(&read_enabled, &read_type, &read_order))
++        ok(read_enabled == original_enabled && read_type == original_type && read_order == original_order,
++           "Original settings did not restore, got %d/%u/%u.\n", read_enabled, read_type, read_order);
++}
++
+ START_TEST(font)
+ {
+     static const char *test_names[] =
+@@ -8021,6 +8173,16 @@
+     init();
+ 
+     argc = winetest_get_mainargs(&argv);
++    if (argc >= 3 && !strcmp(argv[2], "smoothing"))
++    {
++        test_font_smoothing_matrix();
++        return;
++    }
++    if (argc >= 3 && !strcmp(argv[2], "smoothing-child"))
++    {
++        test_font_smoothing(argc, argv);
++        return;
++    }
+     if (argc >= 3)
+     {
+         if (!strcmp(argv[2], "AddFontMemResource"))
+@@ -8030,6 +8192,7 @@
+ 
+     test_stock_fonts();
+     test_logfont();
++    test_font_smoothing(argc, argv);
+     test_bitmap_font();
+     test_outline_font();
+     test_bitmap_font_metrics();

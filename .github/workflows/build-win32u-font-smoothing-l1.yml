@@ -1,0 +1,65 @@
+name: Build win32u font smoothing L1
+
+on:
+  push:
+    branches: ['topic/win32u-cleartype-measure']
+    paths:
+      - 'patches/tests-first/win32u-tests-font-smoothing.patch'
+      - '.github/workflows/build-win32u-font-smoothing-l1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  l1:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 gcc-mingw-w64-i686 bison flex llvm
+      - name: Build the exact gdi32 font test for both architectures
+        run: |
+          set -euo pipefail
+          source wine/version.env
+          source scripts/lib/wine-source.sh
+          WINE_PINNED_VERSION="$WINE_VERSION"
+          test "$WINE_VERSION" = 11.22
+          work="$(mktemp -d)"
+          curl -fsSL --retry 3 https://dl.winehq.org/wine/source/11.x/wine-11.22.tar.xz -o "$work/wine.tar.xz"
+          wine_verify_tarball "$work/wine.tar.xz" 11.22
+          tar -xJf "$work/wine.tar.xz" -C "$work"
+          src="$work/wine-11.22"
+          patch -d "$src" -p1 --fuzz=0 < patches/tests-first/win32u-tests-font-smoothing.patch
+          mkdir "$work/build" out
+          cd "$work/build"
+          "$src/configure" --enable-archs=x86_64,i386 --enable-tests --without-x \
+            --without-wayland --without-vulkan --without-opengl --without-freetype --without-fontconfig \
+            > configure.log 2>&1 || { tail -60 configure.log; exit 1; }
+          make -j"$(nproc)" dlls/gdi32/tests/{x86_64,i386}-windows/gdi32_test.exe > build.log 2>&1 ||
+            { tail -80 build.log; exit 1; }
+          out="$GITHUB_WORKSPACE/out"
+          cp "$src/COPYING.LIB" "$out/"
+          cp dlls/gdi32/tests/x86_64-windows/gdi32_test.exe "$out/gdi32-x86_64.exe"
+          cp dlls/gdi32/tests/i386-windows/gdi32_test.exe "$out/gdi32-i686.exe"
+          cd "$out"
+          printf '%s\r\n' '@echo off' 'cd /d "%~dp0"'             'if exist exitcodes.txt (echo Use a fresh copy of this bundle. & exit /b 2)'             'gdi32-x86_64.exe font smoothing > result-font-smoothing-x86_64.txt 2>&1'             '>>exitcodes.txt echo x86_64=%ERRORLEVEL%'             'gdi32-i686.exe font smoothing > result-font-smoothing-i686.txt 2>&1'             '>>exitcodes.txt echo i686=%ERRORLEVEL%' 'type exitcodes.txt' > run-tests.bat
+          cat > README.txt <<INFO
+          Native L1 for the Wine gdi32 font test (Wine 11.22, winum ${GITHUB_SHA}).
+          Verify SHA256SUMS and run run-tests.bat in a fresh folder on the offline
+          Windows 10 snapshot with an interactive desktop. The selected matrix
+          temporarily changes smoothing and restores it. Return both
+          result-font-smoothing-*.txt files and exitcodes.txt.
+          Source: https://github.com/Harvi654/winum/tree/${GITHUB_SHA}
+          INFO
+          sha256sum -- ./* > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: win32u-font-smoothing-l1
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
