@@ -45,10 +45,15 @@ TARBALL="$WORK/wine-$WINE_VERSION.tar.xz"
 [ -s "$TARBALL" ] || curl -fL --retry 3 -o "$TARBALL" "https://dl.winehq.org/wine/source/$SUB/wine-$WINE_VERSION.tar.xz"
 wine_verify_tarball "$TARBALL" "$WINE_VERSION" >/dev/null || exit 1
 tar -xf "$TARBALL" -C "$WORK"
-if [ "$VARIANT" = series ]; then
-    say "Applying patches/series"
-    # shellcheck disable=SC1091
-    source "$HERE/scripts/lib/wine-patches.sh"
+say "Applying the release series (font smoothing runtime only in the candidate)"
+# shellcheck disable=SC1091
+source "$HERE/scripts/lib/wine-patches.sh"
+if [ "$VARIANT" = vanilla ]; then
+    mkdir -p "$WORK/baseline-patches"
+    cp -a "$HERE"/patches/*.patch "$WORK/baseline-patches/"
+    sed '/^win32u-font-smoothing\.patch$/d' "$HERE/patches/series" > "$WORK/baseline-patches/series"
+    wine_apply_patches "$SRC" "$WORK/baseline-patches" "$HERE" HEAD
+else
     wine_apply_patches "$SRC" "$HERE/patches" "$HERE" HEAD
 fi
 if [ -f "$HERE/patches/tests-first/series" ]; then
@@ -163,6 +168,51 @@ for t in $TESTS; do
         done
     done
 done
+if [ "$GROUP" = g2 ]; then
+    say "Checking the native-validated matrix with rgba=none and rgba=rgb"
+    mkdir -p "$OUTDIR/font-smoothing"
+    for rgba in none rgb; do
+        (
+            export FONTCONFIG_FILE="$WORK/fonts-$rgba.conf" WINEPREFIX="$WORK/font-prefix-$rgba"
+            trap 'timeout -k 5 15 ./server/wineserver -k 2>/dev/null || true' EXIT
+            cat > "$FONTCONFIG_FILE" <<EOF
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+<fontconfig>
+ <include ignore_missing="no">/etc/fonts/fonts.conf</include>
+ <match target="pattern"><edit name="rgba" mode="assign"><const>$rgba</const></edit></match>
+ <match target="font">
+   <edit name="antialias" mode="assign"><bool>true</bool></edit>
+   <edit name="rgba" mode="assign"><const>$rgba</const></edit>
+ </match>
+</fontconfig>
+EOF
+            if [ "$rgba" = none ]; then expected=5; else expected=1; fi
+            test "$(fc-match -f '%{rgba}' sans-serif)" = "$expected"
+            timeout -k 5 120 ./wine wineboot -i > "$WORK/font-boot-$rgba.log" 2>&1
+            timeout -k 5 60 ./server/wineserver -w
+            for arch in x86_64 i386; do
+                log="$OUTDIR/font-smoothing/$rgba-$arch.txt"
+                rc=0
+                timeout -k 5 120 ./wine "dlls/gdi32/tests/$arch-windows/gdi32_test.exe" \
+                    font smoothing > "$log" 2>&1 || rc=$?
+                sed -i 's/\r$//' "$log"
+                printf 'exit=%s\n' "$rc" >> "$log"
+                cat "$log"
+                test "$(grep -c 'font-smoothing settings on=' "$log")" = 8
+                test "$(grep -c 'tests executed' "$log")" = 9
+                if [ "$VARIANT" = series ]; then
+                    test "$rc" = 0
+                    test "$(grep -c '0 failures), 0 skipped.' "$log")" = 9
+                else
+                    test "$rc" -gt 0
+                    test "$rc" -lt 124
+                    grep -q 'Test failed: Expected subpixel ' "$log"
+                fi
+            done
+        )
+    done
+fi
 ./server/wineserver -k 2>/dev/null || true
 if [ "$want_mshtml" = 1 ]; then
     WINEPREFIX="$mshtml_prefix" ./server/wineserver -k 2>/dev/null || true

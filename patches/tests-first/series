@@ -6,3 +6,5 @@
 # (winum-11.20-1); the file stays as the record.
 # ucrtbase-tests-cxx-exception-size.patch: moved into
 # ucrtbase-cxx-exception-size.patch (winum-11.22-2); the file stays as the record.
+
+win32u-tests-font-smoothing.patch
