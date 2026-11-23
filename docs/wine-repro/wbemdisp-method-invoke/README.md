@@ -96,10 +96,26 @@ altered argument count. Its results therefore combine an argument-count
 change and a registry type change. Probe v2 adds the two calls while the
 value is still a string. Their case labels are `read_no_out_string` and
 `read_extra_string`. Keep the v1 observations for comparison. The
-initial Wine test covers the v1 sequence. Its native L1 is pending.
+initial Wine test covers the v1 sequence.
 
 The v2 Winum run still rejects the two added cases on both architectures.
 The return values for the method flags are unchanged from v1.
 [Winum x86_64](results/round-2/winum-11.22-2/result-x86_64.txt) ·
 [Winum i686](results/round-2/winum-11.22-2/result-i686.txt) ·
 [Round 2 CI](https://github.com/Harvi654/winum/actions/runs/45258932265).
+
+
+On offline Windows 10, both flags and both architectures returned
+S_OK with a VT_I4 zero for the two added cases. The extra-argument case
+still copied the string back to the supplied output. The earlier
+type mismatch came from the registry value type. The trailing argument after the supplied output was ignored in the
+measured five-argument call.
+[Windows x86_64](results/round-2/windows-10/result-x86_64.txt) ·
+[Windows i686](results/round-2/windows-10/result-i686.txt).
+
+### L1
+
+The offline Windows 10 Wine unit executed 135 checks per architecture
+with zero failures, todos, or skips. Both executables exited zero.
+[Native unit results](results/l1-windows-10/) ·
+[L1 bundle](https://github.com/Harvi654/winum/actions/runs/45258770226/artifacts/14858028728).
