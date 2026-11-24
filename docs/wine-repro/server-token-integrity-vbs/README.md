@@ -67,7 +67,9 @@ wine cmd /c 'C:\winum-repro\per-user-dotnet-class.bat'
 ~~~
 
 (copy the three files to `drive_c/winum-repro` first). Without the integrity candidate:
-`err=0x1AD`; with it: `err=0x0`. For the NEWPFUI classes on the
+`err=0x1AD`; with it: `err=0x0` - measured by the maintainer on 2026-11-24
+(Inventor 2027.2 + Nastran prefix copy, native .NET 4.8, the four
+per-user class overlays on both runtimes; exit 0 and 1). For the NEWPFUI classes on the
 maintainer's machine, with Nastran installed in the Inventor prefix:
 
 ~~~bash
