@@ -168,3 +168,12 @@ gh run download 45209934855 -R Harvi654/winum \
 With `INV_PREFIX` pointing to the candidate test copy, select this build
 by prepending `$candidate/winum-11.22-2-x86_64/bin` to PATH and setting
 `INV_WINE=system` and `INV_YEAR=2027` for `scripts/launch-inventor.sh`.
+
+## DRAFT and PROOF follow-up
+
+The updated MEASURE bundle includes `quality=draft` and `quality=proof`
+in the same font, pixel-size and smoothing matrix. Run both variants in
+the offline Windows 10 VM with the new bundle. Return the two result
+files and exit codes. The Wine test and L1 expectations will be updated
+from that observation. The earlier 301-check result covers the previous
+quality set.

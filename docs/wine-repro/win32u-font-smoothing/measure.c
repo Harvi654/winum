@@ -15,7 +15,8 @@ static const char *const ids[] = {"wine_tahoma", "system_tahoma", "open_sans_con
 static const struct { BYTE value; const char *name; } qualities[] = {
     {DEFAULT_QUALITY, "default"}, {ANTIALIASED_QUALITY, "aa"},
     {CLEARTYPE_QUALITY, "ct"}, {CLEARTYPE_NATURAL_QUALITY, "ct_natural"},
-    {NONANTIALIASED_QUALITY, "nonaa"}
+    {NONANTIALIASED_QUALITY, "nonaa"},
+    {DRAFT_QUALITY, "draft"}, {PROOF_QUALITY, "proof"}
 };
 
 struct settings { BOOL enabled; UINT type, orientation; };
