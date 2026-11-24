@@ -1,0 +1,313 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] kernelbase: Merge HKCR class values for read opens.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Non-elevated Windows 10 opened a per-user InprocServer32 directly and
+relative to HKCR\CLSID in both process bitnesses. A shared value came
+from HKCU, while an HKLM-only value on the same key was still readable.
+Winum 11.22-2 opened only the HKLM classes.
+
+Preserve HKCR provenance on read handles in the measured CLSID
+namespace. Keep a machine backing handle when available and query the
+matching physical user view for value precedence. Keep direct physical
+hive handles, ACL checks and explicit write opens on the existing paths.
+---
+--- a/dlls/kernelbase/registry.c
++++ b/dlls/kernelbase/registry.c
+@@ -23,6 +23,7 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+  */
+
++#include <limits.h>
+ #include <stdlib.h>
+ #include <stdarg.h>
+ #include <stdio.h>
+@@ -636,6 +637,219 @@
+ }
+
+
++/* The low bits do not participate in the NT handle index. */
++static BOOL is_hkcr_read_handle( HKEY key )
++{
++    ULONG_PTR value = (ULONG_PTR)key;
++    return value < 0x80000000 && (value & 3) == 2;
++}
++
++static BOOL is_missing_key( NTSTATUS status )
++{
++    return status == STATUS_OBJECT_NAME_NOT_FOUND || status == STATUS_OBJECT_PATH_NOT_FOUND;
++}
++
++static BOOL registry_prefix( const UNICODE_STRING *path, const WCHAR *prefix )
++{
++    unsigned int len = wcslen( prefix );
++    return path->Length >= len * sizeof(WCHAR) && !wcsnicmp( path->Buffer, prefix, len );
++}
++
++static void advance_registry_path( UNICODE_STRING *path, unsigned int len )
++{
++    path->Buffer += len;
++    path->Length -= len * sizeof(WCHAR);
++}
++
++static KEY_NAME_INFORMATION *query_registry_key_name( HKEY key, void *buffer, DWORD size )
++{
++    KEY_NAME_INFORMATION *info = buffer;
++    NTSTATUS status;
++
++    status = NtQueryKey( key, KeyNameInformation, info, size, &size );
++    if (status == STATUS_BUFFER_OVERFLOW || status == STATUS_BUFFER_TOO_SMALL)
++    {
++        if (!(info = HeapAlloc( GetProcessHeap(), 0, size ))) return NULL;
++        status = NtQueryKey( key, KeyNameInformation, info, size, &size );
++    }
++    if (!status) return info;
++    if (info != buffer) HeapFree( GetProcessHeap(), 0, info );
++    return NULL;
++}
++
++/* Recover the physical path, including its registry view, from a tagged handle. */
++static BOOL hkcr_class_relative_name( const KEY_NAME_INFORMATION *info,
++                                      UNICODE_STRING *path, BOOL *machine )
++{
++    static const WCHAR user_prefix[] = L"\\Registry\\User\\";
++    static const WCHAR user_classes[] = L"\\Software\\Classes\\";
++    unsigned int i;
++
++    if (!info || info->NameLength > USHRT_MAX) return FALSE;
++    path->Buffer = (WCHAR *)info->Name;
++    path->Length = path->MaximumLength = info->NameLength;
++
++    if ((*machine = registry_prefix( path, root_key_names[0] )))
++    {
++        unsigned int len = wcslen( root_key_names[0] );
++        if (path->Length <= len * sizeof(WCHAR) || path->Buffer[len] != '\\') return FALSE;
++        advance_registry_path( path, len + 1 );
++        return TRUE;
++    }
++    if (!registry_prefix( path, user_prefix )) return FALSE;
++    for (i = ARRAY_SIZE(user_prefix) - 1; i < path->Length / sizeof(WCHAR); ++i)
++        if (path->Buffer[i] == '\\') break;
++    advance_registry_path( path, i );
++    if (!registry_prefix( path, user_classes )) return FALSE;
++    advance_registry_path( path, ARRAY_SIZE(user_classes) - 1 );
++    return TRUE;
++}
++
++static BOOL is_hkcr_clsid_path( const UNICODE_STRING *path )
++{
++    return (path->Length == sizeof(L"CLSID") - sizeof(WCHAR) && registry_prefix( path, L"CLSID" )) ||
++           registry_prefix( path, L"CLSID\\" ) ||
++           (path->Length == sizeof(L"Wow6432Node\\CLSID") - sizeof(WCHAR) &&
++            registry_prefix( path, L"Wow6432Node\\CLSID" )) ||
++           registry_prefix( path, L"Wow6432Node\\CLSID\\" );
++}
++
++static NTSTATUS open_hkcr_physical_key( HKEY *key, HKEY root, UNICODE_STRING *path, ACCESS_MASK access )
++{
++    OBJECT_ATTRIBUTES attr;
++    InitializeObjectAttributes( &attr, path, OBJ_CASE_INSENSITIVE, root, NULL );
++    /* path already names the physical view. */
++    return NtOpenKeyEx( (HANDLE *)key, (access & ~KEY_WOW64_RES) | KEY_WOW64_64KEY, &attr, 0 );
++}
++
++static NTSTATUS open_hkcr_user_class( HKEY *key, UNICODE_STRING *path, ACCESS_MASK access )
++{
++    static const WCHAR classes[] = L"Software\\Classes\\";
++    unsigned int len = sizeof(classes) - sizeof(WCHAR) + path->Length;
++    UNICODE_STRING full;
++    HKEY user;
++    NTSTATUS status;
++
++    if (len > USHRT_MAX) return STATUS_NAME_TOO_LONG;
++    if (!(full.Buffer = HeapAlloc( GetProcessHeap(), 0, len ))) return STATUS_NO_MEMORY;
++    memcpy( full.Buffer, classes, sizeof(classes) - sizeof(WCHAR) );
++    memcpy( full.Buffer + ARRAY_SIZE(classes) - 1, path->Buffer, path->Length );
++    full.Length = full.MaximumLength = len;
++
++    if (!(status = RtlOpenCurrentUser( KEY_READ, (HANDLE *)&user )))
++    {
++        status = open_hkcr_physical_key( key, user, &full, access );
++        NtClose( user );
++    }
++    HeapFree( GetProcessHeap(), 0, full.Buffer );
++    return status;
++}
++
++static NTSTATUS open_registry_key( HKEY *key, HKEY root, UNICODE_STRING *name,
++                                   DWORD options, ACCESS_MASK access )
++{
++    static const WCHAR wow_prefix[] = L"Wow6432Node\\";
++    char buffer[256];
++    KEY_NAME_INFORMATION *info = NULL;
++    UNICODE_STRING prefix = {0}, path;
++    BOOL machine, separator = FALSE, close_classes = FALSE;
++    DWORD len;
++    HKEY classes = NULL, actual;
++    ACCESS_MASK mode = access & ~KEY_WOW64_RES;
++    NTSTATUS status;
++
++    if (!(actual = get_special_root_hkey( root ))) return STATUS_INVALID_HANDLE;
++    if (!key || options || !name->Length || (access & KEY_WOW64_RES) == KEY_WOW64_RES ||
++        (mode != MAXIMUM_ALLOWED && (!(mode & KEY_QUERY_VALUE) || (mode & ~KEY_READ)))) goto ordinary;
++
++    if (root == HKEY_CLASSES_ROOT)
++    {
++        if (!is_hkcr_clsid_path( name )) goto ordinary;
++        /* A remapped predefined handle must retain its existing behavior. */
++        if (!(info = query_registry_key_name( actual, buffer, sizeof(buffer) ))) goto ordinary;
++        if (info->NameLength != wcslen( root_key_names[0] ) * sizeof(WCHAR) ||
++            wcsnicmp( info->Name, root_key_names[0], info->NameLength / sizeof(WCHAR) )) goto ordinary;
++        if (!registry_prefix( name, wow_prefix ) &&
++            ((is_win64 && (access & KEY_WOW64_32KEY)) || (is_wow64 && !(access & KEY_WOW64_64KEY))))
++            RtlInitUnicodeString( &prefix, wow_prefix );
++        classes = actual;
++    }
++    else if (is_hkcr_read_handle( root ))
++    {
++        if (name->Buffer[0] == '\\') goto ordinary;
++        info = query_registry_key_name( actual, buffer, sizeof(buffer) );
++        if (!hkcr_class_relative_name( info, &prefix, &machine ) || !is_hkcr_clsid_path( &prefix ))
++            goto ordinary;
++        separator = TRUE;
++        if (!(classes = open_classes_root())) goto ordinary;
++        close_classes = TRUE;
++    }
++    else goto ordinary;
++
++    len = prefix.Length + separator * sizeof(WCHAR) + name->Length;
++    if (len > USHRT_MAX || !(path.Buffer = HeapAlloc( GetProcessHeap(), 0, len ))) goto ordinary;
++    path.Length = path.MaximumLength = len;
++    if (prefix.Length) memcpy( path.Buffer, prefix.Buffer, prefix.Length );
++    if (separator) path.Buffer[prefix.Length / sizeof(WCHAR)] = '\\';
++    memcpy( path.Buffer + prefix.Length / sizeof(WCHAR) + separator, name->Buffer, name->Length );
++
++    *key = NULL;
++    status = open_hkcr_physical_key( key, classes, &path, access );
++    if (is_missing_key( status ))
++    {
++        /* RegOpenKey (used by RegQueryValue) requests MAXIMUM_ALLOWED.
++         * User-only fallback grants read access, even on that path. */
++        status = open_hkcr_user_class( key, &path, mode == MAXIMUM_ALLOWED ? KEY_READ : access );
++    }
++    if (!status) *key = (HKEY)((ULONG_PTR)*key | 2);
++    HeapFree( GetProcessHeap(), 0, path.Buffer );
++    if (close_classes) NtClose( classes );
++    if (info && info != (void *)buffer) HeapFree( GetProcessHeap(), 0, info );
++    return status;
++
++ordinary:
++    if (close_classes) NtClose( classes );
++    if (info && info != (void *)buffer) HeapFree( GetProcessHeap(), 0, info );
++    return open_key( key, actual, name, options, access, FALSE );
++}
++
++/* Use the physical key first to check the rights on the caller's handle.
++ * A successful user query (including its buffer-size reply) takes precedence. */
++static NTSTATUS query_registry_value( HKEY key, const UNICODE_STRING *name,
++                                     void *data, DWORD size, DWORD *result_size )
++{
++    char buffer[256];
++    KEY_NAME_INFORMATION *info;
++    UNICODE_STRING path;
++    NTSTATUS status, user_status;
++    DWORD user_size;
++    BOOL machine;
++    HKEY user;
++
++    status = NtQueryValueKey( key, name, KeyValuePartialInformation, data, size, result_size );
++    if (!is_hkcr_read_handle( key ) ||
++        (status && status != STATUS_BUFFER_OVERFLOW && status != STATUS_BUFFER_TOO_SMALL &&
++         status != STATUS_OBJECT_NAME_NOT_FOUND)) return status;
++
++    info = query_registry_key_name( key, buffer, sizeof(buffer) );
++    if (hkcr_class_relative_name( info, &path, &machine ) && machine && is_hkcr_clsid_path( &path ) &&
++        !open_hkcr_user_class( &user, &path, KEY_QUERY_VALUE ))
++    {
++        user_status = NtQueryValueKey( user, name, KeyValuePartialInformation, data, size, &user_size );
++        NtClose( user );
++        if (user_status == STATUS_OBJECT_NAME_NOT_FOUND)
++            status = NtQueryValueKey( key, name, KeyValuePartialInformation, data, size, result_size );
++        else
++        {
++            if (!user_status || user_status == STATUS_BUFFER_OVERFLOW || user_status == STATUS_BUFFER_TOO_SMALL)
++                *result_size = user_size;
++            status = user_status;
++        }
++    }
++    if (info && info != (void *)buffer) HeapFree( GetProcessHeap(), 0, info );
++    return status;
++}
++
+ /******************************************************************************
+  * RegOpenKeyExW   (kernelbase.@)
+  *
+@@ -658,10 +872,9 @@
+
+     if (!retkey) return ERROR_INVALID_PARAMETER;
+     *retkey = NULL;
+-    if (!(hkey = get_special_root_hkey( hkey ))) return ERROR_INVALID_HANDLE;
+
+     RtlInitUnicodeString( &nameW, name );
+-    return RtlNtStatusToDosError( open_key( retkey, hkey, &nameW, options, access, FALSE ) );
++    return RtlNtStatusToDosError( open_registry_key( retkey, hkey, &nameW, options, access ) );
+ }
+
+
+@@ -705,14 +918,13 @@
+         if (HandleToUlong(hkey) == HandleToUlong(HKEY_CLASSES_ROOT) && name && *name == '\\') name++;
+     }
+
+-    if (!(hkey = get_special_root_hkey( hkey ))) return ERROR_INVALID_HANDLE;
+
+     RtlInitAnsiString( &nameA, name );
+     if (!(status = RtlAnsiStringToUnicodeString( &NtCurrentTeb()->StaticUnicodeString,
+                                                  &nameA, FALSE )))
+     {
+         UNICODE_STRING nameW = NtCurrentTeb()->StaticUnicodeString;
+-        status = open_key( retkey, hkey, &nameW, options, access, FALSE );
++        status = open_registry_key( retkey, hkey, &nameW, options, access );
+     }
+     return RtlNtStatusToDosError( status );
+ }
+@@ -1663,8 +1875,7 @@
+         if (count) *count = 0;
+     }
+
+-    status = NtQueryValueKey( hkey, &name_str, KeyValuePartialInformation,
+-                              buffer, total_size, &total_size );
++    status = query_registry_value( hkey, &name_str, buffer, total_size, &total_size );
+     if (status && status != STATUS_BUFFER_OVERFLOW) goto done;
+
+     if (data)
+@@ -1676,8 +1887,7 @@
+             if (!(buf_ptr = HeapAlloc( GetProcessHeap(), 0, total_size )))
+                 return ERROR_NOT_ENOUGH_MEMORY;
+             info = (KEY_VALUE_PARTIAL_INFORMATION *)buf_ptr;
+-            status = NtQueryValueKey( hkey, &name_str, KeyValuePartialInformation,
+-                                      buf_ptr, total_size, &total_size );
++            status = query_registry_value( hkey, &name_str, buf_ptr, total_size, &total_size );
+         }
+
+         if (!status)
+@@ -1762,8 +1972,7 @@
+         return ret;
+     }
+
+-    status = NtQueryValueKey( hkey, &nameW, KeyValuePartialInformation,
+-                              buffer, sizeof(buffer), &total_size );
++    status = query_registry_value( hkey, &nameW, buffer, sizeof(buffer), &total_size );
+     if (status && status != STATUS_BUFFER_OVERFLOW) goto done;
+
+     /* we need to fetch the contents for a string type even if not requested,
+@@ -1780,8 +1989,7 @@
+                 goto done;
+             }
+             info = (KEY_VALUE_PARTIAL_INFORMATION *)buf_ptr;
+-            status = NtQueryValueKey( hkey, &nameW, KeyValuePartialInformation,
+-                                      buf_ptr, total_size, &total_size );
++            status = query_registry_value( hkey, &nameW, buf_ptr, total_size, &total_size );
+         }
+
+         if (status) goto done;

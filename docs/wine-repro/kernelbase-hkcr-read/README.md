@@ -110,3 +110,8 @@ both-hive class while they run.
 Return `exitcodes.txt`, `result-hkcr-class-reads-x86_64.txt` and
 `result-hkcr-class-reads-i686.txt`. A native pass has zero exit codes,
 failures, todos, skips and cleanup errors.
+
+The maintainer's offline native run completed 57 checks on each of
+x86_64 and i686, with zero failures, todos, skips or cleanup errors.
+Both processes ran without elevation and used the setup helper.
+[Verified L1 bundle](https://github.com/Harvi654/winum/actions/runs/45294088865/artifacts/14874679050).
