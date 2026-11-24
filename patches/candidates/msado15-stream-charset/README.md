@@ -14,8 +14,8 @@ the ADO illegal-operation status.
 | Level | Status |
 | --- | --- |
 | L0 | Both candidate DLL architectures built after applying the release series and candidate with zero fuzz. Full WoW64 validation is in the paired run. |
-| L1 | v1 passed 335 checks on each architecture on offline Windows 10. The updated v2 test requires a fresh native run. [Results](../../../docs/wine-repro/msado15-stream-charset/results/l1-windows-10/) |
-| L2 | The v1 pair failed to link stream_charset on both architectures and produced no L2 results. [Failed v1 CI](https://github.com/Harvi654/winum/actions/runs/45270694368). The v2 pair validates the in-tree units on both sides. |
+| L1 | v1 passed 335 checks on each architecture on offline Windows 10. The rebuilt v2 test requires a fresh native run. [Verified v2 bundle](https://github.com/Harvi654/winum/actions/runs/45469035228/artifacts/14957485380). [Results](../../../docs/wine-repro/msado15-stream-charset/results/l1-windows-10/) |
+| L2 | The v1 pair failed to link stream_charset on both architectures and produced no L2 results. [Failed v1 CI](https://github.com/Harvi654/winum/actions/runs/45270694368). The v2 pair validates the in-tree units on both sides. [v2 paired CI](https://github.com/Harvi654/winum/actions/runs/45469035401). |
 | L3 | The candidate passed 335 Wine checks per architecture. C and VBScript results match the offline reference for the changed charsets after normalizing the integer width of Size and Position. [Results](../../../docs/wine-repro/msado15-stream-charset/results/candidate/) |
 | L4 | 2026-11-23: joint registration completed and NEiInventor.dll loaded from the installed path. Nastran UI startup still reported 0x80040154 on per-user COM activation. |
 | Cross review | Claude, 2026-11-24: approved with three required changes, addressed in v2 below. |
