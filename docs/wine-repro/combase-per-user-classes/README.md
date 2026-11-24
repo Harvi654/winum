@@ -147,7 +147,7 @@ Plain HKCR remains a separate observation.
 
 ## Medium and High integrity
 
-With the updated bundle, run hkcr-independent native COM activation
+With the updated bundle, run the native COM fixture
 from a normal Command Prompt and an elevated one under the same VM
 account. Use the matching redirection suffix in each console.
 

@@ -9,9 +9,9 @@ Direct registry calls retain the existing Wine HKCR implementation.
 | --- | --- |
 | L0 | Both DLL architectures compiled after zero-fuzz apply in [round 1](https://github.com/Harvi654/winum/actions/runs/45278159284). |
 | L1 | 54 successful native checks on x86_64 and 59 on i686. [Results](../../../docs/wine-repro/combase-per-user-classes/results/l1-windows-10/) |
-| L2 | Paired combase and ole32 suites running. [CI](https://github.com/Harvi654/winum/actions/runs/45278894160) |
+| L2 | Paired combase and ole32 suites passed. [CI](https://github.com/Harvi654/winum/actions/runs/45278894160) |
 | L3 | All native COM results reproduced with the WOW64 test subtree. Focused Wine unit passed 51 x86_64 and 56 i686 checks. [Results](../../../docs/wine-repro/combase-per-user-classes/results/candidate/) |
-| L4 | Pending joint Nastran run with wbemdisp and msado15 and the Inventor application smoke test. |
+| L4 | Combined Nastran 2027 mesh, solve and results passed on 2026-11-24 with the token candidate and four overlays. Full Inventor smoke remains open. [Combined result](https://github.com/Harvi654/winum/blob/236463a/patches/candidates/server-limited-token-medium-integrity/README.md#validation) |
 | Cross review | Claude reviewed the candidate. Elevated native COM comparison pending. |
 
 [Native and Winum measurement](../../../docs/wine-repro/combase-per-user-classes/README.md).
