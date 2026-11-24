@@ -119,6 +119,11 @@ The offline unit passed on x86_64 and i686 with 335 checks each and
 zero failures, todos or skips. Both processes exited zero.
 [Offline L1 results](results/l1-windows-10/).
 
+The updated v2 test passed on offline Windows 10 on 2026-11-24.
+Both x86_64 and i686 ran 335 checks, exited 0, and reported zero
+todos, flaky checks, failures or skips. The [v2 bundle](https://github.com/Harvi654/winum/actions/runs/45469035228/artifacts/14957485380)
+compiles the test from the candidate patch. [Native v2 summary](results/l1-windows-10-v2/summary.tsv).
+
 
 ### Candidate comparison (L3)
 
