@@ -337,9 +337,43 @@ static HANDLE launch_helper(HANDLE *ready, HANDLE *done)
     return launch.hProcess;
 }
 
+static DWORD run_unit(const WCHAR *exe)
+{
+    STARTUPINFOW startup = {0};
+    PROCESS_INFORMATION process;
+    WCHAR command[MAX_PATH + 40];
+    DWORD status;
+
+    if (wcslen(exe) >= MAX_PATH || wcschr(exe, '"')) return ERROR_INVALID_PARAMETER;
+    if (!SetEnvironmentVariableW(L"WINUM_HKCR_COLLISION", ids[2 * COUNT(views)]))
+        return GetLastError();
+    swprintf(command, COUNT(command), L"\"%ls\" hkcr_class_reads", exe);
+    startup.cb = sizeof(startup);
+    startup.dwFlags = STARTF_USESTDHANDLES;
+    startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    startup.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+    startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+    if (!CreateProcessW(exe, command, NULL, NULL, TRUE, 0, NULL, NULL, &startup, &process))
+        return GetLastError();
+
+    status = WaitForSingleObject(process.hProcess, 30000);
+    if (status == WAIT_TIMEOUT)
+    {
+        TerminateProcess(process.hProcess, WAIT_TIMEOUT);
+        WaitForSingleObject(process.hProcess, 5000);
+    }
+    else if (status == WAIT_OBJECT_0 && !GetExitCodeProcess(process.hProcess, &status))
+        status = GetLastError();
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+    return status;
+}
+
 int wmain(int argc, WCHAR **argv)
 {
-    BOOL direct = argc == 2 && !wcscmp(argv[1], L"--direct-machine");
+    BOOL direct = argc > 1 && !wcscmp(argv[1], L"--direct-machine");
+    int arg = direct ? 2 : 1;
+    const WCHAR *unit = NULL;
     HANDLE user_token, helper = NULL, ready = NULL, done = NULL, handles[2];
     TOKEN_ELEVATION token;
     DWORD returned, wait_result, helper_exit = 0;
@@ -358,7 +392,8 @@ int wmain(int argc, WCHAR **argv)
         }
         return machine_helper();
     }
-    if (argc != 1 && !direct) return ERROR_INVALID_PARAMETER;
+    if (argc == arg + 2 && !wcscmp(argv[arg], L"--run-test")) unit = argv[arg + 1];
+    else if (argc != arg) return ERROR_INVALID_PARAMETER;
 
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &user_token)) return GetLastError();
     if (!GetTokenInformation(user_token, TokenElevation, &token, sizeof(token), &returned))
@@ -403,6 +438,18 @@ int wmain(int argc, WCHAR **argv)
     }
     printf("machine_setup_status=%ld\n", status);
     if (status) goto cleanup;
+
+    if (unit)
+    {
+        status = register_class(HKEY_CURRENT_USER, 2 * COUNT(views));
+        if (!status)
+        {
+            fflush(stdout);
+            status = run_unit(unit);
+        }
+        printf("l1_unit_status=%ld\n", status);
+        goto cleanup;
+    }
 
     for (i = 0; i < FIXTURES; ++i)
     {

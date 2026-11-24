@@ -66,3 +66,47 @@ enumeration, writes, deletes and notifications as separate questions.
 Before promotion, pair advapi32, kernelbase, ole32, combase and shell32.
 Run Nastran and the Inventor smoke test, and AutoCAD if available.
 Claude cross-review follows Windows measurement and the candidate change.
+
+## Offline Windows 10 results
+
+Both architectures ran with a non-elevated token and an elevated setup
+helper. Each completed all 13 cases, exited zero, and reported zero user
+and machine cleanup errors.
+
+| Read in the matching view | User only | Machine only | Both | Absent |
+| --- | --- | --- | --- | --- |
+| Open from HKCR or its CLSID handle | Success | Success | Success | ERROR_FILE_NOT_FOUND |
+| Default and Shared values | USER | MACHINE | USER | Missing |
+| UserOnly value | USER | Missing | USER | Missing |
+| MachineOnly value | Missing | MACHINE | MACHINE | Missing |
+
+RegQueryValueExW showed the same value results after ANSI, Unicode and
+relative opens. RegGetValueW also returned the machine-only value in the
+collision. RegQueryValueW returned the user default in the collision.
+A class registered in a single view only opened in that view. A literal
+Wow6432Node registration matched the explicit 32-bit view in the probe.
+The default view tracked process bitness on the 64-bit host.
+
+Default-view enumeration saw the probe class when either hive contained it.
+For the default-view user-only and both-hive cases the write marker landed
+in HKCU. The absent write returned access denied. Other writes varied by
+view and architecture. These are observations for separate work.
+
+On Winum 11.22-2 the user-only open returned ERROR_FILE_NOT_FOUND both
+directly and relative to the CLSID handle. A collision yielded the machine
+value. Returning only a physical user handle would lose the measured
+machine-value fallback. Relative HKCR opens also need to keep their
+provenance, since an explicit HKLM handle must remain a machine handle.
+
+## Exact Wine test (L1)
+
+Verify the checksums in the `kernelbase-hkcr-read-l1` artifact before
+copying it into the offline Windows 10 VM. Run `run-tests.bat` from the
+normal desktop and accept the two prompts for the setup helpers. The
+test processes stay non-elevated. The runner extracts the exact new
+tests from the Wine test patch and uses the measured helper to hold a
+both-hive class while they run.
+
+Return `exitcodes.txt`, `result-hkcr-class-reads-x86_64.txt` and
+`result-hkcr-class-reads-i686.txt`. A native pass has zero exit codes,
+failures, todos, skips and cleanup errors.
