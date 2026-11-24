@@ -72,7 +72,8 @@ without a virtual desktop:
 - [ ] assembly: place two parts, constraint; save, reopen
 - [ ] drawing: base and projected view, dimension; save, reopen
 - [ ] Open/Save dialogs (shell32 fixes of 11.22-2 still fine)
-- [ ] Stress Analysis or Frame Analysis: one study, results
+- [x] Stress Analysis or Frame Analysis: one study, results - 2026-11-24:
+      Stress Analysis alone (mesh, run, save) pass
 - [ ] fonts look as before or better (win32u font smoothing: ClearType on
       the desktop setting)
 - [ ] restart Inventor, the last file opens
@@ -80,10 +81,13 @@ without a virtual desktop:
 
 Inventor Nastran 2027 (in the Inventor 2027.2 prefix copy):
 
-- [ ] Nastran environment, Generate Mesh, Run (linear static), results -
-      no 0x80040154 dialog
-- [ ] `wine cscript //nologo 'C:\newpfui.vbs' NEWPFUI.NEProgressImpl` ->
-      `err=0x0`
+- [x] Nastran environment, Generate Mesh, Run (linear static), results -
+      no 0x80040154 dialog - 2026-11-24: pass; Nastran alone (mesh, run,
+      finish, save) pass; saving a large FE model shows the progress
+      several times and finishes (normal)
+- [x] `wine cscript //nologo 'C:\newpfui.vbs' NEWPFUI.NEProgressImpl` ->
+      `err=0x0` - 2026-11-24: pass, and the runtime check (MEASURE:
+      Medium for a program started from Linux) pass
 
 Install from an ODIS image (fresh prefix, the installer now runs at
 Medium integrity; elevated installers stay High):
@@ -100,6 +104,14 @@ AutoCAD 2027 (wineserver, ntdll and combase are shared):
       15 minutes without "Connection Lost"
 
 Report per item: pass, fail (with a filtered log line), or not run.
+
+Results so far (maintainer, 2026-11-24, Inventor 2027.2 + Nastran
+prefix copy, this artifact): runtime check, NEWPFUI, Nastran mesh / run /
+results, Stress Analysis alone - pass. Seen and **not part of this
+release**: Nastran and then Stress Analysis in the same Inventor session
+give no mesh and no results until the part is reopened (Inventor issue
+#41, Windows comparison pending). The other items are in progress.
+
 Known and not part of this release: the black bar above the Nastran
 result legend, the four unregistered mscoree CLSIDs, explorer.exe's
 High token (Inventor with `INV_VDESKTOP`), the Frame Analysis repaint.
