@@ -120,7 +120,7 @@ architectures.
 | L2 | Local paired run 2026-11-24 (series vs series + candidate, both with the tests-first test): advapi32, ntdll, kernelbase, kernel32, combase, ole32 - no new failures; the 10 integrity checks per architecture fixed. CI run [45307710447](https://github.com/Harvi654/winum/actions/runs/45307710447) (compares *vanilla* Wine with series + candidate, so it also shows the whole series): the same 10 fixed per architecture, one unit `ntdll.i386.virtual` timed out (exit 124) on the series side; locally it passes in 4-5 s, 0 failures, three runs with the candidate - to re-run in CI before it is recorded as clean. |
 | L3 | Windows 10 (2026-11-24): `per-user-dotnet-class.bat` created from a normal console, `err=0x1AD` from an elevated one - the same split as Nastran's NEWPFUI. Wine (2026-11-24, maintainer's Inventor 2027.2 + Nastran prefix, native .NET 4.8, candidate runtime below): `NEWPFUI.NEProgressImpl` and `NEWPFUI.NEWPFUIImpl` `err=0x0` (without the candidate `0x1AD`); MEASURE: limited process token 8192, linked 12288. `per-user-dotnet-class.bat` under Wine not run yet (see the repro README). |
 | L4 | Nastran 2027, 2026-11-24, passed: part, Nastran environment, Generate Mesh (parabolic, 0.167 mm, 1,254,416 nodes, 806,387 elements), Run (linear static), von Mises contour, Deformed + Animate - no 0x80040154 dialog. Still pending: full Inventor smoke test (assembly, drawing, save/reopen, restart), ODIS installer, AutoCAD (wineserver and ntdll are shared). |
-| Cross review | Codex, pending. |
+| Cross review | Codex, 2026-11-24. Approved for the combined test-run within the measured scope. CI timeout and remaining L4 checks are open. |
 
 On winum-11.22-2 the L1 test fails 10 checks per architecture (every
 Medium expectation; the High linked token passes): see the Result log.
@@ -176,3 +176,34 @@ Wine: fails. Related: bug 17019 (HKCR merging).
   linked token S-1-16-8192. Every other line equals winum-11.22-2 (object
   labels, groups, `SetTokenInformation`). Standalone L1 test under the
   candidate: 66 checks, 0 failures per architecture.
+
+## Cross review (Codex, 2026-11-24)
+
+Read in full: both candidate patches, the advapi32 test patch, the
+MEASURE program and this README. Checked the relevant Wine 11.22 token
+creation, duplication and process-grant paths and all four native
+measurement reports.
+
+- The limited process token is Medium (8192) and the full token High
+  (12288). In both consoles and bitnesses, primary, impersonation,
+  identification and restricted duplicates, ImpersonateSelf, pseudo
+  handles and the child retain the originating level. The linked token
+  uses the opposite level and its linked token returns to the original
+  level. Every sampled label has attributes 0x60. Initializing in
+  create_token and copying in token_duplicate covers those paths.
+- The explorer desktop path requests ProcessWineGrantAdminToken. The
+  server replaces the token with a default admin token, which remains
+  High. Full admin and explicitly supplied process tokens keep their
+  existing path and duplicates retain the source level.
+- Both patches apply without fuzz. The regenerated protocol header and
+  request-handler assertions agree. The regenerated get_token_info
+  trace printer agrees too. The new RID is at offset 44 and the reply
+  remains 56 bytes. The protocol bump to 980 makes wineserver and ntdll
+  a matched pair. The server handler checks TOKEN_QUERY and the ntdll
+  SID result retains its layout and label flags.
+- The native measurements establish the split-token behavior. Token
+  object labels, TokenGroups, mandatory policy and integrity-level
+  setters remain separate compatibility work. The measured Nastran
+  result is a pass with the combined overlays. Recheck the recorded
+  ntdll.i386.virtual timeout before declaring CI L2 clean. Full
+  Inventor, ODIS and AutoCAD L4 remain open.
