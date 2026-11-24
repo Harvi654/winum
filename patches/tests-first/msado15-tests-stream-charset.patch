@@ -16,10 +16,10 @@ index a6c162d..c9fc275 100644
 +	stream_charset.c \
 diff --git a/dlls/msado15/tests/stream_charset.c b/dlls/msado15/tests/stream_charset.c
 new file mode 100644
-index 0000000..bc1a169
+index 0000000..ad51454
 --- /dev/null
 +++ b/dlls/msado15/tests/stream_charset.c
-@@ -0,0 +1,345 @@
+@@ -0,0 +1,346 @@
 +/*
 + * ADODB.Stream text charset tests
 + *
@@ -72,6 +72,7 @@ index 0000000..bc1a169
 +static HRESULT invoke(IDispatch *obj, const WCHAR *member, WORD flags,
 +                      UINT n, VARIANT first, VARIANT second, VARIANT *ret, HRESULT *detail)
 +{
++    static const GUID null_iid;
 +    VARIANT args[] = {second, first};
 +    DISPID put = DISPID_PROPERTYPUT, id;
 +    DISPPARAMS params = {args + 2 - n, flags == PUT ? &put : NULL, n, flags == PUT};
@@ -81,9 +82,9 @@ index 0000000..bc1a169
 +
 +    VariantInit(ret);
 +    *detail = S_OK;
-+    hr = IDispatch_GetIDsOfNames(obj, &IID_NULL, &name, 1, LOCALE_USER_DEFAULT, &id);
++    hr = IDispatch_GetIDsOfNames(obj, &null_iid, &name, 1, LOCALE_USER_DEFAULT, &id);
 +    if (SUCCEEDED(hr))
-+        hr = IDispatch_Invoke(obj, id, &IID_NULL, LOCALE_USER_DEFAULT, flags, &params,
++        hr = IDispatch_Invoke(obj, id, &null_iid, LOCALE_USER_DEFAULT, flags, &params,
 +                              ret, &exception, NULL);
 +    if (exception.pfnDeferredFillIn) exception.pfnDeferredFillIn(&exception);
 +    *detail = exception.scode;

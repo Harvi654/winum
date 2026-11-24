@@ -20,7 +20,10 @@ wine_verify_tarball "$tarball" "$WINE_VERSION"
 source_dir="$work/wine-$WINE_VERSION"
 tar -xf "$tarball" -C "$work" \
     "wine-$WINE_VERSION"/{COPYING.LIB,dlls/msado15/tests/Makefile.in,include/wine/debug.h,include/wine/test.h}
-patch -d "$source_dir" -p1 --fuzz=0 < "$repo/patches/tests-first/msado15-tests-stream-charset.patch"
+candidate="$repo/patches/candidates/msado15-stream-charset/msado15-stream-charset.patch"
+sed -n '\|^diff --git a/dlls/msado15/tests/|,$p' "$candidate" > "$work/unit.patch"
+test -s "$work/unit.patch"
+patch -d "$source_dir" -p1 --fuzz=0 < "$work/unit.patch"
 
 bat="$work/run-tests.bat"
 printf '%s\r\n' '@echo off' 'cd /d "%~dp0"' 'if exist exitcodes.txt (echo already run - use a fresh copy & exit /b 2)' > "$bat"

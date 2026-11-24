@@ -43,42 +43,29 @@ jobs:
       - name: Build and test the release series with the measured unit
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          unit=msado15-tests-stream-charset.patch
-          printf '%s\n' "$unit" >> patches/tests-first/series
           if [[ "$VARIANT" == candidate ]]; then
             cp patches/candidates/msado15-stream-charset/msado15-stream-charset.patch patches/
             printf '%s\n' msado15-stream-charset.patch >> patches/series
-            python3 - "$unit" <<'PY'
-          from pathlib import Path
-          import re
-          import sys
-
-          patch = Path("patches/tests-first") / sys.argv[1]
-          text = patch.read_text()
-          for before, after in (
-              ("+    todo_wine_if(todo)\n", "+    (void)todo;\n"),
-              ("+    todo_wine\n", "+    /* Candidate tests require native results. */\n"),
-          ):
-              assert text.count(before) == 1
-              text = text.replace(before, after)
-          patch.write_text(text)
-          PY
+          else
+            printf '%s\n' msado15-tests-stream-charset.patch >> patches/tests-first/series
           fi
           bash scripts/test-series.sh series out
           python3 - <<'PY'
           import json
-          import re
+          import os
           from pathlib import Path
 
           out = Path("out")
           data = json.loads((out / "results-series-ado.json").read_text())
-          for suite in ("msado15",):
-              for arch in ("x86_64", "i386"):
-                  assert any(k.startswith(f"{suite}.{arch}.") for k in data), (suite, arch)
           for arch in ("x86_64", "i386"):
-              report = (out / f"logs/msado15.{arch}.stream_charset.log").read_text()
-              assert re.search(r"stream_charset: \d+ tests executed .*0 failures\), 0 skipped", report), report
-              print(report)
+              for unit in ("msado15", "stream_charset"):
+                  result = data[f"msado15.{arch}.{unit}"]
+                  assert result["finished"] and result["exit"] is None, result
+              result = data[f"msado15.{arch}.stream_charset"]
+              assert result["failures"] == result["skipped"] == 0, result
+              if os.environ["VARIANT"] == "candidate":
+                  assert result["tests"] == 335 and result["todo"] == 0, result
+              print(arch, result)
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()

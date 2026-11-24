@@ -14,11 +14,11 @@ the ADO illegal-operation status.
 | Level | Status |
 | --- | --- |
 | L0 | Both candidate DLL architectures built after applying the release series and candidate with zero fuzz. Full WoW64 validation is in the paired run. |
-| L1 | Offline Windows 10 passed 335 checks on x86_64 and i686 with zero failures, todos or skips. [Results](../../../docs/wine-repro/msado15-stream-charset/results/l1-windows-10/) |
-| L2 | Paired msado15 suite is running. [CI](https://github.com/Harvi654/winum/actions/runs/45270694368) |
+| L1 | v1 passed 335 checks on each architecture on offline Windows 10. The updated v2 test requires a fresh native run. [Results](../../../docs/wine-repro/msado15-stream-charset/results/l1-windows-10/) |
+| L2 | The v1 pair failed to link stream_charset on both architectures and produced no L2 results. [Failed v1 CI](https://github.com/Harvi654/winum/actions/runs/45270694368). The v2 pair validates the in-tree units on both sides. |
 | L3 | The candidate passed 335 Wine checks per architecture. C and VBScript results match the offline reference for the changed charsets after normalizing the integer width of Size and Position. [Results](../../../docs/wine-repro/msado15-stream-charset/results/candidate/) |
 | L4 | 2026-11-23: joint registration completed and NEiInventor.dll loaded from the installed path. Nastran UI startup still reported 0x80040154 on per-user COM activation. |
-| Cross review | Claude, 2026-11-24: approved with three changes required before the series (below). |
+| Cross review | Claude, 2026-11-24: approved with three required changes, addressed in v2 below. |
 
 [Measurement and exact reference bytes](../../../docs/wine-repro/msado15-stream-charset/README.md).
 
@@ -119,6 +119,15 @@ candidate; the failures are the todos (item 2).
    `stream_LoadFromFile` use `"\\n"` (a literal backslash and `n`, no
    newline) in their TRACE format; `+msado15` logs run those lines
    together. Use `"\n"` as the rest of the file does.
+
+### v2 (2026-11-24)
+
+The tests-first baseline and the candidate use a local null IID. The
+candidate includes the native assertions without the passing todos.
+The standalone L1 bundle builds that same test. The baseline retains
+the expected Wine failures for comparison. Corrected newline escapes
+in CopyTo, SaveToFile and LoadFromFile traces. Stream behavior and
+the measured expectations are unchanged.
 
 ### Checked, no change needed
 

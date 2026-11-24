@@ -10,6 +10,11 @@ and copy operations. Use the Windows code-page APIs on the measured
 non-Unicode charsets and preserve the existing Unicode ReadText and
 WriteText paths.
 
+v2 (2026-11-24): Use a local null IID to link the test inside Wine and
+fold the test into the candidate with the passing todo_wine annotations
+removed. Use actual newlines in the three file and copy traces. The
+stream behavior and measured expectations are unchanged.
+
 --- a/dlls/msado15/stream.c
 +++ b/dlls/msado15/stream.c
 @@ -182,5 +182,5 @@
@@ -56,7 +61,7 @@ WriteText paths.
 +    VARIANT data;
 +    LONG count;
 +
-+    TRACE( "%p, %p, %Id\\n", iface, dst, size );
++    TRACE( "%p, %p, %Id\n", iface, dst, size );
 +    if (stream->state == adStateClosed) return MAKE_ADO_HRESULT( adErrObjectClosed );
 +    if (!dst || size < adReadAll) return MAKE_ADO_HRESULT( adErrInvalidArgument );
 +    if (dst == iface) return MAKE_ADO_HRESULT( adErrIllegalOperation );
@@ -89,7 +94,7 @@ WriteText paths.
 +    HANDLE file;
 +    HRESULT hr = S_OK;
 +
-+    TRACE( "%p, %s, %u\\n", iface, debugstr_w(filename), options );
++    TRACE( "%p, %s, %u\n", iface, debugstr_w(filename), options );
 +    if (stream->state == adStateClosed) return MAKE_ADO_HRESULT( adErrObjectClosed );
 +    if (!filename || !*filename || (options != adSaveCreateNotExist && options != adSaveCreateOverWrite))
 +        return MAKE_ADO_HRESULT( adErrInvalidArgument );
@@ -117,7 +122,7 @@ WriteText paths.
 +    HANDLE file;
 +    HRESULT hr = S_OK;
 +
-+    TRACE( "%p, %s\\n", iface, debugstr_w(filename) );
++    TRACE( "%p, %s\n", iface, debugstr_w(filename) );
 +    if (stream->state == adStateClosed) return MAKE_ADO_HRESULT( adErrObjectClosed );
 +    if (!filename || !*filename) return MAKE_ADO_HRESULT( adErrInvalidArgument );
 +    file = CreateFileW( filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
@@ -315,3 +320,359 @@ WriteText paths.
 +    if (codepage) return write_encoded_text( stream, codepage, data, options );
      if (options != adWriteChar)
      {
+diff --git a/dlls/msado15/tests/Makefile.in b/dlls/msado15/tests/Makefile.in
+index a6c162d..c9fc275 100644
+--- a/dlls/msado15/tests/Makefile.in
++++ b/dlls/msado15/tests/Makefile.in
+@@ -4,0 +5 @@ SOURCES = \
++	stream_charset.c \
+diff --git a/dlls/msado15/tests/stream_charset.c b/dlls/msado15/tests/stream_charset.c
+new file mode 100644
+index 0000000..72d6b15
+--- /dev/null
++++ b/dlls/msado15/tests/stream_charset.c
+@@ -0,0 +1,344 @@
++/*
++ * ADODB.Stream text charset tests
++ *
++ * Copyright 2026 Harvi654
++ * AI-assisted (Codex), original code.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ */
++
++#define COBJMACROS
++#include <windows.h>
++#include <ole2.h>
++#include <oleauto.h>
++#include <string.h>
++#include "wine/test.h"
++
++#define CALL DISPATCH_METHOD
++#define GET DISPATCH_PROPERTYGET
++#define PUT DISPATCH_PROPERTYPUT
++
++#define ADO_ILLEGAL_OPERATION ((HRESULT)0x800a0c93)
++
++static VARIANT number(LONG n)
++{
++    VARIANT v = {0};
++    V_VT(&v) = VT_I4;
++    V_I4(&v) = n;
++    return v;
++}
++
++static VARIANT string(const WCHAR *s)
++{
++    VARIANT v = {0};
++    V_VT(&v) = VT_BSTR;
++    V_BSTR(&v) = SysAllocString(s);
++    return v;
++}
++
++static VARIANT object_arg(IDispatch *obj)
++{
++    VARIANT v = {0};
++    V_VT(&v) = VT_DISPATCH;
++    V_DISPATCH(&v) = obj;
++    return v;
++}
++
++static HRESULT invoke(IDispatch *obj, const WCHAR *member, WORD flags,
++                      UINT n, VARIANT first, VARIANT second, VARIANT *ret, HRESULT *detail)
++{
++    static const GUID null_iid;
++    VARIANT args[] = {second, first};
++    DISPID put = DISPID_PROPERTYPUT, id;
++    DISPPARAMS params = {args + 2 - n, flags == PUT ? &put : NULL, n, flags == PUT};
++    EXCEPINFO exception = {0};
++    WCHAR *name = (WCHAR *)member;
++    HRESULT hr;
++
++    VariantInit(ret);
++    *detail = S_OK;
++    hr = IDispatch_GetIDsOfNames(obj, &null_iid, &name, 1, LOCALE_USER_DEFAULT, &id);
++    if (SUCCEEDED(hr))
++        hr = IDispatch_Invoke(obj, id, &null_iid, LOCALE_USER_DEFAULT, flags, &params,
++                              ret, &exception, NULL);
++    if (exception.pfnDeferredFillIn) exception.pfnDeferredFillIn(&exception);
++    *detail = exception.scode;
++    SysFreeString(exception.bstrSource);
++    SysFreeString(exception.bstrDescription);
++    SysFreeString(exception.bstrHelpFile);
++    /* Dispatch arguments borrow the caller's reference. BSTRs belong to here. */
++    if (V_VT(&first) == VT_BSTR) VariantClear(&first);
++    if (V_VT(&second) == VT_BSTR) VariantClear(&second);
++    return hr;
++}
++
++static const WCHAR sample[] = {L'A', 0x010d, 0x20ac, 0xd83d, 0xde03, 0};
++
++static IDispatch *open_stream(LONG type, const WCHAR *charset)
++{
++    IDispatch *stream = NULL;
++    VARIANT result;
++    HRESULT hr, detail;
++    CLSID clsid;
++
++    hr = CLSIDFromProgID(L"ADODB.Stream", &clsid);
++    ok(hr == S_OK, "CLSIDFromProgID returned %#lx.\n", hr);
++    if (FAILED(hr)) return NULL;
++    hr = CoCreateInstance(&clsid, NULL, CLSCTX_INPROC_SERVER, &IID_IDispatch, (void **)&stream);
++    ok(hr == S_OK, "CoCreateInstance returned %#lx.\n", hr);
++    if (FAILED(hr)) return NULL;
++    hr = invoke(stream, L"Type", PUT, 1, number(type), number(0), &result, &detail);
++    ok(hr == S_OK, "Setting Type returned %#lx/%#lx.\n", hr, detail);
++    VariantClear(&result);
++    hr = invoke(stream, L"Open", CALL, 0, number(0), number(0), &result, &detail);
++    ok(hr == S_OK, "Open returned %#lx/%#lx.\n", hr, detail);
++    VariantClear(&result);
++    if (FAILED(hr))
++    {
++        IDispatch_Release(stream);
++        return NULL;
++    }
++    if (charset)
++    {
++        hr = invoke(stream, L"Charset", PUT, 1, string(charset), number(0), &result, &detail);
++        ok(hr == S_OK, "Setting Charset returned %#lx/%#lx.\n", hr, detail);
++        VariantClear(&result);
++    }
++    return stream;
++}
++
++static HRESULT operation(IDispatch *stream, const WCHAR *name, WORD flags, UINT argc,
++                         VARIANT first, VARIANT second, HRESULT expected, HRESULT scode)
++{
++    HRESULT hr, detail;
++    VARIANT result;
++
++    hr = invoke(stream, name, flags, argc, first, second, &result, &detail);
++    ok(hr == expected && detail == scode, "%ls: got %#lx/%#lx, expected %#lx/%#lx.\n",
++       name, hr, detail, expected, scode);
++    VariantClear(&result);
++    return hr;
++}
++
++static void check_position(IDispatch *stream, const WCHAR *name, LONG expected)
++{
++    HRESULT hr, detail;
++    VARIANT value;
++    LONGLONG actual = -1;
++
++    hr = invoke(stream, name, GET, 0, number(0), number(0), &value, &detail);
++    if (V_VT(&value) == VT_I4) actual = V_I4(&value);
++    else if (V_VT(&value) == VT_I8) actual = V_I8(&value);
++    ok(hr == S_OK && actual == expected, "%ls: got %#lx, type %u, value %lld, expected %ld.\n",
++       name, hr, V_VT(&value), (long long)actual, expected);
++    VariantClear(&value);
++}
++
++static void check_read(IDispatch *stream, LONG count, const WCHAR *expected, UINT length, LONG pos)
++{
++    HRESULT hr, detail;
++    VARIANT value;
++
++    hr = invoke(stream, L"ReadText", CALL, 1, number(count), number(0), &value, &detail);
++    ok(hr == S_OK, "ReadText(%ld) returned %#lx/%#lx.\n", count, hr, detail);
++    if (SUCCEEDED(hr))
++    {
++        ok(V_VT(&value) == VT_BSTR, "Got type %u.\n", V_VT(&value));
++        if (V_VT(&value) == VT_BSTR)
++        {
++            ok(SysStringLen(V_BSTR(&value)) == length, "Got length %u, expected %u.\n",
++               SysStringLen(V_BSTR(&value)), length);
++            if (length && SysStringLen(V_BSTR(&value)) == length)
++                ok(!memcmp(V_BSTR(&value), expected, length * sizeof(WCHAR)), "Wrong UTF-16 units.\n");
++        }
++        check_position(stream, L"Position", pos);
++    }
++    VariantClear(&value);
++}
++
++static void check_file(const WCHAR *path, const BYTE *expected, DWORD len)
++{
++    BYTE bytes[32];
++    DWORD count = 0;
++    HANDLE file;
++
++    file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
++    ok(file != INVALID_HANDLE_VALUE, "CreateFileW returned %lu.\n", GetLastError());
++    if (file == INVALID_HANDLE_VALUE) return;
++    ok(ReadFile(file, bytes, sizeof(bytes), &count, NULL), "ReadFile returned %lu.\n", GetLastError());
++    ok(count == len, "Got %lu bytes, expected %lu.\n", count, len);
++    if (count == len && len) ok(!memcmp(bytes, expected, len), "Wrong serialized bytes.\n");
++    CloseHandle(file);
++}
++
++#define METHOD(o,n) operation(o,L##n,CALL,0,number(0),number(0),S_OK,S_OK)
++#define SETINT(o,n,v) operation(o,L##n,PUT,1,number(v),number(0),S_OK,S_OK)
++#define FILECALL(o,n,p) operation(o,L##n,CALL,1,string(p),number(0),S_OK,S_OK)
++
++static void test_write(const WCHAR *path)
++{
++    static const BYTE utf8[] = {0xef,0xbb,0xbf,0x41,0xc4,0x8d,0xe2,0x82,0xac,
++                                0xf0,0x9f,0x98,0x83,0x42,0x0d,0x0a,0x43,0x0a};
++    static const BYTE ascii[] = {0x41,0x63,0x3f,0x3f,0x3f,0x42,0x0d,0x0a,0x43,0x0a};
++    static const BYTE cp1252[] = {0x41,0x63,0x80,0x3f,0x3f,0x42,0x0d,0x0a,0x43,0x0a};
++    static const WCHAR bounded[] = {0x010d,0x20ac,0xd83d};
++    static const WCHAR after_split[] = {0xfffd,L'B',L'\r'};
++    static const struct
++    {
++        const WCHAR *name;
++        const BYTE *bytes;
++        DWORD size;
++        LONG preamble, written;
++    }
++    cases[] =
++    {
++        {L"utf-8", utf8, sizeof(utf8), 3, 13},
++        {L"UTF-8", utf8, sizeof(utf8), 3, 13},
++        {L"us-ascii", ascii, sizeof(ascii), 0, 5},
++        {L"windows-1252", cp1252, sizeof(cp1252), 0, 5},
++        {L"iso-8859-1", ascii, sizeof(ascii), 0, 5},
++    };
++    IDispatch *s, *b;
++    HRESULT hr, line1, line2;
++    unsigned int i;
++
++    for (i = 0; i < ARRAY_SIZE(cases); ++i)
++    {
++        winetest_push_context("charset %ls", cases[i].name);
++        s = open_stream(2, cases[i].name);
++        if (!s)
++        {
++            winetest_pop_context();
++            continue;
++        }
++        hr = operation(s,L"WriteText",CALL,2,string(L""),number(0),S_OK,S_OK);
++        if (SUCCEEDED(hr))
++        {
++            check_position(s,L"Size",cases[i].preamble);
++            check_position(s,L"Position",cases[i].preamble);
++        }
++        hr = operation(s,L"WriteText",CALL,2,string(sample),number(0),S_OK,S_OK);
++        if (SUCCEEDED(hr))
++        {
++            check_position(s,L"Size",cases[i].written);
++            check_position(s,L"Position",cases[i].written);
++            operation(s,L"Charset",PUT,1,string(L"Unicode"),number(0),
++                      DISP_E_EXCEPTION,ADO_ILLEGAL_OPERATION);
++        }
++        SETINT(s,"LineSeparator",-1);
++        line1 = operation(s,L"WriteText",CALL,2,string(L"B"),number(1),S_OK,S_OK);
++        SETINT(s,"LineSeparator",10);
++        line2 = operation(s,L"WriteText",CALL,2,string(L"C"),number(1),S_OK,S_OK);
++        if (SUCCEEDED(operation(s,L"SaveToFile",CALL,2,string(path),number(2),S_OK,S_OK)) &&
++            SUCCEEDED(hr) && SUCCEEDED(line1) && SUCCEEDED(line2))
++        {
++            check_position(s,L"Position",0);
++            check_file(path,cases[i].bytes,cases[i].size);
++        }
++        if (i < 2 && SUCCEEDED(hr) && SUCCEEDED(line1) && SUCCEEDED(line2))
++        {
++            SETINT(s,"Position",0);
++            check_read(s,1,L"A",1,4);
++            check_read(s,3,bounded,ARRAY_SIZE(bounded),12);
++            check_read(s,-2,after_split,ARRAY_SIZE(after_split),18);
++        }
++        SETINT(s,"Position",0);
++        b = open_stream(1,NULL);
++        if (b)
++        {
++            if (SUCCEEDED(operation(s,L"CopyTo",CALL,2,object_arg(b),number(-1),S_OK,S_OK)) &&
++                SUCCEEDED(hr) && SUCCEEDED(line1) && SUCCEEDED(line2))
++            {
++                check_position(s,L"Position",cases[i].size);
++                check_position(b,L"Position",cases[i].size);
++                if (SUCCEEDED(operation(b,L"SaveToFile",CALL,2,string(path),number(2),S_OK,S_OK)))
++                    check_file(path,cases[i].bytes,cases[i].size);
++            }
++            METHOD(b,"Close");
++            IDispatch_Release(b);
++        }
++        SETINT(s,"Position",0);
++        METHOD(s,"SetEOS");
++        check_position(s,L"Size",0);
++        if (SUCCEEDED(operation(s,L"SaveToFile",CALL,2,string(path),number(2),S_OK,S_OK)))
++            check_file(path,NULL,0);
++        METHOD(s,"Close");
++        IDispatch_Release(s);
++        winetest_pop_context();
++    }
++}
++
++static void test_load(const WCHAR *path, BOOL bom)
++{
++    static const BYTE fixture[] = {0xef,0xbb,0xbf,0x41,0xc4,0x8d,0xe2,0x82,0xac,
++                                   0xf0,0x9f,0x98,0x83,0x0d,0x0a,0x5a,0x0a,0x51};
++    DWORD count = 0, offset = bom ? 0 : 3;
++    IDispatch *s, *b;
++    HANDLE f;
++
++    f = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
++    ok(f != INVALID_HANDLE_VALUE, "CreateFileW returned %lu.\n", GetLastError());
++    if (f == INVALID_HANDLE_VALUE) return;
++    ok(WriteFile(f,fixture + offset,sizeof(fixture) - offset,&count,NULL) &&
++       count == sizeof(fixture) - offset, "Fixture write returned %lu, bytes %lu.\n", GetLastError(), count);
++    CloseHandle(f);
++
++    s = open_stream(2,L"utf-8");
++    if (!s) return;
++    if (SUCCEEDED(FILECALL(s,"LoadFromFile",path)))
++    {
++        check_position(s,L"Size",18);
++        check_position(s,L"Position",0);
++        SETINT(s,"LineSeparator",-1);
++        check_read(s,-2,sample,ARRAY_SIZE(sample)-1,15);
++        SETINT(s,"LineSeparator",10);
++        check_read(s,-2,L"Z",1,17);
++        check_read(s,-1,L"Q",1,18);
++    }
++    SETINT(s,"Position",0);
++    METHOD(s,"SetEOS");
++    b = open_stream(1,NULL);
++    if (b)
++    {
++        if (SUCCEEDED(FILECALL(b,"LoadFromFile",path)))
++        {
++            check_position(b,L"Size",sizeof(fixture) - offset);
++            operation(b,L"CopyTo",CALL,2,object_arg(s),number(-1),
++                      DISP_E_EXCEPTION,ADO_ILLEGAL_OPERATION);
++            check_position(b,L"Position",0);
++            check_position(s,L"Size",0);
++        }
++        METHOD(b,"Close");
++        IDispatch_Release(b);
++    }
++    METHOD(s,"Close");
++    IDispatch_Release(s);
++}
++
++START_TEST(stream_charset)
++{
++    WCHAR temp[MAX_PATH], path[MAX_PATH];
++    HRESULT hr;
++    DWORD len;
++
++    hr = CoInitialize(NULL);
++    ok(SUCCEEDED(hr), "CoInitialize returned %#lx.\n", hr);
++    if (FAILED(hr)) return;
++    len = GetTempPathW(ARRAY_SIZE(temp),temp);
++    ok(len && len < ARRAY_SIZE(temp), "GetTempPathW returned %lu.\n", len);
++    if (len && len < ARRAY_SIZE(temp))
++    {
++        if (GetTempFileNameW(temp,L"ado",0,path))
++        {
++            test_write(path);
++            test_load(path,TRUE);
++            test_load(path,FALSE);
++            ok(DeleteFileW(path), "DeleteFileW returned %lu.\n", GetLastError());
++        }
++        else ok(FALSE, "GetTempFileNameW returned %lu.\n", GetLastError());
++    }
++    CoUninitialize();
++}

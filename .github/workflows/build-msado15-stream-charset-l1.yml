@@ -4,7 +4,7 @@ on:
   push:
     branches: ['topic/msado15-stream-charset-measure']
     paths:
-      - 'patches/tests-first/msado15-tests-stream-charset.patch'
+      - 'patches/candidates/msado15-stream-charset/msado15-stream-charset.patch'
       - 'scripts/build-l1-msado15-stream-charset.sh'
       - '.github/workflows/build-msado15-stream-charset-l1.yml'
   workflow_dispatch:
