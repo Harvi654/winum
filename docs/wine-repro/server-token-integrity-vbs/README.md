@@ -29,7 +29,21 @@ mscorlib's `System.Collections.ArrayList` under a new CLSID) gave
 `err=0x1AD` in **both** consoles on Windows 10 (2026-11-24), so it did not
 show the integrity difference. Likely reason: the class's own GUID is not
 the CLSID it was registered under; a class of our own with that GUID
-avoids the question. Kept as the record.
+avoids the question. Kept as the record. Under Wine with the candidate
+(maintainer, 2026-11-24) it printed `err=0x0`, but then exited 3
+("cleanup error 0x1BD"): `WshShell.RegDelete` is a stub in Wine
+(`fixme:wshom:WshShell3_RegDelete`), so its keys stay and a second run
+exits 2. If it was run, remove them with:
+
+~~~bash
+wine reg delete 'HKCU\Software\Classes\CLSID\{6F3C2A51-9B7E-4C1D-8E2F-7A0B5D4C3E21}' /f
+wine reg delete 'HKCU\Software\Classes\WinumRepro.PerUserArrayList' /f
+~~~
+
+The current `per-user-dotnet-class.bat` uses `reg.exe` for setup and
+cleanup, which works in Wine. Note that it uses the same CLSID with
+another ProgID, so it refuses to start (exit 2) while the v1 keys are
+still there.
 
 Run (needs no network; the DLL is built on the spot and deleted):
 

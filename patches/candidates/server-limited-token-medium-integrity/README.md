@@ -96,6 +96,21 @@ Rebuild: apply `patches/series`, then this `series`, `--fuzz=0`. The
 server protocol changes, so wineserver and ntdll must come from the same
 build (they always do in a winum runtime).
 
+## Which build has the candidate
+
+Only builds of `test-run/token-integrity-level-1` carry the candidate
+(it is in that branch's `patches/series`): "Build Wine"
+[run 45317855190](https://github.com/Harvi654/winum/actions/runs/45317855190),
+artifact `winum-11.22-2-binary` (the name is the series' version, the
+content is series + candidate). Builds of `topic/token-integrity-level`
+(e.g. run 45307586910) contain only `patches/series` - the candidate
+lives in `patches/candidates/` there - and report High as before
+(maintainer's first L3 attempt, 2026-11-24). Check a runtime with the
+MEASURE program: `process.integrity=S-1-16-8192` for a program started
+from Linux. For the L4 runtime the four Nastran overlays (wbemdisp,
+msado15, combase, kernelbase) were copied over this artifact, both
+architectures.
+
 ## Validation
 
 | Level | Status |
@@ -103,8 +118,8 @@ build (they always do in a winum runtime).
 | L0 | 2026-11-24: "Build Wine" on `test-run/token-integrity-level-1` (Wine 11.22 + `patches/series` + this series, both architectures, `--fuzz=0`) passed, [run 45317855190](https://github.com/Harvi654/winum/actions/runs/45317855190). Also a local reduced build (no X11). |
 | L1 | 2026-11-24: passed on the maintainer's offline Windows 10 (10.0.19045), x86_64 and i686, from a normal and an elevated console: 66 checks, 0 failures, todos or skips each; MEASURE values for every token the test checks agree (`docs/wine-repro/server-token-integrity/windows-2026-11-24/`). |
 | L2 | Local paired run 2026-11-24 (series vs series + candidate, both with the tests-first test): advapi32, ntdll, kernelbase, kernel32, combase, ole32 - no new failures; the 10 integrity checks per architecture fixed. CI run [45307710447](https://github.com/Harvi654/winum/actions/runs/45307710447) (compares *vanilla* Wine with series + candidate, so it also shows the whole series): the same 10 fixed per architecture, one unit `ntdll.i386.virtual` timed out (exit 124) on the series side; locally it passes in 4-5 s, 0 failures, three runs with the candidate - to re-run in CI before it is recorded as clean. |
-| L3 | `docs/wine-repro/server-token-integrity-vbs/per-user-dotnet-class.bat`: on Windows 10 (2026-11-24) created from a normal console, `err=0x1AD` from an elevated one - the same split as Nastran's NEWPFUI. Wine run in the maintainer's prefix (native .NET 4.8) pending. |
-| L4 | Pending: Nastran Generate Mesh / Run; Inventor start, part, assembly, drawing, save/reopen, restart; ODIS installer; AutoCAD (server and ntdll are shared). |
+| L3 | Windows 10 (2026-11-24): `per-user-dotnet-class.bat` created from a normal console, `err=0x1AD` from an elevated one - the same split as Nastran's NEWPFUI. Wine (2026-11-24, maintainer's Inventor 2027.2 + Nastran prefix, native .NET 4.8, candidate runtime below): `NEWPFUI.NEProgressImpl` and `NEWPFUI.NEWPFUIImpl` `err=0x0` (without the candidate `0x1AD`); MEASURE: limited process token 8192, linked 12288. `per-user-dotnet-class.bat` under Wine not run yet (see the repro README). |
+| L4 | Nastran 2027, 2026-11-24, passed: part, Nastran environment, Generate Mesh (parabolic, 0.167 mm, 1,254,416 nodes, 806,387 elements), Run (linear static), von Mises contour, Deformed + Animate - no 0x80040154 dialog. Still pending: full Inventor smoke test (assembly, drawing, save/reopen, restart), ODIS installer, AutoCAD (wineserver and ntdll are shared). |
 | Cross review | Codex, pending. |
 
 On winum-11.22-2 the L1 test fails 10 checks per architecture (every
@@ -124,7 +139,7 @@ patch with its own test):
 - `SetTokenInformation(TokenIntegrityLevel)`: Windows lowers, refuses
   raising with 1314; Wine claims success and changes nothing.
 - `TokenMandatoryPolicy`: Windows 3; Wine fails with error 1.
-- explorer.exe gets a default admin token from Wine (`ProcessWineGrantAdminToken`), so it and what it starts stay High; on Windows explorer runs at Medium. Programs started from Linux are not affected.
+- explorer.exe gets a default admin token from Wine (`ProcessWineGrantAdminToken`), so it and **everything it starts stay High**; on Windows explorer runs at Medium. Programs started from Linux are not affected, but a program started through explorer is - e.g. Inventor with a Wine virtual desktop (`INV_VDESKTOP`: the launcher runs `wine explorer /desktop=... Inventor.exe`), where Nastran's dialog stays. A fix in Wine would give the desktop process a limited token and elevate only what asks for it; that is a separate candidate with its own measurement.
 
 ## Notes for a Wine bug report
 
@@ -143,6 +158,12 @@ Wine: fails. Related: bug 17019 (HKCR merging).
   S-1-16-12288, attributes 0x60, no label in `TokenGroups`,
   `SetTokenInformation` accepted without effect. Standalone L1 test on
   winum-11.22-2: 66 checks, 10 failures per architecture (expected).
+- 2026-11-24: L3 and L4 by the maintainer (Validation table): NEWPFUI
+  created, Nastran mesh and solve without the dialog. Seen in the same
+  Inventor run, not yet attributed: `DllGetClassObject` 0x80070002 on
+  `C:\windows\system32\MSCOREE.DLL` for four CLSIDs registered nowhere
+  (probably registration-free `clrClass` entries of a manifest), no
+  visible effect; to be compared with a runtime without the candidate.
 - 2026-11-24: L1 passed in the offline VM (normal and elevated console,
   both architectures); MEASURE confirms the test's values for every
   token. The first synthetic VBScript failed on Windows in both consoles
