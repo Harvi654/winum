@@ -372,7 +372,8 @@ int wmain(int argc, WCHAR **argv)
 {
     WCHAR *slash;
     DWORD len, returned;
-    BOOL wow = FALSE;
+    BOOL wow = FALSE, elevation_only;
+    DWORD integrity;
     TOKEN_ELEVATION elevation = {0};
     HANDLE token;
     HRESULT hr;
@@ -383,14 +384,29 @@ int wmain(int argc, WCHAR **argv)
     if (!(slash = wcsrchr(directory, '\\'))) return 2;
     *slash = 0;
     if (argc == 3 && !wcscmp(argv[1], L"--machine-helper")) return machine_helper(argv[2]);
-    if (argc != 1 && (argc != 2 || wcscmp(argv[1], L"--direct-machine"))) return 2;
+    elevation_only = argc == 2 && !wcscmp(argv[1], L"--elevation-only");
+    if (argc != 1 && !elevation_only && (argc != 2 || wcscmp(argv[1], L"--direct-machine"))) return 2;
     setvbuf(stdout, NULL, _IONBF, 0);
     IsWow64Process(GetCurrentProcess(), &wow);
     if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
     {
+        union { TOKEN_MANDATORY_LABEL label; BYTE bytes[64]; } buffer;
         GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &returned);
+        if (elevation_only && GetTokenInformation(token, TokenIntegrityLevel, buffer.bytes,
+                                                   sizeof(buffer.bytes), &returned))
+        {
+            PSID sid = buffer.label.Label.Sid;
+            integrity = *GetSidSubAuthority(sid, *GetSidSubAuthorityCount(sid) - 1);
+            printf("token_integrity=0x%lx\n", integrity);
+        }
+        else if (elevation_only)
+        {
+            CloseHandle(token);
+            return 2;
+        }
         CloseHandle(token);
     }
+    else if (elevation_only) return 2;
     printf("measure=v1 bits=%u wow64=%d elevated=%lu\n", (unsigned int)(8 * sizeof(void *)), wow,
            elevation.TokenIsElevated);
     hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
@@ -398,10 +414,13 @@ int wmain(int argc, WCHAR **argv)
     if (FAILED(hr)) return 2;
 
     user_case("user_only", CLSID_ROOT, 0, 8 * sizeof(void *));
-    user_case("user_explicit_32", CLSID_ROOT, KEY_WOW64_32KEY, 32);
-    user_case("user_explicit_64", CLSID_ROOT, KEY_WOW64_64KEY, 64);
-    user_case("user_literal_wow6432node", WOW_ROOT, 0, 32);
-    precedence(argc == 2);
+    if (!elevation_only)
+    {
+        user_case("user_explicit_32", CLSID_ROOT, KEY_WOW64_32KEY, 32);
+        user_case("user_explicit_64", CLSID_ROOT, KEY_WOW64_64KEY, 64);
+        user_case("user_literal_wow6432node", WOW_ROOT, 0, 32);
+        precedence(argc == 2);
+    }
     CoUninitialize();
     printf("measure_complete=1 cleanup_errors=%u\n", cleanup_errors);
     return cleanup_errors ? 2 : 0;

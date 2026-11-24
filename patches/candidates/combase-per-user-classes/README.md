@@ -12,7 +12,7 @@ Direct registry calls retain the existing Wine HKCR implementation.
 | L2 | Paired combase and ole32 suites running. [CI](https://github.com/Harvi654/winum/actions/runs/45278894160) |
 | L3 | All native COM results reproduced with the WOW64 test subtree. Focused Wine unit passed 51 x86_64 and 56 i686 checks. [Results](../../../docs/wine-repro/combase-per-user-classes/results/candidate/) |
 | L4 | Pending joint Nastran run with wbemdisp and msado15 and the Inventor application smoke test. |
-| Cross review | Claude review pending. |
+| Cross review | Claude reviewed the candidate. Elevated native COM comparison pending. |
 
 [Native and Winum measurement](../../../docs/wine-repro/combase-per-user-classes/README.md).
 
@@ -116,3 +116,13 @@ MEASURE program and results.
    (measured and documented above).
 4. combase is used by everything: the Inventor smoke test (part, assembly,
    drawing, save/reopen, restart) is part of this L4, as the README says.
+
+## Elevated native COM observation
+
+The .NET Framework shim was observed skipping the user registration at
+High integrity. The native in-process fixture tests COM activation
+independently of that shim. Run the updated MEASURE executables with
+--elevation-only in the normal and elevated consoles of the same
+offline Windows 10 account. The fixture uses one volatile HKCU-only
+class per process and reports the integrity RID and activation results.
+Native results are pending. The combase patch is unchanged.

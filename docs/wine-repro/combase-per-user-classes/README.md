@@ -144,3 +144,19 @@ and has three fewer assertions per architecture than the UAC-helper run.
 Plain HKCR remains a separate observation.
 [Round 2 results](results/candidate/) ·
 [CI](https://github.com/Harvi654/winum/actions/runs/45278822590).
+
+## Medium and High integrity
+
+With the updated bundle, run hkcr-independent native COM activation
+from a normal Command Prompt and an elevated one under the same VM
+account. Use the matching redirection suffix in each console.
+
+~~~bat
+combase-per-user-classes-x86_64.exe --elevation-only > result-combase-medium-x86_64.txt
+combase-per-user-classes-i686.exe --elevation-only > result-combase-medium-i686.txt
+~~~
+
+Repeat in the elevated console with high in the filenames. Return all
+four result files. The token_integrity lines should identify the actual
+Medium (0x2000) and High (0x3000) tokens. The probe records activation
+and closes the temporary registration without changing the candidate.
