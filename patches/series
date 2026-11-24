@@ -104,3 +104,5 @@ ucrtbase-cxx-exception-size.patch
 
 # AutoCAD 2027 "Connection Lost": cancelling a windowless timer from another thread.
 server-cross-thread-killtimer.patch
+server-token-integrity-level.patch
+ntdll-token-integrity-level.patch

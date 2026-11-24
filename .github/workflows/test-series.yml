@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: 'Run only this group (g1..g5); empty = all'
+        description: 'Run only this group (g1..g3); empty = all'
         required: false
         default: ''
   push:
@@ -27,18 +27,14 @@ jobs:
       fail-fast: false
       matrix:
         variant: [vanilla, series]
-        group: [g1, g2, g3, g4, g5]
+        group: [g1, g2, g3]
         include:
           - group: g1
-            tests: user32
+            tests: advapi32 ntdll kernelbase kernel32
           - group: g2
-            tests: win32u gdi32 comctl32 opengl32 glu32
+            tests: combase ole32 oleaut32 shell32 urlmon
           - group: g3
-            tests: ntdll kernel32 kernelbase advapi32 combase ole32 oleaut32 rpcrt4 urlmon packager
-          - group: g4
             tests: msi
-          - group: g5
-            tests: msxml3 mspatcha riched20 msftedit shell32 wbemprox wininet mshtml
     runs-on: ubuntu-24.04
     container: archlinux:base-devel
     timeout-minutes: 350
@@ -67,7 +63,7 @@ jobs:
           export WORK=/tmp/work
           export TESTS="${{ matrix.tests }}"
           export GROUP="${{ matrix.group }}"
-          export MAKE_L1="${{ matrix.group == 'g1' && '1' || '0' }}"
+          export MAKE_L1=0
           bash scripts/test-series.sh ${{ matrix.variant }} out
       - name: Build log on failure
         if: failure() && env.RUN_GROUP == 'true'

@@ -1,0 +1,54 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH 2/2] ntdll: Report the token's integrity level.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+NtQueryInformationToken(TokenIntegrityLevel) returned a constant
+S-1-16-12288 (High) for every token. Windows 10 returns Medium for the
+limited token of a normal process and High for an elevated one, with the
+attributes SE_GROUP_INTEGRITY | SE_GROUP_INTEGRITY_ENABLED. Ask the
+server for the token's level (previous patch) and build the label SID
+from it. The size and layout of the returned TOKEN_MANDATORY_LABEL do not
+change; the WoW64 thunk already converts it.
+
+Needs server-token-integrity-level.patch (the get_token_info reply field).
+
+v1 2026-11-24: first version.
+
+diff --git a/dlls/ntdll/unix/security.c b/dlls/ntdll/unix/security.c
+--- a/dlls/ntdll/unix/security.c
++++ b/dlls/ntdll/unix/security.c
+@@ -606,18 +606,25 @@ NTSTATUS WINAPI NtQueryInformationToken( HANDLE token, TOKEN_INFORMATION_CLASS c
+         break;
+ 
+     case TokenIntegrityLevel:
++        SERVER_START_REQ( get_token_info )
+         {
+-            /* report always "S-1-16-12288" (high mandatory level) for now */
+-            static const SID high_level = {SID_REVISION, 1, {SECURITY_MANDATORY_LABEL_AUTHORITY},
+-                                                            {SECURITY_MANDATORY_HIGH_RID}};
+-
++            static const SID_IDENTIFIER_AUTHORITY label_authority = {SECURITY_MANDATORY_LABEL_AUTHORITY};
+             TOKEN_MANDATORY_LABEL *tml = info;
+-            PSID psid = tml + 1;
++            SID *sid = (SID *)(tml + 1);
+ 
+-            tml->Label.Sid = psid;
+-            tml->Label.Attributes = SE_GROUP_INTEGRITY | SE_GROUP_INTEGRITY_ENABLED;
+-            memcpy( psid, &high_level, sizeof(SID) );
++            req->handle = wine_server_obj_handle( token );
++            status = wine_server_call( req );
++            if (!status)
++            {
++                sid->Revision = SID_REVISION;
++                sid->SubAuthorityCount = 1;
++                sid->IdentifierAuthority = label_authority;
++                sid->SubAuthority[0] = reply->integrity_level;
++                tml->Label.Sid = sid;
++                tml->Label.Attributes = SE_GROUP_INTEGRITY | SE_GROUP_INTEGRITY_ENABLED;
++            }
+         }
++        SERVER_END_REQ;
+         break;
+ 
+     case TokenUIAccess:
