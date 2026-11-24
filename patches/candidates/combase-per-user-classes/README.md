@@ -12,7 +12,7 @@ Direct registry calls retain the existing Wine HKCR implementation.
 | L2 | Paired combase and ole32 suites passed. [CI](https://github.com/Harvi654/winum/actions/runs/45278894160) |
 | L3 | All native COM results reproduced with the WOW64 test subtree. Focused Wine unit passed 51 x86_64 and 56 i686 checks. [Results](../../../docs/wine-repro/combase-per-user-classes/results/candidate/) |
 | L4 | Combined Nastran 2027 mesh, solve and results passed on 2026-11-24 with the token candidate and four overlays. Full Inventor smoke remains open. [Combined result](https://github.com/Harvi654/winum/blob/236463a/patches/candidates/server-limited-token-medium-integrity/README.md#validation) |
-| Cross review | Claude reviewed the candidate. Elevated native COM comparison pending. |
+| Cross review | Claude reviewed the candidate. The elevated native COM comparison is recorded below. |
 
 [Native and Winum measurement](../../../docs/wine-repro/combase-per-user-classes/README.md).
 
@@ -125,4 +125,13 @@ independently of that shim. Run the updated MEASURE executables with
 --elevation-only in the normal and elevated consoles of the same
 offline Windows 10 account. The fixture uses one volatile HKCU-only
 class per process and reports the integrity RID and activation results.
-Native results are pending. The combase patch is unchanged.
+Offline Windows 10 reported Medium (0x2000, elevated=0) and High
+(0x3000, elevated=1) on both x86_64 and i686. At Medium, CoGetClassObject
+and CoCreateInstance returned S_OK, and the object reported its user
+fixture marker (164 or 132). At High both entry points returned
+REGDB_E_CLASSNOTREG (0x80040154), despite successful HKCU registration.
+Cleanup was successful in all four runs.
+
+The native in-process COM result confirms the elevation distinction
+independently of the .NET shim. The candidate is unchanged. Its
+non-elevated validation does not establish parity for High integrity.
