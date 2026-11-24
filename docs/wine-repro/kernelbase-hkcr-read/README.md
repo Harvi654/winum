@@ -125,7 +125,15 @@ and requires `token_integrity=0x3000 elevated=1` before setting up the
 temporary keys. Return `result-hkcr-read-high-x86_64.txt`,
 `result-hkcr-read-high-i686.txt` and `exitcodes-high.txt`.
 
-Compare user-only, machine-only and shared CLSID cases with the normal
-run, including opens relative to an HKCR CLSID handle and explicit
-WOW64 views. The High COM activation result is separate from what
-registry readers see through HKCR. High HKCR results are pending.
+On 2026-11-24, x86_64 and i686 both reported RID 0x3000, completed
+all 13 cases, exited 0 and reported zero cleanup errors. Against the
+non-elevated Windows run, each open, query and enumeration result matched.
+This includes HKCU-only opens directly and relative to the HKCR CLSID
+handle, user precedence and machine-only value fallback in collisions,
+and the explicit WOW64 views. Elevated HKCR still reads HKCU classes.
+[Comparison counts](results/windows-10-high/comparison.tsv).
+
+The write probes did differ. For example, elevated writes to the
+machine-only fixture succeeded in all four view cases, while the
+corresponding non-elevated writes failed. Writing through HKCR is
+outside this read candidate. The measured reads need no integrity gate.
