@@ -21,7 +21,7 @@ sides from `patches/tests-first/` (token, combase, wbemdisp, win32u).
 
 | What | Run | Artifact |
 | --- | --- | --- |
-| L0: "Build Wine", workflow_dispatch on this branch | [45485575952](https://github.com/Harvi654/winum/actions/runs/45485575952) (running) | `winum-11.22-2-binary` (the name is the released version; the content is the 80-patch series) |
+| L0: "Build Wine", workflow_dispatch on this branch | [45485575952](https://github.com/Harvi654/winum/actions/runs/45485575952): **passed** 2026-11-24, both architectures, `--fuzz=0` | [`winum-11.22-2-binary`](https://github.com/Harvi654/winum/actions/runs/45485575952/artifacts/14966831462) (id 14966831462, zip sha256 `b07379bcfddf35d142572ad833dc1ef101d5d6b8f59553c7c5e9566ae12bc25d`; the name is the released version, the content is the 80-patch series), source `winum-11.22-2-source` (id 14962559464) |
 | L2: "Test series", released series against series + candidates, five groups | [45485567767](https://github.com/Harvi654/winum/actions/runs/45485567767) (running) | `l2-report` |
 
 Builds of the topic branches do **not** contain the candidates; only builds
