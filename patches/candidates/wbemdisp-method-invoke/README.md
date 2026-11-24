@@ -20,7 +20,7 @@ zero fuzz. The release series does not select it.
 | L1 | Offline Windows 10. 135 checks per architecture, zero failures, todos and skips. |
 | L2 | The paired wbemdisp, wbemprox and vbscript run covered 18 units with zero regressions. [L2](https://github.com/Harvi654/winum/actions/runs/45261162354) |
 | L3 | The overlay passed 135 Wine checks per architecture. All 30 C calls and the VBScript output and process statuses matched the offline Windows reference on each architecture. [CI](https://github.com/Harvi654/winum/actions/runs/45260888480) · [Results](https://github.com/Harvi654/winum/actions/runs/45260888480/artifacts/14860436546) |
-| L4 | 2026-11-23: the maintainer observed StdRegProv dispatch pass. Registration then stopped at ADODB.Stream WriteText with charset UTF-8. Full L4 is pending a fresh-prefix run with the msado15 candidate as well. |
+| L4 | The maintainer observed StdRegProv dispatch and registration complete. The 2026-11-24 combined run with msado15, combase, HKCR and the token candidate passed mesh, solve and result display without 0x80040154. [Combined result](https://github.com/Harvi654/winum/blob/236463a/patches/candidates/server-limited-token-medium-integrity/README.md#validation) |
 | Cross review | Claude approved the candidate for L4. The provider status mapping is recorded under Known limitation. |
 
 ## Known limitation
