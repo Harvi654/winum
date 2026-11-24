@@ -35,7 +35,7 @@ readback, and starts a new rendering process for each tuple. Wine 11.22
 initializes cached font settings when the process starts. The controller
 restores and re-reads the original settings even following a run failure.
 Use a disposable offline VM snapshot for recovery if the controller is
-force-killed. A complete run has eight matrices of 258 cases and the
+force-killed. A complete run of the expanded probe has eight matrices of 360 cases and the
 completion line `measure_complete matrices=8 restored=1` per architecture.
 
 ## Build and run

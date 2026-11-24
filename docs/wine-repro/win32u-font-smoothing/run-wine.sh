@@ -40,8 +40,8 @@ CONF
             timeout -k 5s 150s "$wine" "$bundle/font-smoothing-$arch.exe" 2>&1 |
                 tr -d '\r' >> "$result"
             grep -Fxq 'measure_complete matrices=8 restored=1' "$result"
-            [[ $(grep -c '^case=' "$result") == 2064 ]]
-            [[ $(grep -c '^matrix_cases=258$' "$result") == 8 ]]
+            [[ $(grep -c '^case=' "$result") == 2880 ]]
+            [[ $(grep -c '^matrix_cases=360$' "$result") == 8 ]]
         done
     )
 done
