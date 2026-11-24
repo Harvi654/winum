@@ -24,17 +24,16 @@ settings.
 | Level | Status |
 |---|---|
 | L0 | 2026-11-23, full WoW64 build passed. The source job applied the release series and candidate with zero fuzz. [Build and artifacts](https://github.com/Harvi654/winum/actions/runs/45209934855) |
-| L1 | 2026-11-23 offline Windows 10, x86_64 and i686 each 301 checks, no failures, todos or skips, both exit 0. Expanded v2 L1 pending. |
-| L2 | [Paired gdi32, win32u and user32](https://github.com/Harvi654/winum/actions/runs/45209934774). The candidate passed all 301 targeted checks under each fontconfig profile on both architectures. |
+| L1 | 2026-11-23 offline Windows 10, x86_64 and i686 each 301 checks, no failures, todos or skips, both exit 0. Expanded v2 L1 pending native execution. [Verified v2 bundle](https://github.com/Harvi654/winum/actions/runs/45460314173/artifacts/14952323004) |
+| L2 | v1 passed all 301 targeted candidate checks under both fontconfig profiles and architectures. The v2 release-baseline comparison is running. [Paired v2](https://github.com/Harvi654/winum/actions/runs/45460436638) |
 | L4 Inventor 2027 | 2026-11-23, maintainer reports improved text in an initial check. @krokosik has the build for the pending check on a larger 4K display. |
 | L4 AutoCAD | Deferred in this validation round. |
 | Cross review | Claude reviewed on 2026-11-23. The requested DRAFT_QUALITY and PROOF_QUALITY native measurement matches Default. v2 updates the expected values and runtime. Expanded L1 pending. |
 
 
-Before resuming L2, update the baseline log match to allow the quality and
-smoothing fields between `Test failed:` and `Expected subpixel`. The
-baseline g2 job rejected the expected failures and produced no g2 report
-for the paired comparison. See the [baseline job](https://github.com/Harvi654/winum/actions/runs/45209934774/job/137815683465).
+The v1 baseline g2 job rejected the expected failure lines when winetest
+inserted the quality and smoothing context. The v2 paired runner accepts
+that context and tests both sides against the release series.
 
 [Inventor L4 instructions](../../../docs/wine-repro/win32u-font-smoothing/README.md#inventor-2027-l4)
 use the [CI binary](https://github.com/Harvi654/winum/actions/runs/45209934855/artifacts/14839823850).
