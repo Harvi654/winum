@@ -22,7 +22,7 @@ sides from `patches/tests-first/` (token, combase, wbemdisp, win32u).
 | What | Run | Artifact |
 | --- | --- | --- |
 | L0: "Build Wine", workflow_dispatch on this branch | [45485575952](https://github.com/Harvi654/winum/actions/runs/45485575952): **passed** 2026-11-24, both architectures, `--fuzz=0` | [`winum-11.22-2-binary`](https://github.com/Harvi654/winum/actions/runs/45485575952/artifacts/14966831462) (id 14966831462, zip sha256 `b07379bcfddf35d142572ad833dc1ef101d5d6b8f59553c7c5e9566ae12bc25d`; the name is the released version, the content is the 80-patch series), source `winum-11.22-2-source` (id 14962559464) |
-| L2: "Test series", released series against series + candidates, five groups | [45485567767](https://github.com/Harvi654/winum/actions/runs/45485567767) (running) | `l2-report` |
+| L2: "Test series", released series against series + candidates, five groups | [45485567767](https://github.com/Harvi654/winum/actions/runs/45485567767): done 2026-11-24, no real regression (below) | `l2-report` |
 
 Builds of the topic branches do **not** contain the candidates; only builds
 of this branch do. Check a runtime before the L4: the token MEASURE
@@ -34,6 +34,29 @@ oleaut32 urlmon shell32; g3 wbemdisp wbemprox msado15 msi; g4 win32u gdi32
 comctl32; g5 user32. Both sides build the released series; only the
 candidate side gets patches 74-80 (`scripts/test-series.sh` on this
 branch).
+
+## L2 result (run 45485567767, 452 units)
+
+The compare step exits 1 on six "regressions"; none is a new failure:
+
+| Unit | What it is |
+| --- | --- |
+| `combase.{i386,x86_64}.per_user_classes` | "Test succeeded inside todo block" (lines 109, 123, 134, 160, 163, 184): the tests-first test still marks the checks the combase fix now passes |
+| `wbemdisp.{i386,x86_64}.method` | the same, line 114 (26 per architecture) |
+| `ntdll.{i386,x86_64}.threadpool` | line 1645 "expected that timers are merged" succeeded inside todo - timing; the same line was listed as *fixed* on the other side in run 45307710447 |
+
+Fixed: the 10 token integrity checks per architecture
+(`advapi32.*.security`), `gdi32.*.font` line 8294 (font smoothing).
+`msado15.*.stream_charset` (in its patch): 335 checks, 0 failures, both
+architectures. `advapi32.x86_64.registry` (kernelbase test in its patch):
+7268 -> 7306 checks, no failure, so the WOW64 layout concern of the
+kernelbase cross review did not show on a fresh prefix. Other changes are
+check counts of timing-dependent units (kernel32 sync/pipe/debugger,
+ntdll exception/virtual, msi, urlmon).
+
+**For the promotion:** when the combase, wbemdisp, token and win32u tests
+move from `tests-first` into their patches, the `todo_wine` marks on the
+checks above are dropped (as in the kernelbase and msado15 v2 patches).
 
 ## L4 checklist (maintainer)
 
