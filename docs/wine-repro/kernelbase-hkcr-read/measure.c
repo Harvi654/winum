@@ -371,7 +371,8 @@ static DWORD run_unit(const WCHAR *exe)
 
 int wmain(int argc, WCHAR **argv)
 {
-    BOOL direct = argc > 1 && !wcscmp(argv[1], L"--direct-machine");
+    BOOL high = argc > 1 && !wcscmp(argv[1], L"--elevated");
+    BOOL direct = high || (argc > 1 && !wcscmp(argv[1], L"--direct-machine"));
     int arg = direct ? 2 : 1;
     const WCHAR *unit = NULL;
     HANDLE user_token, helper = NULL, ready = NULL, done = NULL, handles[2];
@@ -400,6 +401,29 @@ int wmain(int argc, WCHAR **argv)
     {
         CloseHandle(user_token);
         return 1;
+    }
+    if (high)
+    {
+        union
+        {
+            TOKEN_MANDATORY_LABEL label;
+            BYTE buffer[sizeof(TOKEN_MANDATORY_LABEL) + SECURITY_MAX_SID_SIZE];
+        } integrity;
+        DWORD rid = 0;
+        PSID sid;
+
+        if (GetTokenInformation(user_token, TokenIntegrityLevel, &integrity, sizeof(integrity), &returned))
+        {
+            sid = integrity.label.Label.Sid;
+            rid = *GetSidSubAuthority(sid, *GetSidSubAuthorityCount(sid) - 1);
+        }
+        printf("token_integrity=0x%04lx elevated=%lu\n", rid, token.TokenIsElevated);
+        if (!token.TokenIsElevated || rid != SECURITY_MANDATORY_HIGH_RID)
+        {
+            puts("setup_error=run_from_high_integrity_administrator_shell");
+            CloseHandle(user_token);
+            return 1;
+        }
     }
     CloseHandle(user_token);
     printf("measure=hkcr-read bits=%u wow=%d elevated=%lu machine_setup=%s\n",

@@ -8,5 +8,7 @@ for arch in x86_64 i686; do
     "$arch-w64-mingw32-clang" -Wall -Wextra -Werror -O2 -municode \
         "$here/measure.c" -lole32 -lshell32 -ladvapi32 -o "$out/hkcr-read-$arch.exe"
 done
-sed "s/\$/\\r/" "$here/run-measure.bat" > "$out/run-measure.bat"
-(cd -- "$out" && sha256sum hkcr-read-x86_64.exe hkcr-read-i686.exe run-measure.bat > SHA256SUMS)
+for runner in run-measure.bat run-measure-high.bat; do
+    sed "s/\$/\\r/" "$here/$runner" > "$out/$runner"
+done
+(cd -- "$out" && sha256sum hkcr-read-x86_64.exe hkcr-read-i686.exe run-measure.bat run-measure-high.bat > SHA256SUMS)

@@ -115,3 +115,17 @@ The maintainer's offline native run completed 57 checks on each of
 x86_64 and i686, with zero failures, todos, skips or cleanup errors.
 Both processes ran without elevation and used the setup helper.
 [Verified L1 bundle](https://github.com/Harvi654/winum/actions/runs/45294088865/artifacts/14874679050).
+
+## High integrity measurement
+
+In the same offline Windows 10 snapshot and account as the normal run,
+open Command Prompt with **Run as administrator**, then run
+`run-measure-high.bat`. It runs both architectures in that console
+and requires `token_integrity=0x3000 elevated=1` before setting up the
+temporary keys. Return `result-hkcr-read-high-x86_64.txt`,
+`result-hkcr-read-high-i686.txt` and `exitcodes-high.txt`.
+
+Compare user-only, machine-only and shared CLSID cases with the normal
+run, including opens relative to an HKCR CLSID handle and explicit
+WOW64 views. The High COM activation result is separate from what
+registry readers see through HKCR. High HKCR results are pending.
