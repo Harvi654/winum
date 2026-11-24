@@ -21,7 +21,16 @@ zero fuzz. The release series does not select it.
 | L2 | The paired wbemdisp, wbemprox and vbscript run covered 18 units with zero regressions. [L2](https://github.com/Harvi654/winum/actions/runs/45261162354) |
 | L3 | The overlay passed 135 Wine checks per architecture. All 30 C calls and the VBScript output and process statuses matched the offline Windows reference on each architecture. [CI](https://github.com/Harvi654/winum/actions/runs/45260888480) · [Results](https://github.com/Harvi654/winum/actions/runs/45260888480/artifacts/14860436546) |
 | L4 | 2026-11-23: the maintainer observed StdRegProv dispatch pass. Registration then stopped at ADODB.Stream WriteText with charset UTF-8. Full L4 is pending a fresh-prefix run with the msado15 candidate as well. |
-| Cross review | Claude approved the candidate for L4. The provider status mapping is still open for promotion. |
+| Cross review | Claude approved the candidate for L4. The provider status mapping is recorded under Known limitation. |
+
+## Known limitation
+
+The measured direct IDispatch path maps ERROR_UNSUPPORTED_TYPE from
+StdRegProv.GetStringValue to WBEM_E_TYPE_MISMATCH. Native IWbemServices::ExecMethod
+and the existing ExecMethod_ route retain the current provider result.
+No current Winum consumer is known to rely on the wrong-type path. If a
+consumer needs it, compare direct Windows ExecMethod results and put the
+provider change and its test in a separate wbemprox candidate.
 
 ## Inventor Nastran 2027 L4
 
