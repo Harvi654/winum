@@ -103,7 +103,7 @@ build (they always do in a winum runtime).
 | L0 | 2026-11-24: "Build Wine" on `test-run/token-integrity-level-1` (Wine 11.22 + `patches/series` + this series, both architectures, `--fuzz=0`) passed, [run 45317855190](https://github.com/Harvi654/winum/actions/runs/45317855190). Also a local reduced build (no X11). |
 | L1 | 2026-11-24: passed on the maintainer's offline Windows 10 (10.0.19045), x86_64 and i686, from a normal and an elevated console: 66 checks, 0 failures, todos or skips each; MEASURE values for every token the test checks agree (`docs/wine-repro/server-token-integrity/windows-2026-11-24/`). |
 | L2 | Local paired run 2026-11-24 (series vs series + candidate, both with the tests-first test): advapi32, ntdll, kernelbase, kernel32, combase, ole32 - no new failures; the 10 integrity checks per architecture fixed. CI run [45307710447](https://github.com/Harvi654/winum/actions/runs/45307710447) (compares *vanilla* Wine with series + candidate, so it also shows the whole series): the same 10 fixed per architecture, one unit `ntdll.i386.virtual` timed out (exit 124) on the series side; locally it passes in 4-5 s, 0 failures, three runs with the candidate - to re-run in CI before it is recorded as clean. |
-| L3 | `docs/wine-repro/server-token-integrity-vbs/` - pending on the maintainer's prefix (needs native .NET 4.8). |
+| L3 | `docs/wine-repro/server-token-integrity-vbs/per-user-dotnet-class.bat`: on Windows 10 (2026-11-24) created from a normal console, `err=0x1AD` from an elevated one - the same split as Nastran's NEWPFUI. Wine run in the maintainer's prefix (native .NET 4.8) pending. |
 | L4 | Pending: Nastran Generate Mesh / Run; Inventor start, part, assembly, drawing, save/reopen, restart; ODIS installer; AutoCAD (server and ntdll are shared). |
 | Cross review | Codex, pending. |
 
@@ -146,7 +146,8 @@ Wine: fails. Related: bug 17019 (HKCR merging).
 - 2026-11-24: L1 passed in the offline VM (normal and elevated console,
   both architectures); MEASURE confirms the test's values for every
   token. The first synthetic VBScript failed on Windows in both consoles
-  and was replaced by a compiled per-user class (L3 pending).
+  and was replaced by a compiled per-user class; that one shows the
+  Windows split (normal `err=0x0`, elevated `err=0x1AD`).
 - 2026-11-24: local L2 paired and CI L0/L2 (Validation table). MEASURE on
   the candidate build (`wine-candidate-v1-*.txt`): limited process token,
   its pseudo handles, duplicates, restricted token, ImpersonateSelf token

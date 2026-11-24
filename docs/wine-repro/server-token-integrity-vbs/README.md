@@ -21,8 +21,8 @@ Nastran 2027's NEWPFUI classes (0x80040154 at Generate Mesh / Run).
 
 | Console | Integrity | NEWPFUI (maintainer, 2026-11-24) | `per-user-dotnet-class.bat` |
 | --- | --- | --- | --- |
-| normal | Medium, S-1-16-8192 | created, `err=0x0` | pending |
-| elevated | High, S-1-16-12288 | `err=0x1AD` | pending |
+| normal | Medium, S-1-16-8192 | created, `err=0x0` | created, `err=0x0` (2026-11-24) |
+| elevated | High, S-1-16-12288 | `err=0x1AD` | `err=0x1AD` (2026-11-24) |
 
 The first synthetic version (`docs/archive/server-token-integrity-vbs/per-user-dotnet-class-v1.vbs`,
 mscorlib's `System.Collections.ArrayList` under a new CLSID) gave
