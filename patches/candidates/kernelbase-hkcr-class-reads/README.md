@@ -26,7 +26,7 @@ to an existing handle are outside this experiment.
 | --- | --- |
 | L0 | v1 built both DLL architectures with zero fuzz. v2 verification pending. [v1 CI](https://github.com/Harvi654/winum/actions/runs/45295261497) |
 | L1 | Offline Windows 10 passed 57 checks per architecture, zero errors or skips. [Measurement](../../../docs/wine-repro/kernelbase-hkcr-read/README.md#exact-wine-test-l1) |
-| L2 | Paired advapi32, kernelbase, ole32, combase and shell32 suites use a fresh prefix. On i686 a missing physical HKCU WOW64 CLSID subtree skips the user-only matrix. The x86_64 negative explicit 32-bit check still runs. |
+| L2 | Paired advapi32, kernelbase, ole32, combase and shell32 suites use a fresh prefix. On i686 a missing physical HKCU WOW64 CLSID subtree skips the user-only matrix. The x86_64 negative explicit 32-bit check still runs. [Paired CI](https://github.com/Harvi654/winum/actions/runs/45455927981) |
 | L3 | v1 passed native assertions on both architectures with the Windows-like WOW64 subtree. v2 verification pending. [v1 CI](https://github.com/Harvi654/winum/actions/runs/45295261497) |
-| L4 | Pending Nastran and Inventor smoke tests. AutoCAD when available. |
+| L4 | The v1 overlay contributed to the successful 2026-11-24 Nastran run with the token candidate. Recheck v2 in the combined build. Full Inventor and AutoCAD smoke tests are open. [Combined result](https://github.com/Harvi654/winum/blob/236463a/patches/candidates/server-limited-token-medium-integrity/README.md#validation) |
 | Cross review | Claude reviewed v1. v2 folds the exact test into the patch and removes the passing todos. Fresh-prefix L2 follows. [Review](https://github.com/Harvi654/winum/blob/bc9ad7e/docs/wine-repro/cross-review-2026-11-24-kernelbase-hkcr-class-reads.md) |
