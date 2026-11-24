@@ -172,8 +172,9 @@ by prepending `$candidate/winum-11.22-2-x86_64/bin` to PATH and setting
 ## DRAFT and PROOF follow-up
 
 The updated MEASURE bundle includes `quality=draft` and `quality=proof`
-in the same font, pixel-size and smoothing matrix. Run both variants in
-the offline Windows 10 VM with the new bundle. Return the two result
-files and exit codes. The Wine test and L1 expectations will be updated
-from that observation. The earlier 301-check result covers the previous
-quality set.
+in the same font, pixel-size and smoothing matrix. Both offline Windows 10 runs completed with exit code 0 and restored
+the original settings. Each produced 2,880 cases. All 408 Draft rows
+and 408 Proof rows matched the corresponding Default rows on both
+architectures, including the pixel checksums. The v2 Wine assertion
+now covers these qualities. The earlier 301-check L1 covers the
+previous quality set.

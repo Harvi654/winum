@@ -24,11 +24,11 @@ settings.
 | Level | Status |
 |---|---|
 | L0 | 2026-11-23, full WoW64 build passed. The source job applied the release series and candidate with zero fuzz. [Build and artifacts](https://github.com/Harvi654/winum/actions/runs/45209934855) |
-| L1 | 2026-11-23 offline Windows 10, x86_64 and i686 each 301 checks, no failures, todos or skips, both exit 0. |
+| L1 | 2026-11-23 offline Windows 10, x86_64 and i686 each 301 checks, no failures, todos or skips, both exit 0. Expanded v2 L1 pending. |
 | L2 | [Paired gdi32, win32u and user32](https://github.com/Harvi654/winum/actions/runs/45209934774). The candidate passed all 301 targeted checks under each fontconfig profile on both architectures. |
 | L4 Inventor 2027 | 2026-11-23, maintainer reports improved text in an initial check. @krokosik has the build for the pending check on a larger 4K display. |
 | L4 AutoCAD | Deferred in this validation round. |
-| Cross review | Claude reviewed on 2026-11-23. The probe now includes DRAFT_QUALITY and PROOF_QUALITY. Native results, derived expectations and the updated L1 are pending. |
+| Cross review | Claude reviewed on 2026-11-23. The requested DRAFT_QUALITY and PROOF_QUALITY native measurement matches Default. v2 updates the expected values and runtime. Expanded L1 pending. |
 
 
 Before resuming L2, update the baseline log match to allow the quality and
@@ -40,6 +40,21 @@ for the paired comparison. See the [baseline job](https://github.com/Harvi654/wi
 use the [CI binary](https://github.com/Harvi654/winum/actions/runs/45209934855/artifacts/14839823850).
 SHA-256 of `winum-11.22-2-x86_64.tar.xz`:
 `35579316ea9f0a1c81ba5126264c517fbf3074837bf9e3fa49e6daab45ec88e9`.
+
+## Draft and Proof follow-up
+
+Both offline Windows 10 runs completed 2,880 cases across eight
+smoothing settings and restored the original settings. The reports
+differ only in the architecture header. Across the three font faces
+and 8–24 px heights, all 408 Draft cases and all 408 Proof cases per
+architecture match the corresponding Default rows, including pixel
+counts and RGB/BGR checksums. Each quality produced 256 bi-level,
+50 greyscale and 102 subpixel cases.
+
+The v2 regression test requests both qualities with Tahoma at 12 px
+under all eight settings. The runtime applies the configured desktop
+policy to both, including when smoothing is disabled. Native L1 for
+the expanded test remains open.
 
 ## Cross review (Claude Opus 5.5, 2026-11-23)
 
