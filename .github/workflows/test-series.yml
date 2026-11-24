@@ -16,7 +16,7 @@ on:
         required: false
         default: ''
   push:
-    branches: ['test-run/win32u-font-smoothing-1']
+    branches: ['test-run/win32u-font-smoothing-2']
 
 permissions:
   contents: read
@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [vanilla, series]
+        variant: [baseline, candidate]
         group: [g1, g2]
         include:
           - group: g1
@@ -62,7 +62,12 @@ jobs:
           export TESTS="${{ matrix.tests }}"
           export GROUP="${{ matrix.group }}"
           export MAKE_L1=0
-          bash scripts/test-series.sh ${{ matrix.variant }} out
+          export FONT_SMOOTHING_FIXED=1
+          if [[ '${{ matrix.variant }}' == baseline ]]; then
+              export FONT_SMOOTHING_FIXED=0
+              sed -i '/^win32u-font-smoothing\.patch$/d' patches/series
+          fi
+          bash scripts/test-series.sh series out
       - name: Build log on failure
         if: failure() && env.RUN_GROUP == 'true'
         run: tail -n 80 /tmp/work/*.log || true
@@ -84,17 +89,17 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          pattern: tests-vanilla-*
-          path: results/vanilla
+          pattern: tests-baseline-*
+          path: results/baseline
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          pattern: tests-series-*
-          path: results/series
+          pattern: tests-candidate-*
+          path: results/candidate
       - name: Compare the release baseline with the font smoothing candidate
         run: |
           set -o pipefail
           rc=0
-          python3 scripts/compare-tests.py compare results/vanilla results/series > l2-report.md || rc=$?
+          python3 scripts/compare-tests.py compare results/baseline results/candidate > l2-report.md || rc=$?
           cat l2-report.md >> "$GITHUB_STEP_SUMMARY"
           cat l2-report.md   # also in the log, readable without the web page
           exit "$rc"

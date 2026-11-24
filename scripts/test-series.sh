@@ -201,13 +201,13 @@ EOF
                 cat "$log"
                 test "$(grep -c 'font-smoothing settings on=' "$log")" = 8
                 test "$(grep -c 'tests executed' "$log")" = 9
-                if [ "$VARIANT" = series ]; then
+                if [ "${FONT_SMOOTHING_FIXED:-1}" = 1 ]; then
                     test "$rc" = 0
                     test "$(grep -c '0 failures), 0 skipped.' "$log")" = 9
                 else
                     test "$rc" -gt 0
                     test "$rc" -lt 124
-                    grep -q 'Test failed: Expected subpixel ' "$log"
+                    grep -Eq 'Test failed: (.* )?Expected subpixel ' "$log"
                 fi
             done
         )

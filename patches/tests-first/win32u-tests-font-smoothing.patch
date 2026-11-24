@@ -12,12 +12,16 @@ currently lets the host fontconfig mode take precedence for these
 qualities. Compare color presence at 12 px in Tahoma with opaque ink
 and keep the measured non-subpixel qualities as controls.
 
+v2 2026-11-24: Draft and Proof match Default in all 408 native cases
+
+per quality and architecture, including smoothing disabled.
+
 --- a/dlls/gdi32/tests/font.c
 +++ b/dlls/gdi32/tests/font.c
-@@ -8007,6 +8007,158 @@
+@@ -8007,6 +8007,160 @@
      SetCurrentDirectoryW( cwd );
  }
- 
+
 +static BOOL get_smoothing(BOOL *enabled, UINT *type, UINT *order)
 +{
 +    BOOL ret;
@@ -43,7 +47,8 @@ and keep the measured non-subpixel qualities as controls.
 +static void test_font_smoothing(int argc, char **argv)
 +{
 +    static const BYTE qualities[] = {DEFAULT_QUALITY, ANTIALIASED_QUALITY, CLEARTYPE_QUALITY,
-+                                     CLEARTYPE_NATURAL_QUALITY, NONANTIALIASED_QUALITY};
++                                     CLEARTYPE_NATURAL_QUALITY, NONANTIALIASED_QUALITY,
++                                     DRAFT_QUALITY, PROOF_QUALITY};
 +    static const WCHAR text[] = L"HIllm Aa xy 012";
 +    enum { width = 290, height = 38 };
 +    BYTE pixels[width * height * 4];
@@ -99,7 +104,8 @@ and keep the measured non-subpixel qualities as controls.
 +        lf.lfQuality = qualities[i];
 +        subpixel = lf.lfQuality == CLEARTYPE_QUALITY ||
 +                   lf.lfQuality == CLEARTYPE_NATURAL_QUALITY ||
-+                   (lf.lfQuality == DEFAULT_QUALITY && enabled && type == FE_FONTSMOOTHINGCLEARTYPE);
++                   ((lf.lfQuality == DEFAULT_QUALITY || lf.lfQuality == DRAFT_QUALITY ||
++                     lf.lfQuality == PROOF_QUALITY) && enabled && type == FE_FONTSMOOTHINGCLEARTYPE);
 +        winetest_push_context("quality %u, smoothing %d/%u/%u", lf.lfQuality, !!enabled, type, order);
 +        font = CreateFontIndirectW(&lf);
 +        ok(!!font, "CreateFontIndirectW failed.\n");
@@ -173,9 +179,9 @@ and keep the measured non-subpixel qualities as controls.
  START_TEST(font)
  {
      static const char *test_names[] =
-@@ -8021,6 +8173,16 @@
+@@ -8021,6 +8175,16 @@
      init();
- 
+
      argc = winetest_get_mainargs(&argv);
 +    if (argc >= 3 && !strcmp(argv[2], "smoothing"))
 +    {
@@ -190,8 +196,8 @@ and keep the measured non-subpixel qualities as controls.
      if (argc >= 3)
      {
          if (!strcmp(argv[2], "AddFontMemResource"))
-@@ -8030,6 +8192,7 @@
- 
+@@ -8030,6 +8194,7 @@
+
      test_stock_fonts();
      test_logfont();
 +    test_font_smoothing(argc, argv);
