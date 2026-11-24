@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   candidate:
@@ -23,7 +24,7 @@ jobs:
       - name: Dependencies (official Arch repositories)
         run: |
           pacman-key --init
-          pacman -Syu --noconfirm --needed git mingw-w64-gcc curl xz \
+          pacman -Syu --noconfirm --needed git github-cli unzip mingw-w64-gcc curl xz \
             xorg-server-xvfb xorg-xauth libx11 libxext libxi libxrandr libxrender \
             libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
             fontconfig freetype2 ttf-dejavu alsa-lib libpulse gnutls krb5 dbus \
@@ -55,13 +56,14 @@ jobs:
             { tail -n 60 configure.log; exit 1; }
           make -j"$(nproc)" dlls/combase/{x86_64,i386}-windows/combase.dll > build.log 2>&1 ||
             { tail -n 80 build.log; exit 1; }
-      - name: Assemble the test runtime from Winum 11.22-2
+      - name: Assemble the test runtime with token integrity support
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          artifact=winum-11.22-2-x86_64.tar.xz
           cd /tmp
-          curl -fLsS --retry 3 -O "https://github.com/Harvi654/winum/releases/download/winum-11.22-2/$artifact"
-          printf '%s  %s\n' 0523b2615596cbb66e7e9ed95a5024008a25f5141ba2e4483e862a47db0c9980 "$artifact" | sha256sum -c -
-          tar -xJf "$artifact"
+          gh api repos/Harvi654/winum/actions/artifacts/14887517598/zip > token-runtime.zip
+          printf '%s  %s\n' cb69d4633c2416982b97ba6b3d555737762eee13234b9de144fd50cc2c63452f token-runtime.zip | sha256sum -c -
+          unzip -p token-runtime.zip winum-11.22-2-x86_64.tar.xz | tar -xJ
           out="$GITHUB_WORKSPACE/overlay"
           mkdir -p "$out"
           for arch in x86_64 i386; do
@@ -73,7 +75,7 @@ jobs:
           cp /tmp/wine-11.22/{COPYING.LIB,PATCHES.txt} "$out/"
           cp "$GITHUB_WORKSPACE/patches/candidates/combase-per-user-classes/combase-per-user-classes.patch" "$out/"
           cd "$out"
-          printf 'combase overlay for Winum 11.22-2\nCommit %s\n' "$GITHUB_SHA" > BUILDINFO
+          printf 'combase overlay for the token integrity runtime (artifact 14887517598)\nCommit %s\n' "$GITHUB_SHA" > BUILDINFO
           sha256sum BUILDINFO COPYING.LIB PATCHES.txt ./*.patch ./*-windows/combase.dll > SHA256SUMS
           sha256sum -c SHA256SUMS
       - name: Run the candidate Wine test and the measurement

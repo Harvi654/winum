@@ -3,16 +3,16 @@
 Non-elevated Windows 10 uses the per-user in-process registration ahead
 of the machine registration for the same CLSID. The candidate applies
 that lookup to InprocServer32, ProgID and TreatAs reads in combase.
-Direct registry calls retain the existing Wine HKCR implementation.
+Direct registry calls are outside this candidate.
 
 | Level | Status |
 | --- | --- |
-| L0 | Both DLL architectures compiled after zero-fuzz apply in [round 1](https://github.com/Harvi654/winum/actions/runs/45278159284). |
-| L1 | 54 successful native checks on x86_64 and 59 on i686. [Results](../../../docs/wine-repro/combase-per-user-classes/results/l1-windows-10/) |
-| L2 | Paired combase and ole32 suites passed. [CI](https://github.com/Harvi654/winum/actions/runs/45278894160) |
-| L3 | All native COM results reproduced with the WOW64 test subtree. Focused Wine unit passed 51 x86_64 and 56 i686 checks. [Results](../../../docs/wine-repro/combase-per-user-classes/results/candidate/) |
+| L0 | v2 build pending. Both v1 DLL architectures compiled after zero-fuzz apply in [round 1](https://github.com/Harvi654/winum/actions/runs/45278159284). |
+| L1 | v2 High unit pending. v1 had 54 successful native checks on x86_64 and 59 on i686. [Results](../../../docs/wine-repro/combase-per-user-classes/results/l1-windows-10/) |
+| L2 | v2 paired against the same token candidate on both sides. v1 paired combase and ole32 suites passed. [CI](https://github.com/Harvi654/winum/actions/runs/45278894160) |
+| L3 | v2 rerun pending. v1 reproduced all native non-elevated COM results with the WOW64 test subtree. Focused Wine unit passed 51 x86_64 and 56 i686 checks. [Results](../../../docs/wine-repro/combase-per-user-classes/results/candidate/) |
 | L4 | Combined Nastran 2027 mesh, solve and results passed on 2026-11-24 with the token candidate and four overlays. Full Inventor smoke remains open. [Combined result](https://github.com/Harvi654/winum/blob/236463a/patches/candidates/server-limited-token-medium-integrity/README.md#validation) |
-| Cross review | Claude reviewed the candidate. The elevated native COM comparison is recorded below. |
+| Cross review | Claude reviewed v1. v2 review is pending. |
 
 [Native and Winum measurement](../../../docs/wine-repro/combase-per-user-classes/README.md).
 
@@ -132,6 +132,24 @@ fixture marker (164 or 132). At High both entry points returned
 REGDB_E_CLASSNOTREG (0x80040154), despite successful HKCU registration.
 Cleanup was successful in all four runs.
 
-The native in-process COM result confirms the elevation distinction
-independently of the .NET shim. The candidate is unchanged. Its
-non-elevated validation does not establish parity for High integrity.
+### v2 (2026-11-24)
+
+The COM lookup skips HKCU for an effective caller token at High integrity
+or above. Use the thread token when present and the process token otherwise.
+If integrity cannot be determined, use the machine lookup. The same guard
+covers the per-user ProgID and TreatAs lookup paths. The native High test
+asserts the two measured activation results.
+
+Apply the Wine series, then both patches in the
+[server-limited-token-medium-integrity series](https://github.com/Harvi654/winum/tree/236463a8828adf1c4e6c9373424913dbff056dfb/patches/candidates/server-limited-token-medium-integrity)
+in their listed order, then the combase candidate. The matching wineserver
+and ntdll are required. Winum 11.22-2 without those patches reports High
+for ordinary Wine processes. Both sides of paired L2 include the token
+series. The v2 overlay requires the token runtime, so the historical v1
+overlay trial above is retained for reference.
+
+Run the expanded L1 bundle from the normal console with run-tests.bat.
+Then, from an elevated Command Prompt for the same account and offline
+Windows 10 snapshot, run run-high-tests.bat. It checks for RID 0x3000
+and writes separate result-combase-per-user-classes-high-*.txt files and
+exitcodes-high.txt.

@@ -9,15 +9,48 @@ the per-user ProgID and TreatAs keys. Search the current user's classes
 before the existing machine lookup for those reads. Keep explicit registry
 view selection and preserve other HKCR callers.
 
+v2 (2026-11-24): The native Windows 10 fixture found that High integrity
+callers cannot activate a class registered only in HKCU. Use the thread
+token when impersonating and otherwise the process token. At High or
+above, or if integrity cannot be determined, use the existing machine
+lookup. This revision requires the server and ntdll token integrity
+patches so a limited Wine process reports its actual integrity level.
+
 --- a/dlls/combase/combase.c
 +++ b/dlls/combase/combase.c
-@@ -304,5 +304,37 @@
+@@ -304,5 +304,64 @@
  }
  
 -HRESULT open_key_for_clsid(REFCLSID clsid, const WCHAR *keyname, REGSAM access, HKEY *subkey)
 +static BOOL classes_key_missing(LSTATUS ret)
 +{
 +    return ret == ERROR_FILE_NOT_FOUND || ret == ERROR_PATH_NOT_FOUND;
++}
++
++static BOOL use_per_user_classes(void)
++{
++    union
++    {
++        TOKEN_MANDATORY_LABEL label;
++        BYTE buffer[sizeof(TOKEN_MANDATORY_LABEL) + SECURITY_MAX_SID_SIZE];
++    } info;
++    HANDLE token;
++    NTSTATUS status;
++    ULONG size;
++    PSID sid;
++    UCHAR count;
++
++    status = NtOpenThreadToken(GetCurrentThread(), TOKEN_QUERY, TRUE, &token);
++    if (status == STATUS_NO_TOKEN) status = NtOpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token);
++    if (status) return FALSE;
++
++    status = NtQueryInformationToken(token, TokenIntegrityLevel, &info, sizeof(info), &size);
++    NtClose(token);
++    if (status) return FALSE;
++
++    sid = info.label.Label.Sid;
++    if (!RtlValidSid(sid) || !(count = *RtlSubAuthorityCountSid(sid))) return FALSE;
++    return *RtlSubAuthoritySid(sid, count - 1) < SECURITY_MANDATORY_HIGH_RID;
 +}
 +
 +static LSTATUS open_user_classes_key(const WCHAR *name, const WCHAR *leaf, REGSAM access, HKEY *key)
@@ -28,6 +61,7 @@ view selection and preserve other HKCR callers.
 +    HKEY user;
 +    LSTATUS ret;
 +
++    if (!use_per_user_classes()) return ERROR_FILE_NOT_FOUND;
 +    if (leaf) count += 1 + lstrlenW(leaf);
 +    if (!(path = malloc(count * sizeof(*path)))) return ERROR_NOT_ENOUGH_MEMORY;
 +    lstrcpyW(path, prefix);
@@ -50,7 +84,7 @@ view selection and preserve other HKCR callers.
 +                              BOOL user_first)
  {
      static const WCHAR clsidW[] = L"CLSID\\";
-@@ -313,4 +345,11 @@
+@@ -313,4 +372,11 @@
      lstrcpyW(path, clsidW);
      StringFromGUID2(clsid, path + lstrlenW(clsidW), CHARS_IN_GUID);
 +    if (user_first)
@@ -62,7 +96,7 @@ view selection and preserve other HKCR callers.
 +    }
      res = open_classes_key(HKEY_CLASSES_ROOT, path, access, &key);
      if (res == ERROR_FILE_NOT_FOUND)
-@@ -335,4 +374,9 @@
+@@ -335,4 +401,9 @@
  }
  
 +HRESULT open_key_for_clsid(REFCLSID clsid, const WCHAR *keyname, REGSAM access, HKEY *subkey)
@@ -72,14 +106,14 @@ view selection and preserve other HKCR callers.
 +
  /* open HKCR\\AppId\\{string form of appid clsid} key */
  HRESULT open_appidkey_from_clsid(REFCLSID clsid, REGSAM access, HKEY *subkey)
-@@ -1188,5 +1232,5 @@
+@@ -1188,5 +1259,5 @@
      *clsidNew = *clsidOld;
  
 -    hr = open_key_for_clsid(clsidOld, L"TreatAs", KEY_READ, &hkey);
 +    hr = open_class_key(clsidOld, L"TreatAs", KEY_READ, &hkey, TRUE);
      if (FAILED(hr))
      {
-@@ -1304,8 +1348,8 @@
+@@ -1304,8 +1375,8 @@
      }
  
 -    hr = open_key_for_clsid(clsid, L"ProgID", KEY_READ, &hkey);
@@ -90,13 +124,13 @@ view selection and preserve other HKCR callers.
 +        hr = open_class_key(clsid, L"ProgID", opposite | KEY_READ, &hkey, TRUE);
          if (FAILED(hr))
              return hr;
-@@ -1416,4 +1460,5 @@
+@@ -1416,4 +1487,5 @@
      LONG buf2len = sizeof(buf2);
      HKEY xhkey;
 +    LSTATUS ret;
      WCHAR *buf;
  
-@@ -1424,5 +1469,8 @@
+@@ -1424,5 +1496,8 @@
      lstrcpyW(buf, progid);
      lstrcatW(buf, L"\\CLSID");
 -    if (open_classes_key(HKEY_CLASSES_ROOT, buf, MAXIMUM_ALLOWED, &xhkey))
@@ -106,7 +140,7 @@ view selection and preserve other HKCR callers.
 +    if (ret)
      {
          free(buf);
-@@ -1800,5 +1848,5 @@
+@@ -1800,5 +1875,5 @@
          HKEY hkey;
  
 -        hr = open_key_for_clsid(rclsid, L"InprocServer32", KEY_READ, &hkey);

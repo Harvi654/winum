@@ -43,6 +43,14 @@ jobs:
       - name: Build and test the release series with the measured unit
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          token_revision=236463a8828adf1c4e6c9373424913dbff056dfb
+          token_dir=patches/candidates/server-limited-token-medium-integrity
+          git fetch --no-tags --depth=1 origin "$token_revision"
+          git show "$token_revision:$token_dir/series" > /tmp/combase-token-series
+          while IFS= read -r dependency; do
+            git show "$token_revision:$token_dir/$dependency" > "patches/$dependency"
+            printf '%s\n' "$dependency" >> patches/series
+          done < /tmp/combase-token-series
           unit=combase-tests-per-user-classes.patch
           printf '%s\n' "$unit" >> patches/tests-first/series
           if [[ "$VARIANT" == candidate ]]; then
