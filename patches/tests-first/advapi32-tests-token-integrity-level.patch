@@ -4,13 +4,12 @@ Subject: [TEST] advapi32: Test the integrity level of derived tokens.
 AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted upstream.
 
 Windows 10 reports Medium integrity for a limited token and High for a
-full one (whoami /groups and the VBScript repro in a normal and an
-elevated console, 2026-11-24). Check the process token, its pseudo
-handles, primary, impersonation, identification and restricted
-duplicates, an ImpersonateSelf thread token and both linked tokens,
-each against its own elevation type. The derived-token values are
-checked against the MEASURE program's Windows results before this test
-counts as L1 (docs/wine-repro/server-token-integrity).
+full one, and every token made from one keeps its level: pseudo handles,
+primary, impersonation, identification and restricted duplicates, an
+ImpersonateSelf thread token; the linked token has the other level
+(MEASURE, normal and elevated console, x86_64 and i686, 2026-11-24,
+docs/wine-repro/server-token-integrity). Check each against its own
+elevation type. Passed on Windows 10 in both consoles (L1, 2026-11-24).
 
 The block between the BEGIN/END markers builds on its own for the L1
 bundle (scripts/build-l1-token-integrity.sh).

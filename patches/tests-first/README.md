@@ -15,4 +15,4 @@ and its line leaves `series` here; the file moves to `docs/archive/`.
 | Patch | For | Windows values |
 | --- | --- | --- |
 | `urlmon-tests-res-zones.patch` | `urlmon-res-zone-local-machine`, `urlmon-maptozone-null-terminate` | `docs/wine-repro/urlmon-zones/windows-2026-11-09` |
-| `advapi32-tests-token-integrity-level.patch` | `server-limited-token-medium-integrity` (candidate) | console levels 2026-11-24; derived tokens: `docs/wine-repro/server-token-integrity` (pending) |
+| `advapi32-tests-token-integrity-level.patch` | `server-limited-token-medium-integrity` (candidate) | `docs/wine-repro/server-token-integrity/windows-2026-11-24` (L1 passed) |

@@ -88,9 +88,37 @@ attributes 0x60; `TokenGroups` has no label entry;
 2026-11-24): the limited token and every token made from it S-1-16-8192,
 the linked full token S-1-16-12288; nothing else changes.
 
-## Windows 10 results
+## Windows 10 results (2026-11-24)
 
-Pending. What the maintainer already saw on Windows 10 with
-`whoami /groups` and the VBScript repro (`../server-token-integrity-vbs/`):
-normal console Medium (S-1-16-8192), elevated console High
-(S-1-16-12288).
+Maintainer's offline Windows 10 22H2 (10.0.19045), x86_64 and i686
+(WoW64), from a normal and an elevated console, all exit codes 0. Files
+in `windows-2026-11-24/` (also the L1 results).
+
+| Token | normal console | elevated console | candidate v1 |
+| --- | --- | --- | --- |
+| process (elevation type) | Limited, S-1-16-8192 | Full, S-1-16-12288 | Limited, 8192 |
+| pseudo handles, primary/impersonation/identification duplicates, restricted, ImpersonateSelf, child | same as process | same as process | same as process |
+| linked token | Full, S-1-16-12288 | Limited, S-1-16-8192 | Full, 12288 |
+| linked token's linked token | Limited, 8192 | Full, 12288 | Limited, 8192 |
+
+- `TokenIntegrityLevel`: attributes 0x60, required size 28 (x86_64) /
+  20 (i686), error 122 without a buffer - the same as Wine.
+- `OpenThreadToken` without impersonation: error 1008, as in Wine.
+- `TokenGroups` holds the label SID with attributes 0x60 (index 14 of
+  the groups); Wine has no label group. Not changed by the candidate.
+- Token object label (`LABEL_SECURITY_INFORMATION`): one
+  `SYSTEM_MANDATORY_LABEL` ACE, mask 0x1 (no-write-up), with the level of
+  the **creating process**, not of the token: in the normal console the
+  linked full token's object label is S-1-16-8192 while it reports
+  12288; in the elevated console the linked limited token's label is
+  12288. Wine: 12288 on every token. Not changed by the candidate
+  (follow-up; Wine's `test_token_label` already expects linked = process).
+- Process object label: S-1-16-8192 / 12288 with mask 0x3
+  (no-write-up, no-read-up). Wine: no label.
+- `TokenMandatoryPolicy`: 3. Wine: fails with error 1.
+- `SetTokenInformation(TokenIntegrityLevel)` on a primary duplicate:
+  lowering (to 0, 4096, own level) succeeds and the read-back follows,
+  also in `TokenGroups`; raising above the own level fails with 1314
+  (`ERROR_PRIVILEGE_NOT_HELD`), from the elevated console only System
+  does; the object label does not change. Wine: always succeeds, no
+  effect. Not changed by the candidate.

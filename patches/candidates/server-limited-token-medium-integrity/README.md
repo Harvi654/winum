@@ -101,7 +101,7 @@ build (they always do in a winum runtime).
 | Level | Status |
 | --- | --- |
 | L0 | 2026-11-24: "Build Wine" on `test-run/token-integrity-level-1` (Wine 11.22 + `patches/series` + this series, both architectures, `--fuzz=0`) passed, [run 45317855190](https://github.com/Harvi654/winum/actions/runs/45317855190). Also a local reduced build (no X11). |
-| L1 | MEASURE and the test bundle ready ([MEASURE run 45306732399](https://github.com/Harvi654/winum/actions/runs/45306732399), [L1 bundle run 45307586912](https://github.com/Harvi654/winum/actions/runs/45307586912)); offline Windows 10 run pending (normal and elevated console). |
+| L1 | 2026-11-24: passed on the maintainer's offline Windows 10 (10.0.19045), x86_64 and i686, from a normal and an elevated console: 66 checks, 0 failures, todos or skips each; MEASURE values for every token the test checks agree (`docs/wine-repro/server-token-integrity/windows-2026-11-24/`). |
 | L2 | Local paired run 2026-11-24 (series vs series + candidate, both with the tests-first test): advapi32, ntdll, kernelbase, kernel32, combase, ole32 - no new failures; the 10 integrity checks per architecture fixed. CI run [45307710447](https://github.com/Harvi654/winum/actions/runs/45307710447) (compares *vanilla* Wine with series + candidate, so it also shows the whole series): the same 10 fixed per architecture, one unit `ntdll.i386.virtual` timed out (exit 124) on the series side; locally it passes in 4-5 s, 0 failures, three runs with the candidate - to re-run in CI before it is recorded as clean. |
 | L3 | `docs/wine-repro/server-token-integrity-vbs/` - pending on the maintainer's prefix (needs native .NET 4.8). |
 | L4 | Pending: Nastran Generate Mesh / Run; Inventor start, part, assembly, drawing, save/reopen, restart; ODIS installer; AutoCAD (server and ntdll are shared). |
@@ -112,16 +112,18 @@ Medium expectation; the High linked token passes): see the Result log.
 
 ## Open points
 
-- The MEASURE results decide the test's expectations for the derived
-  tokens (linked, restricted, impersonation); until they are back, the
-  test's values for those are the hypothesis that each token follows its
-  own elevation type.
-- Token object label: if Windows shows Medium on a limited token's
-  object, that is a follow-up (and Wine's `test_token_label` already
-  expects the linked token's object label to equal the process token's).
-- `SetTokenInformation(TokenIntegrityLevel)`: lowering a token (used by
-  sandboxed child processes) is measured but not implemented.
-- `TokenGroups` label entry: measured, not implemented.
+Measured on Windows 10 and left for follow-ups (none is needed by
+Nastran; each changes what other programs see, so each would be its own
+patch with its own test):
+- Token object label: Windows labels a token object with the level of
+  the process that created it (a normal process's linked full token has
+  an S-1-16-8192 label); Wine labels every token 12288.
+- Process object label (mask 0x3): Windows has one, Wine none.
+- `TokenGroups`: Windows lists the label SID (attributes 0x60); Wine
+  does not.
+- `SetTokenInformation(TokenIntegrityLevel)`: Windows lowers, refuses
+  raising with 1314; Wine claims success and changes nothing.
+- `TokenMandatoryPolicy`: Windows 3; Wine fails with error 1.
 - explorer.exe gets a default admin token from Wine (`ProcessWineGrantAdminToken`), so it and what it starts stay High; on Windows explorer runs at Medium. Programs started from Linux are not affected.
 
 ## Notes for a Wine bug report
@@ -141,6 +143,10 @@ Wine: fails. Related: bug 17019 (HKCR merging).
   S-1-16-12288, attributes 0x60, no label in `TokenGroups`,
   `SetTokenInformation` accepted without effect. Standalone L1 test on
   winum-11.22-2: 66 checks, 10 failures per architecture (expected).
+- 2026-11-24: L1 passed in the offline VM (normal and elevated console,
+  both architectures); MEASURE confirms the test's values for every
+  token. The first synthetic VBScript failed on Windows in both consoles
+  and was replaced by a compiled per-user class (L3 pending).
 - 2026-11-24: local L2 paired and CI L0/L2 (Validation table). MEASURE on
   the candidate build (`wine-candidate-v1-*.txt`): limited process token,
   its pseudo handles, duplicates, restricted token, ImpersonateSelf token
