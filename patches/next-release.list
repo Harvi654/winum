@@ -1,0 +1,7 @@
+server-token-integrity-level.patch
+ntdll-token-integrity-level.patch
+combase-per-user-classes.patch
+kernelbase-hkcr-class-reads.patch
+wbemdisp-method-invoke.patch
+msado15-stream-charset.patch
+win32u-font-smoothing.patch

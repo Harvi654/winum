@@ -30,15 +30,15 @@ jobs:
         group: [g1, g2, g3, g4, g5]
         include:
           - group: g1
-            tests: user32
+            tests: advapi32 ntdll kernelbase kernel32
           - group: g2
-            tests: win32u gdi32 comctl32 opengl32 glu32
+            tests: combase ole32 oleaut32 urlmon shell32
           - group: g3
-            tests: ntdll kernel32 kernelbase advapi32 combase ole32 oleaut32 rpcrt4 urlmon packager
+            tests: wbemdisp wbemprox msado15 msi
           - group: g4
-            tests: msi
+            tests: win32u gdi32 comctl32
           - group: g5
-            tests: msxml3 mspatcha riched20 msftedit shell32 wbemprox wininet mshtml
+            tests: user32
     runs-on: ubuntu-24.04
     container: archlinux:base-devel
     timeout-minutes: 350
@@ -67,7 +67,7 @@ jobs:
           export WORK=/tmp/work
           export TESTS="${{ matrix.tests }}"
           export GROUP="${{ matrix.group }}"
-          export MAKE_L1="${{ matrix.group == 'g1' && '1' || '0' }}"
+          export MAKE_L1=0
           bash scripts/test-series.sh ${{ matrix.variant }} out
       - name: Build log on failure
         if: failure() && env.RUN_GROUP == 'true'
@@ -96,7 +96,7 @@ jobs:
         with:
           pattern: tests-series-*
           path: results/series
-      - name: Compare vanilla and series (all groups that ran on both sides)
+      - name: Compare the released series with series + candidates
         run: |
           set -o pipefail
           rc=0

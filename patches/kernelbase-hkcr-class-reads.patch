@@ -1,0 +1,544 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] kernelbase: Merge HKCR class values for read opens.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Non-elevated Windows 10 opened a per-user InprocServer32 directly and
+relative to HKCR\CLSID in both process bitnesses. A shared value came
+from HKCU, while an HKLM-only value on the same key was still readable.
+Winum 11.22-2 opened only the HKLM classes.
+
+Preserve HKCR provenance on read handles in the measured CLSID
+namespace. Keep a machine backing handle when available and query the
+matching physical user view for value precedence. Keep direct physical
+hive handles, ACL checks and explicit write opens on the existing paths.
+
+v2 2026-11-24: Fold the measured advapi32 test into the candidate. Remove
+the todo_wine_if annotations for the user-only direct and relative
+opens, RegGetValueW and the legacy query status, and for user-value
+precedence after a collision (RegQueryValueExW, RegGetValueW and the
+legacy default value). The existing HKCR CLSID tag assertion becomes
+an ordinary check. A clean Wine i686 fixture without the physical
+per-user WOW64 CLSID tree explicitly skips the user-only matrix.
+---
+--- a/dlls/kernelbase/registry.c
++++ b/dlls/kernelbase/registry.c
+@@ -23,6 +23,7 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+  */
+
++#include <limits.h>
+ #include <stdlib.h>
+ #include <stdarg.h>
+ #include <stdio.h>
+@@ -636,6 +637,219 @@
+ }
+
+
++/* The low bits do not participate in the NT handle index. */
++static BOOL is_hkcr_read_handle( HKEY key )
++{
++    ULONG_PTR value = (ULONG_PTR)key;
++    return value < 0x80000000 && (value & 3) == 2;
++}
++
++static BOOL is_missing_key( NTSTATUS status )
++{
++    return status == STATUS_OBJECT_NAME_NOT_FOUND || status == STATUS_OBJECT_PATH_NOT_FOUND;
++}
++
++static BOOL registry_prefix( const UNICODE_STRING *path, const WCHAR *prefix )
++{
++    unsigned int len = wcslen( prefix );
++    return path->Length >= len * sizeof(WCHAR) && !wcsnicmp( path->Buffer, prefix, len );
++}
++
++static void advance_registry_path( UNICODE_STRING *path, unsigned int len )
++{
++    path->Buffer += len;
++    path->Length -= len * sizeof(WCHAR);
++}
++
++static KEY_NAME_INFORMATION *query_registry_key_name( HKEY key, void *buffer, DWORD size )
++{
++    KEY_NAME_INFORMATION *info = buffer;
++    NTSTATUS status;
++
++    status = NtQueryKey( key, KeyNameInformation, info, size, &size );
++    if (status == STATUS_BUFFER_OVERFLOW || status == STATUS_BUFFER_TOO_SMALL)
++    {
++        if (!(info = HeapAlloc( GetProcessHeap(), 0, size ))) return NULL;
++        status = NtQueryKey( key, KeyNameInformation, info, size, &size );
++    }
++    if (!status) return info;
++    if (info != buffer) HeapFree( GetProcessHeap(), 0, info );
++    return NULL;
++}
++
++/* Recover the physical path, including its registry view, from a tagged handle. */
++static BOOL hkcr_class_relative_name( const KEY_NAME_INFORMATION *info,
++                                      UNICODE_STRING *path, BOOL *machine )
++{
++    static const WCHAR user_prefix[] = L"\\Registry\\User\\";
++    static const WCHAR user_classes[] = L"\\Software\\Classes\\";
++    unsigned int i;
++
++    if (!info || info->NameLength > USHRT_MAX) return FALSE;
++    path->Buffer = (WCHAR *)info->Name;
++    path->Length = path->MaximumLength = info->NameLength;
++
++    if ((*machine = registry_prefix( path, root_key_names[0] )))
++    {
++        unsigned int len = wcslen( root_key_names[0] );
++        if (path->Length <= len * sizeof(WCHAR) || path->Buffer[len] != '\\') return FALSE;
++        advance_registry_path( path, len + 1 );
++        return TRUE;
++    }
++    if (!registry_prefix( path, user_prefix )) return FALSE;
++    for (i = ARRAY_SIZE(user_prefix) - 1; i < path->Length / sizeof(WCHAR); ++i)
++        if (path->Buffer[i] == '\\') break;
++    advance_registry_path( path, i );
++    if (!registry_prefix( path, user_classes )) return FALSE;
++    advance_registry_path( path, ARRAY_SIZE(user_classes) - 1 );
++    return TRUE;
++}
++
++static BOOL is_hkcr_clsid_path( const UNICODE_STRING *path )
++{
++    return (path->Length == sizeof(L"CLSID") - sizeof(WCHAR) && registry_prefix( path, L"CLSID" )) ||
++           registry_prefix( path, L"CLSID\\" ) ||
++           (path->Length == sizeof(L"Wow6432Node\\CLSID") - sizeof(WCHAR) &&
++            registry_prefix( path, L"Wow6432Node\\CLSID" )) ||
++           registry_prefix( path, L"Wow6432Node\\CLSID\\" );
++}
++
++static NTSTATUS open_hkcr_physical_key( HKEY *key, HKEY root, UNICODE_STRING *path, ACCESS_MASK access )
++{
++    OBJECT_ATTRIBUTES attr;
++    InitializeObjectAttributes( &attr, path, OBJ_CASE_INSENSITIVE, root, NULL );
++    /* path already names the physical view. */
++    return NtOpenKeyEx( (HANDLE *)key, (access & ~KEY_WOW64_RES) | KEY_WOW64_64KEY, &attr, 0 );
++}
++
++static NTSTATUS open_hkcr_user_class( HKEY *key, UNICODE_STRING *path, ACCESS_MASK access )
++{
++    static const WCHAR classes[] = L"Software\\Classes\\";
++    unsigned int len = sizeof(classes) - sizeof(WCHAR) + path->Length;
++    UNICODE_STRING full;
++    HKEY user;
++    NTSTATUS status;
++
++    if (len > USHRT_MAX) return STATUS_NAME_TOO_LONG;
++    if (!(full.Buffer = HeapAlloc( GetProcessHeap(), 0, len ))) return STATUS_NO_MEMORY;
++    memcpy( full.Buffer, classes, sizeof(classes) - sizeof(WCHAR) );
++    memcpy( full.Buffer + ARRAY_SIZE(classes) - 1, path->Buffer, path->Length );
++    full.Length = full.MaximumLength = len;
++
++    if (!(status = RtlOpenCurrentUser( KEY_READ, (HANDLE *)&user )))
++    {
++        status = open_hkcr_physical_key( key, user, &full, access );
++        NtClose( user );
++    }
++    HeapFree( GetProcessHeap(), 0, full.Buffer );
++    return status;
++}
++
++static NTSTATUS open_registry_key( HKEY *key, HKEY root, UNICODE_STRING *name,
++                                   DWORD options, ACCESS_MASK access )
++{
++    static const WCHAR wow_prefix[] = L"Wow6432Node\\";
++    char buffer[256];
++    KEY_NAME_INFORMATION *info = NULL;
++    UNICODE_STRING prefix = {0}, path;
++    BOOL machine, separator = FALSE, close_classes = FALSE;
++    DWORD len;
++    HKEY classes = NULL, actual;
++    ACCESS_MASK mode = access & ~KEY_WOW64_RES;
++    NTSTATUS status;
++
++    if (!(actual = get_special_root_hkey( root ))) return STATUS_INVALID_HANDLE;
++    if (!key || options || !name->Length || (access & KEY_WOW64_RES) == KEY_WOW64_RES ||
++        (mode != MAXIMUM_ALLOWED && (!(mode & KEY_QUERY_VALUE) || (mode & ~KEY_READ)))) goto ordinary;
++
++    if (HandleToUlong(root) == HandleToUlong(HKEY_CLASSES_ROOT))
++    {
++        if (!is_hkcr_clsid_path( name )) goto ordinary;
++        /* A remapped predefined handle must retain its existing behavior. */
++        if (!(info = query_registry_key_name( actual, buffer, sizeof(buffer) ))) goto ordinary;
++        if (info->NameLength != wcslen( root_key_names[0] ) * sizeof(WCHAR) ||
++            wcsnicmp( info->Name, root_key_names[0], info->NameLength / sizeof(WCHAR) )) goto ordinary;
++        if (!registry_prefix( name, wow_prefix ) &&
++            ((is_win64 && (access & KEY_WOW64_32KEY)) || (is_wow64 && !(access & KEY_WOW64_64KEY))))
++            RtlInitUnicodeString( &prefix, wow_prefix );
++        classes = actual;
++    }
++    else if (is_hkcr_read_handle( root ))
++    {
++        if (name->Buffer[0] == '\\') goto ordinary;
++        info = query_registry_key_name( actual, buffer, sizeof(buffer) );
++        if (!hkcr_class_relative_name( info, &prefix, &machine ) || !is_hkcr_clsid_path( &prefix ))
++            goto ordinary;
++        separator = TRUE;
++        if (!(classes = open_classes_root())) goto ordinary;
++        close_classes = TRUE;
++    }
++    else goto ordinary;
++
++    len = prefix.Length + separator * sizeof(WCHAR) + name->Length;
++    if (len > USHRT_MAX || !(path.Buffer = HeapAlloc( GetProcessHeap(), 0, len ))) goto ordinary;
++    path.Length = path.MaximumLength = len;
++    if (prefix.Length) memcpy( path.Buffer, prefix.Buffer, prefix.Length );
++    if (separator) path.Buffer[prefix.Length / sizeof(WCHAR)] = '\\';
++    memcpy( path.Buffer + prefix.Length / sizeof(WCHAR) + separator, name->Buffer, name->Length );
++
++    *key = NULL;
++    status = open_hkcr_physical_key( key, classes, &path, access );
++    if (is_missing_key( status ))
++    {
++        /* RegOpenKey (used by RegQueryValue) requests MAXIMUM_ALLOWED.
++         * User-only fallback grants read access, even on that path. */
++        status = open_hkcr_user_class( key, &path, mode == MAXIMUM_ALLOWED ? KEY_READ : access );
++    }
++    if (!status) *key = (HKEY)((ULONG_PTR)*key | 2);
++    HeapFree( GetProcessHeap(), 0, path.Buffer );
++    if (close_classes) NtClose( classes );
++    if (info && info != (void *)buffer) HeapFree( GetProcessHeap(), 0, info );
++    return status;
++
++ordinary:
++    if (close_classes) NtClose( classes );
++    if (info && info != (void *)buffer) HeapFree( GetProcessHeap(), 0, info );
++    return open_key( key, actual, name, options, access, FALSE );
++}
++
++/* Use the physical key first to check the rights on the caller's handle.
++ * A successful user query (including its buffer-size reply) takes precedence. */
++static NTSTATUS query_registry_value( HKEY key, const UNICODE_STRING *name,
++                                     void *data, DWORD size, DWORD *result_size )
++{
++    char buffer[256];
++    KEY_NAME_INFORMATION *info;
++    UNICODE_STRING path;
++    NTSTATUS status, user_status;
++    DWORD user_size;
++    BOOL machine;
++    HKEY user;
++
++    status = NtQueryValueKey( key, name, KeyValuePartialInformation, data, size, result_size );
++    if (!is_hkcr_read_handle( key ) ||
++        (status && status != STATUS_BUFFER_OVERFLOW && status != STATUS_BUFFER_TOO_SMALL &&
++         status != STATUS_OBJECT_NAME_NOT_FOUND)) return status;
++
++    info = query_registry_key_name( key, buffer, sizeof(buffer) );
++    if (hkcr_class_relative_name( info, &path, &machine ) && machine && is_hkcr_clsid_path( &path ) &&
++        !open_hkcr_user_class( &user, &path, KEY_QUERY_VALUE ))
++    {
++        user_status = NtQueryValueKey( user, name, KeyValuePartialInformation, data, size, &user_size );
++        NtClose( user );
++        if (user_status == STATUS_OBJECT_NAME_NOT_FOUND)
++            status = NtQueryValueKey( key, name, KeyValuePartialInformation, data, size, result_size );
++        else
++        {
++            if (!user_status || user_status == STATUS_BUFFER_OVERFLOW || user_status == STATUS_BUFFER_TOO_SMALL)
++                *result_size = user_size;
++            status = user_status;
++        }
++    }
++    if (info && info != (void *)buffer) HeapFree( GetProcessHeap(), 0, info );
++    return status;
++}
++
+ /******************************************************************************
+  * RegOpenKeyExW   (kernelbase.@)
+  *
+@@ -658,10 +872,9 @@
+
+     if (!retkey) return ERROR_INVALID_PARAMETER;
+     *retkey = NULL;
+-    if (!(hkey = get_special_root_hkey( hkey ))) return ERROR_INVALID_HANDLE;
+
+     RtlInitUnicodeString( &nameW, name );
+-    return RtlNtStatusToDosError( open_key( retkey, hkey, &nameW, options, access, FALSE ) );
++    return RtlNtStatusToDosError( open_registry_key( retkey, hkey, &nameW, options, access ) );
+ }
+
+
+@@ -705,14 +918,13 @@
+         if (HandleToUlong(hkey) == HandleToUlong(HKEY_CLASSES_ROOT) && name && *name == '\\') name++;
+     }
+
+-    if (!(hkey = get_special_root_hkey( hkey ))) return ERROR_INVALID_HANDLE;
+
+     RtlInitAnsiString( &nameA, name );
+     if (!(status = RtlAnsiStringToUnicodeString( &NtCurrentTeb()->StaticUnicodeString,
+                                                  &nameA, FALSE )))
+     {
+         UNICODE_STRING nameW = NtCurrentTeb()->StaticUnicodeString;
+-        status = open_key( retkey, hkey, &nameW, options, access, FALSE );
++        status = open_registry_key( retkey, hkey, &nameW, options, access );
+     }
+     return RtlNtStatusToDosError( status );
+ }
+@@ -1663,8 +1875,7 @@
+         if (count) *count = 0;
+     }
+
+-    status = NtQueryValueKey( hkey, &name_str, KeyValuePartialInformation,
+-                              buffer, total_size, &total_size );
++    status = query_registry_value( hkey, &name_str, buffer, total_size, &total_size );
+     if (status && status != STATUS_BUFFER_OVERFLOW) goto done;
+
+     if (data)
+@@ -1676,8 +1887,7 @@
+             if (!(buf_ptr = HeapAlloc( GetProcessHeap(), 0, total_size )))
+                 return ERROR_NOT_ENOUGH_MEMORY;
+             info = (KEY_VALUE_PARTIAL_INFORMATION *)buf_ptr;
+-            status = NtQueryValueKey( hkey, &name_str, KeyValuePartialInformation,
+-                                      buf_ptr, total_size, &total_size );
++            status = query_registry_value( hkey, &name_str, buf_ptr, total_size, &total_size );
+         }
+
+         if (!status)
+@@ -1762,8 +1972,7 @@
+         return ret;
+     }
+
+-    status = NtQueryValueKey( hkey, &nameW, KeyValuePartialInformation,
+-                              buffer, sizeof(buffer), &total_size );
++    status = query_registry_value( hkey, &nameW, buffer, sizeof(buffer), &total_size );
+     if (status && status != STATUS_BUFFER_OVERFLOW) goto done;
+
+     /* we need to fetch the contents for a string type even if not requested,
+@@ -1780,8 +1989,7 @@
+                 goto done;
+             }
+             info = (KEY_VALUE_PARTIAL_INFORMATION *)buf_ptr;
+-            status = NtQueryValueKey( hkey, &nameW, KeyValuePartialInformation,
+-                                      buf_ptr, total_size, &total_size );
++            status = query_registry_value( hkey, &nameW, buf_ptr, total_size, &total_size );
+         }
+
+         if (status) goto done;
+--- a/dlls/advapi32/tests/registry.c
++++ b/dlls/advapi32/tests/registry.c
+@@ -3856,6 +3856,202 @@
+     RegCloseKey( hkcr );
+ }
+
++/* BEGIN HKCR read tests */
++static void check_hkcr_class_value(HKEY key, BOOL collision)
++{
++    static const WCHAR expected[] = L"USER";
++    static const WCHAR machine[] = L"MACHINE";
++    WCHAR data[16];
++    DWORD type = 0, size = sizeof(data);
++    LSTATUS ret;
++
++    ret = RegQueryValueExW(key, L"Shared", NULL, &type, (BYTE *)data, &size);
++    ok(!ret && type == REG_SZ && size == sizeof(expected) && !memcmp(data, expected, sizeof(expected)),
++       "RegQueryValueExW returned %ld, type %lu, size %lu\n", ret, type, size);
++    size = sizeof(data);
++    ret = RegQueryValueExW(key, L"MachineOnly", NULL, &type, (BYTE *)data, &size);
++    if (collision)
++        ok(!ret && type == REG_SZ && size == sizeof(machine) && !memcmp(data, machine, sizeof(machine)),
++           "RegQueryValueExW(MachineOnly) returned %ld, type %lu, size %lu\n", ret, type, size);
++    else
++        ok(ret == ERROR_FILE_NOT_FOUND, "RegQueryValueExW(MachineOnly) returned %ld\n", ret);
++}
++
++static void check_hkcr_class_view(const char *path, REGSAM view, DWORD get_view, BOOL visible, BOOL collision)
++{
++    static const WCHAR expected[] = L"USER", machine[] = L"MACHINE";
++    LSTATUS want = visible ? ERROR_SUCCESS : ERROR_FILE_NOT_FOUND;
++    WCHAR pathW[100], data[16];
++    DWORD type = 0, size = sizeof(data);
++    LONG legacy_size = sizeof(data);
++    HKEY key, parent;
++    LSTATUS ret;
++
++    winetest_push_context("view %#lx", view);
++    MultiByteToWideChar(CP_ACP, 0, path, -1, pathW, ARRAY_SIZE(pathW));
++    ret = RegOpenKeyExW(HKEY_CLASSES_ROOT, pathW, 0, KEY_QUERY_VALUE | view, &key);
++    ok(ret == want, "direct RegOpenKeyExW returned %ld, expected %ld\n", ret, want);
++    if (!ret)
++    {
++        check_hkcr_class_value(key, collision);
++        RegCloseKey(key);
++    }
++    ret = RegOpenKeyExA(HKEY_CLASSES_ROOT, path, 0, KEY_QUERY_VALUE | view, &key);
++    ok(ret == want, "direct RegOpenKeyExA returned %ld, expected %ld\n", ret, want);
++    if (!ret)
++    {
++        check_hkcr_class_value(key, collision);
++        RegCloseKey(key);
++    }
++
++    ret = RegOpenKeyExW(HKEY_CLASSES_ROOT, L"CLSID", 0, KEY_READ | view, &parent);
++    ok(!ret, "opening HKCR\\CLSID returned %ld\n", ret);
++    if (!ret)
++    {
++        ret = RegOpenKeyExW(parent, pathW + ARRAY_SIZE(L"CLSID"), 0, KEY_QUERY_VALUE | view, &key);
++        ok(ret == want, "relative RegOpenKeyExW returned %ld, expected %ld\n", ret, want);
++        if (!ret)
++        {
++            check_hkcr_class_value(key, collision);
++            RegCloseKey(key);
++        }
++        RegCloseKey(parent);
++    }
++
++    ret = RegGetValueW(HKEY_CLASSES_ROOT, pathW, L"Shared", RRF_RT_REG_SZ | get_view, &type, data, &size);
++    ok(ret == want, "RegGetValueW returned %ld, expected %ld\n", ret, want);
++    if (!ret)
++        ok(type == REG_SZ && size == sizeof(expected) && !memcmp(data, expected, sizeof(expected)),
++           "RegGetValueW returned type %lu, size %lu\n", type, size);
++
++    if (collision)
++    {
++        size = sizeof(data);
++        ret = RegGetValueW(HKEY_CLASSES_ROOT, pathW, L"MachineOnly", RRF_RT_REG_SZ | get_view,
++                           &type, data, &size);
++        ok(!ret && type == REG_SZ && size == sizeof(machine) && !memcmp(data, machine, sizeof(machine)),
++           "RegGetValueW(MachineOnly) returned %ld, type %lu, size %lu\n", ret, type, size);
++    }
++
++    if (!view)
++    {
++        ret = RegQueryValueW(HKEY_CLASSES_ROOT, pathW, data, &legacy_size);
++        ok(!ret, "RegQueryValueW returned %ld\n", ret);
++        if (!ret)
++            ok(legacy_size == sizeof(expected) && !memcmp(data, expected, sizeof(expected)),
++               "RegQueryValueW returned size %ld\n", legacy_size);
++    }
++    winetest_pop_context();
++}
++
++static void test_hkcr_class_reads(void)
++{
++    static const char marker[] = "USER";
++    char id[39], key_path[100], relative[100];
++    DWORD pid = GetCurrentProcessId(), tid = GetCurrentThreadId(), disposition;
++    FILETIME time;
++    SYSTEM_INFO info;
++    HKEY fixture, leaf;
++    LSTATUS ret;
++
++    if (sizeof(void *) == 4 && !strcmp(winetest_platform, "wine"))
++    {
++        HKEY redirected;
++        ret = RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Classes\\Wow6432Node\\CLSID",
++                            0, KEY_READ | KEY_WOW64_64KEY, &redirected);
++        if (ret == ERROR_FILE_NOT_FOUND || ret == ERROR_PATH_NOT_FOUND)
++        {
++            skip("fresh Wine prefix has no per-user WOW64 CLSID subtree\n");
++            return;
++        }
++        ok(!ret, "opening the physical WOW64 CLSID subtree returned %ld\n", ret);
++        if (ret) return;
++        RegCloseKey(redirected);
++    }
++
++    GetSystemTimeAsFileTime(&time);
++    sprintf(id, "{%08lx-%04lx-%04lx-%04lx-%04lx%08lx}", time.dwLowDateTime, time.dwHighDateTime & 0xffff,
++            pid & 0xffff, tid & 0xffff, pid >> 16, time.dwHighDateTime);
++    sprintf(key_path, "Software\\Classes\\CLSID\\%s", id);
++    sprintf(relative, "CLSID\\%s\\InprocServer32", id);
++    ret = RegCreateKeyExA(HKEY_CURRENT_USER, key_path, 0, NULL, REG_OPTION_VOLATILE,
++                          KEY_ALL_ACCESS, NULL, &fixture, &disposition);
++    ok(!ret, "creating user CLSID returned %ld\n", ret);
++    if (ret) return;
++    ok(disposition == REG_CREATED_NEW_KEY, "existing fixture key, disposition %lu\n", disposition);
++    if (disposition != REG_CREATED_NEW_KEY)
++    {
++        RegCloseKey(fixture);
++        return;
++    }
++
++    ret = RegCreateKeyExA(fixture, "InprocServer32", 0, NULL, REG_OPTION_VOLATILE,
++                          KEY_SET_VALUE, NULL, &leaf, NULL);
++    ok(!ret, "creating InprocServer32 returned %ld\n", ret);
++    if (!ret)
++    {
++        ret = RegSetValueExA(leaf, NULL, 0, REG_SZ, (const BYTE *)marker, sizeof(marker));
++        ok(!ret, "setting the default value returned %ld\n", ret);
++        ret = RegSetValueExA(leaf, "Shared", 0, REG_SZ, (const BYTE *)marker, sizeof(marker));
++        ok(!ret, "setting the named value returned %ld\n", ret);
++        RegCloseKey(leaf);
++
++        check_hkcr_class_view(relative, 0, 0, TRUE, FALSE);
++        GetNativeSystemInfo(&info);
++        if (info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ||
++            info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM64)
++        {
++            BOOL native = sizeof(void *) == 8;
++            check_hkcr_class_view(relative, KEY_WOW64_32KEY, RRF_SUBKEY_WOW6432KEY, !native, FALSE);
++            check_hkcr_class_view(relative, KEY_WOW64_64KEY, RRF_SUBKEY_WOW6464KEY, native, FALSE);
++        }
++
++        ret = RegDeleteKeyA(fixture, "InprocServer32");
++        ok(!ret, "deleting InprocServer32 returned %ld\n", ret);
++    }
++    RegCloseKey(fixture);
++    ret = RegDeleteKeyA(HKEY_CURRENT_USER, key_path);
++    ok(!ret, "deleting user CLSID returned %ld\n", ret);
++}
++static void test_hkcr_class_collision(void)
++{
++    static const char marker[] = "MACHINE";
++    char id[39], path[100], physical[120], data[16];
++    DWORD type, size = sizeof(data);
++    HKEY root, key;
++    LSTATUS ret;
++    DWORD len = GetEnvironmentVariableA("WINUM_HKCR_COLLISION", id, ARRAY_SIZE(id));
++
++    /* The standalone L1 runner provisions both hives with the native probe. */
++    if (!len) return;
++    ok(len == ARRAY_SIZE(id) - 1 && id[0] == '{' && id[len - 1] == '}' &&
++       strspn(id + 1, "0123456789abcdefABCDEF-") == len - 2, "invalid collision fixture name\n");
++    if (len != ARRAY_SIZE(id) - 1 || id[0] != '{' || id[len - 1] != '}' ||
++        strspn(id + 1, "0123456789abcdefABCDEF-") != len - 2) return;
++    sprintf(path, "CLSID\\%s\\InprocServer32", id);
++    winetest_push_context("both hives");
++    check_hkcr_class_view(path, 0, 0, TRUE, TRUE);
++
++    ret = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "Software\\Classes\\CLSID", 0, KEY_READ, &root);
++    ok(!ret, "opening physical HKLM CLSID returned %ld\n", ret);
++    if (!ret)
++    {
++        sprintf(physical, "%s\\InprocServer32", id);
++        ret = RegOpenKeyExA(root, physical, 0, KEY_QUERY_VALUE, &key);
++        ok(!ret, "opening relative physical HKLM class returned %ld\n", ret);
++        if (!ret)
++        {
++            ret = RegQueryValueExA(key, "Shared", NULL, &type, (BYTE *)data, &size);
++            ok(!ret && type == REG_SZ && size == sizeof(marker) && !memcmp(data, marker, sizeof(marker)),
++               "physical HKLM query returned %ld, type %lu, size %lu\n", ret, type, size);
++            RegCloseKey(key);
++        }
++        RegCloseKey(root);
++    }
++    winetest_pop_context();
++}
++/* END HKCR read tests */
++
+ static void test_classesroot_mask(void)
+ {
+     HKEY hkey;
+@@ -3863,7 +4059,7 @@
+
+     res = RegOpenKeyA( HKEY_CLASSES_ROOT, "CLSID", &hkey );
+     ok(res == ERROR_SUCCESS, "RegOpenKeyA failed: %ld\n", res);
+-    todo_wine ok(IS_HKCR(hkey) || broken(!IS_HKCR(hkey)) /* WinNT */,
++    ok(IS_HKCR(hkey) || broken(!IS_HKCR(hkey)) /* WinNT */,
+                  "hkcr mask not set in %p\n", hkey);
+     RegCloseKey( hkey );
+
+@@ -5180,6 +5376,8 @@
+     test_classesroot();
+     test_classesroot_enum();
+     test_classesroot_mask();
++    test_hkcr_class_reads();
++    test_hkcr_class_collision();
+     test_reg_load_key();
+     test_reg_load_app_key();
+     test_reg_copy_tree();

@@ -6,3 +6,9 @@
 # (winum-11.20-1); the file stays as the record.
 # ucrtbase-tests-cxx-exception-size.patch: moved into
 # ucrtbase-cxx-exception-size.patch (winum-11.22-2); the file stays as the record.
+# test-run/next-release-1: tests of the candidates whose test is not yet in
+# their patch, applied to both sides (kernelbase and msado15 carry theirs).
+advapi32-tests-token-integrity-level.patch
+combase-tests-per-user-classes.patch
+wbemdisp-tests-method-invoke.patch
+win32u-tests-font-smoothing.patch
