@@ -83,6 +83,11 @@ attributes 0x60; `TokenGroups` has no label entry;
 `SetTokenInformation(TokenIntegrityLevel)` succeeds and changes nothing;
 `TokenMandatoryPolicy` fails with error 1.
 
+`wine-candidate-v1-{x86_64,i686}.txt`: the same with
+`patches/candidates/server-limited-token-medium-integrity` (local build,
+2026-11-24): the limited token and every token made from it S-1-16-8192,
+the linked full token S-1-16-12288; nothing else changes.
+
 ## Windows 10 results
 
 Pending. What the maintainer already saw on Windows 10 with

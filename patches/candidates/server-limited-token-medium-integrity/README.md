@@ -100,9 +100,9 @@ build (they always do in a winum runtime).
 
 | Level | Status |
 | --- | --- |
-| L0 | Builds locally (Wine 11.22 + `patches/series` + candidate, x86_64 and i386 PE, `--fuzz=0`, 2026-11-24, reduced configure). Full build in the test-run pending. |
-| L1 | MEASURE and the test bundle ready; offline Windows 10 run pending (normal and elevated console). |
-| L2 | Local paired run (see Result log); CI paired run on `test-run/token-integrity-level-1` pending. |
+| L0 | 2026-11-24: "Build Wine" on `test-run/token-integrity-level-1` (Wine 11.22 + `patches/series` + this series, both architectures, `--fuzz=0`) passed, [run 45317855190](https://github.com/Harvi654/winum/actions/runs/45317855190). Also a local reduced build (no X11). |
+| L1 | MEASURE and the test bundle ready ([MEASURE run 45306732399](https://github.com/Harvi654/winum/actions/runs/45306732399), [L1 bundle run 45307586912](https://github.com/Harvi654/winum/actions/runs/45307586912)); offline Windows 10 run pending (normal and elevated console). |
+| L2 | Local paired run 2026-11-24 (series vs series + candidate, both with the tests-first test): advapi32, ntdll, kernelbase, kernel32, combase, ole32 - no new failures; the 10 integrity checks per architecture fixed. CI run [45307710447](https://github.com/Harvi654/winum/actions/runs/45307710447) (compares *vanilla* Wine with series + candidate, so it also shows the whole series): the same 10 fixed per architecture, one unit `ntdll.i386.virtual` timed out (exit 124) on the series side; locally it passes in 4-5 s, 0 failures, three runs with the candidate - to re-run in CI before it is recorded as clean. |
 | L3 | `docs/wine-repro/server-token-integrity-vbs/` - pending on the maintainer's prefix (needs native .NET 4.8). |
 | L4 | Pending: Nastran Generate Mesh / Run; Inventor start, part, assembly, drawing, save/reopen, restart; ODIS installer; AutoCAD (server and ntdll are shared). |
 | Cross review | Codex, pending. |
@@ -122,6 +122,7 @@ Medium expectation; the High linked token passes): see the Result log.
 - `SetTokenInformation(TokenIntegrityLevel)`: lowering a token (used by
   sandboxed child processes) is measured but not implemented.
 - `TokenGroups` label entry: measured, not implemented.
+- explorer.exe gets a default admin token from Wine (`ProcessWineGrantAdminToken`), so it and what it starts stay High; on Windows explorer runs at Medium. Programs started from Linux are not affected.
 
 ## Notes for a Wine bug report
 
@@ -140,3 +141,10 @@ Wine: fails. Related: bug 17019 (HKCR merging).
   S-1-16-12288, attributes 0x60, no label in `TokenGroups`,
   `SetTokenInformation` accepted without effect. Standalone L1 test on
   winum-11.22-2: 66 checks, 10 failures per architecture (expected).
+- 2026-11-24: local L2 paired and CI L0/L2 (Validation table). MEASURE on
+  the candidate build (`wine-candidate-v1-*.txt`): limited process token,
+  its pseudo handles, duplicates, restricted token, ImpersonateSelf token
+  and the child are S-1-16-8192; the linked (full) token S-1-16-12288, its
+  linked token S-1-16-8192. Every other line equals winum-11.22-2 (object
+  labels, groups, `SetTokenInformation`). Standalone L1 test under the
+  candidate: 66 checks, 0 failures per architecture.
