@@ -24,11 +24,11 @@ settings.
 | Level | Status |
 |---|---|
 | L0 | 2026-11-23, full WoW64 build passed. The source job applied the release series and candidate with zero fuzz. [Build and artifacts](https://github.com/Harvi654/winum/actions/runs/45209934855) |
-| L1 | 2026-11-23 offline Windows 10, x86_64 and i686 each 301 checks, no failures, todos or skips, both exit 0. Expanded v2 L1 pending native execution. [Verified v2 bundle](https://github.com/Harvi654/winum/actions/runs/45460314173/artifacts/14952323004) |
+| L1 | 2026-11-23 offline Windows 10, x86_64 and i686 each 301 checks, no failures, todos or skips, both exit 0. 2026-11-24 expanded v2 passed 397 checks per architecture, both exit 0 with no todos, flaky checks, failures or skips. [v2 results](../../../docs/wine-repro/win32u-font-smoothing/results/l1-windows-10-v2/summary.tsv). [Verified v2 bundle](https://github.com/Harvi654/winum/actions/runs/45460314173/artifacts/14952323004) |
 | L2 | v1 passed all 301 targeted candidate checks under both fontconfig profiles and architectures. The v2 release-baseline comparison is running. [Paired v2](https://github.com/Harvi654/winum/actions/runs/45460436638) |
 | L4 Inventor 2027 | 2026-11-23, maintainer reports improved text in an initial check. @krokosik has the build for the pending check on a larger 4K display. |
 | L4 AutoCAD | Deferred in this validation round. |
-| Cross review | Claude reviewed on 2026-11-23. The requested DRAFT_QUALITY and PROOF_QUALITY native measurement matches Default. v2 updates the expected values and runtime. Expanded L1 pending. |
+| Cross review | Claude reviewed on 2026-11-23. The requested DRAFT_QUALITY and PROOF_QUALITY native measurement matches Default. v2 updates the expected values and runtime. Expanded v2 L1 passed on 2026-11-24. |
 
 
 The v1 baseline g2 job rejected the expected failure lines when winetest
@@ -52,8 +52,7 @@ counts and RGB/BGR checksums. Each quality produced 256 bi-level,
 
 The v2 regression test requests both qualities with Tahoma at 12 px
 under all eight settings. The runtime applies the configured desktop
-policy to both, including when smoothing is disabled. Native L1 for
-the expanded test remains open.
+policy to both, including when smoothing is disabled. The expanded test passed native L1 on both architectures.
 
 ## Cross review (Claude Opus 5.5, 2026-11-23)
 

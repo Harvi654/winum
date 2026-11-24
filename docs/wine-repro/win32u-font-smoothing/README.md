@@ -176,5 +176,11 @@ in the same font, pixel-size and smoothing matrix. Both offline Windows 10 runs 
 the original settings. Each produced 2,880 cases. All 408 Draft rows
 and 408 Proof rows matched the corresponding Default rows on both
 architectures, including the pixel checksums. The v2 Wine assertion
-now covers these qualities. The earlier 301-check L1 covers the
-previous quality set.
+covers these qualities at 12 px under every measured desktop setting.
+
+On 2026-11-24, the expanded L1 bundle passed on offline Windows 10
+for x86_64 and i686. Each executable ran 46 assertions in each of
+the eight smoothing configurations, then 29 in the final standalone
+invocation, for 397 per architecture. Both exited 0 with zero todos,
+flaky checks, failures or skips. See the [results summary](results/l1-windows-10-v2/summary.tsv)
+and [exit codes](results/l1-windows-10-v2/exitcodes.txt).
