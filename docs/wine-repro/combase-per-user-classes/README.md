@@ -160,3 +160,13 @@ Repeat in the elevated console with high in the filenames. Return all
 four result files. The token_integrity lines should identify the actual
 Medium (0x2000) and High (0x3000) tokens. The probe records activation
 and closes the temporary registration without changing the candidate.
+
+### v2 native Wine test with normal and High tokens
+
+The expanded L1 bundle ran on offline Windows 10 on 2026-11-24.
+The normal run passed 54 checks on x86_64 and 59 on i686. The elevated
+run confirmed High integrity (0x3000) and passed 12 checks on each
+architecture, including the expected REGDB_E_CLASSNOTREG from both
+CoGetClassObject and CoCreateInstance for the HKCU-only class. All four
+runs exited 0 with no failures, todos, flaky checks or skips.
+[Native v2 summary](results/l1-windows-10-v2/summary.tsv).

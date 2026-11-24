@@ -7,10 +7,10 @@ Direct registry calls are outside this candidate.
 
 | Level | Status |
 | --- | --- |
-| L0 | v2 build pending. Both v1 DLL architectures compiled after zero-fuzz apply in [round 1](https://github.com/Harvi654/winum/actions/runs/45278159284). |
-| L1 | v2 High unit pending. v1 had 54 successful native checks on x86_64 and 59 on i686. [Results](../../../docs/wine-repro/combase-per-user-classes/results/l1-windows-10/) |
-| L2 | v2 paired against the same token candidate on both sides. v1 paired combase and ole32 suites passed. [CI](https://github.com/Harvi654/winum/actions/runs/45278894160) |
-| L3 | v2 rerun pending. v1 reproduced all native non-elevated COM results with the WOW64 test subtree. Focused Wine unit passed 51 x86_64 and 56 i686 checks. [Results](../../../docs/wine-repro/combase-per-user-classes/results/candidate/) |
+| L0 | v2 compiled both DLL architectures after zero-fuzz application. [CI](https://github.com/Harvi654/winum/actions/runs/45462274892). Both v1 DLL architectures compiled after zero-fuzz apply in [round 1](https://github.com/Harvi654/winum/actions/runs/45278159284). |
+| L1 | v2 on offline Windows 10 passed 54 normal checks on x86_64 and 59 on i686, plus 12 High checks on each. All runs exited 0 with no failures, todos, flaky checks or skips. [Results](../../../docs/wine-repro/combase-per-user-classes/results/l1-windows-10-v2/summary.tsv) |
+| L2 | v2 pairing uses the same token candidate on both sides. [Paired CI](https://github.com/Harvi654/winum/actions/runs/45462274569). v1 paired combase and ole32 suites passed. [CI](https://github.com/Harvi654/winum/actions/runs/45278894160) |
+| L3 | v2 matched the non-elevated native COM matrix on the token runtime with the WOW64 subtree. Wine passed 51 x86_64 and 56 i686 targeted checks. [CI](https://github.com/Harvi654/winum/actions/runs/45462274892). v1 reproduced all native non-elevated COM results with the WOW64 test subtree. Focused Wine unit passed 51 x86_64 and 56 i686 checks. [Results](../../../docs/wine-repro/combase-per-user-classes/results/candidate/) |
 | L4 | Combined Nastran 2027 mesh, solve and results passed on 2026-11-24 with the token candidate and four overlays. Full Inventor smoke remains open. [Combined result](https://github.com/Harvi654/winum/blob/236463a/patches/candidates/server-limited-token-medium-integrity/README.md#validation) |
 | Cross review | Claude reviewed v1. v2 review is pending. |
 

@@ -1,0 +1,5 @@
+arch	mode	integrity_rid_reported	checks	todo	flaky	failures	skipped	exit
+x86_64	normal	-	54	0	0	0	0	0
+i686	normal	-	59	0	0	0	0	0
+x86_64	high	0x3000	12	0	0	0	0	0
+i686	high	0x3000	12	0	0	0	0	0
