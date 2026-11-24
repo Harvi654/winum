@@ -12,6 +12,14 @@ Preserve HKCR provenance on read handles in the measured CLSID
 namespace. Keep a machine backing handle when available and query the
 matching physical user view for value precedence. Keep direct physical
 hive handles, ACL checks and explicit write opens on the existing paths.
+
+v2 2026-11-24: Fold the measured advapi32 test into the candidate. Remove
+the todo_wine_if annotations for the user-only direct and relative
+opens, RegGetValueW and the legacy query status, and for user-value
+precedence after a collision (RegQueryValueExW, RegGetValueW and the
+legacy default value). The existing HKCR CLSID tag assertion becomes
+an ordinary check. A clean Wine i686 fixture without the physical
+per-user WOW64 CLSID tree explicitly skips the user-only matrix.
 ---
 --- a/dlls/kernelbase/registry.c
 +++ b/dlls/kernelbase/registry.c
@@ -152,7 +160,7 @@ hive handles, ACL checks and explicit write opens on the existing paths.
 +    if (!key || options || !name->Length || (access & KEY_WOW64_RES) == KEY_WOW64_RES ||
 +        (mode != MAXIMUM_ALLOWED && (!(mode & KEY_QUERY_VALUE) || (mode & ~KEY_READ)))) goto ordinary;
 +
-+    if (root == HKEY_CLASSES_ROOT)
++    if (HandleToUlong(root) == HandleToUlong(HKEY_CLASSES_ROOT))
 +    {
 +        if (!is_hkcr_clsid_path( name )) goto ordinary;
 +        /* A remapped predefined handle must retain its existing behavior. */
@@ -311,3 +319,226 @@ hive handles, ACL checks and explicit write opens on the existing paths.
          }
 
          if (status) goto done;
+--- a/dlls/advapi32/tests/registry.c
++++ b/dlls/advapi32/tests/registry.c
+@@ -3856,6 +3856,202 @@
+     RegCloseKey( hkcr );
+ }
+
++/* BEGIN HKCR read tests */
++static void check_hkcr_class_value(HKEY key, BOOL collision)
++{
++    static const WCHAR expected[] = L"USER";
++    static const WCHAR machine[] = L"MACHINE";
++    WCHAR data[16];
++    DWORD type = 0, size = sizeof(data);
++    LSTATUS ret;
++
++    ret = RegQueryValueExW(key, L"Shared", NULL, &type, (BYTE *)data, &size);
++    ok(!ret && type == REG_SZ && size == sizeof(expected) && !memcmp(data, expected, sizeof(expected)),
++       "RegQueryValueExW returned %ld, type %lu, size %lu\n", ret, type, size);
++    size = sizeof(data);
++    ret = RegQueryValueExW(key, L"MachineOnly", NULL, &type, (BYTE *)data, &size);
++    if (collision)
++        ok(!ret && type == REG_SZ && size == sizeof(machine) && !memcmp(data, machine, sizeof(machine)),
++           "RegQueryValueExW(MachineOnly) returned %ld, type %lu, size %lu\n", ret, type, size);
++    else
++        ok(ret == ERROR_FILE_NOT_FOUND, "RegQueryValueExW(MachineOnly) returned %ld\n", ret);
++}
++
++static void check_hkcr_class_view(const char *path, REGSAM view, DWORD get_view, BOOL visible, BOOL collision)
++{
++    static const WCHAR expected[] = L"USER", machine[] = L"MACHINE";
++    LSTATUS want = visible ? ERROR_SUCCESS : ERROR_FILE_NOT_FOUND;
++    WCHAR pathW[100], data[16];
++    DWORD type = 0, size = sizeof(data);
++    LONG legacy_size = sizeof(data);
++    HKEY key, parent;
++    LSTATUS ret;
++
++    winetest_push_context("view %#lx", view);
++    MultiByteToWideChar(CP_ACP, 0, path, -1, pathW, ARRAY_SIZE(pathW));
++    ret = RegOpenKeyExW(HKEY_CLASSES_ROOT, pathW, 0, KEY_QUERY_VALUE | view, &key);
++    ok(ret == want, "direct RegOpenKeyExW returned %ld, expected %ld\n", ret, want);
++    if (!ret)
++    {
++        check_hkcr_class_value(key, collision);
++        RegCloseKey(key);
++    }
++    ret = RegOpenKeyExA(HKEY_CLASSES_ROOT, path, 0, KEY_QUERY_VALUE | view, &key);
++    ok(ret == want, "direct RegOpenKeyExA returned %ld, expected %ld\n", ret, want);
++    if (!ret)
++    {
++        check_hkcr_class_value(key, collision);
++        RegCloseKey(key);
++    }
++
++    ret = RegOpenKeyExW(HKEY_CLASSES_ROOT, L"CLSID", 0, KEY_READ | view, &parent);
++    ok(!ret, "opening HKCR\\CLSID returned %ld\n", ret);
++    if (!ret)
++    {
++        ret = RegOpenKeyExW(parent, pathW + ARRAY_SIZE(L"CLSID"), 0, KEY_QUERY_VALUE | view, &key);
++        ok(ret == want, "relative RegOpenKeyExW returned %ld, expected %ld\n", ret, want);
++        if (!ret)
++        {
++            check_hkcr_class_value(key, collision);
++            RegCloseKey(key);
++        }
++        RegCloseKey(parent);
++    }
++
++    ret = RegGetValueW(HKEY_CLASSES_ROOT, pathW, L"Shared", RRF_RT_REG_SZ | get_view, &type, data, &size);
++    ok(ret == want, "RegGetValueW returned %ld, expected %ld\n", ret, want);
++    if (!ret)
++        ok(type == REG_SZ && size == sizeof(expected) && !memcmp(data, expected, sizeof(expected)),
++           "RegGetValueW returned type %lu, size %lu\n", type, size);
++
++    if (collision)
++    {
++        size = sizeof(data);
++        ret = RegGetValueW(HKEY_CLASSES_ROOT, pathW, L"MachineOnly", RRF_RT_REG_SZ | get_view,
++                           &type, data, &size);
++        ok(!ret && type == REG_SZ && size == sizeof(machine) && !memcmp(data, machine, sizeof(machine)),
++           "RegGetValueW(MachineOnly) returned %ld, type %lu, size %lu\n", ret, type, size);
++    }
++
++    if (!view)
++    {
++        ret = RegQueryValueW(HKEY_CLASSES_ROOT, pathW, data, &legacy_size);
++        ok(!ret, "RegQueryValueW returned %ld\n", ret);
++        if (!ret)
++            ok(legacy_size == sizeof(expected) && !memcmp(data, expected, sizeof(expected)),
++               "RegQueryValueW returned size %ld\n", legacy_size);
++    }
++    winetest_pop_context();
++}
++
++static void test_hkcr_class_reads(void)
++{
++    static const char marker[] = "USER";
++    char id[39], key_path[100], relative[100];
++    DWORD pid = GetCurrentProcessId(), tid = GetCurrentThreadId(), disposition;
++    FILETIME time;
++    SYSTEM_INFO info;
++    HKEY fixture, leaf;
++    LSTATUS ret;
++
++    if (sizeof(void *) == 4 && !strcmp(winetest_platform, "wine"))
++    {
++        HKEY redirected;
++        ret = RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Classes\\Wow6432Node\\CLSID",
++                            0, KEY_READ | KEY_WOW64_64KEY, &redirected);
++        if (ret == ERROR_FILE_NOT_FOUND || ret == ERROR_PATH_NOT_FOUND)
++        {
++            skip("fresh Wine prefix has no per-user WOW64 CLSID subtree\n");
++            return;
++        }
++        ok(!ret, "opening the physical WOW64 CLSID subtree returned %ld\n", ret);
++        if (ret) return;
++        RegCloseKey(redirected);
++    }
++
++    GetSystemTimeAsFileTime(&time);
++    sprintf(id, "{%08lx-%04lx-%04lx-%04lx-%04lx%08lx}", time.dwLowDateTime, time.dwHighDateTime & 0xffff,
++            pid & 0xffff, tid & 0xffff, pid >> 16, time.dwHighDateTime);
++    sprintf(key_path, "Software\\Classes\\CLSID\\%s", id);
++    sprintf(relative, "CLSID\\%s\\InprocServer32", id);
++    ret = RegCreateKeyExA(HKEY_CURRENT_USER, key_path, 0, NULL, REG_OPTION_VOLATILE,
++                          KEY_ALL_ACCESS, NULL, &fixture, &disposition);
++    ok(!ret, "creating user CLSID returned %ld\n", ret);
++    if (ret) return;
++    ok(disposition == REG_CREATED_NEW_KEY, "existing fixture key, disposition %lu\n", disposition);
++    if (disposition != REG_CREATED_NEW_KEY)
++    {
++        RegCloseKey(fixture);
++        return;
++    }
++
++    ret = RegCreateKeyExA(fixture, "InprocServer32", 0, NULL, REG_OPTION_VOLATILE,
++                          KEY_SET_VALUE, NULL, &leaf, NULL);
++    ok(!ret, "creating InprocServer32 returned %ld\n", ret);
++    if (!ret)
++    {
++        ret = RegSetValueExA(leaf, NULL, 0, REG_SZ, (const BYTE *)marker, sizeof(marker));
++        ok(!ret, "setting the default value returned %ld\n", ret);
++        ret = RegSetValueExA(leaf, "Shared", 0, REG_SZ, (const BYTE *)marker, sizeof(marker));
++        ok(!ret, "setting the named value returned %ld\n", ret);
++        RegCloseKey(leaf);
++
++        check_hkcr_class_view(relative, 0, 0, TRUE, FALSE);
++        GetNativeSystemInfo(&info);
++        if (info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ||
++            info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM64)
++        {
++            BOOL native = sizeof(void *) == 8;
++            check_hkcr_class_view(relative, KEY_WOW64_32KEY, RRF_SUBKEY_WOW6432KEY, !native, FALSE);
++            check_hkcr_class_view(relative, KEY_WOW64_64KEY, RRF_SUBKEY_WOW6464KEY, native, FALSE);
++        }
++
++        ret = RegDeleteKeyA(fixture, "InprocServer32");
++        ok(!ret, "deleting InprocServer32 returned %ld\n", ret);
++    }
++    RegCloseKey(fixture);
++    ret = RegDeleteKeyA(HKEY_CURRENT_USER, key_path);
++    ok(!ret, "deleting user CLSID returned %ld\n", ret);
++}
++static void test_hkcr_class_collision(void)
++{
++    static const char marker[] = "MACHINE";
++    char id[39], path[100], physical[120], data[16];
++    DWORD type, size = sizeof(data);
++    HKEY root, key;
++    LSTATUS ret;
++    DWORD len = GetEnvironmentVariableA("WINUM_HKCR_COLLISION", id, ARRAY_SIZE(id));
++
++    /* The standalone L1 runner provisions both hives with the native probe. */
++    if (!len) return;
++    ok(len == ARRAY_SIZE(id) - 1 && id[0] == '{' && id[len - 1] == '}' &&
++       strspn(id + 1, "0123456789abcdefABCDEF-") == len - 2, "invalid collision fixture name\n");
++    if (len != ARRAY_SIZE(id) - 1 || id[0] != '{' || id[len - 1] != '}' ||
++        strspn(id + 1, "0123456789abcdefABCDEF-") != len - 2) return;
++    sprintf(path, "CLSID\\%s\\InprocServer32", id);
++    winetest_push_context("both hives");
++    check_hkcr_class_view(path, 0, 0, TRUE, TRUE);
++
++    ret = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "Software\\Classes\\CLSID", 0, KEY_READ, &root);
++    ok(!ret, "opening physical HKLM CLSID returned %ld\n", ret);
++    if (!ret)
++    {
++        sprintf(physical, "%s\\InprocServer32", id);
++        ret = RegOpenKeyExA(root, physical, 0, KEY_QUERY_VALUE, &key);
++        ok(!ret, "opening relative physical HKLM class returned %ld\n", ret);
++        if (!ret)
++        {
++            ret = RegQueryValueExA(key, "Shared", NULL, &type, (BYTE *)data, &size);
++            ok(!ret && type == REG_SZ && size == sizeof(marker) && !memcmp(data, marker, sizeof(marker)),
++               "physical HKLM query returned %ld, type %lu, size %lu\n", ret, type, size);
++            RegCloseKey(key);
++        }
++        RegCloseKey(root);
++    }
++    winetest_pop_context();
++}
++/* END HKCR read tests */
++
+ static void test_classesroot_mask(void)
+ {
+     HKEY hkey;
+@@ -3863,7 +4059,7 @@
+
+     res = RegOpenKeyA( HKEY_CLASSES_ROOT, "CLSID", &hkey );
+     ok(res == ERROR_SUCCESS, "RegOpenKeyA failed: %ld\n", res);
+-    todo_wine ok(IS_HKCR(hkey) || broken(!IS_HKCR(hkey)) /* WinNT */,
++    ok(IS_HKCR(hkey) || broken(!IS_HKCR(hkey)) /* WinNT */,
+                  "hkcr mask not set in %p\n", hkey);
+     RegCloseKey( hkey );
+
+@@ -5180,6 +5376,8 @@
+     test_classesroot();
+     test_classesroot_enum();
+     test_classesroot_mask();
++    test_hkcr_class_reads();
++    test_hkcr_class_collision();
+     test_reg_load_key();
+     test_reg_load_app_key();
+     test_reg_copy_tree();
