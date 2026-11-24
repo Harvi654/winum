@@ -25,7 +25,7 @@ new file mode 100644
 index 0000000..514c518
 --- /dev/null
 +++ b/dlls/combase/tests/per_user_classes.c
-@@ -0,0 +1,427 @@
+@@ -0,0 +1,457 @@
 +/* Original COM tests, AI-assisted (Codex), LGPL-2.1-or-later. */
 +#define COBJMACROS
 +#include <windows.h>
@@ -379,11 +379,16 @@ index 0000000..514c518
 +START_TEST(per_user_classes)
 +{
 +    WCHAR temp[MAX_PATH], dir[MAX_PATH], user[MAX_PATH], machine[MAX_PATH], **args;
-+    BOOL user_created, machine_created, wow;
++    BOOL user_created, machine_created, wow, high;
 +    SYSTEM_INFO info;
 +    HRESULT hr;
 +    DWORD len, returned;
 +    TOKEN_ELEVATION elevation;
++    union
++    {
++        TOKEN_MANDATORY_LABEL label;
++        BYTE buffer[sizeof(TOKEN_MANDATORY_LABEL) + SECURITY_MAX_SID_SIZE];
++    } integrity;
 +    HANDLE token;
 +    int argc, code;
 +
@@ -395,7 +400,27 @@ index 0000000..514c518
 +        ExitProcess(code);
 +    }
 +    LocalFree(args);
-+    if (GetEnvironmentVariableW(L"WINUM_COM_L1_RUNAS", NULL, 0))
++    high = !!GetEnvironmentVariableW(L"WINUM_COM_L1_HIGH", NULL, 0);
++    if (high)
++    {
++        DWORD rid;
++        BOOL ret;
++        PSID sid;
++
++        ret = OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token);
++        ok(ret, "OpenProcessToken returned %lu.\n", GetLastError());
++        if (!ret) return;
++        ret = GetTokenInformation(token, TokenIntegrityLevel, &integrity, sizeof(integrity), &returned);
++        CloseHandle(token);
++        ok(ret, "TokenIntegrityLevel query failed: %lu.\n", GetLastError());
++        if (!ret) return;
++        sid = integrity.label.Label.Sid;
++        rid = *GetSidSubAuthority(sid, *GetSidSubAuthorityCount(sid) - 1);
++        trace("Process integrity RID %#lx.\n", rid);
++        ok(rid == SECURITY_MANDATORY_HIGH_RID, "Run the High L1 test at High integrity, got %#lx.\n", rid);
++        if (rid != SECURITY_MANDATORY_HIGH_RID) return;
++    }
++    else if (GetEnvironmentVariableW(L"WINUM_COM_L1_RUNAS", NULL, 0))
 +    {
 +        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
 +        {
@@ -435,16 +460,21 @@ index 0000000..514c518
 +        ok(SUCCEEDED(hr), "CoInitializeEx returned %#lx.\n", hr);
 +        if (SUCCEEDED(hr))
 +        {
-+            user_case(user, CLSID_ROOT, 0, S_OK, TRUE);
-+            if (wow)
++            if (high)
++                user_case(user, CLSID_ROOT, 0, REGDB_E_CLASSNOTREG, FALSE);
++            else
 +            {
-+                user_case(user, CLSID_ROOT, KEY_WOW64_32KEY,
-+                          sizeof(void *) == 4 ? S_OK : REGDB_E_CLASSNOTREG, FALSE);
-+                user_case(user, CLSID_ROOT, KEY_WOW64_64KEY,
-+                          sizeof(void *) == 8 ? S_OK : REGDB_E_CLASSNOTREG, FALSE);
-+                user_case(user, WOW_ROOT, 0, sizeof(void *) == 4 ? S_OK : REGDB_E_CLASSNOTREG, FALSE);
++                user_case(user, CLSID_ROOT, 0, S_OK, TRUE);
++                if (wow)
++                {
++                    user_case(user, CLSID_ROOT, KEY_WOW64_32KEY,
++                              sizeof(void *) == 4 ? S_OK : REGDB_E_CLASSNOTREG, FALSE);
++                    user_case(user, CLSID_ROOT, KEY_WOW64_64KEY,
++                              sizeof(void *) == 8 ? S_OK : REGDB_E_CLASSNOTREG, FALSE);
++                    user_case(user, WOW_ROOT, 0, sizeof(void *) == 4 ? S_OK : REGDB_E_CLASSNOTREG, FALSE);
++                }
++                precedence(user, machine);
 +            }
-+            precedence(user, machine);
 +            CoFreeUnusedLibrariesEx(0, 0);
 +            CoUninitialize();
 +        }

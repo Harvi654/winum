@@ -39,6 +39,10 @@ bat="$work/run-tests.bat"
 printf '%s\r\n' '@echo off' 'cd /d "%~dp0"' \
     'if exist exitcodes.txt (echo already run - use a fresh copy & exit /b 2)' \
     'set "WINUM_COM_L1_RUNAS=1"' > "$bat"
+high_bat="$work/run-high-tests.bat"
+printf '%s\r\n' '@echo off' 'setlocal' 'cd /d "%~dp0"' \
+    'if exist exitcodes-high.txt (echo already run - use a fresh copy & exit /b 2)' \
+    'set "WINUM_COM_L1_HIGH=1"' > "$high_bat"
 for arch in x86_64 i686; do
     exe="combase-per-user-classes-$arch.exe"
     "$arch-w64-mingw32-gcc" -shared -O2 -Wall -Werror -Wl,--kill-at \
@@ -50,17 +54,23 @@ for arch in x86_64 i686; do
     printf '%s\r\n' "echo running $exe" \
         "$exe per_user_classes > result-combase-per-user-classes-$arch.txt 2>&1" \
         ">>exitcodes.txt echo combase-per-user-classes $arch=%ERRORLEVEL%" >> "$bat"
+    printf '%s\r\n' "echo running $exe at High integrity" \
+        "$exe per_user_classes > result-combase-per-user-classes-high-$arch.txt 2>&1" \
+        ">>exitcodes-high.txt echo combase-per-user-classes-high $arch=%ERRORLEVEL%" >> "$high_bat"
 done
 printf '%s\r\n' 'echo done' 'pause' >> "$bat"
+printf '%s\r\n' 'type exitcodes-high.txt' >> "$high_bat"
 cat > README.txt <<INFO
 Wine $WINE_VERSION combase per-user class test, winum commit $(git -C "$repo" rev-parse --short HEAD).
 Run run-tests.bat from the normal desktop in the offline Windows 10 VM.
 Accept the UAC prompts for the setup helpers only.
 Return both result-combase-per-user-classes-*.txt files and exitcodes.txt.
+Run run-high-tests.bat from an Administrator Command Prompt for the same account.
+Return both result-combase-per-user-classes-high-*.txt files and exitcodes-high.txt.
 The expected native result is zero failures, todos and skips.
 INFO
 mkdir -p -- "$(dirname -- "$out")"
 mkdir -- "$out"
 cp -- "$src/COPYING.LIB" "$src"/dlls/combase/tests/per_user_{classes,server}.c ./*.exe \
-    "$bat" README.txt "$out/"
+    "$bat" "$high_bat" README.txt "$out/"
 (cd "$out" && sha256sum -- ./* > SHA256SUMS)
