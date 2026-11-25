@@ -2,9 +2,9 @@ name: Build combase per-user classes L1
 
 on:
   push:
-    branches: ['topic/combase-per-user-classes-measure']
+    branches: ['topic/combase-per-user-classes-measure', 'topic/release-11.22-3']
     paths:
-      - 'patches/tests-first/combase-tests-per-user-classes.patch'
+      - 'patches/combase-per-user-classes.patch'
       - 'scripts/build-l1-combase-per-user-classes.sh'
       - '.github/workflows/build-combase-per-user-classes-l1.yml'
   workflow_dispatch:
