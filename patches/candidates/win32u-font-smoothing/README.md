@@ -1,3 +1,7 @@
+> **Promoted** to `patches/series` for winum-11.22-3 (2026-11-25); the
+> current patch and page are `patches/win32u-font-smoothing.patch` and `docs/patches/win32u-font-smoothing.md`, with the
+> test inside the patch. This folder stays as the record.
+
 # win32u font smoothing
 
 Credit @krokosik for the diagnosis and original MEASURE probe in Inventor

@@ -15,4 +15,9 @@ and its line leaves `series` here; the file moves to `docs/archive/`.
 | Patch | For | Windows values |
 | --- | --- | --- |
 | `urlmon-tests-res-zones.patch` | `urlmon-res-zone-local-machine`, `urlmon-maptozone-null-terminate` | `docs/wine-repro/urlmon-zones/windows-2026-11-09` |
-| `advapi32-tests-token-integrity-level.patch` | `server-limited-token-medium-integrity` (candidate) | `docs/wine-repro/server-token-integrity/windows-2026-11-24` (L1 passed) |
+| `advapi32-tests-token-integrity-level.patch` | moved into `ntdll-token-integrity-level` (winum-11.22-3) | `docs/wine-repro/server-token-integrity/windows-2026-11-24` |
+| `combase-tests-per-user-classes.patch` | moved into `combase-per-user-classes` (winum-11.22-3) | `docs/wine-repro/combase-per-user-classes` |
+| `advapi32-tests-hkcr-class-reads.patch` | moved into `kernelbase-hkcr-class-reads` (winum-11.22-3) | `docs/wine-repro/kernelbase-hkcr-read` |
+| `wbemdisp-tests-method-invoke.patch` | moved into `wbemdisp-method-invoke` (winum-11.22-3) | `docs/wine-repro/wbemdisp-method-invoke` |
+| `msado15-tests-stream-charset.patch` | moved into `msado15-stream-charset` (winum-11.22-3) | `docs/wine-repro/msado15-stream-charset` |
+| `win32u-tests-font-smoothing.patch` | moved into `win32u-font-smoothing` (winum-11.22-3) | `docs/wine-repro/win32u-font-smoothing` |

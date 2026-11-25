@@ -1,3 +1,7 @@
+> **Promoted** to `patches/series` for winum-11.22-3 (2026-11-25); the
+> current patch and page are `patches/combase-per-user-classes.patch` and `docs/patches/combase-per-user-classes.md`, with the
+> test inside the patch. This folder stays as the record.
+
 # Per-user in-process COM classes
 
 Non-elevated Windows 10 uses the per-user in-process registration ahead
@@ -12,7 +16,7 @@ Direct registry calls are outside this candidate.
 | L2 | v2 pairing uses the same token candidate on both sides. [Paired CI](https://github.com/Harvi654/winum/actions/runs/45462274569). v1 paired combase and ole32 suites passed. [CI](https://github.com/Harvi654/winum/actions/runs/45278894160) |
 | L3 | v2 matched the non-elevated native COM matrix on the token runtime with the WOW64 subtree. Wine passed 51 x86_64 and 56 i686 targeted checks. [CI](https://github.com/Harvi654/winum/actions/runs/45462274892). v1 reproduced all native non-elevated COM results with the WOW64 test subtree. Focused Wine unit passed 51 x86_64 and 56 i686 checks. [Results](../../../docs/wine-repro/combase-per-user-classes/results/candidate/) |
 | L4 | Combined Nastran 2027 mesh, solve and results passed on 2026-11-24 with the token candidate and four overlays. Full Inventor smoke remains open. [Combined result](https://github.com/Harvi654/winum/blob/236463a/patches/candidates/server-limited-token-medium-integrity/README.md#validation) |
-| Cross review | Claude reviewed v1. v2 review is pending. |
+| Cross review | Claude reviewed v1; v2 read in full and approved by Claude on 2026-11-25 (below). |
 
 [Native and Winum measurement](../../../docs/wine-repro/combase-per-user-classes/README.md).
 
@@ -153,3 +157,33 @@ Then, from an elevated Command Prompt for the same account and offline
 Windows 10 snapshot, run run-high-tests.bat. It checks for RID 0x3000
 and writes separate result-combase-per-user-classes-high-*.txt files and
 exitcodes-high.txt.
+
+## Cross review of v2 (second model)
+
+Claude Opus 5.5, 2026-11-25: **approved**. Read in full: the v2 change in
+`dlls/combase/combase.c` (`use_per_user_classes`, `open_user_classes_key`,
+`open_class_key` and its four callers, `clsid_from_string_reg`) against
+Wine 11.22 with the series and the token patches, and the test as it
+moves into the patch for winum-11.22-3.
+
+- The integrity condition follows the measurement: HKCU-only classes are
+  not activated at High (`REGDB_E_CLASSNOTREG` from `CoGetClassObject`
+  and `CoCreateInstance`). The effective token is the thread token when
+  impersonating (opened as self) and otherwise the process token; if the
+  level cannot be read, the old machine-only lookup is used, which is
+  the safe direction.
+- At High the machine lookup goes through `open_classes_key` (NtOpenKey
+  under the machine classes root), not through kernelbase's HKCR read
+  merge, so an HKCU-only class stays invisible there as on Windows.
+- `open_key_for_clsid` keeps its old behaviour for the other callers;
+  only InprocServer32, ProgID (both views) and TreatAs reads and
+  `CLSIDFromProgID` try the user key first.
+- Every activation now queries the token once (open, one server call,
+  close) - small next to the registry work it saves.
+- Notes, no change needed: a per-user key that exists but cannot be
+  opened gives `REGDB_E_READREGDB` instead of falling back to the machine
+  key (not measured); `open_user_classes_key` passes the caller's view
+  flags to HKCU, so the WOW64 layout of the user hive matters (already
+  recorded above).
+- In the combined L2 (run 45485567767) all six todo-marked checks of the
+  test passed with the patch; they are dropped in the promoted patch.

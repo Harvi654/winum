@@ -1,3 +1,7 @@
+> **Promoted** to `patches/series` for winum-11.22-3 (2026-11-25); the
+> current patch and page are `patches/kernelbase-hkcr-class-reads.patch` and `docs/patches/kernelbase-hkcr-class-reads.md`, with the
+> test inside the patch. This folder stays as the record.
+
 # HKCR class reads
 
 Windows 10 opens an HKCU-only CLSID through HKCR and through an open HKCR

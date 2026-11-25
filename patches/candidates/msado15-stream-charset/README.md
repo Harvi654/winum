@@ -1,3 +1,7 @@
+> **Promoted** to `patches/series` for winum-11.22-3 (2026-11-25); the
+> current patch and page are `patches/msado15-stream-charset.patch` and `docs/patches/msado15-stream-charset.md`, with the
+> test inside the patch. This folder stays as the record.
+
 # ADODB.Stream text charsets
 
 The candidate adds UTF-8 in either case, US-ASCII, Windows-1252 and

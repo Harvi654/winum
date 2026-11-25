@@ -1,0 +1,131 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH 1/2] server: Keep an integrity level per token.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+On Windows 10 a process started from a normal console runs with the
+limited half of the administrator's split token and reports Medium
+integrity (S-1-16-8192); from an elevated console it reports High
+(S-1-16-12288). The native .NET Framework COM shim reads the process
+token's integrity level and, at High, ignores COM classes registered
+only in HKCU\Software\Classes, so per-user .NET classes fail to load
+(measured with a VBScript CreateObject in both consoles).
+
+Wine has no integrity level in the token: ntdll reports High for every
+token. Store one in the server's token: Medium for a limited token, High
+for a full or default admin token, copied by duplication (impersonation,
+restricted and primary duplicates), and return it in get_token_info.
+The linked token is created with the opposite elevation type and gets
+its level from that.
+
+The token object's own mandatory label (the SACL returned for
+LABEL_SECURITY_INFORMATION) is a separate thing on Windows and is left
+as it was: token_create_admin still assigns a High label, and changing
+it is a separate question for the measurement. Setting the level
+(NtSetInformationToken) stays a stub. Access checks do not enforce
+mandatory labels in Wine, so the lower level changes no access.
+
+v1 2026-11-24: first version, expected values from the console
+measurements; MEASURE of the derived tokens pending.
+
+v2 2026-11-25: no code change. MEASURE on Windows 10 (normal and
+elevated console, x86_64 and i686) confirmed the level of every derived
+token; L1, paired L2 and the Inventor, Nastran and AutoCAD L4 passed.
+Promoted to the series for winum-11.22-3.
+
+diff --git a/include/wine/server_protocol.h b/include/wine/server_protocol.h
+--- a/include/wine/server_protocol.h
++++ b/include/wine/server_protocol.h
+@@ -5517,9 +5517,9 @@ struct get_token_info_reply
+     int            impersonation_level;
+     int            elevation_type;
+     int            is_elevated;
++    unsigned int   integrity_level;
+     int            group_count;
+     int            privilege_count;
+-    char __pad_52[4];
+ };
+ 
+ 
+@@ -7197,6 +7197,6 @@ union generic_reply
+     struct alpc_create_port_reply alpc_create_port_reply;
+ };
+ 
+-#define SERVER_PROTOCOL_VERSION 979
++#define SERVER_PROTOCOL_VERSION 980
+ 
+ #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
+diff --git a/server/protocol.def b/server/protocol.def
+--- a/server/protocol.def
++++ b/server/protocol.def
+@@ -3908,6 +3908,7 @@ struct handle_info
+     int            impersonation_level; /* level of impersonation */
+     int            elevation_type; /* elevation type (TokenElevation*) */
+     int            is_elevated;   /* is the token elevated as per GetTokenInformation(TokenElevation) */
++    unsigned int   integrity_level; /* integrity level RID (SECURITY_MANDATORY_*_RID) */
+     int            group_count;   /* the number of groups the token is a member of */
+     int            privilege_count; /* the number of privileges the token has */
+ @END
+diff --git a/server/request_handlers.h b/server/request_handlers.h
+--- a/server/request_handlers.h
++++ b/server/request_handlers.h
+@@ -2158,8 +2158,9 @@ C_ASSERT( offsetof(struct get_token_info_reply, primary) == 28 );
+ C_ASSERT( offsetof(struct get_token_info_reply, impersonation_level) == 32 );
+ C_ASSERT( offsetof(struct get_token_info_reply, elevation_type) == 36 );
+ C_ASSERT( offsetof(struct get_token_info_reply, is_elevated) == 40 );
+-C_ASSERT( offsetof(struct get_token_info_reply, group_count) == 44 );
+-C_ASSERT( offsetof(struct get_token_info_reply, privilege_count) == 48 );
++C_ASSERT( offsetof(struct get_token_info_reply, integrity_level) == 44 );
++C_ASSERT( offsetof(struct get_token_info_reply, group_count) == 48 );
++C_ASSERT( offsetof(struct get_token_info_reply, privilege_count) == 52 );
+ C_ASSERT( sizeof(struct get_token_info_reply) == 56 );
+ C_ASSERT( offsetof(struct create_linked_token_request, handle) == 12 );
+ C_ASSERT( sizeof(struct create_linked_token_request) == 16 );
+diff --git a/server/request_trace.h b/server/request_trace.h
+--- a/server/request_trace.h
++++ b/server/request_trace.h
+@@ -3071,6 +3071,7 @@ static void dump_get_token_info_reply( const struct get_token_info_reply *req )
+     fprintf( stderr, ", impersonation_level=%d", req->impersonation_level );
+     fprintf( stderr, ", elevation_type=%d", req->elevation_type );
+     fprintf( stderr, ", is_elevated=%d", req->is_elevated );
++    fprintf( stderr, ", integrity_level=%08x", req->integrity_level );
+     fprintf( stderr, ", group_count=%d", req->group_count );
+     fprintf( stderr, ", privilege_count=%d", req->privilege_count );
+ }
+diff --git a/server/token.c b/server/token.c
+--- a/server/token.c
++++ b/server/token.c
+@@ -114,6 +114,7 @@ struct token
+     struct acl    *default_dacl;    /* the default DACL to assign to objects created by this user */
+     int            impersonation_level; /* impersonation level this token is capable of if non-primary token */
+     int            elevation;       /* elevation type */
++    unsigned int   integrity;       /* integrity level (SECURITY_MANDATORY_*_RID) */
+     struct list    kernel_object;   /* list of kernel object pointers */
+ };
+ 
+@@ -489,6 +490,9 @@ static struct token *create_token( unsigned int primary, unsigned int session_id
+             token->impersonation_level = impersonation_level;
+         token->default_dacl = NULL;
+         token->elevation = elevation;
++        /* a limited token runs at medium integrity, a full or default admin token at high */
++        token->integrity = elevation == TokenElevationTypeLimited ?
++                           SECURITY_MANDATORY_MEDIUM_RID : SECURITY_MANDATORY_HIGH_RID;
+ 
+         /* copy user */
+         token->user = memdup( user, sid_len( user ));
+@@ -603,6 +607,7 @@ struct token *token_duplicate( struct token *src_token, unsigned primary,
+                           src_token->primary_group, NULL, 0, NULL, 0, src_token->default_dacl,
+                           modified_id, impersonation_level, src_token->elevation );
+     if (!token) return token;
++    token->integrity = src_token->integrity;
+ 
+     /* copy groups */
+     LIST_FOR_EACH_ENTRY( group, &src_token->groups, struct group, entry )
+@@ -1562,6 +1567,7 @@ DECL_HANDLER(get_token_info)
+             reply->is_elevated = token_sid_present( token, &builtin_admins_sid, FALSE );
+         else
+             reply->is_elevated = token->elevation == TokenElevationTypeFull;
++        reply->integrity_level = token->integrity;
+         reply->group_count = list_count( &token->groups );
+         reply->privilege_count = list_count( &token->privileges );
+         release_object( token );

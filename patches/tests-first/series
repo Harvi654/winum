@@ -6,4 +6,12 @@
 # (winum-11.20-1); the file stays as the record.
 # ucrtbase-tests-cxx-exception-size.patch: moved into
 # ucrtbase-cxx-exception-size.patch (winum-11.22-2); the file stays as the record.
-advapi32-tests-token-integrity-level.patch
+# The tests of the seven patches added in winum-11.22-3 moved into their
+# patches (todo_wine dropped where the fix passes); the files stay as the
+# record: advapi32-tests-token-integrity-level.patch ->
+# ntdll-token-integrity-level.patch, combase-tests-per-user-classes.patch ->
+# combase-per-user-classes.patch, advapi32-tests-hkcr-class-reads.patch ->
+# kernelbase-hkcr-class-reads.patch, wbemdisp-tests-method-invoke.patch ->
+# wbemdisp-method-invoke.patch, msado15-tests-stream-charset.patch ->
+# msado15-stream-charset.patch, win32u-tests-font-smoothing.patch ->
+# win32u-font-smoothing.patch.

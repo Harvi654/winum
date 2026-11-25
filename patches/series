@@ -104,3 +104,24 @@ ucrtbase-cxx-exception-size.patch
 
 # AutoCAD 2027 "Connection Lost": cancelling a windowless timer from another thread.
 server-cross-thread-killtimer.patch
+
+# Inventor Nastran 2027 0x80040154: a limited token reports Medium integrity (wineserver).
+server-token-integrity-level.patch
+
+# Inventor Nastran 2027: ntdll reports the token's integrity level.
+ntdll-token-integrity-level.patch
+
+# Inventor Nastran 2027: COM finds classes registered per user (HKCU), not at High integrity.
+combase-per-user-classes.patch
+
+# Inventor Nastran 2027: HKCR read opens of a per-user CLSID.
+kernelbase-hkcr-class-reads.patch
+
+# Inventor Nastran 2027 add-in registration: WMI method calls from VBScript (StdRegProv).
+wbemdisp-method-invoke.patch
+
+# Inventor Nastran 2027 add-in registration: ADODB.Stream UTF-8 and single-byte text.
+msado15-stream-charset.patch
+
+# Inventor text: ClearType and desktop font smoothing over fontconfig (@krokosik, #13).
+win32u-font-smoothing.patch

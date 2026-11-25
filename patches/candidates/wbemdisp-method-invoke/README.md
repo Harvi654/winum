@@ -1,3 +1,7 @@
+> **Promoted** to `patches/series` for winum-11.22-3 (2026-11-25); the
+> current patch and page are `patches/wbemdisp-method-invoke.patch` and `docs/patches/wbemdisp-method-invoke.md`, with the
+> test inside the patch. This folder stays as the record.
+
 # Direct WMI method calls in wbemdisp
 
 The [offline Windows reference and L1](../../../docs/wine-repro/wbemdisp-method-invoke/README.md)

@@ -1,3 +1,7 @@
+> **Promoted** to `patches/series` for winum-11.22-3 (2026-11-25); the
+> current patches and pages are `patches/server-token-integrity-level.patch` and `patches/ntdll-token-integrity-level.patch` and `docs/patches/server-token-integrity-level.md` and `docs/patches/ntdll-token-integrity-level.md`, with the
+> test inside the patch. This folder stays as the record.
+
 # Limited token at Medium integrity
 
 Work in progress; not in a normal build. Written by Claude; the cross
