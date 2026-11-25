@@ -22,6 +22,13 @@ patch passes are dropped (CoGetClassObject, CoCreateInstance, the
 server marker, CLSIDFromProgID, ProgIDFromCLSID, CoGetTreatAsClass).
 Promoted to the series for winum-11.22-3.
 
+v4 2026-11-25: no code change. The test skips the explicit KEY_WOW64_32KEY
+user registration in a 64-bit run when HKCU\Software\Classes\Wow6432Node
+does not exist, as in a fresh Wine prefix: Wine then stores that
+registration in the 64-bit view, where Windows redirects it, so the
+case tests the prefix layout, not COM. Windows always has the key, so
+the case still runs there.
+
 diff --git a/dlls/combase/combase.c b/dlls/combase/combase.c
 --- a/dlls/combase/combase.c
 +++ b/dlls/combase/combase.c
@@ -189,7 +196,7 @@ diff --git a/dlls/combase/tests/per_user_classes.c b/dlls/combase/tests/per_user
 new file mode 100644
 --- /dev/null
 +++ b/dlls/combase/tests/per_user_classes.c
-@@ -0,0 +1,451 @@
+@@ -0,0 +1,467 @@
 +/* Original COM tests, AI-assisted (Codex), LGPL-2.1-or-later. */
 +#define COBJMACROS
 +#include <windows.h>
@@ -287,6 +294,18 @@ new file mode 100644
 +{
 +    LONG ret = remove_key(hive, path, view);
 +    ok(ret == ERROR_SUCCESS, "Registry cleanup returned %ld.\n", ret);
++}
++
++/* A fresh Wine prefix has no per-user WOW64 classes tree; Windows always has one. */
++static BOOL user_wow64_classes(void)
++{
++    HKEY key;
++
++    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Classes\\Wow6432Node", 0,
++                      KEY_READ | KEY_WOW64_64KEY, &key))
++        return FALSE;
++    RegCloseKey(key);
++    return TRUE;
 +}
 +
 +static void check_object(IPersist *obj, DWORD expected, BOOL conflict)
@@ -625,8 +644,12 @@ new file mode 100644
 +                user_case(user, CLSID_ROOT, 0, S_OK, TRUE);
 +                if (wow)
 +                {
-+                    user_case(user, CLSID_ROOT, KEY_WOW64_32KEY,
-+                              sizeof(void *) == 4 ? S_OK : REGDB_E_CLASSNOTREG, FALSE);
++                    if (sizeof(void *) == 8 && !user_wow64_classes())
++                        skip("No HKCU Software\\Classes\\Wow6432Node in this prefix: a KEY_WOW64_32KEY "
++                             "user registration lands in the 64-bit view, skipping that case.\n");
++                    else
++                        user_case(user, CLSID_ROOT, KEY_WOW64_32KEY,
++                                  sizeof(void *) == 4 ? S_OK : REGDB_E_CLASSNOTREG, FALSE);
 +                    user_case(user, CLSID_ROOT, KEY_WOW64_64KEY,
 +                              sizeof(void *) == 8 ? S_OK : REGDB_E_CLASSNOTREG, FALSE);
 +                    user_case(user, WOW_ROOT, 0, sizeof(void *) == 4 ? S_OK : REGDB_E_CLASSNOTREG, FALSE);

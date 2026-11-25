@@ -19,7 +19,16 @@ wine_verify_tarball "$tarball" "$WINE_VERSION"
 src="$work/wine-$WINE_VERSION"
 tar -xf "$tarball" -C "$work" \
     "wine-$WINE_VERSION"/{COPYING.LIB,dlls/combase/tests/Makefile.in,include/wine/debug.h,include/wine/test.h}
-patch -d "$src" -p1 --fuzz=0 < "$repo/patches/tests-first/combase-tests-per-user-classes.patch"
+# Since winum-11.22-3 the test is part of patches/combase-per-user-classes.patch;
+# apply only its test files (dlls/combase/tests/).
+python3 - "$repo/patches/combase-per-user-classes.patch" > "$work/combase-tests.patch" <<'PY'
+import re, sys
+text = open(sys.argv[1]).read()
+parts = re.split(r'(?m)^(?=diff --git )', text)
+sys.stdout.write(''.join(p for p in parts if p.startswith('diff --git a/dlls/combase/tests/')))
+PY
+test -s "$work/combase-tests.patch"
+patch -d "$src" -p1 --fuzz=0 < "$work/combase-tests.patch"
 
 cd "$work"
 printf 'EXPORTS\nDllGetClassObject\nDllCanUnloadNow\n' > fixture.def

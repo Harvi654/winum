@@ -31,7 +31,7 @@ Wine `+reg,err+ole` traces of Nastran's dialog; native COM activation matrix on 
 | Level | Result |
 | --- | --- |
 | L0 | Applies with `--fuzz=0` after the full series on Wine 11.22; built x86_64 and i386 in the combined next-release build [45485575952](https://github.com/Harvi654/winum/actions/runs/45485575952) (2026-11-24) and by "Build Wine" on the release branch |
-| L1 | v2 on offline Windows 10: 54 (x86_64) / 59 (i686) normal checks plus 12 High checks per architecture, all exit 0, no failures, todos or skips (2026-11-24) |
+| L1 | v2 on offline Windows 10: 54 (x86_64) / 59 (i686) normal checks plus 12 High checks per architecture, all exit 0, no failures, todos or skips (2026-11-24). v4 test (one skip condition added): re-run on Windows 10, normal and elevated, pending |
 | L2 | Paired with the token patches on both sides [45462274569](https://github.com/Harvi654/winum/actions/runs/45462274569); [Run 45485567767](https://github.com/Harvi654/winum/actions/runs/45485567767): the released 11.22-2 series against it plus the seven 11.22-3 patches, 452 units in five groups, both architectures; no new failure (details in `docs/wine-repro/next-release-1/README.md`) - the test's six todo marks were reported as passing and are dropped |
 | L3 | Native COM matrix reproduced on Wine with the token runtime: 51 x86_64 / 56 i686 targeted checks [45462274892](https://github.com/Harvi654/winum/actions/runs/45462274892) |
 | L4 | With the combined next-release build (maintainer, 2026-11-24/25): Inventor 2027.2 + Nastran prefix copy - part, assembly, drawing, open/save/save-as and reopen, Stress Analysis, Frame Analysis, Frame Generator, Nastran Generate Mesh / Run / results without the 0x80040154 dialog; AutoCAD 2027.1.1 fresh install from its Create Installer image (33 steps, exit 0), sign-in, open, SAVE, SAVEAS, reopen. SOLIDWORKS deferred under AGENTS.md |
@@ -40,7 +40,7 @@ Wine `+reg,err+ole` traces of Nastran's dialog; native COM activation matrix on 
 
 ## Open
 
-- A fresh Wine prefix has no HKCU Classes WOW64 tree, so an explicit 32-bit user registration can land in the 64-bit view (registry layout, not COM); CI models the tree.
+- A fresh Wine prefix has no `HKCU\Software\Classes\Wow6432Node`, so a `KEY_WOW64_32KEY` write to the user classes lands in the 64-bit view, where Windows redirects it to the 32-bit one. A Wine registry difference, outside this release; the programs winum is built for do not need it. The test skips that one case when the key is missing (v4); on Windows the key exists and the case runs.
 - A per-user key that exists but cannot be read gives `REGDB_E_READREGDB` instead of falling back to the machine key (not measured).
 
 ## Notes for a Wine bug report
@@ -52,3 +52,4 @@ COM in Wine ignores `HKCU\Software\Classes` for in-process servers, ProgIDs and 
 - v1 2026-11-23: per-user lookup.
 - v2 2026-11-24: skip HKCU at High integrity (measured).
 - v3 2026-11-25: no code change; test moved into the patch, satisfied todos dropped; promoted to the series.
+- v4 2026-11-25: no code change; the test skips the `KEY_WOW64_32KEY` user case in a 64-bit run without `HKCU\Software\Classes\Wow6432Node` (the release branch's L2 failed on it on a fresh prefix). L1 of the changed test on Windows 10 (normal and elevated) before the tag.
