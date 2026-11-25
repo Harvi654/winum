@@ -1,0 +1,115 @@
+name: Build the HKCR class reads L1 tests
+
+on:
+  push:
+    branches: ['topic/kernelbase-hkcr-read-measure']
+    paths:
+      - 'docs/wine-repro/kernelbase-hkcr-read/measure.c'
+      - 'docs/wine-repro/kernelbase-hkcr-read/build-bundle.sh'
+      - 'patches/tests-first/advapi32-tests-hkcr-class-reads.patch'
+      - 'scripts/build-l1-kernelbase-hkcr-read.sh'
+      - '.github/workflows/build-kernelbase-hkcr-read-l1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install pinned LLVM MinGW
+        run: |
+          toolchain=llvm-mingw-20250910-ucrt-ubuntu-22.04-x86_64
+          cd "$RUNNER_TEMP"
+          curl -fLsS --retry 3 --max-time 120 -o "$toolchain.tar.xz" \
+            "https://github.com/mstorsjo/llvm-mingw/releases/download/20250910/$toolchain.tar.xz"
+          printf '%s  %s\n' f83556c9ffa4d4291fadea1a0776c1383332dacdf4d7fbdf974c2928cb32c6f7 "$toolchain.tar.xz" | sha256sum -c -
+          tar -xJf "$toolchain.tar.xz"
+          printf '%s\n' "$RUNNER_TEMP/$toolchain/bin" >> "$GITHUB_PATH"
+      - name: Build and validate the bundle
+        run: |
+          bash scripts/build-l1-kernelbase-hkcr-read.sh out
+          cd out
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: kernelbase-hkcr-read-l1
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
+
+  wine-smoke:
+    needs: build
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 12
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Prepare the Wine runner
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed curl xz \
+            xorg-server-xvfb xorg-xauth libx11 libxext libxi libxrandr libxrender \
+            libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
+            fontconfig freetype2 ttf-dejavu alsa-lib libpulse gnutls krb5 dbus \
+            wayland mesa libglvnd vulkan-icd-loader gst-plugins-base-libs sdl2 \
+            libcups libgphoto2 sane libpcap v4l-utils pcsclite unixodbc giflib
+          cd /tmp
+          archive=winum-11.22-2-x86_64.tar.xz
+          curl -fLsS --retry 3 -O "https://github.com/Harvi654/winum/releases/download/winum-11.22-2/$archive"
+          printf '%s  %s\n' 0523b2615596cbb66e7e9ed95a5024008a25f5141ba2e4483e862a47db0c9980 "$archive" | sha256sum -c -
+          tar -xJf "$archive"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: kernelbase-hkcr-read-l1
+          path: bundle
+      - name: Run the fixture for both architectures
+        run: |
+          export runtime=/tmp/winum-11.22-2-x86_64
+          export WINESERVER="$runtime/bin/wineserver"
+          export WINEPREFIX=/tmp/hkcr-smoke-prefix WINEDEBUG=-all WINEDLLOVERRIDES='mscoree,mshtml='
+          (cd bundle && sha256sum -c SHA256SUMS)
+          mkdir -p results
+          xvfb-run -a bash -eu -c '
+            stop_wine() {
+              "$WINESERVER" -k >/dev/null 2>&1 || true
+              "$WINESERVER" -w
+            }
+            trap stop_wine EXIT
+            timeout 120 "$runtime/bin/wine" wineboot -i
+            for arch in x86_64 i686; do
+              status=0
+              timeout 120 "$runtime/bin/wine" "bundle/hkcr-read-$arch.exe" --direct-machine --run-test "bundle/hkcr-class-reads-$arch.exe" \
+                > "results/result-$arch.txt" 2> "results/loader-$arch.txt" || status=$?
+              printf "%s exit=%s\n" "$arch" "$status"
+              grep -E "^measure=|^machine_setup_status=|^measure_complete=" "results/result-$arch.txt"
+              test "$status" -eq 0
+              grep -Eq "[0-9]+ tests executed .*0 failures.*0 skipped" "results/result-$arch.txt"
+              grep -Eq "[1-9][0-9]* marked as todo" "results/result-$arch.txt"
+              grep -q "^measure_complete=1 user_cleanup=0 machine_cleanup=0" "results/result-$arch.txt"
+            done
+            stop_wine
+            trap - EXIT
+            test -s "$WINEPREFIX/user.reg"
+            test -s "$WINEPREFIX/system.reg"
+            registry_status=0
+            grep -Eq "^\"(WriteProbe|UserOnly|MachineOnly)\"=" "$WINEPREFIX/"{user,system}.reg ||
+              registry_status=$?
+            if [ "$registry_status" -ne 1 ]; then
+              echo "Fixture cleanup scan failed (grep status $registry_status)."
+              exit 1
+            fi
+            echo "No fixture values remain in the saved hives."
+          '
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: kernelbase-hkcr-read-l1-wine-baseline
+          path: results/result-*.txt
+          if-no-files-found: warn
+          retention-days: 30

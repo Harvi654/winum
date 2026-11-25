@@ -1,0 +1,3 @@
+arch	high_integrity_rid	elevated	cases	open_rows	value_query_rows	enumeration_rows	differing_open_query_enum_rows	user_cleanup	machine_cleanup	exit
+x86_64	0x3000	1	13	208	509	13	0	0	0	0
+i686	0x3000	1	13	208	581	13	0	0	0	0
