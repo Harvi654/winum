@@ -1,0 +1,35 @@
+# Builds the token integrity MEASURE bundle for the maintainer's offline
+# Windows 10 VM (docs/wine-repro/server-token-integrity). Publishes nothing
+# but the workflow artifact.
+name: Build the token integrity measurement
+
+on:
+  push:
+    branches: ['topic/token-integrity-level']
+    paths:
+      - 'docs/wine-repro/server-token-integrity/**'
+      - '.github/workflows/build-token-integrity-measure.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: MinGW (Ubuntu archive)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-mingw-w64
+      - name: Build and check the bundle
+        run: |
+          bash docs/wine-repro/server-token-integrity/build-bundle.sh out
+          cd out
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: token-integrity-measure
+          path: out/
+          if-no-files-found: error
+          retention-days: 30

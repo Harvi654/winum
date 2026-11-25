@@ -1,0 +1,274 @@
+measure=token-integrity-v1
+pointer_bits=32
+wow64=1
+windows=10.0.19045
+wine=11.22
+process.open=1
+process.type=1
+process.elevation_type=3
+process.elevated=0
+process.mandatory_policy=fail(error=87)
+process.integrity_probe=ret=0 error=122 size=20
+process.integrity_size=20
+process.integrity_sid_in_buffer=1
+process.integrity=S-1-16-12288
+process.integrity_attributes=0x60
+process.groups_count=8
+process.groups_label_count=0
+process.groups_with_integrity_flags=0
+process.label_control=0x8014
+process.label_sacl_present=1
+process.label_ace_count=1
+process.label_ace0_type=17 flags=0x0 mask=0x1
+process.label_ace0=S-1-16-12288
+pseudo_process.integrity_probe=ret=0 error=122 size=20
+pseudo_process.integrity_size=20
+pseudo_process.integrity_sid_in_buffer=1
+pseudo_process.integrity=S-1-16-12288
+pseudo_process.integrity_attributes=0x60
+pseudo_effective.integrity_probe=ret=0 error=122 size=20
+pseudo_effective.integrity_size=20
+pseudo_effective.integrity_sid_in_buffer=1
+pseudo_effective.integrity=S-1-16-12288
+pseudo_effective.integrity_attributes=0x60
+process_object.label_control=0x8004
+process_object.label_sacl_present=0
+process_object.label_ace_count=0
+thread_before.open=fail(error=1008)
+linked.open=1
+linked.type=2
+linked.impersonation_level=1
+linked.elevation_type=2
+linked.elevated=1
+linked.mandatory_policy=fail(error=87)
+linked.integrity_probe=ret=0 error=122 size=20
+linked.integrity_size=20
+linked.integrity_sid_in_buffer=1
+linked.integrity=S-1-16-12288
+linked.integrity_attributes=0x60
+linked.groups_count=8
+linked.groups_label_count=0
+linked.groups_with_integrity_flags=0
+linked.label_control=0x8014
+linked.label_sacl_present=1
+linked.label_ace_count=1
+linked.label_ace0_type=17 flags=0x0 mask=0x1
+linked.label_ace0=S-1-16-12288
+linked_linked.open=1
+linked_linked.type=2
+linked_linked.impersonation_level=1
+linked_linked.elevation_type=3
+linked_linked.elevated=0
+linked_linked.mandatory_policy=fail(error=87)
+linked_linked.integrity_probe=ret=0 error=122 size=20
+linked_linked.integrity_size=20
+linked_linked.integrity_sid_in_buffer=1
+linked_linked.integrity=S-1-16-12288
+linked_linked.integrity_attributes=0x60
+linked_linked.groups_count=8
+linked_linked.groups_label_count=0
+linked_linked.groups_with_integrity_flags=0
+linked_linked.label_control=0x8014
+linked_linked.label_sacl_present=1
+linked_linked.label_ace_count=1
+linked_linked.label_ace0_type=17 flags=0x0 mask=0x1
+linked_linked.label_ace0=S-1-16-12288
+dup_primary.open=1
+dup_primary.type=1
+dup_primary.elevation_type=3
+dup_primary.elevated=0
+dup_primary.mandatory_policy=fail(error=87)
+dup_primary.integrity_probe=ret=0 error=122 size=20
+dup_primary.integrity_size=20
+dup_primary.integrity_sid_in_buffer=1
+dup_primary.integrity=S-1-16-12288
+dup_primary.integrity_attributes=0x60
+dup_primary.groups_count=8
+dup_primary.groups_label_count=0
+dup_primary.groups_with_integrity_flags=0
+dup_primary.label_control=0x8014
+dup_primary.label_sacl_present=1
+dup_primary.label_ace_count=1
+dup_primary.label_ace0_type=17 flags=0x0 mask=0x1
+dup_primary.label_ace0=S-1-16-12288
+dup_impersonation.open=1
+dup_impersonation.type=2
+dup_impersonation.impersonation_level=2
+dup_impersonation.elevation_type=3
+dup_impersonation.elevated=0
+dup_impersonation.mandatory_policy=fail(error=87)
+dup_impersonation.integrity_probe=ret=0 error=122 size=20
+dup_impersonation.integrity_size=20
+dup_impersonation.integrity_sid_in_buffer=1
+dup_impersonation.integrity=S-1-16-12288
+dup_impersonation.integrity_attributes=0x60
+dup_impersonation.groups_count=8
+dup_impersonation.groups_label_count=0
+dup_impersonation.groups_with_integrity_flags=0
+dup_impersonation.label_control=0x8014
+dup_impersonation.label_sacl_present=1
+dup_impersonation.label_ace_count=1
+dup_impersonation.label_ace0_type=17 flags=0x0 mask=0x1
+dup_impersonation.label_ace0=S-1-16-12288
+dup_identification.open=1
+dup_identification.type=2
+dup_identification.impersonation_level=1
+dup_identification.elevation_type=3
+dup_identification.elevated=0
+dup_identification.mandatory_policy=fail(error=87)
+dup_identification.integrity_probe=ret=0 error=122 size=20
+dup_identification.integrity_size=20
+dup_identification.integrity_sid_in_buffer=1
+dup_identification.integrity=S-1-16-12288
+dup_identification.integrity_attributes=0x60
+dup_identification.groups_count=8
+dup_identification.groups_label_count=0
+dup_identification.groups_with_integrity_flags=0
+dup_identification.label=fail(error=5)
+restricted.open=1
+restricted.type=1
+restricted.elevation_type=3
+restricted.elevated=0
+restricted.mandatory_policy=fail(error=87)
+restricted.integrity_probe=ret=0 error=122 size=20
+restricted.integrity_size=20
+restricted.integrity_sid_in_buffer=1
+restricted.integrity=S-1-16-12288
+restricted.integrity_attributes=0x60
+restricted.groups_count=8
+restricted.groups_label_count=0
+restricted.groups_with_integrity_flags=0
+restricted.label_control=0x8014
+restricted.label_sacl_present=1
+restricted.label_ace_count=1
+restricted.label_ace0_type=17 flags=0x0 mask=0x1
+restricted.label_ace0=S-1-16-12288
+impersonate_self.open=1
+impersonate_self.type=2
+impersonate_self.impersonation_level=2
+impersonate_self.elevation_type=3
+impersonate_self.elevated=0
+impersonate_self.mandatory_policy=fail(error=87)
+impersonate_self.integrity_probe=ret=0 error=122 size=20
+impersonate_self.integrity_size=20
+impersonate_self.integrity_sid_in_buffer=1
+impersonate_self.integrity=S-1-16-12288
+impersonate_self.integrity_attributes=0x60
+impersonate_self.groups_count=8
+impersonate_self.groups_label_count=0
+impersonate_self.groups_with_integrity_flags=0
+impersonate_self.label_control=0x8014
+impersonate_self.label_sacl_present=1
+impersonate_self.label_ace_count=1
+impersonate_self.label_ace0_type=17 flags=0x0 mask=0x1
+impersonate_self.label_ace0=S-1-16-12288
+impersonate_self_effective.integrity_probe=ret=0 error=122 size=20
+impersonate_self_effective.integrity_size=20
+impersonate_self_effective.integrity_sid_in_buffer=1
+impersonate_self_effective.integrity=S-1-16-12288
+impersonate_self_effective.integrity_attributes=0x60
+process.rid=0x3000
+set_untrusted.set=ret=1 error=0
+set_untrusted.integrity_probe=ret=0 error=122 size=20
+set_untrusted.integrity_size=20
+set_untrusted.integrity_sid_in_buffer=1
+set_untrusted.integrity=S-1-16-12288
+set_untrusted.integrity_attributes=0x60
+set_untrusted.groups_count=8
+set_untrusted.groups_label_count=0
+set_untrusted.groups_with_integrity_flags=0
+set_untrusted.label_control=0x8014
+set_untrusted.label_sacl_present=1
+set_untrusted.label_ace_count=1
+set_untrusted.label_ace0_type=17 flags=0x0 mask=0x1
+set_untrusted.label_ace0=S-1-16-12288
+set_low.set=ret=1 error=0
+set_low.integrity_probe=ret=0 error=122 size=20
+set_low.integrity_size=20
+set_low.integrity_sid_in_buffer=1
+set_low.integrity=S-1-16-12288
+set_low.integrity_attributes=0x60
+set_low.groups_count=8
+set_low.groups_label_count=0
+set_low.groups_with_integrity_flags=0
+set_low.label_control=0x8014
+set_low.label_sacl_present=1
+set_low.label_ace_count=1
+set_low.label_ace0_type=17 flags=0x0 mask=0x1
+set_low.label_ace0=S-1-16-12288
+set_medium.set=ret=1 error=0
+set_medium.integrity_probe=ret=0 error=122 size=20
+set_medium.integrity_size=20
+set_medium.integrity_sid_in_buffer=1
+set_medium.integrity=S-1-16-12288
+set_medium.integrity_attributes=0x60
+set_medium.groups_count=8
+set_medium.groups_label_count=0
+set_medium.groups_with_integrity_flags=0
+set_medium.label_control=0x8014
+set_medium.label_sacl_present=1
+set_medium.label_ace_count=1
+set_medium.label_ace0_type=17 flags=0x0 mask=0x1
+set_medium.label_ace0=S-1-16-12288
+set_medium_plus.set=ret=1 error=0
+set_medium_plus.integrity_probe=ret=0 error=122 size=20
+set_medium_plus.integrity_size=20
+set_medium_plus.integrity_sid_in_buffer=1
+set_medium_plus.integrity=S-1-16-12288
+set_medium_plus.integrity_attributes=0x60
+set_medium_plus.groups_count=8
+set_medium_plus.groups_label_count=0
+set_medium_plus.groups_with_integrity_flags=0
+set_medium_plus.label_control=0x8014
+set_medium_plus.label_sacl_present=1
+set_medium_plus.label_ace_count=1
+set_medium_plus.label_ace0_type=17 flags=0x0 mask=0x1
+set_medium_plus.label_ace0=S-1-16-12288
+set_high.set=ret=1 error=0
+set_high.integrity_probe=ret=0 error=122 size=20
+set_high.integrity_size=20
+set_high.integrity_sid_in_buffer=1
+set_high.integrity=S-1-16-12288
+set_high.integrity_attributes=0x60
+set_high.groups_count=8
+set_high.groups_label_count=0
+set_high.groups_with_integrity_flags=0
+set_high.label_control=0x8014
+set_high.label_sacl_present=1
+set_high.label_ace_count=1
+set_high.label_ace0_type=17 flags=0x0 mask=0x1
+set_high.label_ace0=S-1-16-12288
+set_system.set=ret=1 error=0
+set_system.integrity_probe=ret=0 error=122 size=20
+set_system.integrity_size=20
+set_system.integrity_sid_in_buffer=1
+set_system.integrity=S-1-16-12288
+set_system.integrity_attributes=0x60
+set_system.groups_count=8
+set_system.groups_label_count=0
+set_system.groups_with_integrity_flags=0
+set_system.label_control=0x8014
+set_system.label_sacl_present=1
+set_system.label_ace_count=1
+set_system.label_ace0_type=17 flags=0x0 mask=0x1
+set_system.label_ace0=S-1-16-12288
+child.open=1
+child.type=1
+child.elevation_type=3
+child.elevated=0
+child.mandatory_policy=fail(error=87)
+child.integrity_probe=ret=0 error=122 size=20
+child.integrity_size=20
+child.integrity_sid_in_buffer=1
+child.integrity=S-1-16-12288
+child.integrity_attributes=0x60
+child.groups_count=8
+child.groups_label_count=0
+child.groups_with_integrity_flags=0
+child.label_control=0x8014
+child.label_sacl_present=1
+child.label_ace_count=1
+child.label_ace0_type=17 flags=0x0 mask=0x1
+child.label_ace0=S-1-16-12288
+child.exit=0
+measure_complete=1
