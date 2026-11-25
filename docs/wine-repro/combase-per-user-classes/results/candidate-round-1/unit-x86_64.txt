@@ -1,0 +1,5 @@
+MESA-EGL: warning: DRI3 error: Could not get DRI3 device
+MESA-EGL: warning: Ensure your X server supports DRI3 to get accelerated rendering
+per_user_classes.c:123: Test failed: CoGetClassObject returned 0, expected 0x80040154.
+per_user_classes.c:134: Test failed: CoCreateInstance returned 0, expected 0x80040154.
+0020:per_user_classes: 56 tests executed (0 marked as todo, 0 as flaky, 2 failures), 0 skipped.

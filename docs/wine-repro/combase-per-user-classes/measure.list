@@ -1,0 +1,1 @@
+combase-per-user-classes | docs/wine-repro/combase-per-user-classes/measure.c | -municode -lole32 -luuid -ladvapi32 -lshell32
