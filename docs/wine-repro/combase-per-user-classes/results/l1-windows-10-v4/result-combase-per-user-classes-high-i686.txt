@@ -1,0 +1,2 @@
+per_user_classes.c:397: Process integrity RID 0x3000.
+22d8:per_user_classes: 12 tests executed (0 marked as todo, 0 as flaky, 0 failures), 0 skipped.
