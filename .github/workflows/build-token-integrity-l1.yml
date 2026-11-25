@@ -1,0 +1,37 @@
+# Builds the L1 bundle of the token integrity test (the exact block of
+# patches/tests-first/advapi32-tests-token-integrity-level.patch, standalone)
+# together with the MEASURE program, for the maintainer's offline Windows 10 VM.
+name: Build the token integrity L1 bundle
+
+on:
+  push:
+    branches: ['topic/token-integrity-level']
+    paths:
+      - 'patches/tests-first/advapi32-tests-token-integrity-level.patch'
+      - 'scripts/build-l1-token-integrity.sh'
+      - 'docs/wine-repro/server-token-integrity/**'
+      - '.github/workflows/build-token-integrity-l1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: MinGW (Ubuntu archive)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-mingw-w64
+      - name: Build and check the bundle
+        run: |
+          bash scripts/build-l1-token-integrity.sh out
+          cd out
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: token-integrity-l1
+          path: out/
+          if-no-files-found: error
+          retention-days: 30

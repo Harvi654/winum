@@ -1,0 +1,615 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] wbemdisp: Invoke WMI methods through IDispatch.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Offline Windows 10 executes method members for METHOD and METHOD |
+PROPERTYGET, accepts a missing output or trailing argument, and reports
+the provider status and by-reference outputs separately. Wine rejected
+the invocation or treated the name as a property. Route positional
+method calls through the signature and IWbemServices::ExecMethod, leaving
+ordinary property and type-library dispatch on their existing paths.
+
+v2 2026-11-25: no code change. The wbemdisp test moves from tests-first
+into the patch and its todo_wine is dropped (all 26 Invoke checks pass
+with the patch). Promoted to the series for winum-11.22-3.
+
+diff --git a/dlls/wbemdisp/locator.c b/dlls/wbemdisp/locator.c
+--- a/dlls/wbemdisp/locator.c
++++ b/dlls/wbemdisp/locator.c
+@@ -1285,16 +1285,13 @@ static HRESULT WINAPI object_GetIDsOfNames(
+     return S_OK;
+ }
+ 
+-static BSTR get_member_name( struct object *object, DISPID dispid, CIMTYPE *type )
++static const struct member *get_member( struct object *object, DISPID dispid )
+ {
+     UINT i;
+     for (i = 0; i < object->nb_members; i++)
+     {
+         if (object->members[i].dispid == dispid)
+-        {
+-            *type = object->members[i].type;
+-            return object->members[i].name;
+-        }
++            return &object->members[i];
+     }
+     return NULL;
+ }
+@@ -1330,6 +1327,309 @@ static VARTYPE to_vartype( CIMTYPE type )
+     return 0;
+ }
+ 
++struct method_parameter
++{
++    BSTR name;
++    CIMTYPE type;
++    LONG id;
++    BOOL input, output;
++};
++
++static LONG get_parameter_id( IWbemClassObject *signature, const WCHAR *name )
++{
++    IWbemQualifierSet *qualifiers;
++    VARIANT value;
++    LONG id = -1;
++
++    if (SUCCEEDED(IWbemClassObject_GetPropertyQualifierSet( signature, name, &qualifiers )))
++    {
++        VariantInit( &value );
++        if (SUCCEEDED(IWbemQualifierSet_Get( qualifiers, L"ID", 0, &value, NULL )) && V_VT( &value ) == VT_I4)
++            id = V_I4( &value );
++        VariantClear( &value );
++        IWbemQualifierSet_Release( qualifiers );
++    }
++    return id;
++}
++
++static HRESULT collect_method_parameters( IWbemClassObject *signature, BOOL input,
++                                          struct method_parameter **parameters, UINT *count )
++{
++    struct method_parameter *new_parameters, *param;
++    CIMTYPE type;
++    BSTR name;
++    HRESULT hr;
++    UINT i;
++
++    if (!signature) return S_OK;
++    if (FAILED(hr = IWbemClassObject_BeginEnumeration( signature, WBEM_FLAG_NONSYSTEM_ONLY ))) return hr;
++
++    while ((hr = IWbemClassObject_Next( signature, 0, &name, NULL, &type, NULL )) == S_OK)
++    {
++        if (!input && !wcsicmp( name, L"ReturnValue" ))
++        {
++            SysFreeString( name );
++            continue;
++        }
++        for (i = 0; i < *count; ++i)
++            if (!wcsicmp( name, (*parameters)[i].name )) break;
++        if (i == *count)
++        {
++            if (*count >= ~(size_t)0 / sizeof(**parameters) - 1 ||
++                !(new_parameters = realloc( *parameters, (*count + 1) * sizeof(**parameters) )))
++            {
++                SysFreeString( name );
++                hr = E_OUTOFMEMORY;
++                break;
++            }
++            *parameters = new_parameters;
++            param = &new_parameters[(*count)++];
++            param->name = name;
++            param->type = type;
++            param->id = get_parameter_id( signature, name );
++            param->input = input;
++            param->output = !input;
++        }
++        else
++        {
++            param = &(*parameters)[i];
++            param->output = TRUE;
++            if (param->id < 0) param->id = get_parameter_id( signature, name );
++            SysFreeString( name );
++        }
++    }
++    IWbemClassObject_EndEnumeration( signature );
++    return hr == WBEM_S_NO_MORE_DATA ? S_OK : hr;
++}
++
++static int __cdecl compare_parameter_ids( const void *left, const void *right )
++{
++    const struct method_parameter *a = left, *b = right;
++
++    return (a->id > b->id) - (a->id < b->id);
++}
++
++static void order_method_parameters( struct method_parameter *parameters, UINT count )
++{
++    UINT i, j;
++
++    /* Built-in signatures without ID qualifiers enumerate in provider order. */
++    for (i = 0; i < count; ++i)
++    {
++        if (parameters[i].id < 0) return;
++        for (j = 0; j < i; ++j) if (parameters[j].id == parameters[i].id) return;
++    }
++    if (count > 1) qsort( parameters, count, sizeof(*parameters), compare_parameter_ids );
++}
++
++static HRESULT put_method_parameter( IWbemClassObject *instance, const struct method_parameter *param,
++                                     VARIANT *arg )
++{
++    VARIANT value;
++    VARTYPE type;
++    HRESULT hr;
++
++    VariantInit( &value );
++    if (FAILED(hr = VariantCopyInd( &value, arg ))) return hr;
++    if (!(param->type & CIM_FLAG_ARRAY) && (type = to_vartype( param->type )) && V_VT( &value ) != type)
++    {
++        /* The registry hive is often a signed I4 holding a predefined HKEY. */
++        if (type == VT_UI4 && V_VT( &value ) == VT_I4)
++            V_VT( &value ) = VT_UI4;
++        else
++            hr = VariantChangeType( &value, &value, 0, type );
++    }
++    if (SUCCEEDED(hr)) hr = IWbemClassObject_Put( instance, param->name, 0, &value, param->type );
++    VariantClear( &value );
++    return hr;
++}
++
++static HRESULT string_array_to_variants( VARIANT *value )
++{
++    SAFEARRAY *src = V_ARRAY( value ), *array;
++    LONG lo, i;
++    ULONG offset, count;
++    VARIANT item;
++    HRESULT hr;
++
++    if (!src || SafeArrayGetDim( src ) != 1) return S_OK;
++    if (FAILED(hr = SafeArrayGetLBound( src, 1, &lo ))) return hr;
++    count = src->rgsabound[0].cElements;
++    if (!(array = SafeArrayCreateVector( VT_VARIANT, lo, count ))) return E_OUTOFMEMORY;
++
++    for (offset = 0; offset < count; ++offset)
++    {
++        i = lo + offset;
++        V_VT( &item ) = VT_BSTR;
++        V_BSTR( &item ) = NULL;
++        hr = SafeArrayGetElement( src, &i, &V_BSTR( &item ) );
++        if (SUCCEEDED(hr)) hr = SafeArrayPutElement( array, &i, &item );
++        VariantClear( &item );
++        if (FAILED(hr))
++        {
++            SafeArrayDestroy( array );
++            return hr;
++        }
++    }
++    if (FAILED(hr = VariantClear( value )))
++    {
++        SafeArrayDestroy( array );
++        return hr;
++    }
++    V_VT( value ) = VT_ARRAY | VT_VARIANT;
++    V_ARRAY( value ) = array;
++    return S_OK;
++}
++
++static HRESULT copy_method_output( VARIANT *arg, VARIANT *value )
++{
++    VARTYPE type = V_VT( arg ) & ~VT_BYREF;
++    HRESULT hr;
++
++    if (!(V_VT( arg ) & VT_BYREF)) return S_OK;
++    if (!V_BYREF( arg )) return E_INVALIDARG;
++
++    if (type == VT_VARIANT)
++    {
++        if ((V_VT( value ) == VT_BSTR && !V_BSTR( value )) ||
++            ((V_VT( value ) & VT_ARRAY) && !V_ARRAY( value )))
++            V_VT( value ) = VT_NULL;
++        if (V_VT( value ) == (VT_ARRAY | VT_BSTR) && FAILED(hr = string_array_to_variants( value )))
++            return hr;
++        return VariantCopy( V_VARIANTREF( arg ), value );
++    }
++    if (type == VT_BSTR && V_VT( value ) == VT_NULL)
++    {
++        V_VT( value ) = VT_BSTR;
++        V_BSTR( value ) = NULL;
++    }
++    if (type != V_VT( value ) && FAILED(hr = VariantChangeType( value, value, 0, type )))
++        return hr;
++
++    if (type & VT_ARRAY)
++    {
++        if (*V_ARRAYREF( arg ) && FAILED(hr = SafeArrayDestroy( *V_ARRAYREF( arg ) ))) return hr;
++        *V_ARRAYREF( arg ) = V_ARRAY( value );
++        V_VT( value ) = VT_EMPTY;
++        return S_OK;
++    }
++    switch (type)
++    {
++    case VT_BSTR:
++        SysFreeString( *V_BSTRREF( arg ) );
++        *V_BSTRREF( arg ) = V_BSTR( value );
++        V_VT( value ) = VT_EMPTY;
++        break;
++    case VT_I1:   *V_I1REF( arg ) = V_I1( value ); break;
++    case VT_UI1:  *V_UI1REF( arg ) = V_UI1( value ); break;
++    case VT_I2:   *V_I2REF( arg ) = V_I2( value ); break;
++    case VT_UI2:  *V_UI2REF( arg ) = V_UI2( value ); break;
++    case VT_I4:   *V_I4REF( arg ) = V_I4( value ); break;
++    case VT_UI4:  *V_UI4REF( arg ) = V_UI4( value ); break;
++    case VT_INT:  *V_INTREF( arg ) = V_INT( value ); break;
++    case VT_UINT: *V_UINTREF( arg ) = V_UINT( value ); break;
++    case VT_I8:   *V_I8REF( arg ) = V_I8( value ); break;
++    case VT_UI8:  *V_UI8REF( arg ) = V_UI8( value ); break;
++    case VT_R4:   *V_R4REF( arg ) = V_R4( value ); break;
++    case VT_R8:   *V_R8REF( arg ) = V_R8( value ); break;
++    case VT_BOOL: *V_BOOLREF( arg ) = V_BOOL( value ); break;
++    default: return DISP_E_TYPEMISMATCH;
++    }
++    return S_OK;
++}
++
++static HRESULT invoke_method( struct object *object, const WCHAR *name, DISPPARAMS *args,
++                              VARIANT *result, EXCEPINFO *exception )
++{
++    IWbemClassObject *in_signature = NULL, *out_signature = NULL, *in = NULL, *out = NULL;
++    struct method_parameter *parameters = NULL;
++    VARIANT path, value;
++    UINT count = 0, i;
++    HRESULT hr;
++
++    if (!args || (args->cArgs && !args->rgvarg)) return E_INVALIDARG;
++    if (args->cNamedArgs) return DISP_E_NONAMEDARGS;
++    if (result) VariantInit( result );
++    VariantInit( &path );
++
++    if (FAILED(hr = IWbemClassObject_GetMethod( object->object, name, 0, &in_signature, &out_signature )))
++        goto done;
++    if (FAILED(hr = collect_method_parameters( in_signature, TRUE, &parameters, &count ))) goto done;
++    if (FAILED(hr = collect_method_parameters( out_signature, FALSE, &parameters, &count ))) goto done;
++    order_method_parameters( parameters, count );
++
++    if (in_signature && FAILED(hr = IWbemClassObject_SpawnInstance( in_signature, 0, &in ))) goto done;
++    for (i = 0; i < count; ++i)
++    {
++        if (!parameters[i].input) continue;
++        if (i < args->cArgs)
++            hr = put_method_parameter( in, &parameters[i], &args->rgvarg[args->cArgs - i - 1] );
++        else
++        {
++            VariantInit( &value );
++            hr = IWbemClassObject_Get( in_signature, parameters[i].name, 0, &value, NULL, NULL );
++            if (SUCCEEDED(hr) && V_VT( &value ) != VT_NULL && V_VT( &value ) != VT_EMPTY &&
++                (V_VT( &value ) != VT_BSTR || V_BSTR( &value )))
++                hr = put_method_parameter( in, &parameters[i], &value );
++            else
++            {
++                if (exception)
++                {
++                    memset( exception, 0, sizeof(*exception) );
++                    exception->scode = WBEM_E_INVALID_PARAMETER;
++                }
++                hr = DISP_E_EXCEPTION;
++            }
++            VariantClear( &value );
++        }
++        if (FAILED(hr)) goto done;
++    }
++
++    if (FAILED(hr = IWbemClassObject_Get( object->object, L"__PATH", 0, &path, NULL, NULL ))) goto done;
++    if (V_VT( &path ) != VT_BSTR)
++    {
++        hr = E_UNEXPECTED;
++        goto done;
++    }
++    hr = IWbemServices_ExecMethod( object->services->services, V_BSTR( &path ), name, 0, NULL, in, &out, NULL );
++    if (FAILED(hr) || !out) goto done;
++    for (i = 0; i < count && i < args->cArgs; ++i)
++    {
++        if (!parameters[i].output) continue;
++        VariantInit( &value );
++        hr = IWbemClassObject_Get( out, parameters[i].name, 0, &value, NULL, NULL );
++        if (SUCCEEDED(hr)) hr = copy_method_output( &args->rgvarg[args->cArgs - i - 1], &value );
++        VariantClear( &value );
++        if (FAILED(hr)) goto done;
++    }
++    if (result)
++    {
++        hr = IWbemClassObject_Get( out, L"ReturnValue", 0, result, NULL, NULL );
++        if (hr == WBEM_E_NOT_FOUND) hr = S_OK;
++
++        /* StdRegProv exposes the registry type failure as a WMI status. */
++        if (SUCCEEDED(hr) && V_VT( result ) == VT_I4 && V_I4( result ) == ERROR_UNSUPPORTED_TYPE &&
++            !wcsicmp( name, L"GetStringValue" ))
++        {
++            VariantInit( &value );
++            if (SUCCEEDED(IWbemClassObject_Get( object->object, L"__CLASS", 0, &value, NULL, NULL )) &&
++                V_VT( &value ) == VT_BSTR && V_BSTR( &value ) && !wcsicmp( V_BSTR( &value ), L"StdRegProv" ))
++                V_I4( result ) = WBEM_E_TYPE_MISMATCH;
++            VariantClear( &value );
++        }
++    }
++
++done:
++    if (out) IWbemClassObject_Release( out );
++    if (in) IWbemClassObject_Release( in );
++    if (out_signature) IWbemClassObject_Release( out_signature );
++    if (in_signature) IWbemClassObject_Release( in_signature );
++    for (i = 0; i < count; ++i) SysFreeString( parameters[i].name );
++    free( parameters );
++    VariantClear( &path );
++    return hr;
++}
++
+ static HRESULT WINAPI object_Invoke(
+     ISWbemObject *iface,
+     DISPID member,
+@@ -1342,11 +1642,10 @@ static HRESULT WINAPI object_Invoke(
+     UINT *arg_err )
+ {
+     struct object *object = impl_from_ISWbemObject( iface );
+-    BSTR name;
++    const struct member *entry;
+     ITypeInfo *typeinfo;
+     VARTYPE vartype;
+     VARIANT value;
+-    CIMTYPE type;
+     HRESULT hr;
+ 
+     TRACE( "%p, %ld, %s, %#lx, %#x, %p, %p, %p, %p\n", object, member, debugstr_guid(riid),
+@@ -1364,14 +1663,15 @@ static HRESULT WINAPI object_Invoke(
+         return hr;
+     }
+ 
+-    if (!(name = get_member_name( object, member, &type )))
+-        return DISP_E_MEMBERNOTFOUND;
++    if (!(entry = get_member( object, member ))) return DISP_E_MEMBERNOTFOUND;
++    if (entry->is_method && (flags == DISPATCH_METHOD || flags == (DISPATCH_METHOD | DISPATCH_PROPERTYGET)))
++        return invoke_method( object, entry->name, params, result, excep_info );
+ 
+     if (flags == (DISPATCH_METHOD|DISPATCH_PROPERTYGET) ||
+         flags == DISPATCH_PROPERTYGET)
+     {
+         memset( params, 0, sizeof(*params) );
+-        return IWbemClassObject_Get( object->object, name, 0, result, NULL, NULL );
++        return IWbemClassObject_Get( object->object, entry->name, 0, result, NULL, NULL );
+     }
+     else if (flags == DISPATCH_PROPERTYPUT)
+     {
+@@ -1381,11 +1681,11 @@ static HRESULT WINAPI object_Invoke(
+             return E_INVALIDARG;
+         }
+ 
+-        vartype = to_vartype( type );
++        vartype = to_vartype( entry->type );
+         V_VT( &value ) = VT_EMPTY;
+         if (SUCCEEDED(hr = VariantChangeType( &value, params->rgvarg, 0, vartype )))
+         {
+-            hr = IWbemClassObject_Put( object->object, name, 0, &value, 0 );
++            hr = IWbemClassObject_Put( object->object, entry->name, 0, &value, 0 );
+             VariantClear( &value );
+         }
+         return hr;
+diff --git a/dlls/wbemdisp/tests/Makefile.in b/dlls/wbemdisp/tests/Makefile.in
+--- a/dlls/wbemdisp/tests/Makefile.in
++++ b/dlls/wbemdisp/tests/Makefile.in
+@@ -1,5 +1,6 @@
+ TESTDLL   = wbemdisp.dll
+-IMPORTS   = oleaut32 ole32
++IMPORTS   = oleaut32 ole32 advapi32
+ 
+ SOURCES = \
++	method.c \
+ 	wbemdisp.c
+diff --git a/dlls/wbemdisp/tests/method.c b/dlls/wbemdisp/tests/method.c
+new file mode 100644
+--- /dev/null
++++ b/dlls/wbemdisp/tests/method.c
+@@ -0,0 +1,205 @@
++/*
++ * Direct WMI method invocation tests
++ *
++ * Copyright 2026 Harvi654
++ * AI-assisted (Codex), original code.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ */
++
++#define COBJMACROS
++#include <windows.h>
++#include <ole2.h>
++#include <oleauto.h>
++#include <wbemcli.h>
++#include "wine/test.h"
++
++enum value_kind { HIVE, KEY, NAME, STRING, DWORD_VALUE, OUT_VARIANT, OUT_BSTR };
++enum out_kind { NONE, TEXT, TYPED_TEXT, SUBKEYS, NULL_OUT };
++
++static const struct call
++{
++    const WCHAR *name;
++    const WCHAR *suffix;
++    unsigned int count;
++    enum value_kind args[5];
++    HRESULT hr;
++    LONG retval;
++    enum out_kind out;
++} calls[] =
++{
++    {L"CreateKey", L"", 2, {HIVE, KEY}, S_OK, 0, NONE},
++    {L"CreateKey", L"\\leaf", 2, {HIVE, KEY}, S_OK, 0, NONE},
++    {L"SetStringValue", L"", 4, {HIVE, KEY, NAME, STRING}, S_OK, 0, NONE},
++    {L"GetStringValue", L"", 4, {HIVE, KEY, NAME, OUT_VARIANT}, S_OK, 0, TEXT},
++    {L"GetStringValue", L"", 4, {HIVE, KEY, NAME, OUT_BSTR}, S_OK, 0, TYPED_TEXT},
++    {L"EnumKey", L"", 3, {HIVE, KEY, OUT_VARIANT}, S_OK, 0, SUBKEYS},
++    {L"SetDWORDValue", L"", 4, {HIVE, KEY, NAME, DWORD_VALUE}, S_OK, 0, NONE},
++    {L"GetStringValue", L"\\missing", 4, {HIVE, KEY, NAME, OUT_VARIANT}, S_OK, 2, NULL_OUT},
++    {L"CreateKey", L"", 0, {HIVE}, DISP_E_EXCEPTION, 0, NONE},
++    {L"GetStringValue", L"", 3, {HIVE, KEY, NAME}, S_OK, WBEM_E_TYPE_MISMATCH, NONE},
++    {L"GetStringValue", L"", 5, {HIVE, KEY, NAME, OUT_VARIANT, STRING}, S_OK, WBEM_E_TYPE_MISMATCH, NULL_OUT},
++    {L"DeleteKey", L"\\leaf", 2, {HIVE, KEY}, S_OK, 0, NONE},
++    {L"DeleteKey", L"", 2, {HIVE, KEY}, S_OK, 0, NONE},
++};
++
++static void check_subkeys(VARIANT *out)
++{
++    LONG lo = -1, hi = -1, index = 0;
++    SAFEARRAY *array;
++    VARIANT entry;
++    HRESULT hr;
++
++    ok(V_VT(out) == (VT_ARRAY | VT_VARIANT), "Unexpected out type %#x.\n", V_VT(out));
++    if (V_VT(out) != (VT_ARRAY | VT_VARIANT)) return;
++    array = V_ARRAY(out);
++    ok(array && SafeArrayGetDim(array) == 1, "Unexpected array %p.\n", array);
++    if (!array || SafeArrayGetDim(array) != 1) return;
++    hr = SafeArrayGetLBound(array, 1, &lo);
++    ok(hr == S_OK && lo == 0, "Got %#lx, lower bound %ld.\n", hr, lo);
++    hr = SafeArrayGetUBound(array, 1, &hi);
++    ok(hr == S_OK && hi == 0, "Got %#lx, upper bound %ld.\n", hr, hi);
++    VariantInit(&entry);
++    hr = SafeArrayGetElement(array, &index, &entry);
++    ok(hr == S_OK, "Got %#lx.\n", hr);
++    ok(V_VT(&entry) == VT_BSTR, "Unexpected element type %#x.\n", V_VT(&entry));
++    if (V_VT(&entry) == VT_BSTR)
++        ok(V_BSTR(&entry) && !lstrcmpW(V_BSTR(&entry), L"leaf"), "Got %ls.\n", V_BSTR(&entry) ? V_BSTR(&entry) : L"<null>");
++    VariantClear(&entry);
++}
++
++static void test_call(IDispatch *object, const struct call *call, WCHAR *key, WORD flags)
++{
++    VARIANT args[5], result, out;
++    DISPPARAMS params = {args, NULL, call->count, 0};
++    EXCEPINFO ex = {0};
++    WCHAR *name = (WCHAR *)call->name;
++    BSTR typed = SysAllocString(L"sentinel");
++    unsigned int i, argerr = ~0u;
++    DISPID id;
++    HRESULT hr;
++
++    hr = IDispatch_GetIDsOfNames(object, &IID_NULL, &name, 1, LOCALE_USER_DEFAULT, &id);
++    ok(hr == S_OK, "Lookup got %#lx.\n", hr);
++    if (FAILED(hr))
++    {
++        SysFreeString(typed);
++        return;
++    }
++    VariantInit(&result);
++    VariantInit(&out);
++    V_VT(&out) = VT_BSTR;
++    V_BSTR(&out) = SysAllocString(L"sentinel");
++    for (i = 0; i < call->count; ++i)
++    {
++        VARIANT *arg = &args[call->count - 1 - i];
++
++        VariantInit(arg);
++        switch (call->args[i])
++        {
++        case HIVE: V_VT(arg) = VT_I4; V_I4(arg) = (LONG)0x80000001; break;
++        case DWORD_VALUE: V_VT(arg) = VT_I4; V_I4(arg) = 42; break;
++        case KEY: V_VT(arg) = VT_BSTR; V_BSTR(arg) = SysAllocString(key); break;
++        case NAME: V_VT(arg) = VT_BSTR; V_BSTR(arg) = SysAllocString(L"sample"); break;
++        case STRING: V_VT(arg) = VT_BSTR; V_BSTR(arg) = SysAllocString(L"winum-value"); break;
++        case OUT_VARIANT: V_VT(arg) = VT_VARIANT | VT_BYREF; V_VARIANTREF(arg) = &out; break;
++        case OUT_BSTR: V_VT(arg) = VT_BSTR | VT_BYREF; V_BSTRREF(arg) = &typed; break;
++        }
++    }
++    hr = IDispatch_Invoke(object, id, &IID_NULL, LOCALE_USER_DEFAULT, flags, &params, &result, &ex, &argerr);
++    ok(hr == call->hr, "Invoke got %#lx, expected %#lx.\n", hr, call->hr);
++    if (hr == DISP_E_EXCEPTION && hr == call->hr)
++    {
++        if (ex.pfnDeferredFillIn) ex.pfnDeferredFillIn(&ex);
++        ok(ex.scode == WBEM_E_INVALID_PARAMETER, "Got exception %#lx.\n", ex.scode);
++        ok(V_VT(&result) == VT_EMPTY, "Unexpected result type %#x.\n", V_VT(&result));
++    }
++    if (hr == S_OK && hr == call->hr)
++    {
++        ok(V_VT(&result) == VT_I4, "Unexpected result type %#x.\n", V_VT(&result));
++        if (V_VT(&result) == VT_I4)
++            ok(V_I4(&result) == call->retval, "Got result %#lx, expected %#lx.\n", V_I4(&result), call->retval);
++        switch (call->out)
++        {
++        case TEXT:
++            ok(V_VT(&out) == VT_BSTR, "Unexpected out type %#x.\n", V_VT(&out));
++            if (V_VT(&out) == VT_BSTR)
++                ok(V_BSTR(&out) && !lstrcmpW(V_BSTR(&out), L"winum-value"),
++                   "Got %ls.\n", V_BSTR(&out) ? V_BSTR(&out) : L"<null>");
++            break;
++        case TYPED_TEXT:
++            ok(typed && !lstrcmpW(typed, L"winum-value"), "Got %ls.\n", typed ? typed : L"<null>");
++            break;
++        case SUBKEYS:
++            check_subkeys(&out);
++            break;
++        case NULL_OUT:
++            ok(V_VT(&out) == VT_NULL, "Unexpected out type %#x.\n", V_VT(&out));
++            break;
++        default:
++            break;
++        }
++    }
++    SysFreeString(ex.bstrSource);
++    SysFreeString(ex.bstrDescription);
++    SysFreeString(ex.bstrHelpFile);
++    for (i = 0; i < call->count; ++i) VariantClear(&args[i]);
++    VariantClear(&result);
++    VariantClear(&out);
++    SysFreeString(typed);
++}
++
++START_TEST(method)
++{
++    static WCHAR display[] = L"winmgmts:{impersonationLevel=impersonate}!\\\\.\\root\\default:StdRegProv";
++    static const WORD flags[] = {DISPATCH_METHOD, DISPATCH_METHOD | DISPATCH_PROPERTYGET};
++    WCHAR guid_text[40], root[100], key[120];
++    IDispatch *object = NULL;
++    IMoniker *moniker = NULL;
++    IBindCtx *ctx = NULL;
++    unsigned int i, j;
++    HRESULT hr;
++    ULONG eaten;
++    LONG status;
++    GUID guid;
++
++    hr = CoInitialize(NULL);
++    ok(SUCCEEDED(hr), "Got %#lx.\n", hr);
++    if (FAILED(hr)) return;
++    hr = CreateBindCtx(0, &ctx);
++    ok(hr == S_OK, "Got %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    hr = MkParseDisplayName(ctx, display, &eaten, &moniker);
++    ok(hr == S_OK, "Got %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    hr = IMoniker_BindToObject(moniker, ctx, NULL, &IID_IDispatch, (void **)&object);
++    ok(hr == S_OK, "Got %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    hr = CoCreateGuid(&guid);
++    ok(hr == S_OK, "Got %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    if (!StringFromGUID2(&guid, guid_text, ARRAY_SIZE(guid_text))) goto done;
++    for (i = 0; i < ARRAY_SIZE(flags); ++i)
++    {
++        lstrcpyW(root, L"Software\\winum-wbemdisp-");
++        lstrcatW(lstrcatW(root, guid_text), i ? L"-both" : L"-method");
++        for (j = 0; j < ARRAY_SIZE(calls); ++j)
++        {
++            winetest_push_context("flags %#x call %u (%ls)", flags[i], j, calls[j].name);
++            lstrcatW(lstrcpyW(key, root), calls[j].suffix);
++            test_call(object, &calls[j], key, flags[i]);
++            winetest_pop_context();
++        }
++        status = RegDeleteTreeW(HKEY_CURRENT_USER, root);
++        ok(status == ERROR_SUCCESS || status == ERROR_FILE_NOT_FOUND, "Cleanup got %ld.\n", status);
++    }
++
++done:
++    if (object) IDispatch_Release(object);
++    if (moniker) IMoniker_Release(moniker);
++    if (ctx) IBindCtx_Release(ctx);
++    CoUninitialize();
++}

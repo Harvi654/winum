@@ -9,22 +9,25 @@ and published as versioned releases.
 
 *Winum* is how the Romans pronounced *vinum*, wine.
 
-> **Status (23 November 2026).** Current release:
-> [`winum-11.22-2`](docs/release/winum-11.22-2.md) - Wine 11.22 with 73
-> patches: the 66 of [`winum-11.22-1`](docs/release/winum-11.22-1.md)
-> plus Inventor's Open and Save dialog fixes (four in shell32), the
-> msxml3 same-node fix contributed by @Lukas10999, and two AutoCAD 2027
-> fixes (Save As crash in ucrtbase, "Connection Lost" from a timer in
-> wineserver). Validation: L0 both architectures with `--fuzz=0`; L1 and
-> L2 per patch; L4 in Inventor 2027 and AutoCAD 2027; SOLIDWORKS L4
-> deferred. Every patch in `patches/series` has a Wine test that passed on
-> Windows 10 (L1) or a recorded reason why not; `scripts/check-series.sh`
-> checks it. Next: Wine 11.23 (expected around 27 November).
+> **Status (25 November 2026).** Current release:
+> [`winum-11.22-3`](docs/release/winum-11.22-3.md) - Wine 11.22 with 80
+> patches: the 73 of [`winum-11.22-2`](docs/release/winum-11.22-2.md)
+> plus six fixes that make Autodesk Inventor Nastran 2027 work (token
+> integrity level in wineserver and ntdll, per-user COM classes in
+> combase, HKCR reads in kernelbase, WMI method calls in wbemdisp,
+> ADODB.Stream text in msado15) and ClearType font smoothing in win32u
+> (diagnosed by @krokosik). Validation: L0 both architectures with
+> `--fuzz=0`; L1 and L2 per patch and for all seven together; L4 in
+> Inventor 2027 (with Nastran) and AutoCAD 2027; SOLIDWORKS L4 deferred.
+> Every patch in `patches/series` has a Wine test that passed on Windows
+> 10 (L1) or a recorded reason why not; `scripts/check-series.sh` checks
+> it. Next: Wine 11.23.
 
 ## Releases
 
 | Release | Wine | Date | Patches | What it added |
 | --- | --- | --- | --- | --- |
+| [winum-11.22-3](docs/release/winum-11.22-3.md) | 11.22 | 2026-11-25 | 80 | Inventor Nastran 2027 (token integrity, per-user COM classes, HKCR reads, WMI methods, ADODB.Stream text), ClearType font smoothing (@krokosik) |
 | [winum-11.22-2](docs/release/winum-11.22-2.md) | 11.22 | 2026-11-23 | 73 | Inventor's Open/Save dialogs (shell32), msxml3 same node (@Lukas10999), AutoCAD Save As crash (ucrtbase) and "Connection Lost" (wineserver) |
 | [winum-11.22-1](docs/release/winum-11.22-1.md) | 11.22 | 2026-11-16 | 66 | the 66 patches moved to Wine 11.22 |
 | [winum-11.20-2](docs/release/winum-11.20-2.md) | 11.20 | 2026-11-12 | 66 | Import CAD Reference Model (ole32, packager), contributed by @krokosik |

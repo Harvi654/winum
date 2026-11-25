@@ -1,0 +1,764 @@
+measure=v1 bits=64
+ole_init=0x00000000
+fixtures_ready=1
+c case=write charset=utf-8
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0075,0074,0066,002d,0038] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_empty hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_char hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_crlf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_line_crlf hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_lf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_line_lf hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=save_initial hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=initial error=2
+c step=rewind_read hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_n1 hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_n3 hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_line_lf hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_remaining hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_copy hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c create type=1 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=copy_text_to_binary hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c target=text_to_binary Size=20:0 Position=20:0 EOS=11:-1
+c step=save_binary_target hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=binary_target error=2
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=rewind_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=save_truncated hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=truncated error=2
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=change_at_zero charset=utf-8
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_open_get hr=0x00000000 exception=0x00000000 result=8:[0075,0074,0066,002d,0038] Size=20:0 Position=20:0 EOS=11:-1
+c step=write_before_change hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_write hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_write_get hr=0x00000000 exception=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=20:0 Position=20:0 EOS=11:-1
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=write charset=UTF-8
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0055,0054,0046,002d,0038] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_empty hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_char hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_crlf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_line_crlf hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_lf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_line_lf hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=save_initial hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=initial error=2
+c step=rewind_read hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_n1 hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_n3 hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_line_lf hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_remaining hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_copy hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c create type=1 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=copy_text_to_binary hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c target=text_to_binary Size=20:0 Position=20:0 EOS=11:-1
+c step=save_binary_target hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=binary_target error=2
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=rewind_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=save_truncated hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=truncated error=2
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=change_at_zero charset=UTF-8
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_open_get hr=0x00000000 exception=0x00000000 result=8:[0055,0054,0046,002d,0038] Size=20:0 Position=20:0 EOS=11:-1
+c step=write_before_change hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_write hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_write_get hr=0x00000000 exception=0x00000000 result=8:[0075,0074,0066,002d,0038] Size=20:0 Position=20:0 EOS=11:-1
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=write charset=Unicode
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_empty hr=0x00000000 exception=0x00000000 result=0: Size=20:2 Position=20:2 EOS=11:-1
+c step=write_char hr=0x00000000 exception=0x00000000 result=0: Size=20:14 Position=20:14 EOS=11:-1
+c step=set_crlf hr=0x00000000 exception=0x00000000 result=0: Size=20:14 Position=20:14 EOS=11:-1
+c step=write_line_crlf hr=0x80020009 exception=0x80004001 result=0: Size=20:14 Position=20:14 EOS=11:-1
+c step=set_lf hr=0x00000000 exception=0x00000000 result=0: Size=20:14 Position=20:14 EOS=11:-1
+c step=write_line_lf hr=0x80020009 exception=0x80004001 result=0: Size=20:14 Position=20:14 EOS=11:-1
+c step=save_initial hr=0x80020009 exception=0x80004001 result=0: Size=20:14 Position=20:14 EOS=11:-1
+file origin=c label=initial error=2
+c step=rewind_read hr=0x00000000 exception=0x00000000 result=0: Size=20:14 Position=20:0 EOS=11:0
+c step=read_n1 hr=0x00000000 exception=0x00000000 result=8:[0000] Size=20:14 Position=20:2 EOS=11:0
+c step=read_n3 hr=0x00000000 exception=0x00000000 result=8:[0041,010d,20ac] Size=20:14 Position=20:8 EOS=11:0
+c step=read_line_lf hr=0x80020009 exception=0x80004001 result=8:[] Size=20:14 Position=20:8 EOS=11:0
+c step=read_remaining hr=0x00000000 exception=0x00000000 result=8:[d83d,de03,0000] Size=20:14 Position=20:14 EOS=11:-1
+c step=rewind_copy hr=0x00000000 exception=0x00000000 result=0: Size=20:14 Position=20:0 EOS=11:0
+c create type=1 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=copy_text_to_binary hr=0x80020009 exception=0x80004001 result=0: Size=20:14 Position=20:0 EOS=11:0
+c target=text_to_binary Size=20:0 Position=20:0 EOS=11:-1
+c step=save_binary_target hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=binary_target error=2
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=rewind_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:14 Position=20:0 EOS=11:0
+c step=set_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=save_truncated hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=truncated error=2
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=change_at_zero charset=Unicode
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_open_get hr=0x00000000 exception=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=20:0 Position=20:0 EOS=11:-1
+c step=write_before_change hr=0x00000000 exception=0x00000000 result=0: Size=20:12 Position=20:12 EOS=11:-1
+c step=charset_after_write hr=0x00000000 exception=0x00000000 result=0: Size=20:12 Position=20:12 EOS=11:-1
+c step=charset_after_write_get hr=0x00000000 exception=0x00000000 result=8:[0075,0074,0066,002d,0038] Size=20:12 Position=20:12 EOS=11:-1
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=write charset=us-ascii
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0075,0073,002d,0061,0073,0063,0069,0069] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_empty hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_char hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_crlf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_line_crlf hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_lf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_line_lf hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=save_initial hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=initial error=2
+c step=rewind_read hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_n1 hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_n3 hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_line_lf hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_remaining hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_copy hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c create type=1 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=copy_text_to_binary hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c target=text_to_binary Size=20:0 Position=20:0 EOS=11:-1
+c step=save_binary_target hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=binary_target error=2
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=rewind_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=save_truncated hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=truncated error=2
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=change_at_zero charset=us-ascii
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_open_get hr=0x00000000 exception=0x00000000 result=8:[0075,0073,002d,0061,0073,0063,0069,0069] Size=20:0 Position=20:0 EOS=11:-1
+c step=write_before_change hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_write hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_write_get hr=0x00000000 exception=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=20:0 Position=20:0 EOS=11:-1
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=write charset=windows-1252
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0077,0069,006e,0064,006f,0077,0073,002d,0031,0032,0035,0032] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_empty hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_char hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_crlf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_line_crlf hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_lf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_line_lf hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=save_initial hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=initial error=2
+c step=rewind_read hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_n1 hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_n3 hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_line_lf hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_remaining hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_copy hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c create type=1 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=copy_text_to_binary hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c target=text_to_binary Size=20:0 Position=20:0 EOS=11:-1
+c step=save_binary_target hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=binary_target error=2
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=rewind_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=save_truncated hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=truncated error=2
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=change_at_zero charset=windows-1252
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_open_get hr=0x00000000 exception=0x00000000 result=8:[0077,0069,006e,0064,006f,0077,0073,002d,0031,0032,0035,0032] Size=20:0 Position=20:0 EOS=11:-1
+c step=write_before_change hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_write hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_write_get hr=0x00000000 exception=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=20:0 Position=20:0 EOS=11:-1
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=write charset=iso-8859-1
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0069,0073,006f,002d,0038,0038,0035,0039,002d,0031] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_empty hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_char hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_crlf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_line_crlf hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_lf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=write_line_lf hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=save_initial hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=initial error=2
+c step=rewind_read hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_n1 hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_n3 hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_line_lf hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_remaining hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_copy hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c create type=1 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=copy_text_to_binary hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c target=text_to_binary Size=20:0 Position=20:0 EOS=11:-1
+c step=save_binary_target hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=binary_target error=2
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=rewind_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=save_truncated hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+file origin=c label=truncated error=2
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=change_at_zero charset=iso-8859-1
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_open_get hr=0x00000000 exception=0x00000000 result=8:[0069,0073,006f,002d,0038,0038,0035,0039,002d,0031] Size=20:0 Position=20:0 EOS=11:-1
+c step=write_before_change hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_write hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=charset_after_write_get hr=0x00000000 exception=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=20:0 Position=20:0 EOS=11:-1
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=load charset=utf-8 fixture=bom
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0075,0074,0066,002d,0038] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=load_text hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_n hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_all_after_n hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_lines hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_crlf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_crlf hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=set_lf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_lf hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_tail hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c create type=1 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=load_binary hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=copy_binary_to_text hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c target=binary_to_text Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_from_binary hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_from_binary hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=load charset=utf-8 fixture=bare
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0075,0074,0066,002d,0038] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=load_text hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_n hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_all_after_n hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_lines hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_crlf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_crlf hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=set_lf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_lf hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_tail hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c create type=1 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=load_binary hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=copy_binary_to_text hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c target=binary_to_text Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_from_binary hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_from_binary hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=load charset=UTF-8 fixture=bom
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0055,0054,0046,002d,0038] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=load_text hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_n hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_all_after_n hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_lines hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_crlf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_crlf hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=set_lf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_lf hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_tail hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c create type=1 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=load_binary hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=copy_binary_to_text hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c target=binary_to_text Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_from_binary hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_from_binary hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c case=load charset=UTF-8 fixture=bare
+c create type=2 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_set hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=charset_get hr=0x00000000 exception=0x00000000 result=8:[0055,0054,0046,002d,0038] Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=load_text hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_n hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_all_after_n hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_lines hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_crlf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_crlf hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=set_lf hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_lf hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=read_tail hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=set_eos hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c create type=1 hr=0x00000000
+c step=type hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=open hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=load_binary hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=copy_binary_to_text hr=0x80020009 exception=0x80004001 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c target=binary_to_text Size=20:0 Position=20:0 EOS=11:-1
+c step=rewind_from_binary hr=0x00000000 exception=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+c step=read_from_binary hr=0x80020009 exception=0x80004001 result=8:[] Size=20:0 Position=20:0 EOS=11:-1
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+c step=close hr=0x00000000 exception=0x00000000 result=0: Size=error/0x80020009/0x800a0e78 Position=error/0x80020009/0x800a0e78 EOS=error/0x80020009/0x800a0e78
+vbs case=write charset=utf-8
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0075,0074,0066,002d,0038] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_empty err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_char err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_crlf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_line_crlf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_lf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_line_lf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_initial err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_read err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_n1 err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_n3 err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_line_lf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_remaining err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_copy err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs create type=1 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=copy_text_to_binary err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs target=text_to_binary Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_binary_target err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=rewind_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_truncated err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=change_at_zero charset=utf-8
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_open_get err=0x00000000 result=8:[0075,0074,0066,002d,0038] Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_before_change err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_write err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_write_get err=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=write charset=UTF-8
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0055,0054,0046,002d,0038] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_empty err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_char err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_crlf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_line_crlf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_lf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_line_lf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_initial err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_read err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_n1 err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_n3 err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_line_lf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_remaining err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_copy err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs create type=1 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=copy_text_to_binary err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs target=text_to_binary Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_binary_target err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=rewind_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_truncated err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=change_at_zero charset=UTF-8
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_open_get err=0x00000000 result=8:[0055,0054,0046,002d,0038] Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_before_change err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_write err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_write_get err=0x00000000 result=8:[0075,0074,0066,002d,0038] Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=write charset=Unicode
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_empty err=0x00000000 result=0: Size=20:2 Position=20:2 EOS=11:-1
+vbs step=write_char err=0x00000000 result=0: Size=20:14 Position=20:14 EOS=11:-1
+vbs step=set_crlf err=0x00000000 result=0: Size=20:14 Position=20:14 EOS=11:-1
+vbs step=write_line_crlf err=0x000001BD result=0: Size=20:14 Position=20:14 EOS=11:-1
+vbs step=set_lf err=0x00000000 result=0: Size=20:14 Position=20:14 EOS=11:-1
+vbs step=write_line_lf err=0x000001BD result=0: Size=20:14 Position=20:14 EOS=11:-1
+vbs step=save_initial err=0x000001BD result=0: Size=20:14 Position=20:14 EOS=11:-1
+vbs step=rewind_read err=0x00000000 result=0: Size=20:14 Position=20:0 EOS=11:0
+vbs step=read_n1 err=0x00000000 result=8:[0000] Size=20:14 Position=20:2 EOS=11:0
+vbs step=read_n3 err=0x00000000 result=8:[0041,010d,20ac] Size=20:14 Position=20:8 EOS=11:0
+vbs step=read_line_lf err=0x000001BD result=0: Size=20:14 Position=20:8 EOS=11:0
+vbs step=read_remaining err=0x00000000 result=8:[d83d,de03,0000] Size=20:14 Position=20:14 EOS=11:-1
+vbs step=rewind_copy err=0x00000000 result=0: Size=20:14 Position=20:0 EOS=11:0
+vbs create type=1 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=copy_text_to_binary err=0x000001BD result=0: Size=20:14 Position=20:0 EOS=11:0
+vbs target=text_to_binary Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_binary_target err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=rewind_eos err=0x00000000 result=0: Size=20:14 Position=20:0 EOS=11:0
+vbs step=set_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_truncated err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=change_at_zero charset=Unicode
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_open_get err=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_before_change err=0x00000000 result=0: Size=20:12 Position=20:12 EOS=11:-1
+vbs step=charset_after_write err=0x00000000 result=0: Size=20:12 Position=20:12 EOS=11:-1
+vbs step=charset_after_write_get err=0x00000000 result=8:[0075,0074,0066,002d,0038] Size=20:12 Position=20:12 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=write charset=us-ascii
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0075,0073,002d,0061,0073,0063,0069,0069] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_empty err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_char err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_crlf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_line_crlf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_lf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_line_lf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_initial err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_read err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_n1 err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_n3 err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_line_lf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_remaining err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_copy err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs create type=1 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=copy_text_to_binary err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs target=text_to_binary Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_binary_target err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=rewind_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_truncated err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=change_at_zero charset=us-ascii
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_open_get err=0x00000000 result=8:[0075,0073,002d,0061,0073,0063,0069,0069] Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_before_change err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_write err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_write_get err=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=write charset=windows-1252
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0077,0069,006e,0064,006f,0077,0073,002d,0031,0032,0035,0032] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_empty err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_char err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_crlf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_line_crlf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_lf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_line_lf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_initial err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_read err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_n1 err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_n3 err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_line_lf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_remaining err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_copy err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs create type=1 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=copy_text_to_binary err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs target=text_to_binary Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_binary_target err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=rewind_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_truncated err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=change_at_zero charset=windows-1252
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_open_get err=0x00000000 result=8:[0077,0069,006e,0064,006f,0077,0073,002d,0031,0032,0035,0032] Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_before_change err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_write err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_write_get err=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=write charset=iso-8859-1
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0069,0073,006f,002d,0038,0038,0035,0039,002d,0031] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_empty err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_char err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_crlf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_line_crlf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_lf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_line_lf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_initial err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_read err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_n1 err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_n3 err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_line_lf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_remaining err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_copy err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs create type=1 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=copy_text_to_binary err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs target=text_to_binary Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_binary_target err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=rewind_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=save_truncated err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=change_at_zero charset=iso-8859-1
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_open_get err=0x00000000 result=8:[0069,0073,006f,002d,0038,0038,0035,0039,002d,0031] Size=20:0 Position=20:0 EOS=11:-1
+vbs step=write_before_change err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_write err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=charset_after_write_get err=0x00000000 result=8:[0055,006e,0069,0063,006f,0064,0065] Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=load charset=utf-8 fixture=bom
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0075,0074,0066,002d,0038] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=load_text err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_n err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_all_after_n err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_lines err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_crlf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_crlf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_lf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_lf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_tail err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs create type=1 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=load_binary err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=copy_binary_to_text err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs target=binary_to_text Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_from_binary err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_from_binary err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=load charset=utf-8 fixture=bare
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0075,0074,0066,002d,0038] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=load_text err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_n err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_all_after_n err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_lines err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_crlf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_crlf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_lf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_lf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_tail err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs create type=1 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=load_binary err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=copy_binary_to_text err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs target=binary_to_text Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_from_binary err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_from_binary err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=load charset=UTF-8 fixture=bom
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0055,0054,0046,002d,0038] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=load_text err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_n err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_all_after_n err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_lines err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_crlf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_crlf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_lf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_lf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_tail err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs create type=1 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=load_binary err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=copy_binary_to_text err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs target=binary_to_text Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_from_binary err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_from_binary err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs case=load charset=UTF-8 fixture=bare
+vbs create type=2 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_set err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=charset_get err=0x00000000 result=8:[0055,0054,0046,002d,0038] Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=load_text err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_n err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_all_after_n err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_lines err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_crlf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_crlf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_lf err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_lf err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_tail err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=set_eos err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs create type=1 err=0x00000000
+vbs step=type err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=open err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=load_binary err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=copy_binary_to_text err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs target=binary_to_text Size=20:0 Position=20:0 EOS=11:-1
+vbs step=rewind_from_binary err=0x00000000 result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=read_from_binary err=0x000001BD result=0: Size=20:0 Position=20:0 EOS=11:-1
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs step=close err=0x00000000 result=0: Size=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] Position=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038] EOS=8:[0030,0078,0030,0030,0030,0030,0030,0045,0037,0038]
+vbs complete=1
+cscript exit=0
+file origin=vbs label=vbs-0-initial.bin error=2
+file origin=vbs label=vbs-0-binary.bin error=2
+file origin=vbs label=vbs-0-truncated.bin error=2
+file origin=vbs label=vbs-1-initial.bin error=2
+file origin=vbs label=vbs-1-binary.bin error=2
+file origin=vbs label=vbs-1-truncated.bin error=2
+file origin=vbs label=vbs-2-initial.bin error=2
+file origin=vbs label=vbs-2-binary.bin error=2
+file origin=vbs label=vbs-2-truncated.bin error=2
+file origin=vbs label=vbs-3-initial.bin error=2
+file origin=vbs label=vbs-3-binary.bin error=2
+file origin=vbs label=vbs-3-truncated.bin error=2
+file origin=vbs label=vbs-4-initial.bin error=2
+file origin=vbs label=vbs-4-binary.bin error=2
+file origin=vbs label=vbs-4-truncated.bin error=2
+file origin=vbs label=vbs-5-initial.bin error=2
+file origin=vbs label=vbs-5-binary.bin error=2
+file origin=vbs label=vbs-5-truncated.bin error=2
+scratch_cleanup=1
+measure_complete=1
+probe_exit=0

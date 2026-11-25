@@ -1,0 +1,1 @@
+wbemdisp-method-invoke | docs/wine-repro/wbemdisp-method-invoke/measure.c | -lole32 -loleaut32 -luuid -ladvapi32

@@ -1,0 +1,40 @@
+name: Build msado15 stream charset L1
+
+on:
+  push:
+    branches: ['topic/msado15-stream-charset-measure']
+    paths:
+      - 'patches/candidates/msado15-stream-charset/msado15-stream-charset.patch'
+      - 'scripts/build-l1-msado15-stream-charset.sh'
+      - '.github/workflows/build-msado15-stream-charset-l1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  l1:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install pinned LLVM MinGW
+        run: |
+          toolchain=llvm-mingw-20250910-ucrt-ubuntu-22.04-x86_64
+          cd "$RUNNER_TEMP"
+          curl -fLsS --retry 3 --max-time 120 -o "$toolchain.tar.xz" \
+            "https://github.com/mstorsjo/llvm-mingw/releases/download/20250910/$toolchain.tar.xz"
+          printf '%s  %s\n' f83556c9ffa4d4291fadea1a0776c1383332dacdf4d7fbdf974c2928cb32c6f7 "$toolchain.tar.xz" | sha256sum -c -
+          tar -xJf "$toolchain.tar.xz"
+          printf '%s\n' "$RUNNER_TEMP/$toolchain/bin" >> "$GITHUB_PATH"
+      - name: Build the exact Wine test for the offline VM
+        run: |
+          bash scripts/build-l1-msado15-stream-charset.sh out
+          cd out
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: msado15-stream-charset-l1
+          path: out/
+          if-no-files-found: error
+          retention-days: 30

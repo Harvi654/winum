@@ -1,10 +1,10 @@
 # Patch status overview
 
-One row per patch of `patches/series` (winum-11.22-2, 73 patches), in
+One row per patch of `patches/series` (winum-11.22-3, 80 patches), in
 series order. Details, dates and evidence are on each patch's page, which
 is authoritative; this table is updated with every release (last:
-winum-11.22-2, 2026-11-23). The L1 column follows the page markers that
-`scripts/check-series.sh` checks (73 of 73: L1 62, L3 only 9, known
+winum-11.22-3, 2026-11-25). The L1 column follows the page markers that
+`scripts/check-series.sh` checks (80 of 80: L1 69, L3 only 9, known
 deviation 2). "Since" is the first winum release with the patch. Earlier
 versions of this file: `docs/archive/patches-overview-2026-11-06.md` and
 the git history.
@@ -91,6 +91,13 @@ not planned for the patch.
 | 71 | [msxml3-replacechild-same-node](msxml3-replacechild-same-node.md) | msxml3 | 11.22-2 | yes | yes | yes | yes | yes | - | yes |
 | 72 | [ucrtbase-cxx-exception-size](ucrtbase-cxx-exception-size.md) | ucrtbase | 11.22-2 | yes | yes | yes | - | yes | - | yes |
 | 73 | [server-cross-thread-killtimer](server-cross-thread-killtimer.md) | server | 11.22-2 | yes | yes | yes | yes | yes | - | yes |
+| 74 | [server-token-integrity-level](server-token-integrity-level.md) | server | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
+| 75 | [ntdll-token-integrity-level](ntdll-token-integrity-level.md) | ntdll | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
+| 76 | [combase-per-user-classes](combase-per-user-classes.md) | combase | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
+| 77 | [kernelbase-hkcr-class-reads](kernelbase-hkcr-class-reads.md) | kernelbase | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
+| 78 | [wbemdisp-method-invoke](wbemdisp-method-invoke.md) | wbemdisp | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
+| 79 | [msado15-stream-charset](msado15-stream-charset.md) | msado15 | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
+| 80 | [win32u-font-smoothing](win32u-font-smoothing.md) | win32u | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
 
 ## By release
 
@@ -100,11 +107,12 @@ not planned for the patch.
 | [winum-11.20-2](../release/winum-11.20-2.md) | 2026-11-12 | 66 | rows 63-66: Import CAD Reference Model (ole32, packager), contributed by @krokosik |
 | [winum-11.22-1](../release/winum-11.22-1.md) | 2026-11-16 | 66 | the same 66 on Wine 11.22 |
 | [winum-11.22-2](../release/winum-11.22-2.md) | 2026-11-23 | 73 | rows 67-73: Inventor's Open/Save dialogs (shell32), msxml3 same node (@Lukas10999), AutoCAD Save As (ucrtbase) and "Connection Lost" (server) |
+| [winum-11.22-3](../release/winum-11.22-3.md) | 2026-11-25 | 80 | rows 74-80: Inventor Nastran 2027 (token integrity in server and ntdll, per-user COM classes, HKCR reads, WMI methods, ADODB.Stream text), ClearType font smoothing (@krokosik) |
 
 ## What is missing, by kind
 
 Every patch of the series has a Wine test that passed on Windows 10 or a
-recorded exception (`check-series.sh`, 73 of 73). L5 is the maintainer's
+recorded exception (`check-series.sh`, 80 of 80). L5 is the maintainer's
 confirmation after a week of use; rows marked **confirm** wait for it.
 SOLIDWORKS and AutoCAD L4 are recorded as deferred where the program was
 not being worked on. Open measurements and follow-ups are on each page and

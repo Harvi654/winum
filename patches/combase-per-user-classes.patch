@@ -1,0 +1,772 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] combase: Look up per-user in-process classes.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Non-elevated Windows 10 selected the user registration over the machine
+registration when both named the same in-process class. It also resolved
+the per-user ProgID and TreatAs keys. Search the current user's classes
+before the existing machine lookup for those reads. Keep explicit registry
+view selection and preserve other HKCR callers.
+
+v2 (2026-11-24): The native Windows 10 fixture found that High integrity
+callers cannot activate a class registered only in HKCU. Use the thread
+token when impersonating and otherwise the process token. At High or
+above, or if integrity cannot be determined, use the existing machine
+lookup. This revision requires the server and ntdll token integrity
+patches so a limited Wine process reports its actual integrity level.
+
+v3 2026-11-25: no code change. The combase test moves from tests-first
+into the patch; the six todo_wine/todo_wine_if marks on checks this
+patch passes are dropped (CoGetClassObject, CoCreateInstance, the
+server marker, CLSIDFromProgID, ProgIDFromCLSID, CoGetTreatAsClass).
+Promoted to the series for winum-11.22-3.
+
+v4 2026-11-25: no code change. The test skips the explicit KEY_WOW64_32KEY
+user registration in a 64-bit run when HKCU\Software\Classes\Wow6432Node
+does not exist, as in a fresh Wine prefix: Wine then stores that
+registration in the 64-bit view, where Windows redirects it, so the
+case tests the prefix layout, not COM. Windows always has the key, so
+the case still runs there.
+
+diff --git a/dlls/combase/combase.c b/dlls/combase/combase.c
+--- a/dlls/combase/combase.c
++++ b/dlls/combase/combase.c
+@@ -303,7 +303,66 @@ static LSTATUS open_classes_key(HKEY hkey, const WCHAR *name, REGSAM access, HKE
+     return RtlNtStatusToDosError(NtOpenKey((HANDLE *)retkey, access, &attr));
+ }
+ 
+-HRESULT open_key_for_clsid(REFCLSID clsid, const WCHAR *keyname, REGSAM access, HKEY *subkey)
++static BOOL classes_key_missing(LSTATUS ret)
++{
++    return ret == ERROR_FILE_NOT_FOUND || ret == ERROR_PATH_NOT_FOUND;
++}
++
++static BOOL use_per_user_classes(void)
++{
++    union
++    {
++        TOKEN_MANDATORY_LABEL label;
++        BYTE buffer[sizeof(TOKEN_MANDATORY_LABEL) + SECURITY_MAX_SID_SIZE];
++    } info;
++    HANDLE token;
++    NTSTATUS status;
++    ULONG size;
++    PSID sid;
++    UCHAR count;
++
++    status = NtOpenThreadToken(GetCurrentThread(), TOKEN_QUERY, TRUE, &token);
++    if (status == STATUS_NO_TOKEN) status = NtOpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token);
++    if (status) return FALSE;
++
++    status = NtQueryInformationToken(token, TokenIntegrityLevel, &info, sizeof(info), &size);
++    NtClose(token);
++    if (status) return FALSE;
++
++    sid = info.label.Label.Sid;
++    if (!RtlValidSid(sid) || !(count = *RtlSubAuthorityCountSid(sid))) return FALSE;
++    return *RtlSubAuthoritySid(sid, count - 1) < SECURITY_MANDATORY_HIGH_RID;
++}
++
++static LSTATUS open_user_classes_key(const WCHAR *name, const WCHAR *leaf, REGSAM access, HKEY *key)
++{
++    static const WCHAR prefix[] = L"Software\\Classes\\";
++    SIZE_T count = ARRAY_SIZE(prefix) + lstrlenW(name);
++    WCHAR *path;
++    HKEY user;
++    LSTATUS ret;
++
++    if (!use_per_user_classes()) return ERROR_FILE_NOT_FOUND;
++    if (leaf) count += 1 + lstrlenW(leaf);
++    if (!(path = malloc(count * sizeof(*path)))) return ERROR_NOT_ENOUGH_MEMORY;
++    lstrcpyW(path, prefix);
++    lstrcatW(path, name);
++    if (leaf)
++    {
++        lstrcatW(path, L"\\");
++        lstrcatW(path, leaf);
++    }
++    if (!(ret = RegOpenCurrentUser(KEY_READ, &user)))
++    {
++        ret = RegOpenKeyExW(user, path, 0, access, key);
++        RegCloseKey(user);
++    }
++    free(path);
++    return ret;
++}
++
++static HRESULT open_class_key(REFCLSID clsid, const WCHAR *keyname, REGSAM access, HKEY *subkey,
++                              BOOL user_first)
+ {
+     static const WCHAR clsidW[] = L"CLSID\\";
+     WCHAR path[CHARS_IN_GUID + ARRAY_SIZE(clsidW) - 1];
+@@ -312,6 +371,13 @@ HRESULT open_key_for_clsid(REFCLSID clsid, const WCHAR *keyname, REGSAM access,
+ 
+     lstrcpyW(path, clsidW);
+     StringFromGUID2(clsid, path + lstrlenW(clsidW), CHARS_IN_GUID);
++    if (user_first)
++    {
++        res = open_user_classes_key(path, keyname, access, subkey);
++        if (res == ERROR_SUCCESS) return S_OK;
++        if (!classes_key_missing(res))
++            return res == ERROR_NOT_ENOUGH_MEMORY ? E_OUTOFMEMORY : REGDB_E_READREGDB;
++    }
+     res = open_classes_key(HKEY_CLASSES_ROOT, path, access, &key);
+     if (res == ERROR_FILE_NOT_FOUND)
+         return REGDB_E_CLASSNOTREG;
+@@ -334,6 +400,11 @@ HRESULT open_key_for_clsid(REFCLSID clsid, const WCHAR *keyname, REGSAM access,
+     return S_OK;
+ }
+ 
++HRESULT open_key_for_clsid(REFCLSID clsid, const WCHAR *keyname, REGSAM access, HKEY *subkey)
++{
++    return open_class_key(clsid, keyname, access, subkey, FALSE);
++}
++
+ /* open HKCR\\AppId\\{string form of appid clsid} key */
+ HRESULT open_appidkey_from_clsid(REFCLSID clsid, REGSAM access, HKEY *subkey)
+ {
+@@ -1187,7 +1258,7 @@ HRESULT WINAPI CoGetTreatAsClass(REFCLSID clsidOld, CLSID *clsidNew)
+ 
+     *clsidNew = *clsidOld;
+ 
+-    hr = open_key_for_clsid(clsidOld, L"TreatAs", KEY_READ, &hkey);
++    hr = open_class_key(clsidOld, L"TreatAs", KEY_READ, &hkey, TRUE);
+     if (FAILED(hr))
+     {
+         hr = S_FALSE;
+@@ -1303,10 +1374,10 @@ HRESULT WINAPI DECLSPEC_HOTPATCH ProgIDFromCLSID(REFCLSID clsid, LPOLESTR *progi
+             return REGDB_E_CLASSNOTREG;
+     }
+ 
+-    hr = open_key_for_clsid(clsid, L"ProgID", KEY_READ, &hkey);
++    hr = open_class_key(clsid, L"ProgID", KEY_READ, &hkey, TRUE);
+     if (FAILED(hr) && (opposite == KEY_WOW64_32KEY || (IsWow64Process(GetCurrentProcess(), &is_wow64) && is_wow64)))
+     {
+-        hr = open_key_for_clsid(clsid, L"ProgID", opposite | KEY_READ, &hkey);
++        hr = open_class_key(clsid, L"ProgID", opposite | KEY_READ, &hkey, TRUE);
+         if (FAILED(hr))
+             return hr;
+     }
+@@ -1415,6 +1486,7 @@ static HRESULT clsid_from_string_reg(LPCOLESTR progid, CLSID *clsid)
+     WCHAR buf2[CHARS_IN_GUID];
+     LONG buf2len = sizeof(buf2);
+     HKEY xhkey;
++    LSTATUS ret;
+     WCHAR *buf;
+ 
+     memset(clsid, 0, sizeof(*clsid));
+@@ -1423,7 +1495,10 @@ static HRESULT clsid_from_string_reg(LPCOLESTR progid, CLSID *clsid)
+ 
+     lstrcpyW(buf, progid);
+     lstrcatW(buf, L"\\CLSID");
+-    if (open_classes_key(HKEY_CLASSES_ROOT, buf, MAXIMUM_ALLOWED, &xhkey))
++    ret = open_user_classes_key(buf, NULL, KEY_READ, &xhkey);
++    if (classes_key_missing(ret))
++        ret = open_classes_key(HKEY_CLASSES_ROOT, buf, MAXIMUM_ALLOWED, &xhkey);
++    if (ret)
+     {
+         free(buf);
+         WARN("couldn't open key for ProgID %s\n", debugstr_w(progid));
+@@ -1799,7 +1874,7 @@ static HRESULT com_get_class_object(REFCLSID rclsid, DWORD clscontext,
+     {
+         HKEY hkey;
+ 
+-        hr = open_key_for_clsid(rclsid, L"InprocServer32", KEY_READ, &hkey);
++        hr = open_class_key(rclsid, L"InprocServer32", KEY_READ, &hkey, TRUE);
+         if (FAILED(hr))
+         {
+             if (hr == REGDB_E_CLASSNOTREG)
+diff --git a/dlls/combase/tests/Makefile.in b/dlls/combase/tests/Makefile.in
+--- a/dlls/combase/tests/Makefile.in
++++ b/dlls/combase/tests/Makefile.in
+@@ -1,7 +1,10 @@
+ TESTDLL   = combase.dll
+-IMPORTS   = combase uuid user32
++IMPORTS   = combase uuid user32 ole32 advapi32 shell32
+ 
+ SOURCES = \
++	per_user_classes.c \
++	per_user_server.c \
++	per_user_server.spec \
+ 	combase.rc \
+ 	roapi.c \
+ 	string.c \
+diff --git a/dlls/combase/tests/per_user_classes.c b/dlls/combase/tests/per_user_classes.c
+new file mode 100644
+--- /dev/null
++++ b/dlls/combase/tests/per_user_classes.c
+@@ -0,0 +1,467 @@
++/* Original COM tests, AI-assisted (Codex), LGPL-2.1-or-later. */
++#define COBJMACROS
++#include <windows.h>
++#include <ole2.h>
++#include <objidl.h>
++#include <shellapi.h>
++#include <stdio.h>
++#include <wchar.h>
++
++#include "wine/test.h"
++
++#define COUNT(a) ARRAY_SIZE(a)
++#define CLASSES L"Software\\Classes\\"
++#define CLSID_ROOT L"CLSID"
++#define WOW_ROOT L"Wow6432Node\\CLSID"
++
++static LONG remove_key(HKEY hive, const WCHAR *path, REGSAM view)
++{
++    HKEY key;
++    LONG ret = RegOpenKeyExW(hive, path, 0, KEY_READ | KEY_WRITE | DELETE | view, &key);
++
++    if (ret) return ret;
++    ret = RegDeleteTreeW(key, NULL);
++    RegCloseKey(key);
++    return ret ? ret : RegDeleteKeyExW(hive, path, view, 0);
++}
++
++static LONG new_key(HKEY hive, const WCHAR *path, REGSAM view, HKEY *out)
++{
++    DWORD disposition;
++    LONG ret;
++
++    ret = RegCreateKeyExW(hive, path, 0, NULL, REG_OPTION_VOLATILE, KEY_WRITE | view,
++                         NULL, out, &disposition);
++    if (!ret && disposition != REG_CREATED_NEW_KEY)
++    {
++        RegCloseKey(*out);
++        *out = NULL;
++        return ERROR_ALREADY_EXISTS;
++    }
++    return ret;
++}
++
++static LONG set_string(HKEY key, const WCHAR *name, const WCHAR *value)
++{
++    return RegSetValueExW(key, name, 0, REG_SZ, (const BYTE *)value,
++                          (DWORD)((wcslen(value) + 1) * sizeof(WCHAR)));
++}
++
++static LONG child_value(HKEY parent, const WCHAR *name, const WCHAR *value, REGSAM view)
++{
++    HKEY child;
++    LONG ret = new_key(parent, name, view, &child);
++    if (ret) return ret;
++    ret = set_string(child, NULL, value);
++    RegCloseKey(child);
++    return ret;
++}
++
++static void clsid_path(WCHAR *path, const WCHAR *root, const WCHAR *id)
++{
++    swprintf(path, 160, L"%ls%ls\\%ls", CLASSES, root, id);
++}
++
++static LONG register_class(HKEY hive, const WCHAR *path, REGSAM view, const WCHAR *server,
++                           const WCHAR *progid, const WCHAR *treat_as, BOOL *owned)
++{
++    HKEY key, child;
++    LONG ret = new_key(hive, path, view, &key);
++
++    *owned = ret == ERROR_SUCCESS;
++    if (ret) return ret;
++    if (server)
++    {
++        ret = new_key(key, L"InprocServer32", view, &child);
++        if (!ret)
++        {
++            ret = set_string(child, NULL, server);
++            if (!ret) ret = set_string(child, L"ThreadingModel", L"Both");
++            RegCloseKey(child);
++        }
++    }
++    if (!ret && progid) ret = child_value(key, L"ProgID", progid, view);
++    if (!ret && treat_as) ret = child_value(key, L"TreatAs", treat_as, view);
++    RegCloseKey(key);
++    return ret;
++}
++
++static BOOL new_guid(CLSID *clsid, WCHAR *id)
++{
++    return SUCCEEDED(CoCreateGuid(clsid)) && StringFromGUID2(clsid, id, 40);
++}
++
++static void cleanup_key(HKEY hive, const WCHAR *path, REGSAM view)
++{
++    LONG ret = remove_key(hive, path, view);
++    ok(ret == ERROR_SUCCESS, "Registry cleanup returned %ld.\n", ret);
++}
++
++/* A fresh Wine prefix has no per-user WOW64 classes tree; Windows always has one. */
++static BOOL user_wow64_classes(void)
++{
++    HKEY key;
++
++    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Classes\\Wow6432Node", 0,
++                      KEY_READ | KEY_WOW64_64KEY, &key))
++        return FALSE;
++    RegCloseKey(key);
++    return TRUE;
++}
++
++static void check_object(IPersist *obj, DWORD expected, BOOL conflict)
++{
++    CLSID id;
++    HRESULT hr = IPersist_GetClassID(obj, &id);
++
++    ok(hr == S_OK, "GetClassID returned %#lx.\n", hr);
++    if (SUCCEEDED(hr))
++    {
++        ok(id.Data1 == expected, "Got server marker %lu, expected %lu.\n", id.Data1, expected);
++    }
++    IPersist_Release(obj);
++}
++
++static void check_activation(REFCLSID clsid, HRESULT expected, BOOL conflict)
++{
++    DWORD marker = 100 + 8 * sizeof(void *);
++    IClassFactory *factory = NULL;
++    IPersist *obj = NULL;
++    HRESULT hr;
++
++    hr = CoGetClassObject(clsid, CLSCTX_INPROC_SERVER, NULL, &IID_IClassFactory, (void **)&factory);
++    ok(hr == expected, "CoGetClassObject returned %#lx, expected %#lx.\n", hr, expected);
++    if (factory)
++    {
++        hr = IClassFactory_CreateInstance(factory, NULL, &IID_IPersist, (void **)&obj);
++        ok(hr == S_OK, "Factory CreateInstance returned %#lx.\n", hr);
++        if (obj) check_object(obj, marker, conflict);
++        IClassFactory_Release(factory);
++    }
++    obj = NULL;
++    hr = CoCreateInstance(clsid, NULL, CLSCTX_INPROC_SERVER, &IID_IPersist, (void **)&obj);
++    ok(hr == expected, "CoCreateInstance returned %#lx, expected %#lx.\n", hr, expected);
++    if (obj) check_object(obj, marker, conflict);
++}
++
++static void check_progid_and_treatas(REFCLSID clsid, const WCHAR *id, const WCHAR *progid)
++{
++    WCHAR prog_path[160], alias_path[160], alias_id[40];
++    BOOL alias_owned = FALSE;
++    CLSID found, alias;
++    LPOLESTR name = NULL;
++    LONG ret, machine_before;
++    HRESULT hr;
++    HKEY key;
++
++    swprintf(prog_path, COUNT(prog_path), L"%ls%ls", CLASSES, progid);
++    ret = new_key(HKEY_CURRENT_USER, prog_path, 0, &key);
++    ok(ret == ERROR_SUCCESS, "ProgID registration returned %ld.\n", ret);
++    if (!ret)
++    {
++        ret = child_value(key, L"CLSID", id, 0);
++        RegCloseKey(key);
++        ok(ret == ERROR_SUCCESS, "ProgID CLSID returned %ld.\n", ret);
++        machine_before = RegOpenKeyExW(HKEY_LOCAL_MACHINE, prog_path, 0, KEY_READ, &key);
++        if (!machine_before) RegCloseKey(key);
++        hr = CLSIDFromProgID(progid, &found);
++        ok(hr == S_OK && IsEqualCLSID(&found, clsid), "CLSIDFromProgID returned %#lx.\n", hr);
++        hr = ProgIDFromCLSID(clsid, &name);
++        ok(hr == S_OK && name && !wcscmp(name, progid), "ProgIDFromCLSID returned %#lx.\n", hr);
++        CoTaskMemFree(name);
++        if (machine_before == ERROR_FILE_NOT_FOUND)
++        {
++            ret = remove_key(HKEY_LOCAL_MACHINE, prog_path, 0);
++            ok(ret == ERROR_FILE_NOT_FOUND || ret == ERROR_SUCCESS, "Machine ProgID cleanup returned %ld.\n",ret);
++        }
++        cleanup_key(HKEY_CURRENT_USER, prog_path, 0);
++    }
++    if (!new_guid(&alias, alias_id))
++    {
++        ok(FALSE, "CoCreateGuid failed for TreatAs.\n");
++        return;
++    }
++    clsid_path(alias_path, CLSID_ROOT, alias_id);
++    ret = register_class(HKEY_CURRENT_USER, alias_path, 0, NULL, NULL, id, &alias_owned);
++    ok(ret == ERROR_SUCCESS, "TreatAs registration returned %ld.\n", ret);
++    if (!ret)
++    {
++        hr = CoGetTreatAsClass(&alias, &found);
++        ok(hr == S_OK && IsEqualCLSID(&found, clsid), "CoGetTreatAsClass returned %#lx.\n", hr);
++    }
++    if (alias_owned) cleanup_key(HKEY_CURRENT_USER, alias_path, 0);
++}
++
++static void user_case(const WCHAR *dll, const WCHAR *root, REGSAM view,
++                      HRESULT expected, BOOL names)
++{
++    WCHAR id[40], path[160], progid[80];
++    BOOL owned = FALSE;
++    CLSID clsid;
++    LONG ret;
++
++    if (!new_guid(&clsid, id))
++    {
++        ok(FALSE, "CoCreateGuid failed.\n");
++        return;
++    }
++    clsid_path(path, root, id);
++    swprintf(progid, COUNT(progid), L"WinumTest.P%08lx%04x%04x%02x%02x",
++             clsid.Data1, clsid.Data2, clsid.Data3, clsid.Data4[0], clsid.Data4[1]);
++    ret = register_class(HKEY_CURRENT_USER, path, view, dll, names ? progid : NULL, NULL, &owned);
++    ok(ret == ERROR_SUCCESS, "Per-user class registration returned %ld.\n", ret);
++    if (!ret)
++    {
++        check_activation(&clsid, expected, FALSE);
++        if (names) check_progid_and_treatas(&clsid, id, progid);
++    }
++    if (owned) cleanup_key(HKEY_CURRENT_USER, path, view);
++}
++
++static void event_name(WCHAR *name, const WCHAR *id, const WCHAR *role)
++{
++    swprintf(name, 100, L"Local\\WinumComTest-%ls-%ls", id, role);
++}
++
++static int elevated_setup(const WCHAR *id, const WCHAR *dll)
++{
++    WCHAR name[100], path[160];
++    HANDLE ready, done;
++    LONG ret = ERROR_INVALID_PARAMETER;
++    BOOL owned = FALSE;
++    CLSID clsid;
++
++    if (wcslen(id) != 38 || FAILED(CLSIDFromString(id, &clsid))) return ret;
++    event_name(name, id, L"ready");
++    ready = OpenEventW(EVENT_MODIFY_STATE, FALSE, name);
++    event_name(name, id, L"done");
++    done = OpenEventW(SYNCHRONIZE, FALSE, name);
++    if (ready && done)
++    {
++        clsid_path(path, CLSID_ROOT, id);
++        ret = register_class(HKEY_LOCAL_MACHINE, path, 0, dll, NULL, NULL, &owned);
++        if (!ret)
++            ret = SetEvent(ready) ? WaitForSingleObject(done, 90000) : GetLastError();
++        if (owned)
++        {
++            LONG removed = remove_key(HKEY_LOCAL_MACHINE, path, 0);
++            if (!ret) ret = removed;
++        }
++    }
++    if (ready) CloseHandle(ready);
++    if (done) CloseHandle(done);
++    return ret;
++}
++
++static void precedence(const WCHAR *user, const WCHAR *machine)
++{
++    WCHAR id[40], path[160], module[MAX_PATH], params[2 * MAX_PATH], name[100];
++    SHELLEXECUTEINFOW launch = {0};
++    HANDLE ready = NULL, done = NULL, handles[2];
++    BOOL user_owned = FALSE, machine_owned = FALSE;
++    CLSID clsid;
++    DWORD status, len;
++    LONG ret;
++
++    if (!new_guid(&clsid, id))
++    {
++        ok(FALSE, "CoCreateGuid failed.\n");
++        return;
++    }
++    clsid_path(path, CLSID_ROOT, id);
++    ret = register_class(HKEY_CURRENT_USER, path, 0, user, NULL, NULL, &user_owned);
++    ok(ret == ERROR_SUCCESS, "User registration returned %ld.\n", ret);
++    if (ret) goto cleanup;
++
++    if (GetEnvironmentVariableW(L"WINUM_COM_L1_RUNAS", NULL, 0))
++    {
++        event_name(name, id, L"ready");
++        ready = CreateEventW(NULL, TRUE, FALSE, name);
++        event_name(name, id, L"done");
++        done = CreateEventW(NULL, TRUE, FALSE, name);
++        len = GetModuleFileNameW(NULL, module, COUNT(module));
++        ok(ready && done && len && len < COUNT(module), "Helper setup failed.\n");
++        if (!ready || !done || !len || len >= COUNT(module)) goto cleanup;
++        swprintf(params, COUNT(params), L"per_user_classes --machine-helper \"%ls\" \"%ls\"", id, machine);
++        launch.cbSize = sizeof(launch);
++        launch.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
++        launch.lpVerb = L"runas";
++        launch.lpFile = module;
++        launch.lpParameters = params;
++        launch.nShow = SW_HIDE;
++        if (!ShellExecuteExW(&launch))
++        {
++            ok(FALSE, "Helper launch returned %lu.\n", GetLastError());
++            goto cleanup;
++        }
++        handles[0] = ready;
++        handles[1] = launch.hProcess;
++        status = WaitForMultipleObjects(2, handles, FALSE, 30000);
++        ok(status == WAIT_OBJECT_0, "Helper readiness wait returned %lu.\n", status);
++        if (status != WAIT_OBJECT_0) goto cleanup;
++        ret = ERROR_SUCCESS;
++    }
++    else
++    {
++        ret = register_class(HKEY_LOCAL_MACHINE, path, 0, machine, NULL, NULL, &machine_owned);
++        if (ret == ERROR_ACCESS_DENIED)
++        {
++            skip("Machine registration requires the native L1 helper.\n");
++            goto cleanup;
++        }
++    }
++    ok(ret == ERROR_SUCCESS, "Machine registration returned %ld.\n", ret);
++    if (!ret) check_activation(&clsid, S_OK, TRUE);
++
++cleanup:
++    if (launch.hProcess)
++    {
++        SetEvent(done);
++        status = WaitForSingleObject(launch.hProcess, 35000);
++        ok(status == WAIT_OBJECT_0, "Helper cleanup wait returned %lu.\n", status);
++        if (status == WAIT_OBJECT_0)
++        {
++            DWORD code = ~0;
++            ok(GetExitCodeProcess(launch.hProcess, &code) && !code, "Helper returned %lu.\n", code);
++        }
++        CloseHandle(launch.hProcess);
++    }
++    if (ready) CloseHandle(ready);
++    if (done) CloseHandle(done);
++    if (machine_owned) cleanup_key(HKEY_LOCAL_MACHINE, path, 0);
++    if (user_owned) cleanup_key(HKEY_CURRENT_USER, path, 0);
++}
++
++static BOOL extract_server(const WCHAR *path)
++{
++    DWORD size, written = 0;
++#ifdef STANDALONE
++    HRSRC res = FindResourceW(NULL, MAKEINTRESOURCEW(101), (LPCWSTR)RT_RCDATA);
++#else
++    HRSRC res = FindResourceW(NULL, L"per_user_server.dll", L"TESTDLL");
++#endif
++    HANDLE file;
++    const void *bytes;
++    BOOL ret;
++
++    if (!res || !(bytes = LockResource(LoadResource(NULL,res)))) return FALSE;
++    size = SizeofResource(NULL, res);
++    file = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
++    if (file == INVALID_HANDLE_VALUE) return FALSE;
++    ret = WriteFile(file, bytes, size, &written, NULL) && written == size;
++    CloseHandle(file);
++    if (!ret) DeleteFileW(path);
++    return ret;
++}
++
++START_TEST(per_user_classes)
++{
++    WCHAR temp[MAX_PATH], dir[MAX_PATH], user[MAX_PATH], machine[MAX_PATH], **args;
++    BOOL user_created, machine_created, wow, high;
++    SYSTEM_INFO info;
++    HRESULT hr;
++    DWORD len, returned;
++    TOKEN_ELEVATION elevation;
++    union
++    {
++        TOKEN_MANDATORY_LABEL label;
++        BYTE buffer[sizeof(TOKEN_MANDATORY_LABEL) + SECURITY_MAX_SID_SIZE];
++    } integrity;
++    HANDLE token;
++    int argc, code;
++
++    args = CommandLineToArgvW(GetCommandLineW(), &argc);
++    if (args && argc == 5 && !wcscmp(args[2], L"--machine-helper"))
++    {
++        code = elevated_setup(args[3], args[4]);
++        LocalFree(args);
++        ExitProcess(code);
++    }
++    LocalFree(args);
++    high = !!GetEnvironmentVariableW(L"WINUM_COM_L1_HIGH", NULL, 0);
++    if (high)
++    {
++        DWORD rid;
++        BOOL ret;
++        PSID sid;
++
++        ret = OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token);
++        ok(ret, "OpenProcessToken returned %lu.\n", GetLastError());
++        if (!ret) return;
++        ret = GetTokenInformation(token, TokenIntegrityLevel, &integrity, sizeof(integrity), &returned);
++        CloseHandle(token);
++        ok(ret, "TokenIntegrityLevel query failed: %lu.\n", GetLastError());
++        if (!ret) return;
++        sid = integrity.label.Label.Sid;
++        rid = *GetSidSubAuthority(sid, *GetSidSubAuthorityCount(sid) - 1);
++        trace("Process integrity RID %#lx.\n", rid);
++        ok(rid == SECURITY_MANDATORY_HIGH_RID, "Run the High L1 test at High integrity, got %#lx.\n", rid);
++        if (rid != SECURITY_MANDATORY_HIGH_RID) return;
++    }
++    else if (GetEnvironmentVariableW(L"WINUM_COM_L1_RUNAS", NULL, 0))
++    {
++        if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
++        {
++            ok(FALSE, "OpenProcessToken returned %lu.\n", GetLastError());
++            return;
++        }
++        elevation.TokenIsElevated = 1;
++        GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &returned);
++        CloseHandle(token);
++        if (elevation.TokenIsElevated)
++        {
++            ok(FALSE, "Run the main L1 test without elevation.\n");
++            return;
++        }
++    }
++
++    GetNativeSystemInfo(&info);
++    wow = info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ||
++          info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM64;
++    len = GetTempPathW(COUNT(temp), temp);
++    if (!len || len >= COUNT(temp) || !GetTempFileNameW(temp, L"com", 0, dir))
++    {
++        ok(FALSE, "Temporary path failed.\n");
++        return;
++    }
++    if (!DeleteFileW(dir) || !CreateDirectoryW(dir, NULL))
++    {
++        ok(FALSE, "Creating the fixture directory failed.\n");
++        return;
++    }
++    user_created = swprintf(user, COUNT(user), L"%ls\\user.dll", dir) >= 0 && extract_server(user);
++    machine_created = swprintf(machine, COUNT(machine), L"%ls\\machine.dll", dir) >= 0 && extract_server(machine);
++    ok(user_created && machine_created, "Failed to extract the test servers.\n");
++    if (user_created && machine_created)
++    {
++        hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
++        ok(SUCCEEDED(hr), "CoInitializeEx returned %#lx.\n", hr);
++        if (SUCCEEDED(hr))
++        {
++            if (high)
++                user_case(user, CLSID_ROOT, 0, REGDB_E_CLASSNOTREG, FALSE);
++            else
++            {
++                user_case(user, CLSID_ROOT, 0, S_OK, TRUE);
++                if (wow)
++                {
++                    if (sizeof(void *) == 8 && !user_wow64_classes())
++                        skip("No HKCU Software\\Classes\\Wow6432Node in this prefix: a KEY_WOW64_32KEY "
++                             "user registration lands in the 64-bit view, skipping that case.\n");
++                    else
++                        user_case(user, CLSID_ROOT, KEY_WOW64_32KEY,
++                                  sizeof(void *) == 4 ? S_OK : REGDB_E_CLASSNOTREG, FALSE);
++                    user_case(user, CLSID_ROOT, KEY_WOW64_64KEY,
++                              sizeof(void *) == 8 ? S_OK : REGDB_E_CLASSNOTREG, FALSE);
++                    user_case(user, WOW_ROOT, 0, sizeof(void *) == 4 ? S_OK : REGDB_E_CLASSNOTREG, FALSE);
++                }
++                precedence(user, machine);
++            }
++            CoFreeUnusedLibrariesEx(0, 0);
++            CoUninitialize();
++        }
++    }
++    if (user_created) ok(DeleteFileW(user), "User DLL cleanup returned %lu.\n", GetLastError());
++    if (machine_created) ok(DeleteFileW(machine), "Machine DLL cleanup returned %lu.\n", GetLastError());
++    ok(RemoveDirectoryW(dir), "Fixture cleanup returned %lu.\n", GetLastError());
++}
+diff --git a/dlls/combase/tests/per_user_server.c b/dlls/combase/tests/per_user_server.c
+new file mode 100644
+--- /dev/null
++++ b/dlls/combase/tests/per_user_server.c
+@@ -0,0 +1,94 @@
++/* Original COM measurement server, AI-assisted (Codex), LGPL-2.1-or-later. */
++#if 0
++#pragma makedep testdll
++#endif
++
++#define COBJMACROS
++#define WIN32_LEAN_AND_MEAN
++#include <windows.h>
++#include <initguid.h>
++#include <objidl.h>
++#include <wchar.h>
++
++static LONG object_refs, factory_refs;
++
++static HRESULT WINAPI object_query(IPersist *iface, REFIID iid, void **out)
++{
++    if (!out) return E_POINTER;
++    *out = NULL;
++    if (!IsEqualIID(iid, &IID_IUnknown) && !IsEqualIID(iid, &IID_IPersist)) return E_NOINTERFACE;
++    *out = iface;
++    IPersist_AddRef(iface);
++    return S_OK;
++}
++
++static ULONG WINAPI object_addref(IPersist *iface) { (void)iface; return InterlockedIncrement(&object_refs); }
++static ULONG WINAPI object_release(IPersist *iface) { (void)iface; return InterlockedDecrement(&object_refs); }
++
++static HRESULT WINAPI object_class(IPersist *iface, CLSID *clsid)
++{
++    static const CLSID id = {0, 0x9402, 0x41dd, {0xa8,0x65,0xe2,0xdb,0x26,0x97,0xb8,0x66}};
++    HMODULE self;
++    WCHAR path[MAX_PATH], *name;
++    DWORD len;
++
++    (void)iface;
++    if (!clsid) return E_POINTER;
++    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
++                           GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (const WCHAR *)&object_refs, &self))
++        return E_FAIL;
++    len = GetModuleFileNameW(self, path, (sizeof(path) / sizeof(path[0])));
++    if (!len || len == (sizeof(path) / sizeof(path[0])) || !(name = wcsrchr(path, '\\'))) return E_FAIL;
++    *clsid = id;
++    clsid->Data1 = (!lstrcmpiW(name + 1, L"machine.dll") ? 200 : 100) + 8 * sizeof(void *);
++    return S_OK;
++}
++
++static IPersistVtbl object_vtbl = {object_query, object_addref, object_release, object_class};
++static IPersist object = {&object_vtbl};
++
++static HRESULT WINAPI factory_query(IClassFactory *iface, REFIID iid, void **out)
++{
++    if (!out) return E_POINTER;
++    *out = NULL;
++    if (!IsEqualIID(iid, &IID_IUnknown) && !IsEqualIID(iid, &IID_IClassFactory)) return E_NOINTERFACE;
++    *out = iface;
++    IClassFactory_AddRef(iface);
++    return S_OK;
++}
++
++static ULONG WINAPI factory_addref(IClassFactory *iface) { (void)iface; return InterlockedIncrement(&factory_refs); }
++static ULONG WINAPI factory_release(IClassFactory *iface) { (void)iface; return InterlockedDecrement(&factory_refs); }
++
++static HRESULT WINAPI factory_create(IClassFactory *iface, IUnknown *outer, REFIID iid, void **out)
++{
++    (void)iface;
++    if (!out) return E_POINTER;
++    *out = NULL;
++    if (outer) return CLASS_E_NOAGGREGATION;
++    return IPersist_QueryInterface(&object, iid, out);
++}
++
++static HRESULT WINAPI factory_lock(IClassFactory *iface, BOOL lock)
++{
++    (void)iface;
++    (void)lock;
++    return S_OK;
++}
++
++static IClassFactoryVtbl factory_vtbl =
++{
++    factory_query, factory_addref, factory_release, factory_create, factory_lock
++};
++static IClassFactory factory = {&factory_vtbl};
++
++HRESULT WINAPI DllGetClassObject(REFCLSID clsid, REFIID iid, void **out)
++{
++    (void)clsid;
++    return IClassFactory_QueryInterface(&factory, iid, out);
++}
++
++HRESULT WINAPI DllCanUnloadNow(void)
++{
++    return object_refs || factory_refs ? S_FALSE : S_OK;
++}
+diff --git a/dlls/combase/tests/per_user_server.spec b/dlls/combase/tests/per_user_server.spec
+new file mode 100644
+--- /dev/null
++++ b/dlls/combase/tests/per_user_server.spec
+@@ -0,0 +1,2 @@
++@ stdcall -private DllGetClassObject(ptr ptr ptr)
++@ stdcall -private DllCanUnloadNow()

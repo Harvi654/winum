@@ -1,0 +1,1 @@
+font-smoothing|docs/wine-repro/win32u-font-smoothing/measure.c|-lgdi32 -luser32

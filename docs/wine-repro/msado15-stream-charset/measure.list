@@ -1,0 +1,1 @@
+msado15-stream-charset | docs/wine-repro/msado15-stream-charset/measure.c | -lole32 -loleaut32 -luuid

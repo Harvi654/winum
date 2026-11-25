@@ -1,0 +1,2 @@
+font-smoothing x86_64=0
+font-smoothing i686=0

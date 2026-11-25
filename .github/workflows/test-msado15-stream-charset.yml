@@ -1,0 +1,92 @@
+name: Compare msado15 test suite
+on:
+  push:
+    branches: ['topic/msado15-stream-charset-measure']
+    paths:
+      - 'patches/candidates/msado15-stream-charset/*.patch'
+      - 'patches/tests-first/msado15-tests-stream-charset.patch'
+      - '.github/workflows/test-msado15-stream-charset.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: msado15-stream-charset-l2
+  cancel-in-progress: true
+jobs:
+  suites:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [baseline, candidate]
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 150
+    env:
+      VARIANT: ${{ matrix.variant }}
+      TESTS: msado15
+      GROUP: ado
+      MAKE_L1: '0'
+      WORK: /tmp/ado-tests
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Dependencies (official Arch repositories)
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed git python curl xz mingw-w64-gcc xorg-server-xvfb xorg-xauth \
+            alsa-lib libpulse gnutls krb5 dbus fontconfig freetype2 ttf-dejavu \
+            libx11 libxext libxi libxrandr libxrender libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
+            wayland mesa libglvnd vulkan-icd-loader vulkan-headers \
+            gst-plugins-base-libs sdl2 libcups libgphoto2 sane libpcap v4l-utils pcsclite unixodbc ocl-icd opencl-headers giflib
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build and test the release series with the measured unit
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if [[ "$VARIANT" == candidate ]]; then
+            cp patches/candidates/msado15-stream-charset/msado15-stream-charset.patch patches/
+            printf '%s\n' msado15-stream-charset.patch >> patches/series
+          else
+            printf '%s\n' msado15-tests-stream-charset.patch >> patches/tests-first/series
+          fi
+          bash scripts/test-series.sh series out
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          out = Path("out")
+          data = json.loads((out / "results-series-ado.json").read_text())
+          for arch in ("x86_64", "i386"):
+              for unit in ("msado15", "stream_charset"):
+                  result = data[f"msado15.{arch}.{unit}"]
+                  assert result["finished"] and result["exit"] is None, result
+              result = data[f"msado15.{arch}.stream_charset"]
+              assert result["failures"] == result["skipped"] == 0, result
+              if os.environ["VARIANT"] == "candidate":
+                  assert result["tests"] == 335 and result["todo"] == 0, result
+              print(arch, result)
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: msado15-charset-l2-${{ matrix.variant }}
+          path: |
+            out/results-series-ado.json
+            out/logs/
+          if-no-files-found: warn
+          retention-days: 30
+  compare:
+    needs: suites
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: msado15-charset-l2-*
+          path: results
+      - name: Compare the matching DLL suites
+        run: |
+          set -o pipefail
+          python3 scripts/compare-tests.py compare results/msado15-charset-l2-baseline results/msado15-charset-l2-candidate \
+            | tee "$GITHUB_STEP_SUMMARY"

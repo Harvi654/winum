@@ -1,0 +1,122 @@
+name: Compare combase and ole32 test suites
+on:
+  push:
+    branches: ['topic/combase-per-user-classes-measure']
+    paths:
+      - 'patches/candidates/combase-per-user-classes/*.patch'
+      - 'patches/tests-first/combase-tests-per-user-classes.patch'
+      - '.github/workflows/test-combase-per-user-classes.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: combase-per-user-classes-l2
+  cancel-in-progress: true
+jobs:
+  suites:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [baseline, candidate]
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 150
+    env:
+      VARIANT: ${{ matrix.variant }}
+      TESTS: combase ole32
+      GROUP: com
+      MAKE_L1: '0'
+      WORK: /tmp/com-tests
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Dependencies (official Arch repositories)
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed git python curl xz mingw-w64-gcc xorg-server-xvfb xorg-xauth \
+            alsa-lib libpulse gnutls krb5 dbus fontconfig freetype2 ttf-dejavu \
+            libx11 libxext libxi libxrandr libxrender libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
+            wayland mesa libglvnd vulkan-icd-loader vulkan-headers \
+            gst-plugins-base-libs sdl2 libcups libgphoto2 sane libpcap v4l-utils pcsclite unixodbc ocl-icd opencl-headers giflib
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build and test the release series with the measured unit
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          token_revision=236463a8828adf1c4e6c9373424913dbff056dfb
+          token_dir=patches/candidates/server-limited-token-medium-integrity
+          git fetch --no-tags --depth=1 origin "$token_revision"
+          git show "$token_revision:$token_dir/series" > /tmp/combase-token-series
+          while IFS= read -r dependency; do
+            git show "$token_revision:$token_dir/$dependency" > "patches/$dependency"
+            printf '%s\n' "$dependency" >> patches/series
+          done < /tmp/combase-token-series
+          unit=combase-tests-per-user-classes.patch
+          printf '%s\n' "$unit" >> patches/tests-first/series
+          if [[ "$VARIANT" == candidate ]]; then
+            cp patches/candidates/combase-per-user-classes/combase-per-user-classes.patch patches/
+            printf '%s\n' combase-per-user-classes.patch >> patches/series
+            python3 - "$unit" <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          patch = Path("patches/tests-first") / sys.argv[1]
+          text = patch.read_text()
+          text, count = re.subn(r"(?m)^\+    ( +)?todo_wine_if\(([^)]+)\)$",
+                                lambda m: f"+    {m[1] or ''}todo_wine_if(FALSE && ({m[2]}))", text)
+          assert count == 3
+          text, count = re.subn(r"(?m)^\+( +)todo_wine$", r"+\1todo_wine_if(FALSE)", text)
+          assert count == 3
+          patch.write_text(text)
+          PY
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+
+          runner = Path("scripts/test-series.sh")
+          text = runner.read_text()
+          boot = './wine wineboot -i >/dev/null 2>&1 || true'
+          assert text.count(boot) == 1
+          seed = r"./wine reg add 'HKCU\Software\Classes\Wow6432Node\CLSID' /f /reg:64"
+          runner.write_text(text.replace(boot, boot + "\n" + seed))
+          PY
+          bash scripts/test-series.sh series out
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          out = Path("out")
+          data = json.loads((out / "results-series-com.json").read_text())
+          for suite in ("combase", "ole32"):
+              for arch in ("x86_64", "i386"):
+                  assert any(k.startswith(f"{suite}.{arch}.") for k in data), (suite, arch)
+          for arch in ("x86_64", "i386"):
+              report = (out / f"logs/combase.{arch}.per_user_classes.log").read_text()
+              assert re.search(r"per_user_classes: \d+ tests executed .*0 failures\), 0 skipped", report), report
+              print(report)
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: combase-per-user-l2-${{ matrix.variant }}
+          path: |
+            out/results-series-com.json
+            out/logs/
+          if-no-files-found: warn
+          retention-days: 30
+  compare:
+    needs: suites
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: combase-per-user-l2-*
+          path: results
+      - name: Compare the matching DLL suites
+        run: |
+          set -o pipefail
+          python3 scripts/compare-tests.py compare results/combase-per-user-l2-baseline results/combase-per-user-l2-candidate \
+            | tee "$GITHUB_STEP_SUMMARY"
