@@ -45,7 +45,7 @@ TARBALL="$WORK/wine-$WINE_VERSION.tar.xz"
 [ -s "$TARBALL" ] || curl -fL --retry 3 -o "$TARBALL" "https://dl.winehq.org/wine/source/$SUB/wine-$WINE_VERSION.tar.xz"
 wine_verify_tarball "$TARBALL" "$WINE_VERSION" >/dev/null || exit 1
 tar -xf "$TARBALL" -C "$WORK"
-# test-run/next-release-1: both sides get the released series; only the
+# test-run/release-11.22-3: both sides get the released series; only the
 # candidate side ("series") also gets the patches named in
 # patches/next-release.list.
 # shellcheck disable=SC1091
