@@ -1,0 +1,2 @@
+msado15-stream-charset x86_64=0
+msado15-stream-charset i686=0
