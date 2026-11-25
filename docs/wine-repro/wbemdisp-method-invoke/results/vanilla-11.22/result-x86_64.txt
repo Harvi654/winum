@@ -1,0 +1,51 @@
+measure=v1 bits=64
+ole_init=0x00000000
+scratch_parent=0
+scratch_case=0
+bind_context=0x00000000
+parse_moniker=0x00000000 eaten=69
+bind_dispatch=0x00000000
+invoke flags=0x1 case=create method=CreateKey argc=2 lookup=0x00000000 hr=0x80004001 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x1 case=create_leaf method=CreateKey argc=2 lookup=0x00000000 hr=0x80004001 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x1 case=write_string method=SetStringValue argc=4 lookup=0x00000000 hr=0x80004001 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x1 case=read_string method=GetStringValue argc=4 lookup=0x00000000 hr=0x80004001 argerr=4294967295 excep=0x00000000/0 result=0:empty out_init=8:out-sentinel out=8:out-sentinel
+invoke flags=0x1 case=read_string_typed method=GetStringValue argc=4 lookup=0x00000000 hr=0x80004001 argerr=4294967295 excep=0x00000000/0 result=0:empty out_init=8:out-sentinel typed_out=8:out-sentinel
+invoke flags=0x1 case=enum method=EnumKey argc=3 lookup=0x00000000 hr=0x80004001 argerr=4294967295 excep=0x00000000/0 result=0:empty out_init=8:out-sentinel out=8:out-sentinel
+invoke flags=0x1 case=write_dword method=SetDWORDValue argc=4 lookup=0x00000000 hr=0x80004001 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x1 case=read_missing method=GetStringValue argc=4 lookup=0x00000000 hr=0x80004001 argerr=4294967295 excep=0x00000000/0 result=0:empty out_init=8:out-sentinel out=8:out-sentinel
+invoke flags=0x1 case=create_no_args method=CreateKey argc=0 lookup=0x00000000 hr=0x80004001 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x1 case=read_no_out method=GetStringValue argc=3 lookup=0x00000000 hr=0x80004001 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x1 case=read_extra method=GetStringValue argc=5 lookup=0x00000000 hr=0x80004001 argerr=4294967295 excep=0x00000000/0 result=0:empty out_init=8:out-sentinel out=8:out-sentinel
+invoke flags=0x1 case=delete_leaf method=DeleteKey argc=2 lookup=0x00000000 hr=0x80004001 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x1 case=delete method=DeleteKey argc=2 lookup=0x00000000 hr=0x80004001 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x3 case=create method=CreateKey argc=2 lookup=0x00000000 hr=0x80041002 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x3 case=create_leaf method=CreateKey argc=2 lookup=0x00000000 hr=0x80041002 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x3 case=write_string method=SetStringValue argc=4 lookup=0x00000000 hr=0x80041002 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x3 case=read_string method=GetStringValue argc=4 lookup=0x00000000 hr=0x80041002 argerr=4294967295 excep=0x00000000/0 result=0:empty out_init=8:out-sentinel out=8:out-sentinel
+invoke flags=0x3 case=read_string_typed method=GetStringValue argc=4 lookup=0x00000000 hr=0x80041002 argerr=4294967295 excep=0x00000000/0 result=0:empty out_init=8:out-sentinel typed_out=8:out-sentinel
+invoke flags=0x3 case=enum method=EnumKey argc=3 lookup=0x00000000 hr=0x80041002 argerr=4294967295 excep=0x00000000/0 result=0:empty out_init=8:out-sentinel out=8:out-sentinel
+invoke flags=0x3 case=write_dword method=SetDWORDValue argc=4 lookup=0x00000000 hr=0x80041002 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x3 case=read_missing method=GetStringValue argc=4 lookup=0x00000000 hr=0x80041002 argerr=4294967295 excep=0x00000000/0 result=0:empty out_init=8:out-sentinel out=8:out-sentinel
+invoke flags=0x3 case=create_no_args method=CreateKey argc=0 lookup=0x00000000 hr=0x80041002 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x3 case=read_no_out method=GetStringValue argc=3 lookup=0x00000000 hr=0x80041002 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x3 case=read_extra method=GetStringValue argc=5 lookup=0x00000000 hr=0x80041002 argerr=4294967295 excep=0x00000000/0 result=0:empty out_init=8:out-sentinel out=8:out-sentinel
+invoke flags=0x3 case=delete_leaf method=DeleteKey argc=2 lookup=0x00000000 hr=0x80041002 argerr=4294967295 excep=0x00000000/0 result=0:empty
+invoke flags=0x3 case=delete method=DeleteKey argc=2 lookup=0x00000000 hr=0x80041002 argerr=4294967295 excep=0x00000000/0 result=0:empty
+vbs case=bind err=0x00000000 result=0:empty out=0:empty
+vbs case=create_statement err=0x000001BD result=0:empty out=0:empty
+vbs case=create_leaf err=0x80041002 result=0:empty out=0:empty
+vbs case=write_string err=0x80041002 result=0:empty out=0:empty
+vbs case=read_string err=0x80041002 result=0:empty out=8:out-sentinel
+vbs case=enum err=0x80041002 result=0:empty out=8:out-sentinel
+vbs case=write_dword err=0x80041002 result=0:empty out=0:empty
+vbs case=read_missing err=0x80041002 result=0:empty out=8:out-sentinel
+vbs case=delete_leaf err=0x80041002 result=0:empty out=0:empty
+vbs case=delete err=0x80041002 result=0:empty out=0:empty
+vbs direct_complete
+cscript kind=direct exit=0
+vbs intentional_error_begin
+cscript kind=runtime-error exit=0
+scratch_cleanup=0
+scratch_parent_cleanup=0
+measure_complete dispatch=1
+probe_exit=0

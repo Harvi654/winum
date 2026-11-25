@@ -1,0 +1,231 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] wbemdisp/tests: Measure direct WMI method invocation.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Offline Windows 10 executes direct StdRegProv methods with METHOD and
+METHOD | PROPERTYGET, returning the provider's status and copying out
+the values. Winum 11.22-2 rejected both flag combinations. Use a synthetic
+per-run HKCU key to cover the measured arguments and output types.
+
+diff --git a/dlls/wbemdisp/tests/Makefile.in b/dlls/wbemdisp/tests/Makefile.in
+index 5614c4e..9289a8d 100644
+--- a/dlls/wbemdisp/tests/Makefile.in
++++ b/dlls/wbemdisp/tests/Makefile.in
+@@ -2 +2 @@ TESTDLL   = wbemdisp.dll
+-IMPORTS   = oleaut32 ole32
++IMPORTS   = oleaut32 ole32 advapi32
+@@ -4,0 +5 @@ SOURCES = \
++	method.c \
+diff --git a/dlls/wbemdisp/tests/method.c b/dlls/wbemdisp/tests/method.c
+new file mode 100644
+index 0000000..1ce53c3
+--- /dev/null
++++ b/dlls/wbemdisp/tests/method.c
+@@ -0,0 +1,206 @@
++/*
++ * Direct WMI method invocation tests
++ *
++ * Copyright 2026 Harvi654
++ * AI-assisted (Codex), original code.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ */
++
++#define COBJMACROS
++#include <windows.h>
++#include <ole2.h>
++#include <oleauto.h>
++#include <wbemcli.h>
++#include "wine/test.h"
++
++enum value_kind { HIVE, KEY, NAME, STRING, DWORD_VALUE, OUT_VARIANT, OUT_BSTR };
++enum out_kind { NONE, TEXT, TYPED_TEXT, SUBKEYS, NULL_OUT };
++
++static const struct call
++{
++    const WCHAR *name;
++    const WCHAR *suffix;
++    unsigned int count;
++    enum value_kind args[5];
++    HRESULT hr;
++    LONG retval;
++    enum out_kind out;
++} calls[] =
++{
++    {L"CreateKey", L"", 2, {HIVE, KEY}, S_OK, 0, NONE},
++    {L"CreateKey", L"\\leaf", 2, {HIVE, KEY}, S_OK, 0, NONE},
++    {L"SetStringValue", L"", 4, {HIVE, KEY, NAME, STRING}, S_OK, 0, NONE},
++    {L"GetStringValue", L"", 4, {HIVE, KEY, NAME, OUT_VARIANT}, S_OK, 0, TEXT},
++    {L"GetStringValue", L"", 4, {HIVE, KEY, NAME, OUT_BSTR}, S_OK, 0, TYPED_TEXT},
++    {L"EnumKey", L"", 3, {HIVE, KEY, OUT_VARIANT}, S_OK, 0, SUBKEYS},
++    {L"SetDWORDValue", L"", 4, {HIVE, KEY, NAME, DWORD_VALUE}, S_OK, 0, NONE},
++    {L"GetStringValue", L"\\missing", 4, {HIVE, KEY, NAME, OUT_VARIANT}, S_OK, 2, NULL_OUT},
++    {L"CreateKey", L"", 0, {HIVE}, DISP_E_EXCEPTION, 0, NONE},
++    {L"GetStringValue", L"", 3, {HIVE, KEY, NAME}, S_OK, WBEM_E_TYPE_MISMATCH, NONE},
++    {L"GetStringValue", L"", 5, {HIVE, KEY, NAME, OUT_VARIANT, STRING}, S_OK, WBEM_E_TYPE_MISMATCH, NULL_OUT},
++    {L"DeleteKey", L"\\leaf", 2, {HIVE, KEY}, S_OK, 0, NONE},
++    {L"DeleteKey", L"", 2, {HIVE, KEY}, S_OK, 0, NONE},
++};
++
++static void check_subkeys(VARIANT *out)
++{
++    LONG lo = -1, hi = -1, index = 0;
++    SAFEARRAY *array;
++    VARIANT entry;
++    HRESULT hr;
++
++    ok(V_VT(out) == (VT_ARRAY | VT_VARIANT), "Unexpected out type %#x.\n", V_VT(out));
++    if (V_VT(out) != (VT_ARRAY | VT_VARIANT)) return;
++    array = V_ARRAY(out);
++    ok(array && SafeArrayGetDim(array) == 1, "Unexpected array %p.\n", array);
++    if (!array || SafeArrayGetDim(array) != 1) return;
++    hr = SafeArrayGetLBound(array, 1, &lo);
++    ok(hr == S_OK && lo == 0, "Got %#lx, lower bound %ld.\n", hr, lo);
++    hr = SafeArrayGetUBound(array, 1, &hi);
++    ok(hr == S_OK && hi == 0, "Got %#lx, upper bound %ld.\n", hr, hi);
++    VariantInit(&entry);
++    hr = SafeArrayGetElement(array, &index, &entry);
++    ok(hr == S_OK, "Got %#lx.\n", hr);
++    ok(V_VT(&entry) == VT_BSTR, "Unexpected element type %#x.\n", V_VT(&entry));
++    if (V_VT(&entry) == VT_BSTR)
++        ok(V_BSTR(&entry) && !lstrcmpW(V_BSTR(&entry), L"leaf"), "Got %ls.\n", V_BSTR(&entry) ? V_BSTR(&entry) : L"<null>");
++    VariantClear(&entry);
++}
++
++static void test_call(IDispatch *object, const struct call *call, WCHAR *key, WORD flags)
++{
++    VARIANT args[5], result, out;
++    DISPPARAMS params = {args, NULL, call->count, 0};
++    EXCEPINFO ex = {0};
++    WCHAR *name = (WCHAR *)call->name;
++    BSTR typed = SysAllocString(L"sentinel");
++    unsigned int i, argerr = ~0u;
++    DISPID id;
++    HRESULT hr;
++
++    hr = IDispatch_GetIDsOfNames(object, &IID_NULL, &name, 1, LOCALE_USER_DEFAULT, &id);
++    ok(hr == S_OK, "Lookup got %#lx.\n", hr);
++    if (FAILED(hr))
++    {
++        SysFreeString(typed);
++        return;
++    }
++    VariantInit(&result);
++    VariantInit(&out);
++    V_VT(&out) = VT_BSTR;
++    V_BSTR(&out) = SysAllocString(L"sentinel");
++    for (i = 0; i < call->count; ++i)
++    {
++        VARIANT *arg = &args[call->count - 1 - i];
++
++        VariantInit(arg);
++        switch (call->args[i])
++        {
++        case HIVE: V_VT(arg) = VT_I4; V_I4(arg) = (LONG)0x80000001; break;
++        case DWORD_VALUE: V_VT(arg) = VT_I4; V_I4(arg) = 42; break;
++        case KEY: V_VT(arg) = VT_BSTR; V_BSTR(arg) = SysAllocString(key); break;
++        case NAME: V_VT(arg) = VT_BSTR; V_BSTR(arg) = SysAllocString(L"sample"); break;
++        case STRING: V_VT(arg) = VT_BSTR; V_BSTR(arg) = SysAllocString(L"winum-value"); break;
++        case OUT_VARIANT: V_VT(arg) = VT_VARIANT | VT_BYREF; V_VARIANTREF(arg) = &out; break;
++        case OUT_BSTR: V_VT(arg) = VT_BSTR | VT_BYREF; V_BSTRREF(arg) = &typed; break;
++        }
++    }
++    hr = IDispatch_Invoke(object, id, &IID_NULL, LOCALE_USER_DEFAULT, flags, &params, &result, &ex, &argerr);
++    todo_wine
++    ok(hr == call->hr, "Invoke got %#lx, expected %#lx.\n", hr, call->hr);
++    if (hr == DISP_E_EXCEPTION && hr == call->hr)
++    {
++        if (ex.pfnDeferredFillIn) ex.pfnDeferredFillIn(&ex);
++        ok(ex.scode == WBEM_E_INVALID_PARAMETER, "Got exception %#lx.\n", ex.scode);
++        ok(V_VT(&result) == VT_EMPTY, "Unexpected result type %#x.\n", V_VT(&result));
++    }
++    if (hr == S_OK && hr == call->hr)
++    {
++        ok(V_VT(&result) == VT_I4, "Unexpected result type %#x.\n", V_VT(&result));
++        if (V_VT(&result) == VT_I4)
++            ok(V_I4(&result) == call->retval, "Got result %#lx, expected %#lx.\n", V_I4(&result), call->retval);
++        switch (call->out)
++        {
++        case TEXT:
++            ok(V_VT(&out) == VT_BSTR, "Unexpected out type %#x.\n", V_VT(&out));
++            if (V_VT(&out) == VT_BSTR)
++                ok(V_BSTR(&out) && !lstrcmpW(V_BSTR(&out), L"winum-value"),
++                   "Got %ls.\n", V_BSTR(&out) ? V_BSTR(&out) : L"<null>");
++            break;
++        case TYPED_TEXT:
++            ok(typed && !lstrcmpW(typed, L"winum-value"), "Got %ls.\n", typed ? typed : L"<null>");
++            break;
++        case SUBKEYS:
++            check_subkeys(&out);
++            break;
++        case NULL_OUT:
++            ok(V_VT(&out) == VT_NULL, "Unexpected out type %#x.\n", V_VT(&out));
++            break;
++        default:
++            break;
++        }
++    }
++    SysFreeString(ex.bstrSource);
++    SysFreeString(ex.bstrDescription);
++    SysFreeString(ex.bstrHelpFile);
++    for (i = 0; i < call->count; ++i) VariantClear(&args[i]);
++    VariantClear(&result);
++    VariantClear(&out);
++    SysFreeString(typed);
++}
++
++START_TEST(method)
++{
++    static WCHAR display[] = L"winmgmts:{impersonationLevel=impersonate}!\\\\.\\root\\default:StdRegProv";
++    static const WORD flags[] = {DISPATCH_METHOD, DISPATCH_METHOD | DISPATCH_PROPERTYGET};
++    WCHAR guid_text[40], root[100], key[120];
++    IDispatch *object = NULL;
++    IMoniker *moniker = NULL;
++    IBindCtx *ctx = NULL;
++    unsigned int i, j;
++    HRESULT hr;
++    ULONG eaten;
++    LONG status;
++    GUID guid;
++
++    hr = CoInitialize(NULL);
++    ok(SUCCEEDED(hr), "Got %#lx.\n", hr);
++    if (FAILED(hr)) return;
++    hr = CreateBindCtx(0, &ctx);
++    ok(hr == S_OK, "Got %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    hr = MkParseDisplayName(ctx, display, &eaten, &moniker);
++    ok(hr == S_OK, "Got %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    hr = IMoniker_BindToObject(moniker, ctx, NULL, &IID_IDispatch, (void **)&object);
++    ok(hr == S_OK, "Got %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    hr = CoCreateGuid(&guid);
++    ok(hr == S_OK, "Got %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    if (!StringFromGUID2(&guid, guid_text, ARRAY_SIZE(guid_text))) goto done;
++    for (i = 0; i < ARRAY_SIZE(flags); ++i)
++    {
++        lstrcpyW(root, L"Software\\winum-wbemdisp-");
++        lstrcatW(lstrcatW(root, guid_text), i ? L"-both" : L"-method");
++        for (j = 0; j < ARRAY_SIZE(calls); ++j)
++        {
++            winetest_push_context("flags %#x call %u (%ls)", flags[i], j, calls[j].name);
++            lstrcatW(lstrcpyW(key, root), calls[j].suffix);
++            test_call(object, &calls[j], key, flags[i]);
++            winetest_pop_context();
++        }
++        status = RegDeleteTreeW(HKEY_CURRENT_USER, root);
++        ok(status == ERROR_SUCCESS || status == ERROR_FILE_NOT_FOUND, "Cleanup got %ld.\n", status);
++    }
++
++done:
++    if (object) IDispatch_Release(object);
++    if (moniker) IMoniker_Release(moniker);
++    if (ctx) IBindCtx_Release(ctx);
++    CoUninitialize();
++}
