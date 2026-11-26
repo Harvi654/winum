@@ -9,7 +9,7 @@ text, so it can never be scrolled into view. Windows covers the whole
 line with the range and scrolls the caret into view when the control gets
 the focus.
 
-[MEASURE program, Windows results and the trace](../../../docs/wine-repro/riched20-target-device-width/README.md).
+[MEASURE program, Windows results and the trace](https://github.com/Harvi654/winum/tree/9707b4d3e35c4cbf1b8b33204cea17985ead84e5/docs/wine-repro/riched20-target-device-width).
 
 | Level | Evidence |
 | --- | --- |
@@ -19,7 +19,7 @@ the focus.
 | L1 | Offline Windows 10, 96 dpi, 2026-11-26: 83 tests per architecture, 0 failures, todos or skips, exit 0. [L1 bundle](https://github.com/Harvi654/winum/actions/runs/45865705834/artifacts/15140801437). |
 | L2 | Running: paired riched20 and msftedit suites, the new test on both sides (it should fail only on the baseline). [Run](https://github.com/Harvi654/winum/actions/runs/45865705690). |
 | L4 | Inventor 2027, 2026-11-26: the dialog opens scrolled with the thumb in the middle as on Windows, and the letter can now be scrolled to. It sits just past the right edge of the box (Windows shows it inside, at the edge); the smallest scroll shows it. Maintainer: acceptable, the open point below. AutoCAD 2027, 2026-11-26: MTEXT (several lines, centred, reopened), TEXT and dimension text edit as before. |
-| Cross review | Pending: Codex (Claude wrote the patch). |
+| Cross review | Codex, 2026-11-26. No blocker found for the measured scope. See review below. |
 
 The fix keeps a second width, the target line width in pixels, next to
 the text width and lets the scroll range cover the larger one. Nothing
@@ -41,3 +41,31 @@ character after it; the caret is before the letter when Wine scrolls; or
 the visible width was taken before the vertical scroll bar appeared. The
 L1 test's visibility check passes on Windows; the paired L2 shows whether
 it passes under Wine in the plain case.
+
+
+## Cross review (Codex, 2026-11-26)
+
+Reviewed the entire runtime patch, tests-first patch and candidate
+README at 38e4b23. Read the MEASURE README, source, manifest list, Wine
+runner and both saved native extracts in full at 9707b4d. Read the
+relevant Wine 11.22 source paths for target-device setup, rewrap, scroll,
+drawing and sizing. The rest of the Wine tree and unrelated CI were
+outside this review.
+
+- At 96 DPI, MulDiv rounds 42211 twips to 2814 pixels and 100000 twips
+  to 6667. Adding one pixel for RichEdit20W reproduces 2815 and 6668.
+  The saved native extracts show 42211 across reference DC kinds and
+  both scrollbar styles. The 100000 expectations appear in the passing
+  Windows L1. The formula uses the layout context DPI rather than the
+  reference DC passed in the message. The zoomed range is unmeasured.
+- Only the non-NULL EM_SETTARGETDEVICE path sets a nonzero nAvailWidth.
+  The NULL path resets it and rewraps, clearing target_scroll_width.
+  The Windows NULL-DC behavior is a known compatibility difference.
+- The candidate uses the extra extent only for horizontal scrollbar
+  range and visibility. EN_REQUESTRESIZE, TxGetNaturalSize and border
+  painting continue to read nTotalWidth.
+- The remaining Inventor clipping is open. The test checks the start
+  position of the letter against the client width. It does not check
+  the entire glyph against the formatting rectangle or reproduce
+  Inventor's timing. The caret position and the formatting rectangle
+  before and after focus are needed to distinguish the hypotheses.
