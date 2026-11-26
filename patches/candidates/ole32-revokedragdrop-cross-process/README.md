@@ -10,8 +10,8 @@ IDropTarget pointer stored by the other process and the caller crashes.
 | --- | --- |
 | MEASURE | Both rounds agree across x86_64 and i686. The foreign call invalidates the registration, preserves LastError and leaves the owner references unchanged. |
 | L0 | Pending. Apply the candidate after the winum-11.22-3 series with zero fuzz. |
-| L1 | Offline Windows 10 passed 19 checks per architecture on 2026-11-26, seven in the caller and twelve in the owner, with zero failures, todos, flaky checks or skips. [Results](../../../docs/wine-repro/ole32-revokedragdrop-cross-process/results/l1-windows-10/summary.tsv). [Verified L1 bundle](https://github.com/Harvi654/winum/actions/runs/45827199214/artifacts/15118964743). |
-| L2 | CI pairs ole32, combase and user32 against the same release series. The new cross-process case runs on the patched side. [Paired L2](https://github.com/Harvi654/winum/actions/runs/45827199191). |
+| L1 | Offline Windows 10 passed 19 checks per architecture on 2026-11-26, seven in the caller and twelve in the owner, with zero failures, todos, flaky checks or skips. [Results](../../../docs/wine-repro/ole32-revokedragdrop-cross-process/results/l1-windows-10/summary.tsv). The test is unchanged in v2, so this L1 remains valid. [Verified L1 bundle](https://github.com/Harvi654/winum/actions/runs/45827199214/artifacts/15118964743). |
+| L2 | v1 matched the owner's HRESULT but set LastError to 2 on both architectures. v2 restores the saved value for the same-process not-registered return. Paired ole32, combase and user32 rerun pending. [v1 comparison](https://github.com/Harvi654/winum/actions/runs/45827199191) |
 | L4 | Pending. Verify Revit 2027.4 reaches Home and opens a model on the desktop PC. Smoke test Inventor and AutoCAD, including open, save, reopen and restart. |
 | Cross review | Claude, 2026-11-26: approved for L2/L4; two open points below. |
 
@@ -62,3 +62,17 @@ purpose):
    (`caller_register_unregistered`) - a second process can register on
    another's window. Not measured in Wine and not needed by Revit;
    recorded for the bug report.
+
+## v2 (2026-11-26)
+
+The normal property lookup sets LastError to ERROR_FILE_NOT_FOUND
+when the original owner calls RevokeDragDrop after the registration
+has been removed. Restore the entry value on the same-process
+DRAGDROP_E_NOTREGISTERED return. The regression test and L1
+expectations are unchanged.
+
+For L4, use the candidate overlay with a test copy of the winum-11.22-3
+runtime. Verify SHA256SUMS in the extracted artifact. Install each
+ole32.dll into the matching x86_64-windows or i386-windows directory
+under lib/wine. BUILDINFO identifies the release base and exact
+candidate commit.

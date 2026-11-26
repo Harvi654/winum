@@ -10,7 +10,13 @@ DRAGDROP_E_NOTREGISTERED. Both preserve LastError.
 
 Wine's target and mapping belong to the registering process. Clear
 the registration on the foreign window without dereferencing or
-closing the other process's resources. Keep the same-process path.
+closing the other process's resources.
+
+v2 (2026-11-26): Also restore LastError on the same-process
+DRAGDROP_E_NOTREGISTERED return. The owner's follow-up revoke already
+returned the measured HRESULT in L2, but the property lookup set
+LastError to ERROR_FILE_NOT_FOUND. Other same-process returns retain
+their existing behavior.
 
 --- a/dlls/ole32/ole2.c
 +++ b/dlls/ole32/ole2.c
@@ -20,10 +26,9 @@ closing the other process's resources. Keep the same-process path.
 +  DWORD last_error = GetLastError(), pid;
    HANDLE map;
    IStream *stream;
-@@ -640,4 +641,22 @@
-     return DRAGDROP_E_INVALIDHWND;
+@@ -641,7 +642,28 @@
    }
-+
+ 
 +  if (!GetWindowThreadProcessId(hwnd, &pid))
 +    return DRAGDROP_E_INVALIDHWND;
 +
@@ -41,5 +46,12 @@ closing the other process's resources. Keep the same-process path.
 +    return hr;
 +  }
 +  SetLastError(last_error);
- 
++
    /* no registration data */
+   if (!(map = get_droptarget_handle(hwnd)))
++  {
++    SetLastError(last_error);
+     return DRAGDROP_E_NOTREGISTERED;
++  }
+ 
+   drop_target = GetPropW(hwnd, prop_oledroptarget);
