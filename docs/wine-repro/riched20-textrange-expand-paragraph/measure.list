@@ -1,0 +1,1 @@
+riched-expand | docs/wine-repro/riched20-textrange-expand-paragraph/measure.cpp | -fno-exceptions -fno-rtti -lole32 -loleaut32 -luser32 -lgdi32 -luuid
