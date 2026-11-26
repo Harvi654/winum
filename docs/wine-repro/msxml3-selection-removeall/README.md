@@ -44,3 +44,19 @@ E_NOINTERFACE in all 80 cases.
 
 - [Verified offline Windows bundle](https://github.com/Harvi654/winum/actions/runs/45906581797/artifacts/15156934679)
 - [Wine baseline results](https://github.com/Harvi654/winum/actions/runs/45906581797/artifacts/15156994739)
+
+## Offline Windows 10 comparison
+
+Both architectures completed all 80 cases with exit 0. The case records
+are identical between x86_64 and i686 and the two selection acquisition
+paths agree on removal behavior.
+
+| Call | Windows 10 | winum-11.22-3 |
+| --- | --- | --- |
+| removeAll on an empty or populated selection | S_OK in all 40 cases. Detaches all matching nodes, including with an advanced cursor. | E_NOTIMPL, no change. |
+| Selection after removeAll | Length zero, nextNode returns S_FALSE. Reset and a later matching insertion do not repopulate the snapshot. A fresh query sees the inserted match. | Selection retains its original result. |
+| removeNext | S_OK and detached node when a next node exists (28 cases), otherwise S_FALSE and no node (12 cases). Only the removed entry leaves the selection. The cursor stays at its current index in the compacted result. | E_NOTIMPL in 40 cases. |
+| QueryInterface for ISupportErrorInfo | E_NOINTERFACE on both DOM versions and both acquisition paths. | Same. |
+
+The candidate implements removeAll. removeNext is a separate cursor and
+returned-object change. Error-info support already agrees with Windows.

@@ -1,7 +1,7 @@
 # MSXML selection removal and the Inventor Content Center filter
 
-**Status:** MEASURE pending on offline Windows 10. Candidate tests
-and implementation follow the native results.
+**Status:** Candidate and tests based on the completed offline Windows 10
+measurement. Application validation is pending.
 
 Inventor 2027 on winum-11.22-3 crashes when the Content Center editor's
 standard filter is set to ISO. Windows refreshes the open editor. The
@@ -29,16 +29,19 @@ closes and reopens the browser window.
    the Wine E_NOTIMPL stub. ISupportErrorInfo is unavailable on the
    selection and the unhandled C++ exception follows.
 
-The immediate API difference to verify is removeAll on an empty
-selection. The synthetic probe also checks removal from populated
-selections and the state of their cursors and parent nodes.
+The native measurement confirms S_OK on the empty selection. It also
+shows the same result for populated selections, irrespective of the
+cursor. After successful removal the old selection stays empty, and
+a fresh query can see newly inserted matches.
 
 ## Validation
 
 | Level | State |
 | --- | --- |
-| MEASURE | [Probe and instructions](../wine-repro/msxml3-selection-removeall/README.md). Native results pending. |
-| L0–L2 | Pending the measured candidate and tests. |
+| MEASURE | [Probe and instructions](../wine-repro/msxml3-selection-removeall/README.md). 80 matching cases on both native architectures. |
+| L0 | Both patches apply with zero fuzz to winum-11.22-3. Overlay build pending. |
+| L1 | Focused offline Windows test pending. |
+| L2 | Paired msxml3 suites pending. |
 | L4 | Set ISO in the Content Center editor and verify the list refreshes. Change the filter, restart Inventor and check that the saved setting reloads. |
 | Review | Maintainer after the candidate. |
 

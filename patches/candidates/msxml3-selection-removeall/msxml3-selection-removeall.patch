@@ -1,0 +1,79 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msxml3: Implement selection removeAll.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+In offline Windows 10 measurements, DOMDocument30 and DOMDocument60
+return S_OK for empty and populated selections. All matches are removed
+regardless of the cursor, and the static result is then empty.
+
+Use the existing DOM detachment and release helpers while each selected
+node is still referenced. Preserve the existing doctype removal
+restriction. Leave removeNext and error-info querying outside this fix.
+
+--- a/dlls/msxml3/node.c
++++ b/dlls/msxml3/node.c
+@@ -541,11 +541,11 @@
+     old_owner->refcount -= node->refcount;
+     if (old_owner->refcount == 0)
+         domnode_destroy_tree(old_owner);
+ }
+ 
+-static void domnode_unlink_child(struct domnode *child)
++void domnode_unlink_child(struct domnode *child)
+ {
+     struct domnode *node, *top;
+ 
+     if (!child->parent)
+          return;
+--- a/dlls/msxml3/msxml_private.h
++++ b/dlls/msxml3/msxml_private.h
+@@ -461,10 +461,11 @@
+ extern HRESULT node_substring_data(struct domnode *, LONG, LONG, BSTR *);
+ extern HRESULT node_get_data_length(struct domnode *, LONG *);
+ extern HRESULT node_insert_data(struct domnode *, LONG, BSTR);
+ extern HRESULT node_replace_data(struct domnode *, LONG, LONG, BSTR);
+ extern void node_unlink_children(struct domnode *);
++extern void domnode_unlink_child(struct domnode *);
+ 
+ extern UINT get_codepage_for_encoding(const WCHAR *encoding);
+ 
+ extern HRESULT SchemaCache_validate_tree(IXMLDOMSchemaCollection2*, xmlNodePtr);
+ extern XDR_DT SchemaCache_get_node_dt(IXMLDOMSchemaCollection2 *, const WCHAR *name, const WCHAR *uri);
+--- a/dlls/msxml3/selection.c
++++ b/dlls/msxml3/selection.c
+@@ -328,13 +328,31 @@
+     return E_NOTIMPL;
+ }
+ 
+ static HRESULT WINAPI domselection_removeAll(IXMLDOMSelection *iface)
+ {
+-    FIXME("%p.\n", iface);
+-
+-    return E_NOTIMPL;
++    domselection *selection = impl_from_IXMLDOMSelection(iface);
++    struct selected_list *result = &selection->result;
++    LONG i;
++
++    TRACE("%p.\n", iface);
++
++    for (i = 0; i < result->count; ++i)
++    {
++        struct domnode *node = result->nodes[i];
++
++        if (!node) continue;
++        /* The selection holds the node alive while it is detached. */
++        if (node->type != NODE_DOCUMENT_TYPE)
++            domnode_unlink_child(node);
++        domnode_release(node);
++    }
++
++    free(result->nodes);
++    result->nodes = NULL;
++    result->count = result->pos = 0;
++    return S_OK;
+ }
+ 
+ static HRESULT WINAPI domselection_clone(IXMLDOMSelection *iface, IXMLDOMSelection **node)
+ {
+     FIXME("%p, %p.\n", iface, node);
