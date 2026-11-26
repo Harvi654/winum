@@ -1,0 +1,1 @@
+msxml3-selection-removeall | docs/wine-repro/msxml3-selection-removeall/measure.c | -lole32 -loleaut32 -luuid
