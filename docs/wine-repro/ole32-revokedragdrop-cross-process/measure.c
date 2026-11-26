@@ -293,6 +293,11 @@ int wmain(int argc, WCHAR **argv)
     HRESULT hr;
 
     setvbuf(stdout, NULL, _IONBF, 0);
+    if (GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "wine_get_version"))
+    {
+        puts("setup=native_windows_required");
+        return 1;
+    }
     if (argc == 5 && !wcscmp(argv[1], L"--owner"))
         return child_main((HANDLE)(ULONG_PTR)wcstoull(argv[2], NULL, 10),
                           (HANDLE)(ULONG_PTR)wcstoull(argv[3], NULL, 10),

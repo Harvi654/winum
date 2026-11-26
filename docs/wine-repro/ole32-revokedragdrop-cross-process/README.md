@@ -24,7 +24,8 @@ are verified to be different threads in the requested processes.
 
 ## Offline Windows 10
 
-Check SHA256SUMS in the extracted MEASURE bundle on Linux. Transfer the
+The probe runs on native Windows. Check SHA256SUMS in the extracted
+MEASURE bundle on Linux. Transfer the
 bundle to a short path in the offline Windows 10 snapshot and run
 run-measure.bat in a normal console. Return these three text files:
 
