@@ -66,4 +66,33 @@ and `exitcodes.txt`.
 
 ## Results
 
-Pending.
+Offline Windows 10 VM, 2026-11-26, both architectures: 612 cases, none
+failed, exit 0. The centred 42211-twip rows of x86_64 are in
+[results/windows-10/center-42211-x86_64.txt](results/windows-10/center-42211-x86_64.txt);
+the Wine column is CI run 45861796621 (winum-11.22-3, Xvfb, 96 dpi).
+
+| Centred, 42211 twips, DC not NULL | Windows 10 | winum-11.22-3 |
+| --- | --- | --- |
+| `EM_POSFROMCHAR(0)` x, RICHEDIT50W / RichEdit20W | 1404 / 1403 | 1404 / 1404 |
+| Horizontal scroll range, both scroll bars, `ES_DISABLENOSCROLL` | 0..2814, page 585 (2815 in RichEdit20W) | 0..1, page 0 |
+| Horizontal scroll range, both scroll bars, `ES_AUTOHSCROLL` | 0..2814, page 602 | 0..100 (order 0) or none (order 1) |
+| `EM_GETSCROLLPOS` | 0,0 | 0,0 |
+
+- Wine already lays the line out as Windows does: the target device's
+  line width (42211 twips = 2814 pixels at 96 dpi) is the line, and the
+  centred letter sits at its middle, outside the 610-pixel window, on
+  Windows too. The printer DC at 600 dpi gives the same position, so the
+  width is not converted through the DC's resolution.
+- The difference is the horizontal scroll range. Windows covers the whole
+  line (0..2814) so the letter can be scrolled to; Wine's range is the
+  width of the text (`editor->nTotalWidth`, the widest paragraph), so the
+  scroll bar has nothing to scroll.
+- Side finding, not used by Inventor: with a NULL DC and 42211,
+  RichEdit20W uses the width as well (x 1403), RICHEDIT50W centres in the
+  window (x 298) but still reports the 0..2814 range; Wine centres in the
+  window (x 301) for both.
+
+Open before a patch: how the letter becomes visible in Inventor's dialog
+on Windows, where the scroll position also starts at 0 - most likely
+RichEdit scrolls the caret into view when the dialog focuses it, which
+Wine cannot do while the range ends at 1.
