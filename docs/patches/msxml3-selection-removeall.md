@@ -39,9 +39,10 @@ a fresh query can see newly inserted matches.
 | Level | State |
 | --- | --- |
 | MEASURE | [Probe and instructions](../wine-repro/msxml3-selection-removeall/README.md). 80 matching cases on both native architectures. |
-| L0 | Both patches apply with zero fuzz to winum-11.22-3. Overlay build pending. |
+| L0 | Both DLL architectures built with v2 after zero-fuzz application to winum-11.22-3. [Verified overlay](https://github.com/Harvi654/winum/actions/runs/45907358465/artifacts/15158681305). |
 | L1 | Offline Windows 10 passed 149 checks per architecture on 2026-11-26. Both exit codes are 0, with no failures, todos, flaky checks or skips. The test is unchanged in v2. [Results](../wine-repro/msxml3-selection-removeall/results/l1-windows-10/summary.tsv). [L1 bundle](https://github.com/Harvi654/winum/actions/runs/45907168374/artifacts/15158600698). |
 | L2 | Paired msxml3 suites running for v2. [CI](https://github.com/Harvi654/winum/actions/runs/45907358527). |
+| L3 | Local x86_64 v2 matched all 40 complete native removeAll case records, including XML serialization, both selection paths and the advanced cursor. All 149 focused assertions passed without todos. The unpatched release showed ten expected HRESULT differences. |
 | L4 | Set ISO in the Content Center editor and verify the list refreshes. Change the filter, restart Inventor and check that the saved setting reloads. |
 | Review | Maintainer after the candidate. |
 

@@ -12,3 +12,11 @@ empty selections and populated selections spanning multiple parents.
 
 removeNext is measured separately. Both native versions return
 E_NOINTERFACE for ISupportErrorInfo. Neither API is changed here.
+
+
+For the application check, verify SHA256SUMS from the
+[v2 overlay](https://github.com/Harvi654/winum/actions/runs/45907358465/artifacts/15158681305)
+and copy both msxml3.dll files to the matching architecture directories
+under lib/wine in a test copy of winum-11.22-3. In the Content Center
+editor, select ISO and check the list, change the filter again, restart
+Inventor and check the persisted setting.
