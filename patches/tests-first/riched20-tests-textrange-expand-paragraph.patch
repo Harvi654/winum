@@ -1,0 +1,184 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] riched20/tests: Measure paragraph expansion in TOM ranges.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Windows 10 expands to the enclosing paragraphs, counts the implicit terminal
+paragraph mark, and returns S_FALSE when the range is unchanged.
+Wine 11.22 returns E_NOTIMPL for this unit.
+
+--- a/dlls/riched20/tests/richole.c
++++ b/dlls/riched20/tests/richole.c
+@@ -5562,12 +5562,158 @@
+   hr = ITextDocument_Unfreeze(doc, NULL);
+   ok(hr == S_OK, "ITextDocument_Unfreeze returned %#lx\n", hr);
+ 
+   release_interfaces(&hwnd, &reole, &doc, &selection);
+ }
+ 
++static BOOL set_expand_text(ITextDocument *doc, const WCHAR *text)
++{
++    ITextRange *range;
++    HRESULT hr;
++    BSTR str;
++
++    hr = ITextDocument_Range(doc, 0, 0, &range);
++    ok(hr == S_OK, "Range failed: %#lx\n", hr);
++    if (FAILED(hr)) return FALSE;
++    hr = ITextRange_Expand(range, tomStory, NULL);
++    ok(SUCCEEDED(hr), "Expand story failed: %#lx\n", hr);
++    if (SUCCEEDED(hr))
++    {
++        str = SysAllocString(text);
++        hr = ITextRange_SetText(range, str);
++        SysFreeString(str);
++        ok(hr == S_OK, "SetText failed: %#lx\n", hr);
++    }
++    ITextRange_Release(range);
++    return SUCCEEDED(hr);
++}
++
++static void check_expand_paragraph(ITextRange *range, LONG expected_start, LONG expected_end,
++                                   LONG expected_delta, HRESULT expected_hr, BOOL want_delta)
++{
++    LONG start = -1, end = -1, delta = 0x12345678;
++    HRESULT hr;
++
++    hr = ITextRange_Expand(range, tomParagraph, want_delta ? &delta : NULL);
++    todo_wine
++    ok(hr == expected_hr, "Expand returned %#lx, expected %#lx\n", hr, expected_hr);
++    if (FAILED(hr)) return;
++
++    ITextRange_GetStart(range, &start);
++    ITextRange_GetEnd(range, &end);
++    ok(start == expected_start && end == expected_end, "range %ld,%ld, expected %ld,%ld\n",
++       start, end, expected_start, expected_end);
++    if (want_delta)
++        ok(delta == expected_delta, "delta %ld, expected %ld\n", delta, expected_delta);
++}
++
++static void test_expand_paragraph_class(const WCHAR *class_name)
++{
++    static const GUID text_document_iid = {0x8cc497c0,0xa1df,0x11ce,{0x80,0x98,0x00,0xaa,0x00,0x47,0xbe,0x5d}};
++    static const struct
++    {
++        LONG start, end, expanded_start, expanded_end, delta;
++        HRESULT hr;
++    }
++    cases[] =
++    {
++        {  2,  5,  0, 18, 15, S_OK },
++        {  5, 23,  0, 31, 13, S_OK },
++        {  0, 18,  0, 18,  0, S_FALSE },
++        { 18, 31, 18, 31,  0, S_FALSE },
++        {  6, 18,  0, 18,  6, S_OK },
++        {  7,  7,  0, 18, 18, S_OK },
++        { 18, 18, 18, 31, 13, S_OK },
++        { 35, 36, 31, 36,  4, S_OK },
++        { 36, 36, 36, 37,  1, S_OK },
++        { 36, 37, 36, 37,  0, S_FALSE },
++        { 37, 37, 36, 37,  1, S_OK },
++    };
++    ITextRange *range, *duplicate;
++    ITextDocument *doc;
++    IUnknown *ole = NULL;
++    unsigned int i, want_delta;
++    HRESULT hr;
++    HWND hwnd;
++
++    hwnd = CreateWindowExW(0, class_name, NULL, WS_POPUP | ES_MULTILINE,
++                           0, 0, 320, 200, NULL, NULL, NULL, NULL);
++    ok(!!hwnd, "CreateWindowExW failed: %lu\n", GetLastError());
++    if (!hwnd) return;
++    SendMessageW(hwnd, EM_GETOLEINTERFACE, 0, (LPARAM)&ole);
++    ok(!!ole, "EM_GETOLEINTERFACE failed\n");
++    if (!ole) goto done;
++    hr = IUnknown_QueryInterface(ole, &text_document_iid, (void **)&doc);
++    IUnknown_Release(ole);
++    ok(hr == S_OK, "QueryInterface returned %#lx\n", hr);
++    if (FAILED(hr)) goto done;
++
++    if (set_expand_text(doc, L"Alpha beta. Next!\rGamma delta.\rLast\r"))
++    {
++        for (i = 0; i < ARRAY_SIZE(cases); ++i)
++        {
++            for (want_delta = 0; want_delta <= 1; ++want_delta)
++            {
++                winetest_push_context("case %u, want_delta %u", i, want_delta);
++                hr = ITextDocument_Range(doc, cases[i].start, cases[i].end, &range);
++                ok(hr == S_OK, "Range failed: %#lx\n", hr);
++                if (SUCCEEDED(hr))
++                {
++                    check_expand_paragraph(range, cases[i].expanded_start, cases[i].expanded_end,
++                                           cases[i].delta, cases[i].hr, want_delta);
++                    ITextRange_Release(range);
++                }
++                winetest_pop_context();
++            }
++        }
++    }
++
++    if (set_expand_text(doc, L"-\r"))
++    {
++        hr = ITextDocument_Range(doc, 0, 0, &range);
++        ok(hr == S_OK, "Range failed: %#lx\n", hr);
++        if (SUCCEEDED(hr))
++        {
++            hr = ITextRange_Expand(range, tomStory, NULL);
++            ok(SUCCEEDED(hr), "Expand story failed: %#lx\n", hr);
++            hr = ITextRange_SetStart(range, 0);
++            ok(SUCCEEDED(hr), "SetStart failed: %#lx\n", hr);
++            hr = ITextRange_SetEnd(range, 2);
++            ok(SUCCEEDED(hr), "SetEnd failed: %#lx\n", hr);
++            hr = ITextRange_GetDuplicate(range, &duplicate);
++            ok(hr == S_OK, "GetDuplicate failed: %#lx\n", hr);
++            if (SUCCEEDED(hr))
++            {
++                check_expand_paragraph(duplicate, 0, 2, 0, S_FALSE, FALSE);
++                ITextRange_Release(duplicate);
++            }
++            ITextRange_Release(range);
++        }
++    }
++    ITextDocument_Release(doc);
++done:
++    DestroyWindow(hwnd);
++}
++
++static void test_expand_paragraph(void)
++{
++    HMODULE msftedit = LoadLibraryW(L"msftedit.dll");
++
++    winetest_push_context("RichEdit20W");
++    test_expand_paragraph_class(L"RichEdit20W");
++    winetest_pop_context();
++    if (msftedit)
++    {
++        winetest_push_context("RICHEDIT50W");
++        test_expand_paragraph_class(L"RICHEDIT50W");
++        winetest_pop_context();
++        FreeLibrary(msftedit);
++    }
++    else win_skip("msftedit.dll unavailable\n");
++}
++
+ START_TEST(richole)
+ {
+   /* Must explicitly LoadLibrary(). The test has no references to functions in
+    * RICHED20.DLL, so the linker doesn't actually link to it. */
+   hmoduleRichEdit = LoadLibraryA("riched20.dll");
+   ok(hmoduleRichEdit != NULL, "error: %d\n", (int) GetLastError());
+@@ -5600,12 +5746,13 @@
+   test_GetStoryType();
+   test_SetFont();
+   test_InsertObject();
+   test_GetStoryLength();
+   test_ITextSelection_GetDuplicate();
+   test_Expand();
++  test_expand_paragraph();
+   test_MoveEnd_story();
+   test_character_movement();
+   test_clipboard();
+   test_undo();
+   test_undo_control();
+   test_freeze();
