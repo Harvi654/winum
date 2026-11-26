@@ -87,7 +87,7 @@ index 0ba1935..70480be 100644
 +
 +            /* Inventor's order: target device, text at the selection, alignment. */
 +            res = SendMessageW( edit, EM_SETTARGETDEVICE, (WPARAM)dc, tests[i].width );
-+            ok( res == 1, "EM_SETTARGETDEVICE returned %Id\n", res );
++            ok( res == 1, "EM_SETTARGETDEVICE returned %d\n", (int)res );
 +            SendMessageW( edit, EM_SETTEXTEX, (WPARAM)&st, (LPARAM)L"A" );
 +            SendMessageW( edit, EM_EXGETSEL, 0, (LPARAM)&sel );
 +            SendMessageW( edit, EM_SETSEL, 0, -1 );
