@@ -101,3 +101,9 @@ outside this change.
 
 [Call results](results/windows-10/owner-first-calls.tsv) ·
 [Reference counts](results/windows-10/owner-first-references.tsv).
+
+## Exact dragdrop test on Windows 10 (L1)
+
+On 2026-11-26 the offline x86_64 and i686 runs each passed seven caller
+checks and twelve owner checks. Both returned exit code 0 with zero
+failures, todos, flaky checks or skips. [Native L1 summary](results/l1-windows-10/summary.tsv).
