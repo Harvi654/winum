@@ -14,9 +14,8 @@ removeNext is measured separately. Both native versions return
 E_NOINTERFACE for ISupportErrorInfo. Neither API is changed here.
 
 
-For the application check, verify SHA256SUMS from the
-[v2 overlay](https://github.com/Harvi654/winum/actions/runs/45907358465/artifacts/15158681305)
-and copy both msxml3.dll files to the matching architecture directories
-under lib/wine in a test copy of winum-11.22-3. In the Content Center
-editor, select ISO and check the list, change the filter again, restart
-Inventor and check the persisted setting.
+The maintainer verified that the v2 overlay fixes ISO filtering in
+Inventor 2027 and that a changed filter survives restart. AutoCAD
+and Revit smoke checks and maintainer cross review are open.
+See the [L4 record](../../../docs/patches/msxml3-selection-removeall.md#validation)
+for the tested runtime, trace counts, and outstanding release gates.

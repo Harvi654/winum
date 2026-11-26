@@ -1,7 +1,8 @@
 # MSXML selection removal and the Inventor Content Center filter
 
-**Status:** Candidate and tests based on the completed offline Windows 10
-measurement. Application validation is pending.
+**Status:** v2 fixes the ISO-filter crash in Inventor 2027 and preserves
+the filter across restart. Paired L2, AutoCAD and Revit application
+checks, and maintainer review are tracked below.
 
 Inventor 2027 on winum-11.22-3 crashes when the Content Center editor's
 standard filter is set to ISO. Windows refreshes the open editor. The
@@ -16,13 +17,21 @@ closes and reopens the browser window.
 2. The window-tree comparison surfaced the CBS_HASSTRINGS combo-box
    style difference. A temporary overlay changing it left the crash
    reproducible.
-3. The XML stream and XML processing instruction sequence occurs while
-   saving settings. The measured document-level append matches Windows.
-   The element-append candidate fixed a separate discrepancy and the
-   crash remained. The candidate and the trace overlay stay outside
-   the series.
-4. The focused trace loads ContentCenterSettings.xml using a BSTR file
-   path. It finds the settings root, eight filter groups and a
+3. The UTF-16 stream and XML processing instruction sequence occurs
+   while saving settings. The element-append candidate matched a
+   native compatibility difference, but the verified overlay still
+   crashed on ISO. The operation in the Inventor trace was
+   domdoc_appendChild on the same document instance as creation. For
+   that case Windows and winum return S_OK and produce top-level
+   xml/root/xml. [Element-append measurements](../wine-repro/msxml3-content-center-stream/README.md#offline-windows-10-comparison).
+4. A debug-only msxml3 overlay on the release behavior logged stream
+   load and parse results, root lookup and append results with the
+   destination type. It also provided a bounded local DOM preview.
+   That experiment separated settings serialization from the failing
+   call. The XML PI candidate and the debug patch stay outside the
+   series. [Trace overlay](https://github.com/Harvi654/winum/actions/runs/45904679098/artifacts/15158046259).
+5. The focused +msxml trace loads ContentCenterSettings.xml using a
+   BSTR file path. It finds the settings root, eight filter groups and a
    FilterPartCategories node. The latter has no string children, so
    selectNodes("./string") correctly returns an empty selection.
    QueryInterface to IXMLDOMSelection succeeds, then removeAll reaches
@@ -43,7 +52,14 @@ a fresh query can see newly inserted matches.
 | L1 | Offline Windows 10 passed 149 checks per architecture on 2026-11-26. Both exit codes are 0, with no failures, todos, flaky checks or skips. The test is unchanged in v2. [Results](../wine-repro/msxml3-selection-removeall/results/l1-windows-10/summary.tsv). [L1 bundle](https://github.com/Harvi654/winum/actions/runs/45907168374/artifacts/15158600698). |
 | L2 | Paired msxml3 suites running for v2. [CI](https://github.com/Harvi654/winum/actions/runs/45907358527). |
 | L3 | Local x86_64 v2 matched all 40 complete native removeAll case records, including XML serialization, both selection paths and the advanced cursor. All 149 focused assertions passed without todos. The unpatched release showed ten expected HRESULT differences. |
-| L4 | Set ISO in the Content Center editor and verify the list refreshes. Change the filter, restart Inventor and check that the saved setting reloads. |
-| Review | Maintainer after the candidate. |
+| L4 Inventor 2027 | Passed on the maintainer's test copy of winum-11.22-3 with the v2 overlay (run 45907358465). The maintainer verified the runtime path, both SHA256SUMS entries (x86_64 `7d536b5b…`, i386 `289cdc8f…`), and ran with +msxml. ISO refreshed the list without a crash. A changed filter survived restart and was reloaded. The trace recorded 27 removeAll calls, no removeAll stub message, and no e06d7363 exceptions. |
+| L4 AutoCAD | Open. Start, test a drawing, save and reopen. |
+| L4 Revit | Open. Start, test a project, save and reopen. |
+| Review | Maintainer cross review pending. |
+
+Series inclusion requires the completed L2 comparison, the AutoCAD and
+Revit L4 checks, and maintainer cross review. The intended release is
+the Wine 11.23 rebase or, if it ships first, winum-11.22-4 with the
+four RichEdit and ole32 patches.
 
 [Inventor issue #45](https://github.com/Harvi654/Autodesk-Inventor-for-Linux/issues/45)
