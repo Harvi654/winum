@@ -1,0 +1,2 @@
+enddialog-nondialog x86_64=0
+enddialog-nondialog i686=0

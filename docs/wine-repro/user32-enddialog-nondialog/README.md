@@ -28,4 +28,20 @@ desktop without touching mouse or keyboard; return both
 
 ## Results
 
-Pending.
+Offline Windows 10 VM, 2026-11-26, x86_64 and i686 identical, exit 0
+([results/windows-10/](results/windows-10/)); winum-11.22-3 in CI run
+45894005968.
+
+| Case | Windows 10 | winum-11.22-3 |
+| --- | --- | --- |
+| MDI client, child, top-level, owned popup | `FALSE`, last error 1420 (`ERROR_WINDOW_NOT_DIALOG`), window untouched | `FALSE`, last error unchanged, window untouched |
+| Modeless dialog, disabled owner | `TRUE`, dialog hidden, owner enabled, focus leaves it | same |
+| Destroyed window, NULL | `FALSE`, 1400 | same |
+| MDI client afterwards | visible, can create a child | same |
+
+So Windows rejects `EndDialog` on a non-dialog window just like Wine and
+leaves the window alone. The only difference is the last error (1420 on
+Windows, unchanged in Wine). Inventor's call on its MDI client fails on
+Windows too, so it is not the cause of the Content Center crash; it is a
+side effect of the same code path. Not worth a patch on its own (it
+fixes nothing for the program); noted for a Wine bug report.

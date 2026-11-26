@@ -1,0 +1,11 @@
+setup	frame=1	mdi=1
+case	mdi_client	ret=0	err=1420	exists=1->1	visible=1->1	enabled=1->1	owner_enabled=1->1	focus_was_window=0	focus_is_window=0	active_is_window=0
+case	mdi_client_focus	ret=0	err=1420	exists=1->1	visible=1->1	enabled=1->1	owner_enabled=1->1	focus_was_window=1	focus_is_window=1	active_is_window=0
+case	plain_child	ret=0	err=1420	exists=1->1	visible=1->1	enabled=1->1	owner_enabled=1->1	focus_was_window=0	focus_is_window=0	active_is_window=0
+case	plain_toplevel	ret=0	err=1420	exists=1->1	visible=1->1	enabled=1->1	owner_enabled=-1->-1	focus_was_window=1	focus_is_window=1	active_is_window=1
+case	owned_popup_owner_disabled	ret=0	err=1420	exists=1->1	visible=1->1	enabled=1->1	owner_enabled=0->0	focus_was_window=1	focus_is_window=1	active_is_window=1
+case	modeless_dialog_owner_disabled	ret=1	err=0	exists=1->1	visible=1->0	enabled=1->1	owner_enabled=0->1	focus_was_window=1	focus_is_window=0	active_is_window=0
+case	destroyed_window	ret=0	err=1400	exists=0->0	visible=0->0	enabled=0->0	owner_enabled=-1->-1	focus_was_window=0	focus_is_window=0	active_is_window=0
+case	null	ret=0	err=1400	exists=-1->-1	visible=-1->-1	enabled=-1->-1	owner_enabled=-1->-1	focus_was_window=0	focus_is_window=0	active_is_window=0
+after	mdi_visible=1	mdi_child_created=1
+measure_complete
