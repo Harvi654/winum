@@ -15,32 +15,50 @@ interval per editor and apply the measured grid to implicit tab stops.
 Keep a usable layout interval when the reported stored value is zero
 or the older control's overflow sentinel.
 
+v2 (2026-11-26): Include the method signatures in the patch context.
+The series shifts richole.c, and the shorter context matched two
+unrelated stubs. The behavior and test are unchanged.
+
 --- a/dlls/riched20/editstr.h
 +++ b/dlls/riched20/editstr.h
-@@ -399,4 +399,5 @@
+@@ -397,8 +397,9 @@
+   SIZE sizeWindow;
+   int nTotalLength, nLastTotalLength;
    int nTotalWidth, nLastTotalWidth;
    int nAvailWidth; /* 0 = wrap to client area, else wrap width in twips */
 +  int default_tab; /* twips */
    int nUDArrowX;
    int total_rows;
+   int nEventMask;
+   int nModifyStep;
 --- a/dlls/riched20/editor.c
 +++ b/dlls/riched20/editor.c
-@@ -3014,4 +3014,5 @@
+@@ -3012,8 +3012,9 @@
+   ITextHost_TxGetScrollBars( ed->texthost, &ed->scrollbars );
+   ed->pBuffer = ME_MakeText();
    ed->nZoomNumerator = ed->nZoomDenominator = 0;
    ed->nAvailWidth = 0; /* wrap to client area */
 +  ed->default_tab = lDefaultTab;
    list_init( &ed->style_list );
  
-@@ -3675,4 +3676,6 @@
+   hdc = ITextHost_TxGetDC( ed->texthost );
+   ME_MakeFirstParagraph( ed, hdc );
+@@ -3673,8 +3674,10 @@
+   }
+   case WM_SETTEXT:
    {
      ME_Cursor cursor;
 +
 +    editor->default_tab = lDefaultTab;
      ME_SetCursorToStart(editor, &cursor);
      ME_InternalDeleteText(editor, &cursor, ME_GetTextLength(editor), FALSE);
+     if (lParam)
+     {
 --- a/dlls/riched20/richole.c
 +++ b/dlls/riched20/richole.c
-@@ -4181,6 +4181,9 @@
+@@ -4179,17 +4179,34 @@
+ 
+ static HRESULT WINAPI ITextDocument2Old_fnGetDefaultTabStop(ITextDocument2Old *iface, float *pValue)
  {
      struct text_services *services = impl_from_ITextDocument2Old(iface);
 -    FIXME("stub %p\n", services);
@@ -52,7 +70,7 @@ or the older control's overflow sentinel.
 +    return S_OK;
  }
  
-@@ -4188,6 +4191,20 @@
+ static HRESULT WINAPI ITextDocument2Old_fnSetDefaultTabStop(ITextDocument2Old *iface, float Value)
  {
      struct text_services *services = impl_from_ITextDocument2Old(iface);
 -    FIXME("stub %p\n", services);
@@ -75,9 +93,13 @@ or the older control's overflow sentinel.
 +    return S_OK;
  }
  
+ static HRESULT WINAPI ITextDocument2Old_fnNew(ITextDocument2Old *iface)
+ {
 --- a/dlls/riched20/run.c
 +++ b/dlls/riched20/run.c
-@@ -721,4 +721,21 @@
+@@ -719,8 +719,25 @@
+           shift = shift >> 1;
+         pos = shift + (pFmt->rgxTabs[i]&0x00FFFFFF);
          i++;
        }
 +      else if (c->editor->default_tab > 0 && c->editor->default_tab != lDefaultTab)
@@ -99,3 +121,5 @@ or the older control's overflow sentinel.
 +      }
        else
        {
+         pos += lDefaultTab - (pos % lDefaultTab);
+       }
