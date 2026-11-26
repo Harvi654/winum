@@ -100,3 +100,15 @@ is visible. The Wine trace has no scroll message from Inventor
 scrolls. Round 2 of the program keeps the caret after the letter, gives
 the control the focus and reads the scroll position and the letter's
 position again (`focus_*` columns) to measure that step.
+
+### Round 2 (focus), 2026-11-26
+
+Both architectures 612 cases, exit 0;
+[centred 42211-twip rows](results/windows-10/round2-focus-center-42211-x86_64.txt).
+With a scroll bar and a DC, giving the control the focus scrolls the view
+so that the caret after the letter is at the right edge: scroll position
+827 (`ES_DISABLENOSCROLL`, page 585; RichEdit20W 826) or 810
+(`ES_AUTOHSCROLL`, page 602; RichEdit20W 809), the letter then at x 577
+or 594. Before the focus the position is 0 on Windows. Without scroll
+bars nothing scrolls. Under winum-11.22-3 the position stays 0 after the
+focus, because the range ends at 1 (CI run 45863190609).
