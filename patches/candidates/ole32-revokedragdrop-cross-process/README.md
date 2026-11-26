@@ -13,7 +13,7 @@ IDropTarget pointer stored by the other process and the caller crashes.
 | L1 | Offline Windows 10 passed 19 checks per architecture on 2026-11-26, seven in the caller and twelve in the owner, with zero failures, todos, flaky checks or skips. [Results](../../../docs/wine-repro/ole32-revokedragdrop-cross-process/results/l1-windows-10/summary.tsv). [Verified L1 bundle](https://github.com/Harvi654/winum/actions/runs/45827199214/artifacts/15118964743). |
 | L2 | CI pairs ole32, combase and user32 against the same release series. The new cross-process case runs on the patched side. [Paired L2](https://github.com/Harvi654/winum/actions/runs/45827199191). |
 | L4 | Pending. Verify Revit 2027.4 reaches Home and opens a model on the desktop PC. Smoke test Inventor and AutoCAD, including open, save, reopen and restart. |
-| Cross review | Claude after test and fix. |
+| Cross review | Claude, 2026-11-26: approved for L2/L4; two open points below. |
 
 The fix invalidates both window registration properties when the owner
 process differs. The target reference and map are process-local.
@@ -21,3 +21,44 @@ The foreign caller leaves them alone, so invalidation can leave the
 owner-side registration resources alive. Native Windows retained the
 observed owner reference. The candidate leaves the same-process path
 and RegisterDragDrop behavior in place.
+
+## Cross review (Claude, 2026-11-26)
+
+Read in full: the fix patch, the test patch
+(`patches/tests-first/ole32-tests-revokedragdrop-cross-process.patch`),
+the three Windows 10 result tables and the L1 summary; `measure.c`, the
+two workflows and `scripts/build-l1-ole32-revokedragdrop.sh` only skimmed.
+Checked against Wine 11.22's `dlls/ole32/ole2.c`.
+
+- The fix matches the measured cross-process rows: a registered foreign
+  window gives `RPC_E_WRONG_THREAD` and loses its registration without a
+  Release in the owner (`owner-first-references.tsv`: refs stay 2,
+  releases 0 until the owner's own cleanup); an empty foreign window gives
+  `DRAGDROP_E_NOTREGISTERED`; LastError is kept in both. `is_droptarget()`
+  reads the window property, which works across processes, and the
+  foreign path never dereferences the other process's pointer or touches
+  its mapping handle - the crash Revit hit cannot happen there.
+- The owner's view after the foreign call is right for Wine too: its
+  `RevokeDragDrop` finds no registration (`DRAGDROP_E_NOTREGISTERED`,
+  measured) and `RegisterDragDrop` succeeds again. The owner's mapping
+  and target reference stay alive until the process ends - the same
+  retained reference Windows shows.
+- Nit: when `GetWindowThreadProcessId` fails the function returns before
+  restoring LastError. It cannot fail after `IsWindow` succeeded, so this
+  only matters for a window destroyed in between.
+
+Open points (not blockers for this candidate, which is limited on
+purpose):
+
+1. **Same process, other thread.** Windows returns `RPC_E_WRONG_THREAD`
+   there too and also drops the registration without a Release
+   (`calls.tsv` and `owner-first-references.tsv`, case
+   `same_process_other_thread`), so its rule looks thread-based, not
+   process-based. Wine (vanilla and with this patch) still revokes with a
+   Release and `S_OK` in that case. A follow-up could use the window's
+   thread for the check; it needs its own test, as it changes behaviour a
+   program in one process might rely on.
+2. **`RegisterDragDrop` on a foreign window.** Windows returns `S_OK`
+   (`caller_register_unregistered`) - a second process can register on
+   another's window. Not measured in Wine and not needed by Revit;
+   recorded for the bug report.
