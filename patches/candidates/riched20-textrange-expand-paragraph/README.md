@@ -124,4 +124,15 @@ The tests-first patch now contains the strict assertions used on the
 passing candidate side of L2. It is byte-for-byte the patch that the
 paired run produced after stripping its three Wine todo markers. The
 archived baseline test is used only in the candidate's comparison
-workflow. Shared CAD smoke testing uses the separate four-patch overlay.
+workflow. Shared CAD smoke testing uses the
+[four-patch overlay](https://github.com/Harvi654/winum/actions/runs/45880891853/artifacts/15147073657).
+It builds riched20 and ole32 from the same winum-11.22-3 source tree,
+with the verified RichEdit patch order and ole32 RevokeDragDrop v2.
+Both DLL architectures and the patch manifest were verified against
+SHA256SUMS.
+
+Use a disposable copy of the runtime. Install both DLLs into their
+matching architecture directories below lib/wine. The combined smoke
+test covers notes, dimensions and the symbol editor in Inventor,
+MTEXT and TEXT in AutoCAD, and New Project in Revit with DirectX
+Software rendering.
