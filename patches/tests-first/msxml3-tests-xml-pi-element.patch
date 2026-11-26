@@ -1,0 +1,121 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msxml3/tests: Test appending the XML declaration to an element.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Offline Windows 10 rejects appending an xml processing instruction under
+an element. DOMDocument30 returns E_FAIL and DOMDocument60 E_INVALIDARG.
+The failure returns no node and leaves the document unchanged.
+
+--- a/dlls/msxml3/tests/domdoc.c
++++ b/dlls/msxml3/tests/domdoc.c
+@@ -19741,10 +19741,97 @@
+ 
+     IXMLDOMDocument3_Release(doc2);
+     free_bstrs();
+ }
+ 
++static void test_append_xml_pi_to_element(void)
++{
++    static const WCHAR xml[] = L"\xfeff<?xml version=\"1.0\" encoding=\"UTF-16\"?><root><item/></root>";
++    static const struct
++    {
++        const CLSID *clsid;
++        HRESULT expected;
++    } versions[] =
++    {
++        { &CLSID_DOMDocument30, E_FAIL },
++        { &CLSID_DOMDocument60, E_INVALIDARG },
++    };
++    unsigned int i;
++
++    for (i = 0; i < ARRAY_SIZE(versions); ++i)
++    {
++        IXMLDOMProcessingInstruction *pi = NULL;
++        IXMLDOMNode *child = NULL, *result = NULL;
++        IXMLDOMElement *root = NULL;
++        IXMLDOMDocument *doc = NULL;
++        BSTR target = NULL, data = NULL, before = NULL, after = NULL;
++        LARGE_INTEGER zero = {{0, 0}};
++        IStream *stream = NULL;
++        VARIANT_BOOL loaded;
++        VARIANT source;
++        HRESULT hr;
++
++        winetest_push_context("version %u", i ? 60 : 30);
++        hr = CoCreateInstance(versions[i].clsid, NULL, CLSCTX_INPROC_SERVER,
++                              &IID_IXMLDOMDocument, (void **)&doc);
++        ok(hr == S_OK, "CoCreateInstance returned %#lx.\n", hr);
++        if (!doc) goto done;
++
++        hr = IXMLDOMDocument_put_async(doc, VARIANT_FALSE);
++        ok(hr == S_OK, "put_async returned %#lx.\n", hr);
++        target = SysAllocString(L"xml");
++        data = SysAllocString(L"version='1.0' encoding='UTF-16'");
++        hr = IXMLDOMDocument_createProcessingInstruction(doc, target, data, &pi);
++        ok(hr == S_OK, "createProcessingInstruction returned %#lx.\n", hr);
++        if (!pi) goto done;
++        hr = IXMLDOMProcessingInstruction_QueryInterface(pi, &IID_IXMLDOMNode, (void **)&child);
++        ok(hr == S_OK, "QueryInterface returned %#lx.\n", hr);
++        if (!child) goto done;
++
++        hr = CreateStreamOnHGlobal(NULL, TRUE, &stream);
++        ok(hr == S_OK, "CreateStreamOnHGlobal returned %#lx.\n", hr);
++        if (!stream) goto done;
++        hr = IStream_Write(stream, xml, sizeof(xml) - sizeof(WCHAR), NULL);
++        ok(hr == S_OK, "Write returned %#lx.\n", hr);
++        hr = IStream_Seek(stream, zero, STREAM_SEEK_SET, NULL);
++        ok(hr == S_OK, "Seek returned %#lx.\n", hr);
++        VariantInit(&source);
++        V_VT(&source) = VT_UNKNOWN;
++        V_UNKNOWN(&source) = (IUnknown *)stream;
++        hr = IXMLDOMDocument_load(doc, source, &loaded);
++        ok(hr == S_OK && loaded == VARIANT_TRUE, "load returned %#lx, %d.\n", hr, loaded);
++        hr = IXMLDOMDocument_get_documentElement(doc, &root);
++        ok(hr == S_OK, "get_documentElement returned %#lx.\n", hr);
++        if (!root) goto done;
++        hr = IXMLDOMDocument_get_xml(doc, &before);
++        ok(hr == S_OK, "get_xml returned %#lx.\n", hr);
++
++        hr = IXMLDOMElement_appendChild(root, child, &result);
++        todo_wine
++        ok(hr == versions[i].expected, "appendChild returned %#lx.\n", hr);
++        if (hr == versions[i].expected)
++        {
++            ok(!result, "appendChild returned a node.\n");
++            hr = IXMLDOMDocument_get_xml(doc, &after);
++            ok(hr == S_OK && before && after && !wcscmp(before, after), "Document changed after the rejected append.\n");
++        }
++
++done:
++        if (result) IXMLDOMNode_Release(result);
++        if (root) IXMLDOMElement_Release(root);
++        if (stream) IStream_Release(stream);
++        if (child) IXMLDOMNode_Release(child);
++        if (pi) IXMLDOMProcessingInstruction_Release(pi);
++        if (doc) IXMLDOMDocument_Release(doc);
++        SysFreeString(before);
++        SysFreeString(after);
++        SysFreeString(target);
++        SysFreeString(data);
++        winetest_pop_context();
++    }
++}
++
+ START_TEST(domdoc)
+ {
+     HRESULT hr;
+ 
+     hr = CoInitialize( NULL );
+@@ -19804,10 +19891,11 @@
+     test_events();
+     test_put_nodeTypedValue();
+     test_get_xml();
+     test_insertBefore();
+     test_appendChild();
++    test_append_xml_pi_to_element();
+     test_get_doctype();
+     test_get_tagName();
+     test_get_dataType();
+     test_get_nodeTypeString();
+     test_get_attributes();
