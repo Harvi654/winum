@@ -1,0 +1,101 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] riched20: Implement ITextDocument default tab stops.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Offline Windows 10 stores a default of 720 twips. The setter rounds
+positive values to twips, changes the default layout grid immediately
+and leaves explicit paragraph formatting alone. WM_SETTEXT resets
+the default; selection edits preserve it. The newer window class
+rejects inputs over 0xffffff twips. Reuse the class flag provided
+by the series SCF_WORD patch.
+
+Wine stubbed the TOM calls and used a fixed interval. Store the
+interval per editor and apply the measured grid to implicit tab stops.
+Keep a usable layout interval when the reported stored value is zero
+or the older control's overflow sentinel.
+
+--- a/dlls/riched20/editstr.h
++++ b/dlls/riched20/editstr.h
+@@ -399,4 +399,5 @@
+   int nTotalWidth, nLastTotalWidth;
+   int nAvailWidth; /* 0 = wrap to client area, else wrap width in twips */
++  int default_tab; /* twips */
+   int nUDArrowX;
+   int total_rows;
+--- a/dlls/riched20/editor.c
++++ b/dlls/riched20/editor.c
+@@ -3014,4 +3014,5 @@
+   ed->nZoomNumerator = ed->nZoomDenominator = 0;
+   ed->nAvailWidth = 0; /* wrap to client area */
++  ed->default_tab = lDefaultTab;
+   list_init( &ed->style_list );
+ 
+@@ -3675,4 +3676,6 @@
+   {
+     ME_Cursor cursor;
++
++    editor->default_tab = lDefaultTab;
+     ME_SetCursorToStart(editor, &cursor);
+     ME_InternalDeleteText(editor, &cursor, ME_GetTextLength(editor), FALSE);
+--- a/dlls/riched20/richole.c
++++ b/dlls/riched20/richole.c
+@@ -4181,6 +4181,9 @@
+ {
+     struct text_services *services = impl_from_ITextDocument2Old(iface);
+-    FIXME("stub %p\n", services);
+-    return E_NOTIMPL;
++
++    TRACE("(%p)->(%p)\n", services, pValue);
++    if (!pValue) return E_INVALIDARG;
++    *pValue = services->editor->default_tab * 0.05f;
++    return S_OK;
+ }
+ 
+@@ -4188,6 +4191,20 @@
+ {
+     struct text_services *services = impl_from_ITextDocument2Old(iface);
+-    FIXME("stub %p\n", services);
+-    return E_NOTIMPL;
++    ME_TextEditor *editor = services->editor;
++    double twips;
++    int tab;
++
++    TRACE("(%p)->(%g)\n", services, Value);
++    if (!(Value > 0.0f) || (editor->msftedit && Value > 838860.75f)) return E_INVALIDARG;
++
++    twips = (double)Value * 20.0 + 0.5;
++    /* The older control returns the signed integer overflow sentinel. */
++    tab = twips >= (double)INT_MAX + 1.0 ? INT_MIN : (int)twips;
++    if (editor->default_tab != tab)
++    {
++        editor->default_tab = tab;
++        ME_RewrapRepaint(editor);
++    }
++    return S_OK;
+ }
+ 
+--- a/dlls/riched20/run.c
++++ b/dlls/riched20/run.c
+@@ -721,4 +721,21 @@
+         i++;
+       }
++      else if (c->editor->default_tab > 0 && c->editor->default_tab != lDefaultTab)
++      {
++        int start = startx + run->pt.x;
++        double width = (double)c->editor->default_tab * c->dpi.cx / 1440.0;
++        LONGLONG next;
++        int pixels;
++
++        if (c->editor->nZoomNumerator)
++          width *= (double)c->editor->nZoomNumerator / c->editor->nZoomDenominator;
++        /* Snap the default interval once, then use its pixel grid. */
++        pixels = max(1, (int)min(width + 0.5, INT_MAX));
++        next = ((LONGLONG)max(start, 0) / pixels + 1) * pixels;
++        if (c->editor->props & TXTBIT_WORDWRAP && c->nAvailWidth > 0)
++          next = min(next, (LONGLONG)c->nAvailWidth - 1);
++        size.cx = max(0, min(next - start, INT_MAX));
++        break;
++      }
+       else
+       {

@@ -1,0 +1,87 @@
+name: Compare riched20 default tab stop suites
+on:
+  push:
+    branches: ['topic/riched20-default-tab-stop']
+    paths:
+      - 'patches/candidates/riched20-default-tab-stop/*.patch'
+      - 'patches/tests-first/riched20-tests-default-tab-stop.patch'
+      - '.github/workflows/test-riched20-default-tab-stop.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: riched20-default-tab-stop-l2
+  cancel-in-progress: true
+jobs:
+  suites:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [baseline, candidate]
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 180
+    env:
+      VARIANT: ${{ matrix.variant }}
+      TESTS: riched20 msftedit
+      GROUP: richedit
+      MAKE_L1: '0'
+      WORK: /tmp/richedit-tests
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Dependencies (official Arch repositories)
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed git python curl xz mingw-w64-gcc xorg-server-xvfb xorg-xauth \
+            alsa-lib libpulse gnutls krb5 dbus fontconfig freetype2 ttf-dejavu \
+            libx11 libxext libxi libxrandr libxrender libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
+            wayland mesa libglvnd vulkan-icd-loader vulkan-headers \
+            gst-plugins-base-libs sdl2 libcups libgphoto2 sane libpcap v4l-utils pcsclite unixodbc ocl-icd opencl-headers giflib
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build and test the release series with the measured unit
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if [[ "$VARIANT" == candidate ]]; then
+            cp patches/candidates/riched20-default-tab-stop/riched20-default-tab-stop.patch patches/
+            printf '%s\n' riched20-default-tab-stop.patch >> patches/series
+            printf '%s\n' riched20-tests-default-tab-stop.patch >> patches/tests-first/series
+          fi
+          bash scripts/test-series.sh series out
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          out = Path("out")
+          data = json.loads((out / "results-series-richedit.json").read_text())
+          for suite in ("riched20", "msftedit"):
+              for arch in ("x86_64", "i386"):
+                  assert any(key.startswith(f"{suite}.{arch}.") for key in data), (suite, arch)
+          for arch in ("x86_64", "i386"):
+              result = data[f"riched20.{arch}.richole"]
+              assert result["finished"], result
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: riched20-default-tab-stop-l2-${{ matrix.variant }}
+          path: |
+            out/results-series-richedit.json
+            out/logs/
+          if-no-files-found: warn
+          retention-days: 30
+  compare:
+    needs: suites
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: riched20-default-tab-stop-l2-*
+          path: results
+      - name: Compare the matching DLL suites
+        run: |
+          set -o pipefail
+          python3 scripts/compare-tests.py compare results/riched20-default-tab-stop-l2-baseline results/riched20-default-tab-stop-l2-candidate \
+            | tee "$GITHUB_STEP_SUMMARY"
