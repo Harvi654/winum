@@ -71,7 +71,9 @@ jobs:
             printf '%s=%s\n' "$arch" "$status" >> results/exitcodes.txt
           done
           cat results/exitcodes.txt
-          test "$(grep -lFx 'measure_complete cases=52 failed=0' results/result-*.txt | wc -l)" -eq 2
+          for result in results/result-*.txt; do
+            tr -d '\r' < "$result" | grep -Fx 'measure_complete cases=52 failed=0'
+          done
           test "$(grep -c '=0$' results/exitcodes.txt)" -eq 2
           BASH
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
