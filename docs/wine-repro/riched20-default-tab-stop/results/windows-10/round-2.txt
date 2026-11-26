@@ -1,0 +1,96 @@
+architectures=x86_64,i686 exit=0 observations_identical=1
+class=RichEdit20W setup=ready dpi_x=96 text_left=1 text_right=1599
+class=RichEdit20W step=edit_set event=set points=18.5 hr=0x00000000
+class=RichEdit20W step=edit_set event=get hr=0x00000000 points=18.5
+class=RichEdit20W step=after_replace_sel event=get hr=0x00000000 points=18.5
+class=RichEdit20W step=after_replace_sel event=position char=0 ret=0 x=1 y=0
+class=RichEdit20W step=after_replace_sel event=position char=2 ret=0 x=26 y=0
+class=RichEdit20W step=after_replace_sel event=position char=4 ret=0 x=51 y=0
+class=RichEdit20W step=after_settext_direct event=get hr=0x00000000 points=36
+class=RichEdit20W step=after_settext_direct event=position char=0 ret=0 x=1 y=0
+class=RichEdit20W step=after_settext_direct event=position char=2 ret=0 x=49 y=0
+class=RichEdit20W step=after_settext_direct event=position char=4 ret=0 x=97 y=0
+class=RichEdit20W step=clear_set event=set points=18.5 hr=0x00000000
+class=RichEdit20W step=clear_set event=get hr=0x00000000 points=18.5
+class=RichEdit20W step=after_settext_empty event=get hr=0x00000000 points=36
+class=RichEdit20W step=empty_set event=set points=18.5 hr=0x00000000
+class=RichEdit20W step=empty_set event=get hr=0x00000000 points=18.5
+class=RichEdit20W step=after_insert_into_empty event=get hr=0x00000000 points=18.5
+class=RichEdit20W step=after_insert_into_empty event=position char=0 ret=0 x=1 y=0
+class=RichEdit20W step=after_insert_into_empty event=position char=2 ret=0 x=26 y=0
+class=RichEdit20W step=after_insert_into_empty event=position char=4 ret=0 x=51 y=0
+class=RichEdit20W step=after_insert_into_empty event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RichEdit20W step=fractional_18_51 event=set points=18.5100002 hr=0x00000000
+class=RichEdit20W step=fractional_18_51 event=get hr=0x00000000 points=18.5
+class=RichEdit20W step=fractional_18_526 event=set points=18.5259991 hr=0x00000000
+class=RichEdit20W step=fractional_18_526 event=get hr=0x00000000 points=18.5500011
+class=RichEdit20W step=fractional_18_549 event=set points=18.5489998 hr=0x00000000
+class=RichEdit20W step=fractional_18_549 event=get hr=0x00000000 points=18.5500011
+class=RichEdit20W step=small_0_05 event=set points=0.0500000007 hr=0x00000000
+class=RichEdit20W step=small_0_05 event=get hr=0x00000000 points=0.0500000007
+class=RichEdit20W step=small_0_025 event=set points=0.0250000004 hr=0x00000000
+class=RichEdit20W step=small_0_025 event=get hr=0x00000000 points=0.0500000007
+class=RichEdit20W step=small_0_01 event=set points=0.00999999978 hr=0x00000000
+class=RichEdit20W step=small_0_01 event=get hr=0x00000000 points=0
+class=RichEdit20W step=small_1e_minus_7 event=set points=1.00000001e-07 hr=0x00000000
+class=RichEdit20W step=small_1e_minus_7 event=get hr=0x00000000 points=0
+class=RichEdit20W step=range_low event=set points=36 hr=0x00000000
+class=RichEdit20W step=range_low event=get hr=0x00000000 points=36
+class=RichEdit20W step=range_high event=set points=3.40282347e+38 hr=0x00000000
+class=RichEdit20W step=range_high event=get hr=0x00000000 points=-107374184
+class=RichEdit20W event=language_initial flags=0x00000082
+class=RichEdit20W event=language_set input=0x00000000 ret=1 read=0x00000000
+class=RichEdit20W event=language_set input=0x00000002 ret=1 read=0x00000002
+class=RichEdit20W event=language_restore ret=1 read=0x00000082
+class=RichEdit20W event=advanced_typography before=0x00000000 set=0x00000001 mask=0x00000001 ret=1 read=0x00000001
+class=RichEdit20W complete=1
+class=RICHEDIT50W setup=ready dpi_x=96 text_left=1 text_right=1599
+class=RICHEDIT50W step=edit_set event=set points=18.5 hr=0x00000000
+class=RICHEDIT50W step=edit_set event=get hr=0x00000000 points=18.5
+class=RICHEDIT50W step=after_replace_sel event=get hr=0x00000000 points=18.5
+class=RICHEDIT50W step=after_replace_sel event=position char=0 ret=0 x=1 y=0
+class=RICHEDIT50W step=after_replace_sel event=position char=2 ret=0 x=26 y=0
+class=RICHEDIT50W step=after_replace_sel event=position char=4 ret=0 x=51 y=0
+class=RICHEDIT50W step=after_settext_direct event=get hr=0x00000000 points=36
+class=RICHEDIT50W step=after_settext_direct event=position char=0 ret=0 x=1 y=0
+class=RICHEDIT50W step=after_settext_direct event=position char=2 ret=0 x=49 y=0
+class=RICHEDIT50W step=after_settext_direct event=position char=4 ret=0 x=97 y=0
+class=RICHEDIT50W step=clear_set event=set points=18.5 hr=0x00000000
+class=RICHEDIT50W step=clear_set event=get hr=0x00000000 points=18.5
+class=RICHEDIT50W step=after_settext_empty event=get hr=0x00000000 points=36
+class=RICHEDIT50W step=empty_set event=set points=18.5 hr=0x00000000
+class=RICHEDIT50W step=empty_set event=get hr=0x00000000 points=18.5
+class=RICHEDIT50W step=after_insert_into_empty event=get hr=0x00000000 points=18.5
+class=RICHEDIT50W step=after_insert_into_empty event=position char=0 ret=0 x=1 y=0
+class=RICHEDIT50W step=after_insert_into_empty event=position char=2 ret=0 x=26 y=0
+class=RICHEDIT50W step=after_insert_into_empty event=position char=4 ret=0 x=51 y=0
+class=RICHEDIT50W step=after_insert_into_empty event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RICHEDIT50W step=fractional_18_51 event=set points=18.5100002 hr=0x00000000
+class=RICHEDIT50W step=fractional_18_51 event=get hr=0x00000000 points=18.5
+class=RICHEDIT50W step=fractional_18_526 event=set points=18.5259991 hr=0x00000000
+class=RICHEDIT50W step=fractional_18_526 event=get hr=0x00000000 points=18.5500011
+class=RICHEDIT50W step=fractional_18_549 event=set points=18.5489998 hr=0x00000000
+class=RICHEDIT50W step=fractional_18_549 event=get hr=0x00000000 points=18.5500011
+class=RICHEDIT50W step=small_0_05 event=set points=0.0500000007 hr=0x00000000
+class=RICHEDIT50W step=small_0_05 event=get hr=0x00000000 points=0.0500000007
+class=RICHEDIT50W step=small_0_025 event=set points=0.0250000004 hr=0x00000000
+class=RICHEDIT50W step=small_0_025 event=get hr=0x00000000 points=0.0500000007
+class=RICHEDIT50W step=small_0_01 event=set points=0.00999999978 hr=0x00000000
+class=RICHEDIT50W step=small_0_01 event=get hr=0x00000000 points=0
+class=RICHEDIT50W step=small_1e_minus_7 event=set points=1.00000001e-07 hr=0x00000000
+class=RICHEDIT50W step=small_1e_minus_7 event=get hr=0x00000000 points=0
+class=RICHEDIT50W step=range_low event=set points=36 hr=0x00000000
+class=RICHEDIT50W step=range_low event=get hr=0x00000000 points=36
+class=RICHEDIT50W step=range_high event=set points=3.40282347e+38 hr=0x80070057
+class=RICHEDIT50W step=range_high event=get hr=0x00000000 points=36
+class=RICHEDIT50W step=range_last_accepted event=set points=838860.75 hr=0x00000000
+class=RICHEDIT50W step=range_last_accepted event=get hr=0x00000000 points=838860.75
+class=RICHEDIT50W step=range_first_rejected event=set points=838860.812 hr=0x80070057
+class=RICHEDIT50W step=range_first_rejected event=get hr=0x00000000 points=838860.75
+class=RICHEDIT50W event=language_initial flags=0x00000182
+class=RICHEDIT50W event=language_set input=0x00000000 ret=1 read=0x00000000
+class=RICHEDIT50W event=language_set input=0x00000002 ret=1 read=0x00000002
+class=RICHEDIT50W event=language_restore ret=1 read=0x00000182
+class=RICHEDIT50W event=advanced_typography before=0x00000000 set=0x00000001 mask=0x00000001 ret=1 read=0x00000001
+class=RICHEDIT50W complete=1
+measure_complete=1

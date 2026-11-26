@@ -80,3 +80,20 @@ on an empty document. When 36 succeeds and FLT_MAX is rejected with
 E_INVALIDARG, it reports neighboring floats across an observed
 acceptance transition. The endpoint result alone does not establish
 monotonicity for all inputs.
+
+## Round 2 result (2026-11-26)
+
+Both architectures completed with identical observations. The layout
+and TOM value survive EM_REPLACESEL. WM_SETTEXT resets both to
+36 points, including when given an empty string.
+
+Both classes round positive points to the nearest twip. For example,
+18.51 reads back as 18.5, 18.526 as approximately 18.55, and 0.01
+as zero. The newer class accepted 838860.75 (0xffffff twips) and
+rejected the next representable float. The older class accepted
+100,000,000 and returned an overflow value for FLT_MAX. The measured
+language and typography messages have separate return and read-back
+differences from Wine. A tab-stop candidate allows those differences
+to be evaluated separately in Revit.
+
+[Normalized follow-up observations](results/windows-10/round-2.txt).
