@@ -8,7 +8,7 @@ IDropTarget pointer stored by the other process and the caller crashes.
 
 | Level | Evidence |
 | --- | --- |
-| MEASURE | x86_64 and i686 probes build. Native Windows 10 observations pending. |
+| MEASURE | Both Windows 10 architectures completed the first probe. Foreign revoke returned RPC_E_WRONG_THREAD and preserved LastError. Owner-first cleanup and the unregistered window observation are pending. |
 | L0 | Pending. Apply the candidate after the winum-11.22-3 series with zero fuzz. |
 | L1 | Pending. Add the measured expectations to the ole32 dragdrop test and run both architectures offline on Windows 10. |
 | L2 | Pending. Pair ole32, combase and user32 against the same release series. |

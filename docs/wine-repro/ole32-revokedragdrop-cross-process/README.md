@@ -59,3 +59,25 @@ reference results once measured. On the Wine side, ole32 stores a
 process-local IDropTarget in the window property and RevokeDragDrop
 tries to release that pointer from the caller. The report can point to
 this synthetic program without needing any application files.
+
+## First Windows 10 result (2026-11-26)
+
+x86_64 and i686 each completed and exited 0 with identical results.
+[Call results](results/windows-10/calls.tsv).
+
+- Cross-process revoke returned RPC_E_WRONG_THREAD (0x8001010e) and
+  preserved the LastError seed. The same-process, other-thread revoke
+  returned the same HRESULT and set LastError to zero.
+- Both targets stayed at two references with zero Release calls through
+  the caller's operation. In both cases the owner's subsequent register
+  and revoke each returned S_OK. After that cleanup the target had two
+  references and one Release call.
+- Registering on the helper's separate unregistered window succeeded on
+  Windows. The process that registered that target also revoked it
+  successfully. Both calls are separate from the original target.
+
+The owner's revoke after re-registration cannot establish the status of
+the original registration. A follow-up measures the owner's revoke first
+and compares it with an untouched registration. It also checks revoke
+on an unregistered foreign window separately. The candidate covers
+RevokeDragDrop and keeps the Wine RegisterDragDrop scope unchanged.
