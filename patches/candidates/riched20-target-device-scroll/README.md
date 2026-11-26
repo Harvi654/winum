@@ -18,7 +18,7 @@ the focus.
 | L0 | Both riched20.dll architectures built after zero-fuzz application to the winum-11.22-3 series (2026-11-26). [Overlay](https://github.com/Harvi654/winum/actions/runs/45865073202/artifacts/15139632984). |
 | L1 | Offline Windows 10, 96 dpi, 2026-11-26: 83 tests per architecture, 0 failures, todos or skips, exit 0. [L1 bundle](https://github.com/Harvi654/winum/actions/runs/45865705834/artifacts/15140801437). |
 | L2 | Running: paired riched20 and msftedit suites, the new test on both sides (it should fail only on the baseline). [Run](https://github.com/Harvi654/winum/actions/runs/45865705690). |
-| L4 | Inventor 2027, 2026-11-26: the dialog opens scrolled with the thumb in the middle as on Windows, and the letter can now be scrolled to. It sits just past the right edge of the box (Windows shows it inside, at the edge); the smallest scroll shows it. Maintainer: acceptable, the open point below. AutoCAD text editing pending. |
+| L4 | Inventor 2027, 2026-11-26: the dialog opens scrolled with the thumb in the middle as on Windows, and the letter can now be scrolled to. It sits just past the right edge of the box (Windows shows it inside, at the edge); the smallest scroll shows it. Maintainer: acceptable, the open point below. AutoCAD 2027, 2026-11-26: MTEXT (several lines, centred, reopened), TEXT and dimension text edit as before. |
 | Cross review | Pending: Codex (Claude wrote the patch). |
 
 The fix keeps a second width, the target line width in pixels, next to
