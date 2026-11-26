@@ -58,3 +58,25 @@ are pending, so this is a baseline observation.
 
 - [Verified offline VM bundle](https://github.com/Harvi654/winum/actions/runs/45902758084/artifacts/15155758981)
 - [winum baseline results](https://github.com/Harvi654/winum/actions/runs/45902758084/artifacts/15156198839)
+
+## Offline Windows 10 comparison
+
+Both native architectures completed the same 52 cases with exit 0.
+All case records agree between x86_64 and i686.
+
+| Condition | Windows 10 | winum-11.22-3 |
+| --- | --- | --- |
+| DOMDocument60, UTF-16LE root, all measured declaration/BOM combinations | Both load paths succeed and return the root | Same |
+| Valid document with a declaration, then append the prepared PI to the document | S_OK, top-level xml/root/xml, same serialized XML | Same |
+| Prepared xml PI appended to a new document | S_OK, one declaration, same serialized XML | Same |
+| Prepared xml PI appended to the loaded root in DOMDocument60 | E_INVALIDARG, no returned node, XML unchanged | S_OK, PI becomes a child of the element |
+| Same valid BOM stream and element append in DOMDocument30 | E_FAIL, no returned node, XML unchanged | S_OK, PI becomes a child of the element |
+| No root, `load(VT_UNKNOWN)` in either version | S_FALSE, false | E_FAIL, false |
+| No root, `IPersistStreamInit::Load` | Native parse HRESULT (0xc00ce558 or, in one 3.0 case, 0xc00ce508) | E_FAIL |
+| BOM-less UTF-16LE root in DOMDocument30 | Both stream load paths reject it | Both accept it |
+
+The standalone candidate targets the measured element append difference
+near the Inventor trace. Empty-stream error reporting and DOMDocument30
+BOM detection are separate differences. The actual destination of the
+application append is still unknown, so the candidate requires Inventor
+L4 before it can be linked to the filter crash.

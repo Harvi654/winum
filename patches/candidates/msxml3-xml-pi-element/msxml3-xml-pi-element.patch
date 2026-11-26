@@ -1,0 +1,80 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msxml3: Reject XML declaration appends under elements.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+The offline Windows probe rejects the XML declaration as an appendChild
+of the root element, with E_FAIL in DOMDocument30 and E_INVALIDARG in
+DOMDocument60. Both accept the declaration as an appendChild of the
+document itself. Wine accepts both destinations.
+
+Check the measured element append before mutation. Keep other insertion
+methods, ordinary processing instructions, and stream parsing untouched.
+
+--- a/dlls/msxml3/node.c
++++ b/dlls/msxml3/node.c
+@@ -603,12 +603,12 @@
+     child->parent = node;
+     domnode_add_refs(child->parent, child->refcount);
+     domnode_set_owner(child, node);
+ }
+ 
+-HRESULT node_insert_before(struct domnode *node, IXMLDOMNode *new_child, const VARIANT *ref_child,
+-        IXMLDOMNode **ret)
++static HRESULT node_insert_child(struct domnode *node, IXMLDOMNode *new_child, const VARIANT *ref_child,
++        IXMLDOMNode **ret, bool append)
+ {
+     struct domnode *child_node, *ref_node = NULL;
+ 
+     if (!new_child)
+         return E_INVALIDARG;
+@@ -616,10 +616,19 @@
+     if (ret)
+         *ret = NULL;
+ 
+     if (!(child_node = get_node_obj(new_child)))
+         return E_FAIL;
++
++    if (append && node->type == NODE_ELEMENT && child_node->type == NODE_PROCESSING_INSTRUCTION
++            && !wcscmp(child_node->name, L"xml"))
++    {
++        MSXML_VERSION version = node_get_doc(node)->properties->version;
++
++        if (version == MSXML6) return E_INVALIDARG;
++        if (version == MSXML3) return E_FAIL;
++    }
+ 
+     switch (V_VT(ref_child))
+     {
+         case VT_EMPTY:
+         case VT_NULL:
+@@ -660,10 +669,16 @@
+         *ret = new_child;
+         IXMLDOMNode_AddRef(*ret);
+     }
+ 
+     return S_OK;
++}
++
++HRESULT node_insert_before(struct domnode *node, IXMLDOMNode *new_child, const VARIANT *ref_child,
++        IXMLDOMNode **ret)
++{
++    return node_insert_child(node, new_child, ref_child, ret, false);
+ }
+ 
+ HRESULT node_replace_child(struct domnode *node, IXMLDOMNode *newChild, IXMLDOMNode *oldChild,
+         IXMLDOMNode **ret)
+ {
+@@ -1286,11 +1301,11 @@
+ HRESULT node_append_child(struct domnode *node, IXMLDOMNode *child, IXMLDOMNode **outChild)
+ {
+     VARIANT var;
+ 
+     VariantInit(&var);
+-    return node_insert_before(node, child, &var, outChild);
++    return node_insert_child(node, child, &var, outChild, true);
+ }
+ 
+ HRESULT node_has_childnodes(const struct domnode *node, VARIANT_BOOL *ret)
+ {
+     if (!ret)
