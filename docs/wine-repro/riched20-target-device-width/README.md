@@ -92,7 +92,11 @@ the Wine column is CI run 45861796621 (winum-11.22-3, Xvfb, 96 dpi).
   window (x 298) but still reports the 0..2814 range; Wine centres in the
   window (x 301) for both.
 
-Open before a patch: how the letter becomes visible in Inventor's dialog
-on Windows, where the scroll position also starts at 0 - most likely
-RichEdit scrolls the caret into view when the dialog focuses it, which
-Wine cannot do while the range ends at 1.
+Inventor's dialog on Windows (maintainer's offline VM, 2026-11-26) shows
+the letter at the right edge of the text box with the scroll thumb in the
+middle of the bar: the view is scrolled so that the caret after the letter
+is visible. The Wine trace has no scroll message from Inventor
+(`EM_SETSCROLLPOS`, `EM_SCROLLCARET`, `WM_HSCROLL`), so RichEdit itself
+scrolls. Round 2 of the program keeps the caret after the letter, gives
+the control the focus and reads the scroll position and the letter's
+position again (`focus_*` columns) to measure that step.

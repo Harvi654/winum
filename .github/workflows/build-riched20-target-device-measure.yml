@@ -71,7 +71,7 @@ jobs:
       - name: Summarise the centred 42211-twip rows
         if: always()
         run: |
-          grep -h 'center' results/result-*.txt | grep -P '\t42211\t' | cut -f2-4,6-7,9,12-14 | sort | uniq -c || true
+          grep -h 'center' results/result-*.txt | grep -P '\t42211\t' | cut -f2-4,7,9,12-13,16-18 | sort | uniq -c || true
           grep -h 'measure_complete\|^printer\|^screen' results/result-*.txt || true
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()

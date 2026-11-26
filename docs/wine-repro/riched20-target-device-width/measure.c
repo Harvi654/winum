@@ -64,14 +64,17 @@ static LRESULT CALLBACK parent_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 static void set_alignment(HWND edit, WORD align)
 {
     PARAFORMAT2 pf;
+    CHARRANGE sel;
 
+    /* Keep the selection EM_SETTEXTEX left (the caret after the letter). */
+    SendMessageW(edit, EM_EXGETSEL, 0, (LPARAM)&sel);
     SendMessageW(edit, EM_SETSEL, 0, -1);
     memset(&pf, 0, sizeof(pf));
     pf.cbSize = sizeof(pf);
     pf.dwMask = PFM_ALIGNMENT;
     pf.wAlignment = align;
     SendMessageW(edit, EM_SETPARAFORMAT, 0, (LPARAM)&pf);
-    SendMessageW(edit, EM_SETSEL, 0, 0);
+    SendMessageW(edit, EM_EXSETSEL, 0, (LPARAM)&sel);
 }
 
 /* order 0: target device, text, alignment (Inventor's order in the trace);
@@ -82,7 +85,10 @@ static void run_case(int c, int s, enum dc_kind kind, LPARAM width, int a, int o
     SETTEXTEX st = { ST_SELECTION, 1200 };
     SCROLLINFO si;
     POINTL pos = { -99999, -99999 };
-    POINT scroll = { 0, 0 };
+    POINT scroll = { 0, 0 }, focus_scroll = { -1, -1 };
+    POINTL focus_pos = { -99999, -99999 };
+    SCROLLINFO focus_si;
+    BOOL have_focus_scroll;
     RECT fmt, client;
     LRESULT target_ret = -1, lines;
     BOOL have_scroll;
@@ -127,13 +133,28 @@ static void run_case(int c, int s, enum dc_kind kind, LPARAM width, int a, int o
     si.fMask = SIF_ALL;
     have_scroll = GetScrollInfo(edit, SB_HORZ, &si);
 
+    /* Round 2: give the control the focus, as a dialog does, and read the
+     * scroll position again (Inventor's dialog shows the letter scrolled
+     * into view on Windows). */
+    SetFocus(edit);
+    UpdateWindow(edit);
+    pump();
+    SendMessageW(edit, EM_GETSCROLLPOS, 0, (LPARAM)&focus_scroll);
+    SendMessageW(edit, EM_POSFROMCHAR, (WPARAM)&focus_pos, 0);
+    memset(&focus_si, 0, sizeof(focus_si));
+    focus_si.cbSize = sizeof(focus_si);
+    focus_si.fMask = SIF_ALL;
+    have_focus_scroll = GetScrollInfo(edit, SB_HORZ, &focus_si);
+
     printf("case\t%s\t%s\t%s\t%ld\t%s\torder%d\tret=%ld\tpos=%ld,%ld\tclient=%ld,%ld\t"
-           "rect=%ld,%ld,%ld,%ld\thscroll=%d:%d,%d,%u,%d\tscrollpos=%ld,%ld\tlines=%ld\tvisible=%d\n",
+           "rect=%ld,%ld,%ld,%ld\thscroll=%d:%d,%d,%u,%d\tscrollpos=%ld,%ld\tlines=%ld\tvisible=%d\t"
+           "focus_scrollpos=%ld,%ld\tfocus_pos=%ld,%ld\tfocus_hscroll=%d:%d,%d,%u,%d\n",
            classes[c].name, styles[s].name, dc_names[kind], kind == DC_NONE ? 0L : (long)width,
            aligns[a].name, order, (long)target_ret, pos.x, pos.y, client.right, client.bottom,
            fmt.left, fmt.top, fmt.right, fmt.bottom,
            have_scroll, si.nMin, si.nMax, si.nPage, si.nPos, scroll.x, scroll.y, (long)lines,
-           pos.x >= 0 && pos.x < client.right);
+           pos.x >= 0 && pos.x < client.right, focus_scroll.x, focus_scroll.y, focus_pos.x, focus_pos.y,
+           have_focus_scroll, focus_si.nMin, focus_si.nMax, focus_si.nPage, focus_si.nPos);
     fflush(stdout);
 
     DestroyWindow(edit);
@@ -183,7 +204,7 @@ int main(void)
         printf("printer\tavailable=0\terror=%lu\n", printer_error);
     printf("columns\tclass\tstyle\tdc\twidth\talign\torder\tEM_SETTARGETDEVICE\tEM_POSFROMCHAR(0)\t"
            "client\tEM_GETRECT\tGetScrollInfo(SB_HORZ) ok:min,max,page,pos\tEM_GETSCROLLPOS\tEM_GETLINECOUNT\t"
-           "char 0 inside client\n");
+           "char 0 inside client\tafter SetFocus: EM_GETSCROLLPOS\tEM_POSFROMCHAR(0)\tGetScrollInfo(SB_HORZ)\n");
 
     for (c = 0; c < 2; c++)
     {
