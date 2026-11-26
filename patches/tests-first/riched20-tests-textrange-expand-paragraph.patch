@@ -9,13 +9,7 @@ Wine 11.22 returns E_NOTIMPL for this unit.
 
 --- a/dlls/riched20/tests/richole.c
 +++ b/dlls/riched20/tests/richole.c
-@@ -5562,12 +5562,158 @@
-   hr = ITextDocument_Unfreeze(doc, NULL);
-   ok(hr == S_OK, "ITextDocument_Unfreeze returned %#lx\n", hr);
- 
-   release_interfaces(&hwnd, &reole, &doc, &selection);
- }
- 
+@@ -5568,6 +5568,152 @@
 +static BOOL set_expand_text(ITextDocument *doc, const WCHAR *text)
 +{
 +    ITextRange *range;

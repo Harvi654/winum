@@ -11,13 +11,16 @@ ranges return S_FALSE. Wine 11.22 returns E_NOTIMPL.
 Use the editor's existing paragraph positions for tomParagraph. Preserve
 tomStory and leave the other unimplemented units outside this change.
 
+v2 (2026-11-26): Generate the patch context from the 11.22-3 series,
+including textfont-applytmp. The implementation and test are unchanged.
+
 --- a/dlls/riched20/richole.c
 +++ b/dlls/riched20/richole.c
-@@ -880,34 +880,48 @@
-             textfont_getname_from_range(font->range, &font->props[propid].str);
-         else
-             get_textfont_prop(font, propid, &font->props[propid]);
-     }
+@@ -892,34 +892,48 @@
+ {
+     SysFreeString(font->props[FONT_NAME].str);
+     font->props[FONT_NAME].str = NULL;
+     textfont_cache_range_props(font);
  }
  
 -static HRESULT textrange_expand(ITextRange *range, LONG unit, LONG *delta)
@@ -71,7 +74,7 @@ tomStory and leave the other unimplemented units outside this change.
  
      return S_OK;
  }
-@@ -1915,13 +1929,13 @@
+@@ -1927,13 +1941,13 @@
  
      TRACE("(%p)->(%ld %p)\n", This, unit, delta);
  
@@ -86,7 +89,7 @@ tomStory and leave the other unimplemented units outside this change.
  {
      ITextRangeImpl *This = impl_from_ITextRange(me);
  
-@@ -5008,13 +5022,13 @@
+@@ -5047,13 +5061,13 @@
      TRACE("(%p)->(%ld %p)\n", This, unit, delta);
  
      if (!This->services)
