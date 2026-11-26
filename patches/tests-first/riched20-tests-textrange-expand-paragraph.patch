@@ -1,15 +1,15 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
-Subject: [PATCH] riched20/tests: Measure paragraph expansion in TOM ranges.
+Subject: [PATCH] riched20/tests: Cover TOM paragraph navigation.
 
 AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
 
-Windows 10 expands to the enclosing paragraphs, counts the implicit terminal
-paragraph mark, and returns S_FALSE when the range is unchanged.
-Wine 11.22 returns E_NOTIMPL for this unit.
+Test the paragraph boundaries, change counts and HRESULTs measured on
+Windows 10. The 11.22-3 baseline lacks paragraph navigation.
+The previous Expand cases remain part of this test.
 
 --- a/dlls/riched20/tests/richole.c
 +++ b/dlls/riched20/tests/richole.c
-@@ -5568,6 +5568,152 @@
+@@ -5568,6 +5568,347 @@
 +static BOOL set_expand_text(ITextDocument *doc, const WCHAR *text)
 +{
 +    ITextRange *range;
@@ -49,6 +49,200 @@ Wine 11.22 returns E_NOTIMPL for this unit.
 +       start, end, expected_start, expected_end);
 +    if (want_delta)
 +        ok(delta == expected_delta, "delta %ld, expected %ld\n", delta, expected_delta);
++}
++
++enum paragraph_operation
++{
++    start_of, end_of, move, move_start, move_end
++};
++
++struct paragraph_case
++{
++    enum paragraph_operation op;
++    LONG arg, start, end, new_start, new_end, delta;
++    HRESULT hr;
++};
++
++static void run_paragraph_cases(ITextDocument *doc, const WCHAR *text,
++                                const struct paragraph_case *cases, unsigned int count)
++{
++    unsigned int i, want_delta;
++
++    if (!set_expand_text(doc, text)) return;
++    for (i = 0; i < count; ++i)
++    {
++        const struct paragraph_case *entry = cases + i;
++
++        for (want_delta = 0; want_delta <= 1; ++want_delta)
++        {
++            LONG delta = 0x12345678, start = -1, end = -1;
++            LONG *out = want_delta ? &delta : NULL;
++            ITextRange *range;
++            HRESULT hr;
++
++            hr = ITextDocument_Range(doc, entry->start, entry->end, &range);
++            ok(hr == S_OK, "Range failed: %#lx\n", hr);
++            if (FAILED(hr)) continue;
++
++            winetest_push_context("operation %u, case %u, want_delta %u", entry->op, i, want_delta);
++            switch (entry->op)
++            {
++            case start_of: hr = ITextRange_StartOf(range, tomParagraph, entry->arg, out); break;
++            case end_of: hr = ITextRange_EndOf(range, tomParagraph, entry->arg, out); break;
++            case move: hr = ITextRange_Move(range, tomParagraph, entry->arg, out); break;
++            case move_start: hr = ITextRange_MoveStart(range, tomParagraph, entry->arg, out); break;
++            case move_end: hr = ITextRange_MoveEnd(range, tomParagraph, entry->arg, out); break;
++            default: hr = E_UNEXPECTED; break;
++            }
++            todo_wine_if(entry->arg || entry->op == start_of || entry->op == end_of)
++            ok(hr == entry->hr, "returned %#lx, expected %#lx\n", hr, entry->hr);
++            if (SUCCEEDED(hr))
++            {
++                ITextRange_GetStart(range, &start);
++                ITextRange_GetEnd(range, &end);
++                ok(start == entry->new_start && end == entry->new_end,
++                   "range %ld,%ld, expected %ld,%ld\n", start, end, entry->new_start, entry->new_end);
++                if (want_delta)
++                    ok(delta == entry->delta, "delta %ld, expected %ld\n", delta, entry->delta);
++            }
++            ITextRange_Release(range);
++            winetest_pop_context();
++        }
++    }
++}
++
++static void test_paragraph_navigation(ITextDocument *doc)
++{
++    static const struct paragraph_case short[] =
++    {
++        { start_of, tomMove, 0, 0, 0, 0, 0, S_FALSE },
++        { start_of, tomExtend, 0, 0, 0, 0, 0, S_FALSE },
++        { end_of, tomMove, 0, 0, 2, 2, 2, S_OK },
++        { end_of, tomExtend, 0, 0, 0, 2, 2, S_OK },
++        { move, 1, 0, 0, 2, 2, 1, S_OK },
++        { move_start, 1, 0, 0, 2, 2, 1, S_OK },
++        { move_end, 1, 0, 0, 0, 2, 1, S_OK },
++        { start_of, tomMove, 1, 2, 0, 0, -2, S_OK },
++        { start_of, tomExtend, 1, 2, 0, 2, -1, S_OK },
++        { end_of, tomMove, 1, 2, 2, 2, 1, S_OK },
++        { end_of, tomExtend, 1, 2, 1, 2, 0, S_FALSE },
++        { move, -32, 1, 2, 0, 0, -1, S_OK },
++        { move, 1, 1, 2, 2, 2, 1, S_OK },
++        { move, 32, 1, 2, 2, 2, 1, S_OK },
++        { move_start, -32, 1, 2, 0, 2, -1, S_OK },
++        { move_start, 1, 1, 2, 2, 2, 1, S_OK },
++        { move_start, 32, 1, 2, 2, 2, 1, S_OK },
++        { move_end, -32, 1, 2, 0, 0, -1, S_OK },
++        { move_end, 1, 1, 2, 1, 3, 1, S_OK },
++        { move_end, 32, 1, 2, 1, 3, 1, S_OK },
++        { move, -1, 1, 1, 0, 0, -1, S_OK },
++        { move, 1, 1, 1, 2, 2, 1, S_OK },
++        { move_start, -1, 1, 1, 0, 1, -1, S_OK },
++        { move_start, 1, 1, 1, 2, 2, 1, S_OK },
++        { move_end, -1, 1, 1, 0, 0, -1, S_OK },
++        { move_end, 1, 1, 1, 1, 2, 1, S_OK },
++        { start_of, tomMove, 2, 2, 2, 2, 0, S_FALSE },
++        { start_of, tomExtend, 2, 2, 2, 2, 0, S_FALSE },
++        { end_of, tomMove, 2, 2, 2, 2, 0, S_FALSE },
++        { end_of, tomExtend, 2, 2, 2, 2, 0, S_FALSE },
++        { move, 1, 2, 2, 2, 2, 0, S_FALSE },
++        { move_start, 1, 2, 2, 2, 2, 0, S_FALSE },
++        { move_end, 1, 2, 2, 2, 3, 1, S_OK },
++        { start_of, tomMove, 2, 3, 2, 2, -1, S_OK },
++        { start_of, tomExtend, 2, 3, 2, 3, 0, S_FALSE },
++        { end_of, tomMove, 2, 3, 2, 2, -1, S_OK },
++        { end_of, tomExtend, 2, 3, 2, 3, 0, S_FALSE },
++        { move, -32, 2, 3, 0, 0, -2, S_OK },
++        { move, -1, 2, 3, 2, 2, -1, S_OK },
++        { move, 1, 2, 3, 2, 2, -1, S_OK },
++        { move, 32, 2, 3, 2, 2, -1, S_OK },
++        { move_start, -32, 2, 3, 0, 3, -1, S_OK },
++        { move_start, -1, 2, 3, 0, 3, -1, S_OK },
++        { move_start, 1, 2, 3, 2, 3, 0, S_FALSE },
++        { move_start, 32, 2, 3, 2, 3, 0, S_FALSE },
++        { move_end, -32, 2, 3, 0, 0, -2, S_OK },
++        { move_end, -1, 2, 3, 2, 2, -1, S_OK },
++        { move_end, 1, 2, 3, 2, 3, 0, S_FALSE },
++        { move_end, 32, 2, 3, 2, 3, 0, S_FALSE },
++    };
++    static const struct paragraph_case two_paragraphs[] =
++    {
++        { start_of, tomMove, 1, 18, 0, 0, -2, S_OK },
++        { start_of, tomExtend, 1, 18, 0, 18, -1, S_OK },
++        { end_of, tomMove, 1, 18, 18, 18, 1, S_OK },
++        { end_of, tomExtend, 1, 18, 1, 18, 0, S_FALSE },
++        { move, 1, 1, 18, 18, 18, 1, S_OK },
++        { move_start, 1, 1, 18, 18, 18, 1, S_OK },
++        { move_end, 1, 1, 18, 1, 31, 1, S_OK },
++        { start_of, tomMove, 1, 20, 0, 0, -2, S_OK },
++        { start_of, tomExtend, 1, 20, 0, 20, -1, S_OK },
++        { end_of, tomMove, 1, 20, 30, 30, 11, S_OK },
++        { end_of, tomExtend, 1, 20, 1, 31, 11, S_OK },
++        { move, -32, 1, 20, 0, 0, -1, S_OK },
++        { move, 0, 1, 20, 1, 20, 0, S_FALSE },
++        { move, 1, 1, 20, 30, 30, 1, S_OK },
++        { move, 32, 1, 20, 30, 30, 1, S_OK },
++        { move_start, -32, 1, 20, 0, 20, -1, S_OK },
++        { move_start, 0, 1, 20, 1, 20, 0, S_FALSE },
++        { move_start, 1, 1, 20, 18, 20, 1, S_OK },
++        { move_start, 32, 1, 20, 30, 30, 2, S_OK },
++        { move_end, -32, 1, 20, 0, 0, -2, S_OK },
++        { move_end, 0, 1, 20, 1, 20, 0, S_FALSE },
++        { move_end, 1, 1, 20, 1, 31, 1, S_OK },
++        { move_end, 32, 1, 20, 1, 31, 1, S_OK },
++        { move, -1, 18, 18, 0, 0, -1, S_OK },
++        { move, 1, 18, 18, 30, 30, 1, S_OK },
++        { move_start, -1, 18, 18, 0, 18, -1, S_OK },
++        { move_start, 1, 18, 18, 30, 30, 1, S_OK },
++        { move_end, -1, 18, 18, 0, 0, -1, S_OK },
++        { move_end, 1, 18, 18, 18, 31, 1, S_OK },
++        { move, -1, 20, 23, 18, 18, -1, S_OK },
++        { move_start, -1, 20, 23, 18, 23, -1, S_OK },
++        { move_end, -1, 20, 23, 18, 18, -1, S_OK },
++        { start_of, tomMove, 30, 30, 18, 18, -12, S_OK },
++        { start_of, tomExtend, 30, 30, 18, 30, -12, S_OK },
++        { end_of, tomMove, 30, 30, 30, 30, 0, S_FALSE },
++        { end_of, tomExtend, 30, 30, 30, 31, 1, S_OK },
++        { move, 1, 30, 30, 30, 30, 0, S_FALSE },
++        { move_start, 1, 30, 30, 30, 30, 0, S_FALSE },
++        { move_end, 1, 30, 30, 30, 31, 1, S_OK },
++        { start_of, tomMove, 30, 31, 18, 18, -13, S_OK },
++        { start_of, tomExtend, 30, 31, 18, 31, -12, S_OK },
++        { end_of, tomMove, 30, 31, 30, 30, -1, S_OK },
++        { end_of, tomExtend, 30, 31, 30, 31, 0, S_FALSE },
++        { move, -32, 30, 31, 0, 0, -2, S_OK },
++        { move, -1, 30, 31, 18, 18, -1, S_OK },
++        { move, 1, 30, 31, 30, 30, -1, S_OK },
++        { move, 32, 30, 31, 30, 30, -1, S_OK },
++        { move_start, -32, 30, 31, 0, 31, -2, S_OK },
++        { move_start, -1, 30, 31, 18, 31, -1, S_OK },
++        { move_start, 1, 30, 31, 30, 31, 0, S_FALSE },
++        { move_start, 32, 30, 31, 30, 31, 0, S_FALSE },
++        { move_end, -32, 30, 31, 0, 0, -2, S_OK },
++        { move_end, -1, 30, 31, 18, 18, -1, S_OK },
++        { move_end, 1, 30, 31, 30, 31, 0, S_FALSE },
++        { move_end, 32, 30, 31, 30, 31, 0, S_FALSE },
++    };
++    static const struct paragraph_case two_trailing_cr[] =
++    {
++        { move, 1, 30, 31, 31, 31, 1, S_OK },
++        { move_start, 1, 30, 31, 31, 31, 1, S_OK },
++        { move_end, 1, 30, 31, 30, 32, 1, S_OK },
++        { start_of, tomMove, 31, 32, 31, 31, -1, S_OK },
++        { start_of, tomExtend, 31, 32, 31, 32, 0, S_FALSE },
++        { end_of, tomMove, 31, 32, 31, 31, -1, S_OK },
++        { end_of, tomExtend, 31, 32, 31, 32, 0, S_FALSE },
++        { move, -1, 31, 32, 31, 31, -1, S_OK },
++        { move, 1, 31, 32, 31, 31, -1, S_OK },
++        { move_start, -1, 31, 32, 18, 32, -1, S_OK },
++        { move_start, 1, 31, 32, 31, 32, 0, S_FALSE },
++        { move_end, -1, 31, 32, 31, 31, -1, S_OK },
++        { move_end, 1, 31, 32, 31, 32, 0, S_FALSE },
++    };
++
++    run_paragraph_cases(doc, L"-\r", short, ARRAY_SIZE(short));
++    run_paragraph_cases(doc, L"Alpha beta. Next!\rGamma delta.", two_paragraphs, ARRAY_SIZE(two_paragraphs));
++    run_paragraph_cases(doc, L"Alpha beta. Next!\rGamma delta.\r", two_trailing_cr, ARRAY_SIZE(two_trailing_cr));
 +}
 +
 +static void test_expand_paragraph_class(const WCHAR *class_name)
@@ -134,6 +328,7 @@ Wine 11.22 returns E_NOTIMPL for this unit.
 +            ITextRange_Release(range);
 +        }
 +    }
++    test_paragraph_navigation(doc);
 +    ITextDocument_Release(doc);
 +done:
 +    DestroyWindow(hwnd);
@@ -162,7 +357,7 @@ Wine 11.22 returns E_NOTIMPL for this unit.
     * RICHED20.DLL, so the linker doesn't actually link to it. */
    hmoduleRichEdit = LoadLibraryA("riched20.dll");
    ok(hmoduleRichEdit != NULL, "error: %d\n", (int) GetLastError());
-@@ -5600,12 +5746,13 @@
+@@ -5600,12 +5941,13 @@
    test_GetStoryType();
    test_SetFont();
    test_InsertObject();
