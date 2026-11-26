@@ -49,7 +49,7 @@ jobs:
             cp patches/candidates/riched20-textrange-expand-paragraph/riched20-textrange-expand-paragraph.patch patches/
             printf '%s\n' riched20-textrange-expand-paragraph.patch >> patches/series
             # That single expected failure is fixed in the candidate.
-            sed -i -e 's/^+    todo_wine$/+/' -e 's/^+            todo_wine_if(.*)$/+/' "patches/tests-first/$test_patch"
+            sed -i -e 's/^+ *todo_wine$/+/' -e 's/^+            todo_wine_if(.*)$/+/' "patches/tests-first/$test_patch"
           fi
           bash scripts/test-series.sh series out
           python3 - <<'PY'

@@ -1,5 +1,5 @@
 From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
-Subject: [PATCH] riched20: Expand TOM ranges to paragraph boundaries.
+Subject: [PATCH] riched20: Implement TOM paragraph navigation.
 
 AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
 
@@ -8,15 +8,20 @@ expand to the paragraphs containing the range, with an exclusive end
 for a nonempty range. The implicit terminal mark counts, and unchanged
 ranges return S_FALSE. Wine 11.22 returns E_NOTIMPL.
 
-Use the editor's existing paragraph positions for tomParagraph. Preserve
-tomStory and leave the other unimplemented units outside this change.
+Use the editor's paragraph positions for the six tomParagraph methods.
+Leave other units unchanged.
 
 v2 (2026-11-26): Generate the patch context from the 11.22-3 series,
 including textfont-applytmp. The implementation and test are unchanged.
 
+v3 (2026-11-26): Offline Windows 10 results agree for both bitnesses and
+all four hosts. Implement StartOf, EndOf, Move, MoveStart and MoveEnd in
+addition to Expand. Collapse and movement count differ at the terminal
+mark. Only MoveEnd and an extending EndOf can reach it via navigation.
+
 --- a/dlls/riched20/richole.c
 +++ b/dlls/riched20/richole.c
-@@ -892,34 +892,48 @@
+@@ -892,34 +892,79 @@
  {
      SysFreeString(font->props[FONT_NAME].str);
      font->props[FONT_NAME].str = NULL;
@@ -26,6 +31,41 @@ including textfont-applytmp. The implementation and test are unchanged.
 -static HRESULT textrange_expand(ITextRange *range, LONG unit, LONG *delta)
 -{
 -    LONG expand_start, expand_end;
++static ME_Paragraph *textrange_paragraph_at(ME_TextEditor *editor, LONG offset)
++{
++    ME_Cursor cursor;
++
++    cursor_from_char_ofs(editor, offset, &cursor);
++    return cursor.para;
++}
++
++/* Count boundaries reached, with the last legal position set by the endpoint. */
++static LONG textrange_move_paragraphs(ME_TextEditor *editor, LONG *offset, LONG count, LONG limit)
++{
++    ME_Paragraph *para = textrange_paragraph_at(editor, *offset);
++    LONG moved = 0;
++
++    while (count > 0 && *offset < limit)
++    {
++        para = para_next(para);
++        *offset = min(para->nCharOfs, limit);
++        --count;
++        ++moved;
++    }
++
++    while (count < 0)
++    {
++        if (*offset <= para->nCharOfs)
++            para = para_prev(para);
++        if (!para)
++            break;
++        *offset = para->nCharOfs;
++        ++count;
++        --moved;
++    }
++    return moved;
++}
++
 +static HRESULT textrange_expand(ITextRange *range, ME_TextEditor *editor, LONG unit, LONG *delta)
 +{
 +    LONG expand_start, expand_end, start, end;
@@ -44,13 +84,9 @@ including textfont-applytmp. The implementation and test are unchanged.
          break;
 +    case tomParagraph:
 +    {
-+        ME_Cursor cursor;
-+
-+        cursor_from_char_ofs(editor, start, &cursor);
-+        expand_start = cursor.para->nCharOfs;
++        expand_start = textrange_paragraph_at(editor, start)->nCharOfs;
 +        /* A nonempty range ends after its last included character. */
-+        cursor_from_char_ofs(editor, end > start ? end - 1 : end, &cursor);
-+        expand_end = para_next(cursor.para)->nCharOfs;
++        expand_end = para_next(textrange_paragraph_at(editor, end > start ? end - 1 : end))->nCharOfs;
 +        break;
 +    }
      default:
@@ -74,7 +110,7 @@ including textfont-applytmp. The implementation and test are unchanged.
  
      return S_OK;
  }
-@@ -1927,13 +1941,13 @@
+@@ -1927,13 +1972,13 @@
  
      TRACE("(%p)->(%ld %p)\n", This, unit, delta);
  
@@ -89,7 +125,188 @@ including textfont-applytmp. The implementation and test are unchanged.
  {
      ITextRangeImpl *This = impl_from_ITextRange(me);
  
-@@ -5047,13 +5061,13 @@
+@@ -2082,13 +2127,13 @@
+         return CO_E_RELEASED;
+ 
+     set_selection(This->child.reole->editor, This->start, This->end);
+     return S_OK;
+ }
+ 
+-static HRESULT textrange_startof(ITextRange *range, LONG unit, LONG extend, LONG *delta)
++static HRESULT textrange_startof(ITextRange *range, ME_TextEditor *editor, LONG unit, LONG extend, LONG *delta)
+ {
+     HRESULT hr;
+     LONG start, end;
+     LONG moved;
+ 
+     ITextRange_GetStart(range, &start);
+@@ -2107,12 +2152,28 @@
+         }
+         if (delta)
+             *delta = moved;
+         hr = moved ? S_OK : S_FALSE;
+         break;
+     }
++    case tomParagraph:
++    {
++        LONG new_start = textrange_paragraph_at(editor, start)->nCharOfs;
++
++        moved = new_start - start;
++        ITextRange_SetStart(range, new_start);
++        if (extend == tomMove)
++        {
++            ITextRange_SetEnd(range, new_start);
++            if (start != end)
++                --moved;
++        }
++        if (delta)
++            *delta = moved;
++        return moved ? S_OK : S_FALSE;
++    }
+     default:
+         FIXME("unit %ld is not supported\n", unit);
+         return E_NOTIMPL;
+     }
+     return hr;
+ }
+@@ -2124,13 +2185,13 @@
+ 
+     TRACE("(%p)->(%ld %ld %p)\n", This, unit, extend, delta);
+ 
+     if (!This->child.reole)
+         return CO_E_RELEASED;
+ 
+-    return textrange_startof(me, unit, extend, delta);
++    return textrange_startof(me, This->child.reole->editor, unit, extend, delta);
+ }
+ 
+ static HRESULT textrange_endof(ITextRange *range, ME_TextEditor *editor, LONG unit, LONG extend, LONG *delta)
+ {
+     HRESULT hr;
+     LONG old_start, old_end, new_end;
+@@ -2159,12 +2220,36 @@
+         if (extend == tomMove)
+             ITextRange_SetStart(range, new_end);
+         if (delta)
+             *delta = moved;
+         hr = moved ? S_OK : S_FALSE;
+         break;
++    }
++    case tomParagraph:
++    {
++        ME_Paragraph *para = textrange_paragraph_at(editor, old_end);
++        LONG length = ME_GetTextLength(editor);
++
++        /* An exact boundary is kept, except at the start of the story. */
++        new_end = old_end;
++        if (!old_end || (old_end <= length && old_end != para->nCharOfs))
++            new_end = para_next(para)->nCharOfs;
++        if (extend == tomMove)
++            new_end = min(new_end, length);
++
++        moved = new_end - old_end;
++        ITextRange_SetEnd(range, new_end);
++        if (extend == tomMove)
++        {
++            ITextRange_SetStart(range, new_end);
++            if (old_start != old_end && old_start != new_end)
++                ++moved;
++        }
++        if (delta)
++            *delta = moved;
++        return moved ? S_OK : S_FALSE;
+     }
+     default:
+         FIXME("unit %ld is not supported\n", unit);
+         return E_NOTIMPL;
+     }
+     return hr;
+@@ -2234,12 +2319,35 @@
+             if (old_start != old_end)
+                 --moved;
+         }
+         if (delta) *delta = moved;
+         break;
+     }
++    case tomParagraph:
++    {
++        LONG length = ME_GetTextLength(editor);
++        LONG offset = count > 0 ? old_end : old_start;
++
++        if (count > 0 && old_end > length)
++        {
++            /* A caret cannot remain past the last character. */
++            offset = length;
++            moved = -1;
++        }
++        else
++        {
++            /* Include the starting edge of a nonempty range if it is a boundary. */
++            if (old_start != old_end)
++                offset += count > 0 ? -1 : 1;
++            moved = textrange_move_paragraphs(editor, &offset, count, length);
++        }
++        new_start = new_end = offset;
++        if (delta)
++            *delta = moved;
++        break;
++    }
+     default:
+         FIXME("unit %ld is not supported\n", unit);
+         return E_NOTIMPL;
+     }
+     if (moved == 0)
+         hr = S_FALSE;
+@@ -2285,12 +2393,23 @@
+         cursor_from_char_ofs( editor, old_start, &cursor );
+         moved = ME_MoveCursorChars(editor, &cursor, count, FALSE);
+         new_start = old_start + moved;
+         new_end = old_end;
+         if (new_end < new_start)
+             new_end = new_start;
++        if (delta)
++            *delta = moved;
++        break;
++    }
++    case tomParagraph:
++    {
++        LONG moved;
++
++        new_start = old_start;
++        moved = textrange_move_paragraphs(editor, &new_start, count, ME_GetTextLength(editor));
++        new_end = max(old_end, new_start);
+         if (delta)
+             *delta = moved;
+         break;
+     }
+     default:
+         FIXME("unit %ld is not supported\n", unit);
+@@ -2363,12 +2482,24 @@
+             else if (new_end == old_end)
+                 *delta = 0;
+             else
+                 *delta = 1;
+         }
+         break;
++    case tomParagraph:
++    {
++        LONG limit, moved;
++
++        ITextRange_GetStoryLength(range, &limit);
++        new_end = old_end;
++        moved = textrange_move_paragraphs(editor, &new_end, count, limit);
++        new_start = min(old_start, new_end);
++        if (delta)
++            *delta = moved;
++        break;
++    }
+     default:
+         FIXME("unit %ld is not supported\n", unit);
+         return E_NOTIMPL;
+     }
+     if (new_end == old_end)
+         hr = S_FALSE;
+@@ -5047,13 +5178,13 @@
      TRACE("(%p)->(%ld %p)\n", This, unit, delta);
  
      if (!This->services)
@@ -104,3 +321,18 @@ including textfont-applytmp. The implementation and test are unchanged.
  
  static HRESULT WINAPI ITextSelection_fnGetIndex(ITextSelection *me, LONG unit, LONG *index)
  {
+@@ -5181,13 +5312,13 @@
+     TRACE("(%p)->(%ld %ld %p)\n", This, unit, extend, delta);
+ 
+     if (!This->services)
+         return CO_E_RELEASED;
+ 
+     ITextSelection_QueryInterface(me, &IID_ITextRange, (void**)&range);
+-    hr = textrange_startof(range, unit, extend, delta);
++    hr = textrange_startof(range, This->services->editor, unit, extend, delta);
+     ITextRange_Release(range);
+     return hr;
+ }
+ 
+ static HRESULT WINAPI ITextSelection_fnEndOf(ITextSelection *me, LONG unit, LONG extend,
+     LONG *delta)

@@ -79,3 +79,23 @@ code. Wine 11.22 returns E_NOTIMPL for paragraph expansion. The
 candidate implements only paragraph expansion. Character, word, and
 sentence results are retained as reference measurements. The measured
 line result depends on the host and is outside this candidate.
+
+## Windows 10 paragraph navigation results (2026-11-26)
+
+Both offline runs exited 0. Each has 10,408 observations, 2,602 per
+host. The x86_64 and i686 output agrees after the bitness header. Both
+RichEdit classes and both CreateTextServices hosts agree for each case.
+
+| Case | Result |
+| --- | --- |
+| Expand the short duplicate (0,2) in "-\\r" | S_FALSE, unchanged |
+| MoveEnd(+1) immediately after that Expand | S_OK, (0,3) |
+| MoveStart(+32) from (0,0) in "Alpha beta. Next!\\rGamma delta." | S_OK, (30,30), delta 2 |
+| MoveEnd(+32) from (0,0) in the same story | S_OK, (0,31), delta 2 |
+| StartOf(tomMove) from (1,5) in the same story | S_OK, (0,0), delta -2 |
+| EndOf(tomMove) from (1,20) in the same story | S_OK, (30,30), delta 11 |
+| EndOf(tomExtend) from (1,20) in the same story | S_OK, (1,31), delta 11 |
+| Move(+1) from (30,31) in the same story | S_OK, (30,30), delta -1 |
+
+The focused Wine test records representative native cases alongside
+the original Expand cases, including the short call sequence.
