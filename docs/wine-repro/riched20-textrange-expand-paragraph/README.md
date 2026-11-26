@@ -1,62 +1,61 @@
-# RichEdit ITextRange Expand units
+# RichEdit TOM paragraph navigation
 
-Base: winum-11.22-3 (Wine 11.22). On Revit 2027.4, the first plan view
-fails in TextEngine.dll after a windowless TOM range returns an
-unimplemented paragraph expansion. The observed access was a read
-from 0x10. This sequence motivates the test. Application testing will
-establish the effect of any implementation change.
+The first plan view in Revit 2027.4 reaches a windowless TOM range. With
+the combined default-tab-stop and Expand overlay, Expand(tomParagraph)
+returns successfully. The next unsupported operation in the trace is
+MoveEnd(tomParagraph). The read at TextEngine.dll+0x2ac70 still occurs.
+This is the third application attempt. A new combined overlay will be
+checked after the six paragraph operations have been measured and
+tested. If the same crash persists, record the trace and defer Revit
+work on this problem.
 
-The probe runs the same synthetic TOM calls on RichEdit20W and
-RICHEDIT50W. It also attempts CreateTextServices from each DLL with an
-original, windowless ITextHost. The C++ host uses MinGW's native x86
-virtual method calling convention. Windowless setup is recorded
-separately for each DLL and architecture.
+## Current probe
 
-## Cases
+The probe runs on RichEdit20W, RICHEDIT50W, and CreateTextServices
+from both DLLs using the same original windowless host as the first
+probe. Each source runs the following cases:
 
-The primary story is "Alpha beta. Next!\rGamma delta.\rLast\r". It
-supplies punctuation, three explicit paragraph marks and a final story
-boundary. The probe records the actual input range coordinates, since
-Range may clamp the requested endpoint. Each call uses a fresh range.
+- Expand, StartOf, EndOf, Move, MoveStart and MoveEnd with tomParagraph.
+- A short story "-\r", one paragraph without a trailing carriage return,
+  two paragraphs with and without a trailing carriage return, and the
+  original "Alpha beta. Next!\rGamma delta.\rLast\r" story.
+- Carets at the start, within paragraphs, at a paragraph boundary and
+  at the story end. Ranges include complete paragraphs, ranges ending
+  at the next boundary, ranges spanning paragraphs and the final marks.
+- StartOf and EndOf with tomMove and tomExtend. The other three
+  movement methods use counts -32, -2, -1, 0, 1, 2 and 32.
+- Fresh ranges for each call, with null and sentinel-initialized delta.
+  Each row records the actual input coordinates, HRESULT, output
+  coordinates, delta and output getter HRESULTs.
+- A separate sequence measures MoveEnd(+1) on the same duplicate after
+  Expand(tomParagraph, NULL) on the short story.
 
-- Paragraph, character, word, sentence and line units on inside,
-  cross-paragraph, whole-paragraph and degenerate ranges.
-- A range whose end is exactly the next paragraph's start, a collapsed
-  range at that boundary, the explicit trailing carriage return and
-  ranges at the end reported by tomStory.
-- For every case, calls with a null delta pointer and with an output
-  initialized to 0x12345678. Output has HRESULT, start, end, delta and
-  the two endpoint getter results.
-- For the windowed controls, line cases at 320 px and 55 px. Use these
-  to identify layout-dependent results before deciding the scope.
-- For each document, a new story containing "-\r" and the observed
-  sequence Range(0,0), Expand(tomStory), SetStart(0), SetEnd(2),
-  GetDuplicate and Expand(tomParagraph, NULL).
+This round measures tomParagraph only. The previous Expand unit matrix
+is retained in the [first probe at d7132a0](https://github.com/Harvi654/winum/tree/d7132a0/docs/wine-repro/riched20-textrange-expand-paragraph)
+and the Windows results below.
 
 ## Offline Windows 10
 
-Verify SHA256SUMS after extracting the CI artifact. Copy the bundle to
-a fresh folder in the offline Windows 10 VM and run run-measure.bat
-from a normal console. Return only:
+Verify SHA256SUMS after extracting the CI artifact. In a fresh directory
+in the offline VM, run `run-measure.bat` and return these three files:
 
-- result-riched-expand-x86_64.txt
-- result-riched-expand-i686.txt
+- result-riched-paragraph-navigation-x86_64.txt
+- result-riched-paragraph-navigation-i686.txt
 - exitcodes.txt
 
-The exit code and measure_complete summarize the windowed controls.
-For the windowless cases, check the separate source completion lines
-and setup results. Report partial output if a setup fails. No native
-HRESULTs, bounds or deltas are assumed by the probe.
+Both architecture runs should report all four source completion lines
+and end with `measure_complete=1`. A failed setup or getter is recorded
+in the output. Partial results are still useful.
 
 ## Build
 
 ~~~bash
-bash scripts/build-measure-bundle.sh out/riched-expand \
+bash scripts/build-measure-bundle.sh out/riched-paragraph-navigation \
     docs/wine-repro/riched20-textrange-expand-paragraph/measure.list
-(cd out/riched-expand && sha256sum -c SHA256SUMS)
+(cd out/riched-paragraph-navigation && sha256sum -c SHA256SUMS)
 ~~~
 
-## Windows 10 results (2026-11-26)
+## First probe: Windows 10 Expand results (2026-11-26)
 
 Both offline executables exited 0. Both window classes and both
 CreateTextServices hosts completed. The x86_64 and i686 results agree
