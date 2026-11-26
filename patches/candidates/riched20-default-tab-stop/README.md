@@ -15,7 +15,7 @@ requires this change together with paragraph navigation v3.
 | L1 | Offline Windows 10 passed 96 checks each on x86_64 and i686 on 2026-11-26. Both exited 0 with no failures, todos, flaky checks or skips. [Results](../../../docs/wine-repro/riched20-default-tab-stop/results/l1-windows-10/summary.tsv). [Verified L1 artifact](https://github.com/Harvi654/winum/actions/runs/45853726852/artifacts/15135495595). |
 | L2 | Paired riched20 and msftedit passed on 2026-11-26. Ten units compared across x86_64 and i386, zero regressions. Each richole architecture ran 181,682 checks on the candidate (181,587 baseline), with no failures or skips in that unit. [CI](https://github.com/Harvi654/winum/actions/runs/45854157626). |
 | L4 | Revit 2027.4 New Project reached “Podlaží 1” on 2026-11-26 with the combined v3 navigation, tab-stop and ole32 overlays in DirectX Software mode. Each fix in isolation still crashed at TextEngine.dll+0x2ac70. See the comparison below. |
-| Cross review | Pending independent review by Claude. |
+| Cross review | Claude, 2026-11-26: approved for the series after the combined Inventor and AutoCAD smoke test; open points below. |
 
 The editor stores the width in twips. Ordinary selection edits keep it
 and WM_SETTEXT restores 720 twips. The setter relayouts implicit stops,
@@ -42,3 +42,44 @@ rendering (WARP on wined3d).
 Both RichEdit changes are required for this Revit New Project fix.
 
 The [tab-stop-only overlay](https://github.com/Harvi654/winum/actions/runs/45854157578/artifacts/15135865485) is retained for comparison.
+
+## Cross review (Claude, 2026-11-26)
+
+Read in full: `riched20-default-tab-stop.patch` (v2) and
+`patches/tests-first/riched20-tests-default-tab-stop.patch`; checked
+against Wine 11.22 with the winum-11.22-3 series (`run.c`
+`ME_GetRunSizeCommon` tab branch, `editor.c` `ME_MakeEditor` and
+`WM_SETTEXT`, `richole.c`). Skimmed: the MEASURE program and the two
+result files, the workflows and the L1 script.
+
+Approved for the series, with the combined L4 below.
+
+- The getter and setter match the measured rows the test covers: 720
+  twips by default, rounding to the nearest twip (18.51 -> 18.5, 18.526
+  -> 18.55, 0.01 -> 0), `E_INVALIDARG` for zero, negative values, NaN and
+  a NULL output, the 0xffffff-twip limit only in RICHEDIT50W, the older
+  class keeping 100,000,000 points and returning the overflow value for
+  FLT_MAX. `GetDefaultTabStop` no longer leaves its output unwritten,
+  which is what Revit's TextEngine tripped over.
+- Layout is limited well: with the default 720 twips the old
+  `lDefaultTab` loop runs unchanged, so programs that never call the
+  setter see no difference. A stored 0 or the overflow value falls back
+  to that loop too. The new branch snaps the interval to whole pixels
+  once and respects zoom and the word-wrap width.
+- `WM_SETTEXT` resets the value (measured); the rewrap after it comes
+  with the new text.
+
+Open points, not blockers:
+
+1. The RICHEDIT50W limit uses `editor->msftedit`, which the SCF_WORD
+   patch sets only for windowed RICHEDIT50W. A windowless msftedit text
+   services object (Revit's TextEngine creates windowless ones) gets the
+   older class's range check. Revit's value (35.4331) is far inside both
+   ranges; the windowless limit was not measured.
+2. Not measured, so unchanged: whether `EM_SETTEXTEX(ST_DEFAULT)`,
+   `EM_STREAMIN` or RTF `\deftab` change or reset the stored value.
+3. Nit: the test uses `ARRAYSIZE`; Wine's tests use `ARRAY_SIZE`.
+
+Before `patches/series`: an Inventor and AutoCAD text editing smoke test
+with the final DLL carrying all three riched20 changes (tab stop,
+paragraph navigation, target device scroll), as the DLL is shared.
