@@ -11,9 +11,9 @@ addresses that crash.
 | Level | Evidence |
 | --- | --- |
 | MEASURE | Two offline Windows 10 rounds agree across architectures. [Observations](../../../docs/wine-repro/riched20-default-tab-stop/README.md#round-2-result-2026-11-26). |
-| L0 | Pending. Build both architectures on the winum-11.22-3 series with zero fuzz. |
-| L1 | Focused richole assertions build for both architectures. Native execution pending. |
-| L2 | Pending. Pair riched20 and msftedit with and without the candidate on the same series. |
+| L0 | Both DLL architectures built after zero-fuzz application to winum-11.22-3. [Overlay build](https://github.com/Harvi654/winum/actions/runs/45854157578). |
+| L1 | Focused richole assertions build for both architectures. Native execution pending. [Verified L1 artifact](https://github.com/Harvi654/winum/actions/runs/45853726852/artifacts/15135495595). |
+| L2 | Paired riched20 and msftedit rerun in progress. [CI](https://github.com/Harvi654/winum/actions/runs/45854157626). |
 | L4 | Pending. Use the riched20 overlay with the ole32 overlay. Verify Revit New Project and a sample project on the desktop PC, plus Inventor and AutoCAD text editing. |
 | Cross review | Claude after the test and fix. |
 
@@ -28,7 +28,7 @@ Language and typography option messages differ from Windows in the
 trace and reference probe. This candidate isolates the tab-stop
 changes so L4 can determine whether the other messages matter.
 
-For L4, verify SHA256SUMS in the extracted candidate overlay. Use a test
+For L4, verify SHA256SUMS in the extracted [candidate overlay](https://github.com/Harvi654/winum/actions/runs/45854157578/artifacts/15135865485). Use a test
 copy of the winum-11.22-3 runtime and copy each DLL into its corresponding
 architecture directory under lib/wine. Include the ole32 overlay in
 that same runtime for the Revit checks.
