@@ -18,7 +18,7 @@ the focus.
 | L0 | Both riched20.dll architectures built after zero-fuzz application to the winum-11.22-3 series (2026-11-26). [Overlay](https://github.com/Harvi654/winum/actions/runs/45865073202/artifacts/15139632984). |
 | L1 | Offline Windows 10, 96 dpi, 2026-11-26: 83 tests per architecture, 0 failures, todos or skips, exit 0. [L1 bundle](https://github.com/Harvi654/winum/actions/runs/45865705834/artifacts/15140801437). |
 | L2 | Running: paired riched20 and msftedit suites, the new test on both sides (it should fail only on the baseline). [Run](https://github.com/Harvi654/winum/actions/runs/45865705690). |
-| L4 | Inventor 2027, 2026-11-26, first try: the scroll range is right and the thumb starts in the middle as on Windows, but the box is not repainted - the letter shows only after the thumb is moved a little. Trace pending. |
+| L4 | Inventor 2027, 2026-11-26: the dialog opens scrolled with the thumb in the middle as on Windows, and the letter can now be scrolled to. It sits just past the right edge of the box (Windows shows it inside, at the edge); the smallest scroll shows it. Maintainer: acceptable, the open point below. AutoCAD text editing pending. |
 | Cross review | Pending: Codex (Claude wrote the patch). |
 
 The fix keeps a second width, the target line width in pixels, next to
@@ -31,3 +31,13 @@ or selection changes).
 Build the overlay into a copy of the winum-11.22-3 runtime as for the
 other riched20 candidates (`lib/wine/<arch>-windows/riched20.dll`, after
 `sha256sum -c SHA256SUMS`).
+
+## Open point
+
+After the focus scroll Inventor's letter ends a few pixels past the right
+edge, where Windows shows it inside the box. Not yet traced. Likely
+causes: Wine scrolls only until the caret position is in view, not the
+character after it; the caret is before the letter when Wine scrolls; or
+the visible width was taken before the vertical scroll bar appeared. The
+L1 test's visibility check passes on Windows; the paired L2 shows whether
+it passes under Wine in the plain case.
