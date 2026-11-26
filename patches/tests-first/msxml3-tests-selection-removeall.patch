@@ -1,0 +1,138 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] msxml3/tests: Cover IXMLDOMSelection removeAll.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Windows 10 returns S_OK even for the empty selection. It removes all
+matches regardless of the cursor. The removed set remains empty after
+reset and after adding a new matching element to the document.
+
+--- a/dlls/msxml3/tests/domdoc.c
++++ b/dlls/msxml3/tests/domdoc.c
+@@ -19741,10 +19741,114 @@
+ 
+     IXMLDOMDocument3_Release(doc2);
+     free_bstrs();
+ }
+ 
++static void test_selection_removeall(void)
++{
++    static const CLSID *const classes[] = {&CLSID_DOMDocument30, &CLSID_DOMDocument60};
++    static const struct
++    {
++        const WCHAR *xml, *query, *expected;
++        LONG selected;
++    }
++    cases[] =
++    {
++        {L"<group><keep/></group>", L"./string", L"<group><keep/></group>", 0},
++        {L"<group><string/><keep/></group>", L"./string", L"<group><keep/></group>", 1},
++        {L"<group><string/><keep/><string/><string/></group>", L"./string", L"<group><keep/></group>", 3},
++        {L"<group><left><string/></left><right><string/><keep/></right></group>",
++         L".//string", L"<group><left/><right><keep/></right></group>", 2},
++        {L"<group><string><string/></string><string/></group>", L".//string", L"<group/>", 3},
++    };
++    unsigned int i, j;
++
++    for (i = 0; i < ARRAY_SIZE(classes); ++i)
++    {
++        for (j = 0; j < ARRAY_SIZE(cases); ++j)
++        {
++            IXMLDOMNodeList *list = NULL;
++            IXMLDOMSelection *selection = NULL;
++            IXMLDOMDocument *doc = NULL;
++            IXMLDOMElement *root = NULL, *added = NULL;
++            IXMLDOMNode *node = NULL;
++            BSTR text = NULL, query = NULL, xml = NULL, name = NULL;
++            VARIANT_BOOL loaded = VARIANT_FALSE;
++            LONG length = -1;
++            HRESULT hr;
++
++            winetest_push_context("version %u, case %u", i ? 60 : 30, j);
++            hr = CoCreateInstance(classes[i], NULL, CLSCTX_INPROC_SERVER,
++                                  &IID_IXMLDOMDocument, (void **)&doc);
++            ok(hr == S_OK, "CoCreateInstance returned %#lx.\n", hr);
++            if (!doc) goto done;
++
++            text = SysAllocString(cases[j].xml);
++            query = SysAllocString(cases[j].query);
++            name = SysAllocString(L"string");
++            hr = IXMLDOMDocument_loadXML(doc, text, &loaded);
++            ok(hr == S_OK && loaded == VARIANT_TRUE, "loadXML returned %#lx, %d.\n", hr, loaded);
++            hr = IXMLDOMDocument_get_documentElement(doc, &root);
++            ok(hr == S_OK, "get_documentElement returned %#lx.\n", hr);
++            if (!root) goto done;
++            hr = IXMLDOMElement_selectNodes(root, query, &list);
++            ok(hr == S_OK, "selectNodes returned %#lx.\n", hr);
++            if (!list) goto done;
++            hr = IXMLDOMNodeList_QueryInterface(list, &IID_IXMLDOMSelection, (void **)&selection);
++            ok(hr == S_OK, "QueryInterface returned %#lx.\n", hr);
++            if (!selection) goto done;
++
++            hr = IXMLDOMSelection_get_length(selection, &length);
++            ok(hr == S_OK && length == cases[j].selected, "length returned %#lx, %ld.\n", hr, length);
++            if (cases[j].selected)
++            {
++                hr = IXMLDOMSelection_nextNode(selection, &node);
++                ok(hr == S_OK && node != NULL, "nextNode returned %#lx, %p.\n", hr, node);
++                if (node) IXMLDOMNode_Release(node);
++                node = NULL;
++            }
++
++            hr = IXMLDOMSelection_removeAll(selection);
++            todo_wine
++            ok(hr == S_OK, "removeAll returned %#lx.\n", hr);
++            if (hr != S_OK) goto done;
++
++            hr = IXMLDOMElement_get_xml(root, &xml);
++            ok(hr == S_OK && xml && !wcscmp(xml, cases[j].expected), "unexpected root XML, hr %#lx.\n", hr);
++            hr = IXMLDOMSelection_get_length(selection, &length);
++            ok(hr == S_OK && !length, "length returned %#lx, %ld.\n", hr, length);
++            hr = IXMLDOMSelection_nextNode(selection, &node);
++            ok(hr == S_FALSE && !node, "nextNode returned %#lx, %p.\n", hr, node);
++            if (node) IXMLDOMNode_Release(node);
++            node = NULL;
++
++            hr = IXMLDOMDocument_createElement(doc, name, &added);
++            ok(hr == S_OK, "createElement returned %#lx.\n", hr);
++            if (!added) goto done;
++            hr = IXMLDOMElement_appendChild(root, (IXMLDOMNode *)added, NULL);
++            ok(hr == S_OK, "appendChild returned %#lx.\n", hr);
++            hr = IXMLDOMSelection_reset(selection);
++            ok(hr == S_OK, "reset returned %#lx.\n", hr);
++            hr = IXMLDOMSelection_nextNode(selection, &node);
++            ok(hr == S_FALSE && !node, "nextNode after reset returned %#lx, %p.\n", hr, node);
++
++done:
++            if (node) IXMLDOMNode_Release(node);
++            if (added) IXMLDOMElement_Release(added);
++            if (selection) IXMLDOMSelection_Release(selection);
++            if (list) IXMLDOMNodeList_Release(list);
++            if (root) IXMLDOMElement_Release(root);
++            if (doc) IXMLDOMDocument_Release(doc);
++            SysFreeString(xml);
++            SysFreeString(name);
++            SysFreeString(query);
++            SysFreeString(text);
++            winetest_pop_context();
++        }
++    }
++}
++
+ START_TEST(domdoc)
+ {
+     HRESULT hr;
+ 
+     hr = CoInitialize( NULL );
+@@ -19804,10 +19908,11 @@
+     test_events();
+     test_put_nodeTypedValue();
+     test_get_xml();
+     test_insertBefore();
+     test_appendChild();
++    test_selection_removeall();
+     test_get_doctype();
+     test_get_tagName();
+     test_get_dataType();
+     test_get_nodeTypeString();
+     test_get_attributes();
