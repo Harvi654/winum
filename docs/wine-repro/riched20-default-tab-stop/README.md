@@ -70,3 +70,13 @@ and returned the flags on read-back.
 
 The follow-up probes the fractional storage and accepted range on empty
 controls, and queries the value after EM_REPLACESEL and WM_SETTEXT.
+
+## Round 2 bundle
+
+Run the new bundle in another fresh directory of the same offline VM.
+Reports for this run include round=2. Return the same three output file
+names. The follow-up records first the edits and then the range probes
+on an empty document. When 36 succeeds and FLT_MAX is rejected with
+E_INVALIDARG, it reports neighboring floats across an observed
+acceptance transition. The endpoint result alone does not establish
+monotonicity for all inputs.

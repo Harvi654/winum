@@ -8,6 +8,8 @@
 #include <richole.h>
 #include <tom.h>
 #include <limits.h>
+#include <float.h>
+#include <string.h>
 #include <stdio.h>
 
 /* MinGW's uuid archive does not supply IID_ITextDocument. */
@@ -89,6 +91,95 @@ static BOOL set_text(HWND hwnd)
     return SetWindowTextW(hwnd, L"") && SetWindowTextW(hwnd, text);
 }
 
+static HRESULT measure_set(ITextDocument *document, const char *name, const char *step, float points)
+{
+    HRESULT hr = ITextDocument_SetDefaultTabStop(document, points);
+
+    printf("class=%s step=%s event=set points=%.9g hr=0x%08lx\n",
+           name, step, (double)points, (unsigned long)hr);
+    measure_get(document, name, step);
+    return hr;
+}
+
+static void measure_upper_bound(ITextDocument *document, const char *name)
+{
+    float low = 36.0f, high = FLT_MAX;
+    DWORD low_bits, high_bits;
+    HRESULT low_hr, high_hr;
+
+    low_hr = measure_set(document, name, "range_low", low);
+    high_hr = measure_set(document, name, "range_high", high);
+    if (low_hr != S_OK || high_hr != E_INVALIDARG) return;
+
+    /* Positive IEEE-754 floats are ordered by their unsigned bit patterns. */
+    memcpy(&low_bits, &low, sizeof(low));
+    memcpy(&high_bits, &high, sizeof(high));
+    while (high_bits - low_bits > 1)
+    {
+        DWORD mid_bits = low_bits + (high_bits - low_bits) / 2;
+        float middle;
+        HRESULT hr;
+
+        memcpy(&middle, &mid_bits, sizeof(middle));
+        hr = ITextDocument_SetDefaultTabStop(document, middle);
+        if (hr == S_OK) low_bits = mid_bits;
+        else if (hr == E_INVALIDARG) high_bits = mid_bits;
+        else
+        {
+            printf("class=%s event=range_search_stopped points=%.9g hr=0x%08lx\n",
+                   name, (double)middle, (unsigned long)hr);
+            return;
+        }
+    }
+    memcpy(&low, &low_bits, sizeof(low));
+    memcpy(&high, &high_bits, sizeof(high));
+    measure_set(document, name, "range_last_accepted", low);
+    measure_set(document, name, "range_first_rejected", high);
+}
+
+static BOOL measure_followup(HWND hwnd, ITextDocument *document, const char *name)
+{
+    static const struct
+    {
+        const char *step;
+        float points;
+    } small[] =
+    {
+        {"fractional_18_51", 18.51f}, {"fractional_18_526", 18.526f},
+        {"fractional_18_549", 18.549f}, {"small_0_05", 0.05f},
+        {"small_0_025", 0.025f}, {"small_0_01", 0.01f},
+        {"small_1e_minus_7", 1.0e-7f}
+    };
+    size_t i;
+
+    if (!set_text(hwnd)) return FALSE;
+    measure_set(document, name, "edit_set", 18.5f);
+    SendMessageW(hwnd, EM_SETSEL, 5, 5);
+    SendMessageW(hwnd, EM_REPLACESEL, FALSE, (LPARAM)L"D");
+    measure_get(document, name, "after_replace_sel");
+    measure_positions(hwnd, name, "after_replace_sel");
+
+    if (!SetWindowTextW(hwnd, text)) return FALSE;
+    measure_get(document, name, "after_settext_direct");
+    measure_positions(hwnd, name, "after_settext_direct");
+
+    measure_set(document, name, "clear_set", 18.5f);
+    if (!SetWindowTextW(hwnd, L"")) return FALSE;
+    measure_get(document, name, "after_settext_empty");
+    measure_set(document, name, "empty_set", 18.5f);
+    SendMessageW(hwnd, EM_REPLACESEL, FALSE, (LPARAM)text);
+    measure_get(document, name, "after_insert_into_empty");
+    measure_positions(hwnd, name, "after_insert_into_empty");
+    measure_para(hwnd, name, "after_insert_into_empty");
+
+    /* Keep the document empty during the range measurements. */
+    if (!SetWindowTextW(hwnd, L"")) return FALSE;
+    for (i = 0; i < ARRAYSIZE(small); ++i)
+        measure_set(document, name, small[i].step, small[i].points);
+    measure_upper_bound(document, name);
+    return TRUE;
+}
+
 static BOOL measure_control(const WCHAR *dll, const WCHAR *class_name, const char *name)
 {
     static const struct
@@ -168,6 +259,8 @@ static BOOL measure_control(const WCHAR *dll, const WCHAR *class_name, const cha
         measure_para(hwnd, name, step);
     }
 
+    if (!measure_followup(hwnd, document, name)) goto text_failed;
+
     /* Use a separate fresh control so the language baseline precedes edits. */
     ITextDocument_Release(document);
     document = NULL;
@@ -202,7 +295,7 @@ int main(void)
     HRESULT hr;
 
     setvbuf(stdout, NULL, _IONBF, 0);
-    printf("measure=riched20-default-tab-stop bits=%u\n", (unsigned int)(sizeof(void *) * CHAR_BIT));
+    printf("measure=riched20-default-tab-stop round=2 bits=%u\n", (unsigned int)(sizeof(void *) * CHAR_BIT));
     hr = OleInitialize(NULL);
     if (FAILED(hr))
     {
