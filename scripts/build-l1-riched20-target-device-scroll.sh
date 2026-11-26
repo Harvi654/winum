@@ -62,12 +62,15 @@ START_TEST(target_device_scroll)
 """
 Path(sys.argv[2]).write_text(head + test + tail)
 PY
+# Only Wine's test framework headers; Windows headers come from MinGW.
+mkdir -p "$work/inc/wine"
+cp "$src/include/wine/test.h" "$src/include/wine/debug.h" "$work/inc/wine/"
 bat="$work/run-tests.bat"
 printf '%s\r\n' '@echo off' 'cd /d "%~dp0"' 'if exist exitcodes.txt exit /b 2' > "$bat"
 for arch in x86_64 i686; do
     exe="riched20-target-device-scroll-$arch.exe"
     "$arch-w64-mingw32-gcc" -DSTANDALONE -DDECLSPEC_EXPORT= -O2 -Wall -Werror \
-        -I "$src/include" "$work/target-device-scroll.c" \
+        -I "$work/inc" "$work/target-device-scroll.c" \
         -o "$work/$exe" -luser32 -lgdi32
     printf '%s\r\n' "$exe target_device_scroll > result-riched20-target-device-scroll-$arch.txt 2>&1" \
         ">>exitcodes.txt echo $arch=%ERRORLEVEL%" >> "$bat"
