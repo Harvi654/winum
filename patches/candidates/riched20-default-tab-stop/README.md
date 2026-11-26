@@ -12,7 +12,7 @@ addresses that crash.
 | --- | --- |
 | MEASURE | Two offline Windows 10 rounds agree across architectures. [Observations](../../../docs/wine-repro/riched20-default-tab-stop/README.md#round-2-result-2026-11-26). |
 | L0 | Both DLL architectures built after zero-fuzz application to winum-11.22-3. [Overlay build](https://github.com/Harvi654/winum/actions/runs/45854157578). |
-| L1 | Focused richole assertions build for both architectures. Native execution pending. [Verified L1 artifact](https://github.com/Harvi654/winum/actions/runs/45853726852/artifacts/15135495595). |
+| L1 | Offline Windows 10 passed 96 checks each on x86_64 and i686 on 2026-11-26. Both exited 0 with no failures, todos, flaky checks or skips. [Results](../../../docs/wine-repro/riched20-default-tab-stop/results/l1-windows-10/summary.tsv). [Verified L1 artifact](https://github.com/Harvi654/winum/actions/runs/45853726852/artifacts/15135495595). |
 | L2 | Paired riched20 and msftedit rerun in progress. [CI](https://github.com/Harvi654/winum/actions/runs/45854157626). |
 | L4 | Pending. Use the riched20 overlay with the ole32 overlay. Verify Revit New Project and a sample project on the desktop PC, plus Inventor and AutoCAD text editing. |
 | Cross review | Claude after the test and fix. |

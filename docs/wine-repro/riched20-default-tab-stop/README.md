@@ -97,3 +97,10 @@ differences from Wine. A tab-stop candidate allows those differences
 to be evaluated separately in Revit.
 
 [Normalized follow-up observations](results/windows-10/round-2.txt).
+
+## Exact tab stop test on Windows 10 (L1)
+
+The focused test passed on 2026-11-26 in the offline Windows 10 VM.
+x86_64 and i686 each completed 96 checks with no failures, todos,
+flaky checks or skips. Both exited 0. The L1 bundle and the candidate
+use the same test assertions. [Native L1 summary](results/l1-windows-10/summary.tsv).
