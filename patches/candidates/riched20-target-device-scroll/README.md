@@ -69,3 +69,19 @@ outside this review.
   the entire glyph against the formatting rectangle or reproduce
   Inventor's timing. The caret position and the formatting rectangle
   before and after focus are needed to distinguish the hypotheses.
+
+## Combined L4 (2026-11-26, evening)
+
+Overlay with all four candidates built from one winum-11.22-3 tree
+(tab stop -> paragraph navigation -> target device scroll, ole32 v2;
+[run 45880891853](https://github.com/Harvi654/winum/actions/runs/45880891853/artifacts/15147073657),
+SHA-256 of archive and DLLs verified), on copies of the prefixes:
+
+- Inventor 2027: note text, dimension text, datum identifier editor
+  (letter reachable by scrolling), drag and drop, open/save/reopen - ok.
+- AutoCAD 2027: MTEXT (several lines, centred, reopened), TEXT,
+  save/reopen - ok.
+- Revit 2027.4, DirectX Software: New project opens "Podlaží 1". A wall
+  drawn afterwards gives Revit's warning that none of the created
+  elements is visible in the view - the drawing problem recorded in the
+  Revit repository, not RichEdit or OLE.
