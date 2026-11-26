@@ -15,9 +15,9 @@ the focus.
 | --- | --- |
 | MEASURE | Offline Windows 10, both architectures, 612 cases per round, two rounds (2026-11-26). |
 | Test | `patches/tests-first/riched20-tests-target-device-scroll.patch`, `test_target_device_scroll` in `dlls/riched20/tests/editor.c`, both classes. |
-| L0 | Pending (overlay workflow). |
-| L1 | Pending (L1 workflow; run `run-tests.bat` in the offline VM at 96 dpi). |
-| L2 | Pending (paired riched20 and msftedit suites; the new test runs on both sides and should fail only on the baseline). |
+| L0 | Both riched20.dll architectures built after zero-fuzz application to the winum-11.22-3 series (2026-11-26). [Overlay](https://github.com/Harvi654/winum/actions/runs/45865073202/artifacts/15139632984). |
+| L1 | Bundle built (2026-11-26), Windows run pending. [L1 bundle](https://github.com/Harvi654/winum/actions/runs/45865705834/artifacts/15140801437). |
+| L2 | Running: paired riched20 and msftedit suites, the new test on both sides (it should fail only on the baseline). [Run](https://github.com/Harvi654/winum/actions/runs/45865705690). |
 | L4 | Pending: Inventor datum identifier letter visible when the dialog opens; AutoCAD text editing (MText) unchanged. |
 | Cross review | Pending: Codex (Claude wrote the patch). |
 
