@@ -1,0 +1,140 @@
+architectures=x86_64,i686 exit=0 observations_identical=1
+class=RichEdit20W setup=ready dpi_x=96 text_left=1 text_right=1599
+class=RichEdit20W step=new event=get hr=0x00000000 points=36
+class=RichEdit20W step=new event=get_null hr=0x80070057
+class=RichEdit20W step=new event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RichEdit20W step=before_set event=position char=0 ret=0 x=1 y=0
+class=RichEdit20W step=before_set event=position char=2 ret=0 x=49 y=0
+class=RichEdit20W step=before_set event=position char=4 ret=0 x=97 y=0
+class=RichEdit20W step=before_set event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RichEdit20W step=set_36 event=set points=36 hr=0x00000000
+class=RichEdit20W step=set_36 event=get hr=0x00000000 points=36
+class=RichEdit20W step=set_36 event=position char=0 ret=0 x=1 y=0
+class=RichEdit20W step=set_36 event=position char=2 ret=0 x=49 y=0
+class=RichEdit20W step=set_36 event=position char=4 ret=0 x=97 y=0
+class=RichEdit20W step=set_36 event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RichEdit20W step=set_36 event=reinserted_text
+class=RichEdit20W step=set_36 event=position char=0 ret=0 x=1 y=0
+class=RichEdit20W step=set_36 event=position char=2 ret=0 x=49 y=0
+class=RichEdit20W step=set_36 event=position char=4 ret=0 x=97 y=0
+class=RichEdit20W step=set_36 event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RichEdit20W step=set_fractional event=set points=18.5 hr=0x00000000
+class=RichEdit20W step=set_fractional event=get hr=0x00000000 points=18.5
+class=RichEdit20W step=set_fractional event=position char=0 ret=0 x=1 y=0
+class=RichEdit20W step=set_fractional event=position char=2 ret=0 x=26 y=0
+class=RichEdit20W step=set_fractional event=position char=4 ret=0 x=51 y=0
+class=RichEdit20W step=set_fractional event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RichEdit20W step=set_fractional event=reinserted_text
+class=RichEdit20W step=set_fractional event=position char=0 ret=0 x=1 y=0
+class=RichEdit20W step=set_fractional event=position char=2 ret=0 x=49 y=0
+class=RichEdit20W step=set_fractional event=position char=4 ret=0 x=97 y=0
+class=RichEdit20W step=set_fractional event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RichEdit20W step=set_zero event=set points=0 hr=0x80070057
+class=RichEdit20W step=set_zero event=get hr=0x00000000 points=36
+class=RichEdit20W step=set_zero event=position char=0 ret=0 x=1 y=0
+class=RichEdit20W step=set_zero event=position char=2 ret=0 x=49 y=0
+class=RichEdit20W step=set_zero event=position char=4 ret=0 x=97 y=0
+class=RichEdit20W step=set_zero event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RichEdit20W step=set_zero event=reinserted_text
+class=RichEdit20W step=set_zero event=position char=0 ret=0 x=1 y=0
+class=RichEdit20W step=set_zero event=position char=2 ret=0 x=49 y=0
+class=RichEdit20W step=set_zero event=position char=4 ret=0 x=97 y=0
+class=RichEdit20W step=set_zero event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RichEdit20W step=set_negative event=set points=-12 hr=0x80070057
+class=RichEdit20W step=set_negative event=get hr=0x00000000 points=36
+class=RichEdit20W step=set_negative event=position char=0 ret=0 x=1 y=0
+class=RichEdit20W step=set_negative event=position char=2 ret=0 x=49 y=0
+class=RichEdit20W step=set_negative event=position char=4 ret=0 x=97 y=0
+class=RichEdit20W step=set_negative event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RichEdit20W step=set_negative event=reinserted_text
+class=RichEdit20W step=set_negative event=position char=0 ret=0 x=1 y=0
+class=RichEdit20W step=set_negative event=position char=2 ret=0 x=49 y=0
+class=RichEdit20W step=set_negative event=position char=4 ret=0 x=97 y=0
+class=RichEdit20W step=set_negative event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RichEdit20W step=set_large event=set points=100000000 hr=0x00000000
+class=RichEdit20W step=set_large event=get hr=0x00000000 points=100000000
+class=RichEdit20W step=set_large event=position char=0 ret=0 x=1 y=0
+class=RichEdit20W step=set_large event=position char=2 ret=0 x=1598 y=0
+class=RichEdit20W step=set_large event=position char=4 ret=0 x=1598 y=0
+class=RichEdit20W step=set_large event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RichEdit20W step=set_large event=reinserted_text
+class=RichEdit20W step=set_large event=position char=0 ret=0 x=1 y=0
+class=RichEdit20W step=set_large event=position char=2 ret=0 x=49 y=0
+class=RichEdit20W step=set_large event=position char=4 ret=0 x=97 y=0
+class=RichEdit20W step=set_large event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RichEdit20W event=language_initial flags=0x00000082
+class=RichEdit20W event=language_set input=0x00000000 ret=1 read=0x00000000
+class=RichEdit20W event=language_set input=0x00000002 ret=1 read=0x00000002
+class=RichEdit20W event=language_restore ret=1 read=0x00000082
+class=RichEdit20W event=advanced_typography before=0x00000000 set=0x00000001 mask=0x00000001 ret=1 read=0x00000001
+class=RichEdit20W complete=1
+class=RICHEDIT50W setup=ready dpi_x=96 text_left=1 text_right=1599
+class=RICHEDIT50W step=new event=get hr=0x00000000 points=36
+class=RICHEDIT50W step=new event=get_null hr=0x80070057
+class=RICHEDIT50W step=new event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RICHEDIT50W step=before_set event=position char=0 ret=0 x=1 y=0
+class=RICHEDIT50W step=before_set event=position char=2 ret=0 x=49 y=0
+class=RICHEDIT50W step=before_set event=position char=4 ret=0 x=97 y=0
+class=RICHEDIT50W step=before_set event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RICHEDIT50W step=set_36 event=set points=36 hr=0x00000000
+class=RICHEDIT50W step=set_36 event=get hr=0x00000000 points=36
+class=RICHEDIT50W step=set_36 event=position char=0 ret=0 x=1 y=0
+class=RICHEDIT50W step=set_36 event=position char=2 ret=0 x=49 y=0
+class=RICHEDIT50W step=set_36 event=position char=4 ret=0 x=97 y=0
+class=RICHEDIT50W step=set_36 event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RICHEDIT50W step=set_36 event=reinserted_text
+class=RICHEDIT50W step=set_36 event=position char=0 ret=0 x=1 y=0
+class=RICHEDIT50W step=set_36 event=position char=2 ret=0 x=49 y=0
+class=RICHEDIT50W step=set_36 event=position char=4 ret=0 x=97 y=0
+class=RICHEDIT50W step=set_36 event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RICHEDIT50W step=set_fractional event=set points=18.5 hr=0x00000000
+class=RICHEDIT50W step=set_fractional event=get hr=0x00000000 points=18.5
+class=RICHEDIT50W step=set_fractional event=position char=0 ret=0 x=1 y=0
+class=RICHEDIT50W step=set_fractional event=position char=2 ret=0 x=26 y=0
+class=RICHEDIT50W step=set_fractional event=position char=4 ret=0 x=51 y=0
+class=RICHEDIT50W step=set_fractional event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RICHEDIT50W step=set_fractional event=reinserted_text
+class=RICHEDIT50W step=set_fractional event=position char=0 ret=0 x=1 y=0
+class=RICHEDIT50W step=set_fractional event=position char=2 ret=0 x=49 y=0
+class=RICHEDIT50W step=set_fractional event=position char=4 ret=0 x=97 y=0
+class=RICHEDIT50W step=set_fractional event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RICHEDIT50W step=set_zero event=set points=0 hr=0x80070057
+class=RICHEDIT50W step=set_zero event=get hr=0x00000000 points=36
+class=RICHEDIT50W step=set_zero event=position char=0 ret=0 x=1 y=0
+class=RICHEDIT50W step=set_zero event=position char=2 ret=0 x=49 y=0
+class=RICHEDIT50W step=set_zero event=position char=4 ret=0 x=97 y=0
+class=RICHEDIT50W step=set_zero event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RICHEDIT50W step=set_zero event=reinserted_text
+class=RICHEDIT50W step=set_zero event=position char=0 ret=0 x=1 y=0
+class=RICHEDIT50W step=set_zero event=position char=2 ret=0 x=49 y=0
+class=RICHEDIT50W step=set_zero event=position char=4 ret=0 x=97 y=0
+class=RICHEDIT50W step=set_zero event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RICHEDIT50W step=set_negative event=set points=-12 hr=0x80070057
+class=RICHEDIT50W step=set_negative event=get hr=0x00000000 points=36
+class=RICHEDIT50W step=set_negative event=position char=0 ret=0 x=1 y=0
+class=RICHEDIT50W step=set_negative event=position char=2 ret=0 x=49 y=0
+class=RICHEDIT50W step=set_negative event=position char=4 ret=0 x=97 y=0
+class=RICHEDIT50W step=set_negative event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RICHEDIT50W step=set_negative event=reinserted_text
+class=RICHEDIT50W step=set_negative event=position char=0 ret=0 x=1 y=0
+class=RICHEDIT50W step=set_negative event=position char=2 ret=0 x=49 y=0
+class=RICHEDIT50W step=set_negative event=position char=4 ret=0 x=97 y=0
+class=RICHEDIT50W step=set_negative event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RICHEDIT50W step=set_large event=set points=100000000 hr=0x80070057
+class=RICHEDIT50W step=set_large event=get hr=0x00000000 points=36
+class=RICHEDIT50W step=set_large event=position char=0 ret=0 x=1 y=0
+class=RICHEDIT50W step=set_large event=position char=2 ret=0 x=49 y=0
+class=RICHEDIT50W step=set_large event=position char=4 ret=0 x=97 y=0
+class=RICHEDIT50W step=set_large event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RICHEDIT50W step=set_large event=reinserted_text
+class=RICHEDIT50W step=set_large event=position char=0 ret=0 x=1 y=0
+class=RICHEDIT50W step=set_large event=position char=2 ret=0 x=49 y=0
+class=RICHEDIT50W step=set_large event=position char=4 ret=0 x=97 y=0
+class=RICHEDIT50W step=set_large event=para ret=0xd0fffdff mask=0xd0fffdff indent=0 tab_count=0 tabs=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+class=RICHEDIT50W event=language_initial flags=0x00000182
+class=RICHEDIT50W event=language_set input=0x00000000 ret=1 read=0x00000000
+class=RICHEDIT50W event=language_set input=0x00000002 ret=1 read=0x00000002
+class=RICHEDIT50W event=language_restore ret=1 read=0x00000182
+class=RICHEDIT50W event=advanced_typography before=0x00000000 set=0x00000001 mask=0x00000001 ret=1 read=0x00000001
+class=RICHEDIT50W complete=1
+measure_complete=1

@@ -45,3 +45,28 @@ bash scripts/build-measure-bundle.sh out/riched-tab-stop \
     docs/wine-repro/riched20-default-tab-stop/measure.list
 (cd out/riched-tab-stop && sha256sum -c SHA256SUMS)
 ~~~
+
+## Round 1 result (2026-11-26)
+
+Both Windows 10 architectures completed all observations with exit 0.
+The [normalized observation](results/windows-10/round-1.txt) is shared.
+
+| Observation | RichEdit20W | RICHEDIT50W |
+| --- | --- | --- |
+| New default, points | 36 | 36 |
+| Null getter output | E_INVALIDARG | E_INVALIDARG |
+| Set 36 and 18.5 | S_OK, exact read-back | S_OK, exact read-back |
+| Set zero and -12 | E_INVALIDARG | E_INVALIDARG |
+| Set 100,000,000 | S_OK, exact read-back | E_INVALIDARG |
+| Initial language flags | 0x82 | 0x182 |
+
+At 96 DPI, the first and second tabbed characters moved from 48 and 96
+pixels relative to the first character to 25 and 50 immediately after
+setting 18.5 points. Reinserting text through WM_SETTEXT restored the
+original spacing. The report did not query the value after reinsertion.
+Explicit paragraph tab count and start indent stayed zero.
+Both classes returned 1 for the measured language and typography setters
+and returned the flags on read-back.
+
+The follow-up probes the fractional storage and accepted range on empty
+controls, and queries the value after EM_REPLACESEL and WM_SETTEXT.
