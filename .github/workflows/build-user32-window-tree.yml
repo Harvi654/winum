@@ -1,0 +1,33 @@
+name: Build the window tree tool
+
+on:
+  push:
+    branches: ['topic/user32-enddialog-measure']
+    paths:
+      - 'docs/wine-repro/user32-window-tree/wintree.c'
+      - 'docs/wine-repro/user32-window-tree/measure.list'
+      - '.github/workflows/build-user32-window-tree.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install the MinGW compilers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 gcc-mingw-w64-i686
+      - name: Build
+        run: |
+          bash scripts/build-measure-bundle.sh out docs/wine-repro/user32-window-tree/measure.list
+          (cd out && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: user32-window-tree
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
