@@ -5,8 +5,12 @@ on:
     branches: ['topic/riched20-textrange-expand-paragraph']
     paths:
       - 'patches/candidates/riched20-textrange-expand-paragraph/*.patch'
-      - '.github/workflows/build-riched20-textrange-expand-paragraph-overlay.yml'
   workflow_dispatch:
+    inputs:
+      navigation_only:
+        description: 'Build paragraph navigation without the tab-stop candidate'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -16,6 +20,8 @@ jobs:
     runs-on: ubuntu-24.04
     container: archlinux:base-devel
     timeout-minutes: 35
+    env:
+      NAVIGATION_ONLY: ${{ inputs.navigation_only }}
     defaults:
       run:
         shell: bash
@@ -37,17 +43,25 @@ jobs:
           source scripts/lib/wine-patches.sh
           export WINE_PINNED_VERSION="$WINE_VERSION"
 
-          tab_stop_commit=5e28f985333d214841ccfd1ad86b5e5fc281b16e
-          git fetch --no-tags origin "$tab_stop_commit"
-          tab_stop_patch=riched20-default-tab-stop.patch
           candidate=riched20-textrange-expand-paragraph
           patch_file="$candidate.patch"
           patchdir=$(mktemp -d)
           cp patches/series patches/*.patch "$patchdir/"
-          git show "$tab_stop_commit:patches/candidates/riched20-default-tab-stop/$tab_stop_patch" \
-            > "$patchdir/$tab_stop_patch"
+          artifact=riched20-paragraph-navigation-only-overlay
+          overlay_patches=()
+          if [[ "$NAVIGATION_ONLY" != true ]]; then
+            tab_stop_commit=5e28f985333d214841ccfd1ad86b5e5fc281b16e
+            git fetch --no-tags origin "$tab_stop_commit"
+            tab_stop_patch=riched20-default-tab-stop.patch
+            git show "$tab_stop_commit:patches/candidates/riched20-default-tab-stop/$tab_stop_patch" \
+              > "$patchdir/$tab_stop_patch"
+            overlay_patches+=("$tab_stop_patch")
+            artifact=riched20-expand-paragraph-and-tab-stop-overlay
+          fi
           cp "patches/candidates/$candidate/$patch_file" "$patchdir/"
-          printf '%s\n' "$tab_stop_patch" "$patch_file" >> "$patchdir/series"
+          overlay_patches+=("$patch_file")
+          printf '%s\n' "${overlay_patches[@]}" >> "$patchdir/series"
+          printf 'OVERLAY_ARTIFACT=%s\n' "$artifact" >> "$GITHUB_ENV"
 
           work=$(mktemp -d)
           src="$work/wine-$WINE_VERSION"
@@ -70,15 +84,18 @@ jobs:
           for arch in x86_64 i386; do
             install -Dm644 "dlls/riched20/$arch-windows/riched20.dll" "$out/$arch-windows/riched20.dll"
           done
-          cp "$src"/{COPYING.LIB,PATCHES.txt} "$patchdir/$patch_file" "$patchdir/$tab_stop_patch" "$out/"
+          cp "$src"/{COPYING.LIB,PATCHES.txt} "$out/"
+          for patch in "${overlay_patches[@]}"; do
+            cp "$patchdir/$patch" "$out/"
+          done
           cd "$out"
-          printf 'riched20 paragraph expansion overlay for winum-11.22-3\nBase %s\nCommit %s\nTab stop commit %s\n' \
-            "$base" "$GITHUB_SHA" "$tab_stop_commit" > BUILDINFO
+          printf '%s for winum-11.22-3\nBase %s\nCommit %s\nTab stop commit %s\n' \
+            "$artifact" "$base" "$GITHUB_SHA" "${tab_stop_commit:-none}" > BUILDINFO
           sha256sum BUILDINFO COPYING.LIB PATCHES.txt ./*.patch ./*-windows/riched20.dll > SHA256SUMS
           sha256sum -c SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: riched20-expand-paragraph-and-tab-stop-overlay
+          name: ${{ env.OVERLAY_ARTIFACT }}
           path: overlay/
           if-no-files-found: error
           retention-days: 30
