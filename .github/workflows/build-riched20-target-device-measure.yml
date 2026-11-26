@@ -1,0 +1,84 @@
+name: Measure riched20 target device width
+
+on:
+  push:
+    branches: ['topic/riched20-target-device-measure']
+    paths:
+      - 'docs/wine-repro/riched20-target-device-width/measure.c'
+      - 'docs/wine-repro/riched20-target-device-width/measure.list'
+      - 'docs/wine-repro/riched20-target-device-width/run-wine.sh'
+      - '.github/workflows/build-riched20-target-device-measure.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install the MinGW compilers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 gcc-mingw-w64-i686
+      - name: Build the Windows bundle
+        run: |
+          bash scripts/build-measure-bundle.sh out docs/wine-repro/riched20-target-device-width/measure.list
+          (cd out && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: riched20-target-device-width-measure
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
+
+  wine:
+    needs: measure
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install the X11 runtime dependencies
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed git curl xz xorg-server-xvfb xorg-xauth libx11 libxext \
+            libxi libxrandr libxrender libxcursor libxcomposite libxinerama libxxf86vm libxkbcommon \
+            fontconfig freetype2 ttf-dejavu alsa-lib libpulse gnutls krb5 dbus wayland mesa libglvnd \
+            vulkan-icd-loader gst-plugins-base-libs sdl2 libcups libgphoto2 sane libpcap v4l-utils \
+            pcsclite unixodbc giflib
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: riched20-target-device-width-measure
+          path: bundle
+      - name: Download and verify the winum 11.22-3 release
+        run: |
+          artifact=winum-11.22-3-x86_64.tar.xz
+          cd /tmp
+          curl -fLsS --retry 3 -O "https://github.com/Harvi654/winum/releases/download/winum-11.22-3/$artifact"
+          printf '%s  %s\n' 6567e3744520bdb9b9db507629bd7d8345e1efb90192d60811bdcddf9b981066 "$artifact" | sha256sum -c -
+          tar -xJf "$artifact"
+      - name: Measure both architectures in Xvfb
+        run: |
+          xvfb-run -a -s '-screen 0 1280x800x24 -dpi 96 -nolisten tcp' bash \
+            docs/wine-repro/riched20-target-device-width/run-wine.sh \
+            /tmp/winum-11.22-3-x86_64/bin/wine /tmp/winum-11.22-3-x86_64/bin/wineserver bundle results
+      - name: Summarise the centred 42211-twip rows
+        if: always()
+        run: |
+          grep -h 'center' results/result-*.txt | grep -P '\t42211\t' | cut -f2-6,8-9,11 | head -40 || true
+          grep -h 'measure_complete\|^printer\|^screen' results/result-*.txt || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: riched20-target-device-width-winum-11.22-3
+          path: |
+            results/result-*.txt
+            results/exitcodes.txt
+          if-no-files-found: warn
+          retention-days: 30
