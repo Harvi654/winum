@@ -34,3 +34,13 @@ A complete probe reports `measure_complete cases=80 failed=0`.
 An API failure under measurement is a result. A setup failure counts
 against completion. CI also runs the same bundle against winum-11.22-3.
 Windows results determine the test and candidate scope.
+
+## winum-11.22-3 baseline
+
+Both architectures completed all 80 cases with exit 0 and identical
+case records. All 40 removeAll calls and all 40 removeNext calls
+returned E_NOTIMPL. QueryInterface for ISupportErrorInfo returned
+E_NOINTERFACE in all 80 cases.
+
+- [Verified offline Windows bundle](https://github.com/Harvi654/winum/actions/runs/45906581797/artifacts/15156934679)
+- [Wine baseline results](https://github.com/Harvi654/winum/actions/runs/45906581797/artifacts/15156994739)
