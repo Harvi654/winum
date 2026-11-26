@@ -1,0 +1,1 @@
+enddialog-nondialog|docs/wine-repro/user32-enddialog-nondialog/measure.c|-luser32 -lgdi32
