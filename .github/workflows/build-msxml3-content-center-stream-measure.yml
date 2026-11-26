@@ -1,0 +1,83 @@
+name: Measure MSXML UTF-16 streams and XML processing instructions
+
+on:
+  push:
+    branches: ['topic/msxml3-content-center-stream-measure']
+    paths:
+      - 'docs/wine-repro/msxml3-content-center-stream/measure.c'
+      - 'docs/wine-repro/msxml3-content-center-stream/measure.list'
+      - '.github/workflows/build-msxml3-content-center-stream-measure.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 10
+    steps:
+      - run: pacman -Syu --noconfirm --needed git mingw-w64-gcc
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build x86_64 and i686 probes
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash scripts/build-measure-bundle.sh out docs/wine-repro/msxml3-content-center-stream/measure.list
+          cd out
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: msxml3-content-center-stream-measure
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
+
+  wine:
+    needs: bundle
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install runtime dependencies
+        run: |
+          pacman -Syu --noconfirm --needed curl xz xorg-server-xvfb xorg-xauth             libx11 libxext libxi libxrandr libxrender libxcursor libxcomposite libxinerama libxxf86vm             fontconfig freetype2 ttf-dejavu libglvnd mesa libxkbcommon libxml2 libxslt
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: msxml3-content-center-stream-measure
+          path: bundle
+      - name: Measure both architectures on winum-11.22-3
+        run: |
+          artifact=winum-11.22-3-x86_64.tar.xz
+          curl -fLsS --retry 3 --max-time 180 -o "/tmp/$artifact"             "https://github.com/Harvi654/winum/releases/download/winum-11.22-3/$artifact"
+          printf '%s  %s\n' 6567e3744520bdb9b9db507629bd7d8345e1efb90192d60811bdcddf9b981066 "/tmp/$artifact" | sha256sum -c -
+          tar -xJf "/tmp/$artifact" -C /tmp
+          (cd bundle && sha256sum -c SHA256SUMS)
+          mkdir results
+          export WINEPREFIX="$(mktemp -d)/prefix" WINEDEBUG=-all WINEDLLOVERRIDES='mscoree,mshtml='
+          export WINE=/tmp/winum-11.22-3-x86_64/bin/wine
+          export WINESERVER=/tmp/winum-11.22-3-x86_64/bin/wineserver
+          xvfb-run -a bash -euo pipefail <<'BASH'
+          trap 'timeout -k 5 15 "$WINESERVER" -k || true' EXIT
+          timeout -k 5 90 "$WINE" wineboot -i > results/boot.txt 2>&1
+          timeout -k 5 45 "$WINESERVER" -w
+          for arch in x86_64 i686; do
+            status=0
+            name="msxml3-content-center-stream-$arch"
+            timeout -k 5 60 "$WINE" "$PWD/bundle/$name.exe" > "results/result-$name.txt" 2>&1 || status=$?
+            printf '%s=%s\n' "$arch" "$status" >> results/exitcodes.txt
+          done
+          cat results/exitcodes.txt
+          test "$(grep -lFx 'measure_complete cases=52 failed=0' results/result-*.txt | wc -l)" -eq 2
+          test "$(grep -c '=0$' results/exitcodes.txt)" -eq 2
+          BASH
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: msxml3-content-center-stream-winum-11.22-3
+          path: results/
+          if-no-files-found: warn
+          retention-days: 30

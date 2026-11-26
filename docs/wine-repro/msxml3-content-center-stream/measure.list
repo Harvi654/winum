@@ -1,0 +1,1 @@
+msxml3-content-center-stream | docs/wine-repro/msxml3-content-center-stream/measure.c | -lole32 -loleaut32 -luuid
