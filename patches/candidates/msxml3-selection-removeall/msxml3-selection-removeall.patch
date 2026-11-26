@@ -11,6 +11,9 @@ Use the existing DOM detachment and release helpers while each selected
 node is still referenced. Preserve the existing doctype removal
 restriction. Leave removeNext and error-info querying outside this fix.
 
+v2 (2026-11-26): Preserve the measured self-closing serialization of
+parents whose last child is removed by removeAll.
+
 --- a/dlls/msxml3/node.c
 +++ b/dlls/msxml3/node.c
 @@ -541,11 +541,11 @@
@@ -42,7 +45,7 @@ restriction. Leave removeNext and error-info querying outside this fix.
  extern XDR_DT SchemaCache_get_node_dt(IXMLDOMSchemaCollection2 *, const WCHAR *name, const WCHAR *uri);
 --- a/dlls/msxml3/selection.c
 +++ b/dlls/msxml3/selection.c
-@@ -328,13 +328,31 @@
+@@ -328,13 +328,38 @@
      return E_NOTIMPL;
  }
  
@@ -59,12 +62,19 @@ restriction. Leave removeNext and error-info querying outside this fix.
 +
 +    for (i = 0; i < result->count; ++i)
 +    {
-+        struct domnode *node = result->nodes[i];
++        struct domnode *node = result->nodes[i], *parent;
 +
 +        if (!node) continue;
 +        /* The selection holds the node alive while it is detached. */
 +        if (node->type != NODE_DOCUMENT_TYPE)
++        {
++            parent = node->parent;
++            if (parent && parent->type == NODE_ELEMENT
++                    && list_head(&parent->children) == &node->entry
++                    && list_tail(&parent->children) == &node->entry)
++                parent->flags |= DOMNODE_USE_EMPTY_TAG;
 +            domnode_unlink_child(node);
++        }
 +        domnode_release(node);
 +    }
 +
