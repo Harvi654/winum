@@ -83,3 +83,21 @@ the original registration. A follow-up measures the owner's revoke first
 and compares it with an untouched registration. It also checks revoke
 on an unregistered foreign window separately. The candidate covers
 RevokeDragDrop and keeps the Wine RegisterDragDrop scope unchanged.
+
+## Owner-first Windows 10 result (2026-11-26)
+
+x86_64 and i686 returned identical results and both exited 0. A registered
+foreign window returned RPC_E_WRONG_THREAD and an unregistered foreign
+window returned DRAGDROP_E_NOTREGISTERED. Both preserved LastError.
+After the caller attempted to revoke the registered window, the original
+owner's revoke returned DRAGDROP_E_NOTREGISTERED. The target stayed at
+two references and zero Release calls through both attempts. The
+untouched control's owner revoke succeeded and dropped one reference.
+
+The other-thread call in the same process also invalidated the
+registration and retained the reference, with LastError set to zero.
+This candidate covers the process boundary. Same-process behavior is
+outside this change.
+
+[Call results](results/windows-10/owner-first-calls.tsv) ·
+[Reference counts](results/windows-10/owner-first-references.tsv).

@@ -8,13 +8,16 @@ IDropTarget pointer stored by the other process and the caller crashes.
 
 | Level | Evidence |
 | --- | --- |
-| MEASURE | Both Windows 10 architectures completed the first probe. Foreign revoke returned RPC_E_WRONG_THREAD and preserved LastError. Owner-first cleanup and the unregistered window observation are pending. |
+| MEASURE | Both rounds agree across x86_64 and i686. The foreign call invalidates the registration, preserves LastError and leaves the owner references unchanged. |
 | L0 | Pending. Apply the candidate after the winum-11.22-3 series with zero fuzz. |
-| L1 | Pending. Add the measured expectations to the ole32 dragdrop test and run both architectures offline on Windows 10. |
-| L2 | Pending. Pair ole32, combase and user32 against the same release series. |
+| L1 | The focused dragdrop test and native bundle build. Windows 10 execution is pending. |
+| L2 | CI pairs ole32, combase and user32 against the same release series. The new cross-process case runs on the patched side. |
 | L4 | Pending. Verify Revit 2027.4 reaches Home and opens a model on the desktop PC. Smoke test Inventor and AutoCAD, including open, save, reopen and restart. |
 | Cross review | Claude after test and fix. |
 
-The native observation will determine how ole32 handles a foreign
-window. The candidate will avoid touching the other process's local
-pointer and preserve the same-process path.
+The fix invalidates both window registration properties when the owner
+process differs. The target reference and map are process-local.
+The foreign caller leaves them alone, so invalidation can leave the
+owner-side registration resources alive. Native Windows retained the
+observed owner reference. The candidate leaves the same-process path
+and RegisterDragDrop behavior in place.

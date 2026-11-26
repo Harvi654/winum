@@ -1,0 +1,45 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ole32: Handle RevokeDragDrop on a foreign window.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+On offline Windows 10 a registered foreign window returns
+RPC_E_WRONG_THREAD and loses the registration without a Release in
+the owner. An unregistered foreign window returns
+DRAGDROP_E_NOTREGISTERED. Both preserve LastError.
+
+Wine's target and mapping belong to the registering process. Clear
+the registration on the foreign window without dereferencing or
+closing the other process's resources. Keep the same-process path.
+
+--- a/dlls/ole32/ole2.c
++++ b/dlls/ole32/ole2.c
+@@ -628,4 +628,5 @@
+ HRESULT WINAPI RevokeDragDrop(HWND hwnd)
+ {
++  DWORD last_error = GetLastError(), pid;
+   HANDLE map;
+   IStream *stream;
+@@ -640,4 +641,22 @@
+     return DRAGDROP_E_INVALIDHWND;
+   }
++
++  if (!GetWindowThreadProcessId(hwnd, &pid))
++    return DRAGDROP_E_INVALIDHWND;
++
++  if (pid != GetCurrentProcessId())
++  {
++    hr = DRAGDROP_E_NOTREGISTERED;
++    if (is_droptarget(hwnd))
++    {
++      /* Invalidate the registration without releasing process-local resources. */
++      RemovePropW(hwnd, prop_oledroptarget);
++      RemovePropW(hwnd, prop_marshalleddroptarget);
++      hr = RPC_E_WRONG_THREAD;
++    }
++    SetLastError(last_error);
++    return hr;
++  }
++  SetLastError(last_error);
+ 
+   /* no registration data */
