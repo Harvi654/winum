@@ -1,0 +1,3 @@
+date	build_commit	artifact_id	arch	checks	todos	flaky	failures	skipped	exit
+2026-11-26	6f95395	15158600698	x86_64	149	0	0	0	0	0
+2026-11-26	6f95395	15158600698	i686	149	0	0	0	0	0
