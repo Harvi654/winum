@@ -80,3 +80,12 @@ near the Inventor trace. Empty-stream error reporting and DOMDocument30
 BOM detection are separate differences. The actual destination of the
 application append is still unknown, so the candidate requires Inventor
 L4 before it can be linked to the filter crash.
+
+### Inventor ISO filter result
+
+The element append candidate did not fix the crash in the 2026-11-26
+23:20 local test with the verified overlay from 0529f17. The supplied
+trace identified domdoc_appendChild on the document itself. In the
+measured load-and-document-append case, both systems return S_OK and
+leave xml/root/xml. The element append finding and the no-root and
+no-BOM stream findings remain separate from the application diagnosis.

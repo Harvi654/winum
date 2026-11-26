@@ -1,0 +1,169 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [DEBUG PATCH] msxml3: Trace Content Center stream load and DOM operations.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Temporary diagnostics for Inventor issue #45. Print public return values,
+the stored parse error and a bounded serialized DOM preview under +msxml.
+Keep captured XML local. This patch is never part of the release series.
+
+--- a/dlls/msxml3/domdoc.c
++++ b/dlls/msxml3/domdoc.c
+@@ -263,10 +263,39 @@
+     FIXME("%p: stub!\n", iface);
+ 
+     return S_FALSE;
+ }
+ 
++/* Keep the preview local to explicit +msxml captures. Do not reread the input stream. */
++static void trace_stream_load(domdoc *doc, const char *api, HRESULT hr, const VARIANT_BOOL *result)
++{
++    BSTR xml = NULL;
++    HRESULT xml_hr;
++    UINT len, limit, offset;
++
++    if (!TRACE_ON(msxml)) return;
++    if (result)
++        TRACE("cc_msxml load doc=%p api=%s hr=%#010lx result=%d parse_error=%#010lx.\n",
++                &doc->IXMLDOMDocument3_iface, api, hr, *result, doc->error);
++    else
++        TRACE("cc_msxml load doc=%p api=%s hr=%#010lx result=NA parse_error=%#010lx.\n",
++                &doc->IXMLDOMDocument3_iface, api, hr, doc->error);
++    if (hr != S_OK) return;
++
++    xml_hr = node_get_xml(doc->node, &xml);
++    len = SysStringLen(xml);
++    limit = min(len, 300);
++    TRACE("cc_msxml preview doc=%p xml_hr=%#010lx xml_len=%u preview_len=%u.\n",
++            &doc->IXMLDOMDocument3_iface, xml_hr, len, limit);
++    /* debugstr_wn has a small escaped-output buffer. */
++    if (SUCCEEDED(xml_hr))
++        for (offset = 0; offset < limit; offset += 48)
++            TRACE("cc_msxml xml doc=%p offset=%u %s.\n", &doc->IXMLDOMDocument3_iface,
++                    offset, debugstr_wn(xml + offset, min(limit - offset, 48)));
++    SysFreeString(xml);
++}
++
+ static HRESULT domdoc_load_from_stream(domdoc *doc, ISequentialStream *stream)
+ {
+     LARGE_INTEGER zero = {{0}};
+     struct domnode *node;
+     DWORD read, written;
+@@ -292,10 +321,12 @@
+         return hr;
+     }
+ 
+     hr = IStream_Seek(hstream, zero, STREAM_SEEK_SET, NULL);
+     hr = parse_stream((ISequentialStream *)hstream, false, doc->node->properties, &node);
++    TRACE("cc_msxml parse_stream doc=%p hr=%#010lx has_node=%d.\n",
++            &doc->IXMLDOMDocument3_iface, hr, !!node);
+     IStream_Release(hstream);
+ 
+     if (!node)
+     {
+         ERR("Failed to parse xml\n");
+@@ -308,16 +339,20 @@
+ 
+ static HRESULT WINAPI PersistStreamInit_Load(IPersistStreamInit *iface, IStream *stream)
+ {
+     domdoc *doc = impl_from_IPersistStreamInit(iface);
+ 
++    HRESULT hr;
++
+     TRACE("%p, %p.\n", iface, stream);
+ 
+     if (!stream)
+         return E_INVALIDARG;
+ 
+-    return doc->error = domdoc_load_from_stream(doc, (ISequentialStream *)stream);
++    hr = doc->error = domdoc_load_from_stream(doc, (ISequentialStream *)stream);
++    trace_stream_load(doc, "IPersistStreamInit::Load", hr, NULL);
++    return hr;
+ }
+ 
+ static HRESULT WINAPI PersistStreamInit_Save(IPersistStreamInit *iface, IStream *stream, BOOL clr_dirty)
+ {
+     domdoc *doc = impl_from_IPersistStreamInit(iface);
+@@ -605,13 +640,17 @@
+ 
+ static HRESULT WINAPI domdoc_appendChild(IXMLDOMDocument3 *iface, IXMLDOMNode *child, IXMLDOMNode **outChild)
+ {
+     domdoc *doc = impl_from_IXMLDOMDocument3(iface);
+ 
++    HRESULT hr;
++
+     TRACE("%p, %p, %p.\n", iface, child, outChild);
+ 
+-    return node_append_child(doc->node, child, outChild);
++    hr = node_append_child(doc->node, child, outChild);
++    TRACE("cc_msxml append doc=%p target=document hr=%#010lx.\n", iface, hr);
++    return hr;
+ }
+ 
+ static HRESULT WINAPI domdoc_hasChildNodes(IXMLDOMDocument3 *iface, VARIANT_BOOL *ret)
+ {
+     domdoc *doc = impl_from_IXMLDOMDocument3(iface);
+@@ -818,24 +857,30 @@
+     HRESULT hr;
+ 
+     TRACE("%p, %p.\n", iface, ret);
+ 
+     if (!ret)
++    {
++        TRACE("cc_msxml root doc=%p hr=%#010lx name=(null).\n", iface, E_INVALIDARG);
+         return E_INVALIDARG;
++    }
+ 
+     *ret = NULL;
+ 
+     if ((element = domnode_get_root_element(doc->node)))
+     {
+         if (SUCCEEDED(hr = create_node(element, &node)))
+         {
+             hr = IXMLDOMNode_QueryInterface(node, &IID_IXMLDOMElement, (void **)ret);
+             IXMLDOMNode_Release(node);
++            TRACE("cc_msxml root doc=%p hr=%#010lx name=%s.\n", iface, hr,
++                    debugstr_w(*ret ? element->qname : NULL));
+             return hr;
+         }
+     }
+ 
++    TRACE("cc_msxml root doc=%p hr=%#010lx name=(null).\n", iface, S_FALSE);
+     return S_FALSE;
+ }
+ 
+ static HRESULT WINAPI domdoc_putref_documentElement(IXMLDOMDocument3 *iface, IXMLDOMElement *element)
+ {
+@@ -1285,10 +1330,11 @@
+         {
+             hr = doc->error = domdoc_load_from_stream(doc, stream);
+             if (SUCCEEDED(hr))
+                 *result = VARIANT_TRUE;
+             ISequentialStream_Release(stream);
++            trace_stream_load(doc, "load(VT_UNKNOWN)", hr, result);
+             return hr;
+         }
+         else if (IUnknown_QueryInterface(V_UNKNOWN(&source), &IID_IPersistStream, (void **)&unk) == S_OK)
+         {
+             FIXME("Loading from IPersistStream is not implemented.\n");
+--- a/dlls/msxml3/element.c
++++ b/dlls/msxml3/element.c
+@@ -274,13 +274,17 @@
+ static HRESULT WINAPI domelem_appendChild(IXMLDOMElement *iface,
+         IXMLDOMNode *child, IXMLDOMNode **outChild)
+ {
+     domelem *element = impl_from_IXMLDOMElement(iface);
+ 
++    HRESULT hr;
++
+     TRACE("%p, %p, %p.\n", iface, child, outChild);
+ 
+-    return node_append_child(element->node, child, outChild);
++    hr = node_append_child(element->node, child, outChild);
++    TRACE("cc_msxml append element=%p target=element hr=%#010lx.\n", iface, hr);
++    return hr;
+ }
+ 
+ static HRESULT WINAPI domelem_hasChildNodes(IXMLDOMElement *iface, VARIANT_BOOL *ret)
+ {
+     domelem *element = impl_from_IXMLDOMElement(iface);
