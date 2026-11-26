@@ -1,4 +1,4 @@
-name: Build riched20 paragraph expansion overlay
+name: Build RichEdit and OLE32 overlays
 
 on:
   push:
@@ -9,6 +9,10 @@ on:
     inputs:
       navigation_only:
         description: 'Build paragraph navigation without the tab-stop candidate'
+        type: boolean
+        default: false
+      release_smoke:
+        description: 'Build all three reviewed RichEdit candidates and ole32 v2 together'
         type: boolean
         default: false
 
@@ -22,6 +26,7 @@ jobs:
     timeout-minutes: 35
     env:
       NAVIGATION_ONLY: ${{ inputs.navigation_only }}
+      RELEASE_SMOKE: ${{ inputs.release_smoke }}
     defaults:
       run:
         shell: bash
@@ -33,7 +38,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
-      - name: Build and package both riched20 architectures
+      - name: Build and package both overlay architectures
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           base=ec9fd62ed2128e0584f3efed4c83a7211af84407
@@ -49,6 +54,11 @@ jobs:
           cp patches/series patches/*.patch "$patchdir/"
           artifact=riched20-paragraph-navigation-only-overlay
           overlay_patches=()
+          dlls=(riched20)
+          if [[ "$NAVIGATION_ONLY" == true && "$RELEASE_SMOKE" == true ]]; then
+            echo "Choose either the navigation-only build or the release smoke build." >&2
+            exit 2
+          fi
           if [[ "$NAVIGATION_ONLY" != true ]]; then
             tab_stop_commit=5e28f985333d214841ccfd1ad86b5e5fc281b16e
             git fetch --no-tags origin "$tab_stop_commit"
@@ -60,7 +70,25 @@ jobs:
           fi
           cp "patches/candidates/$candidate/$patch_file" "$patchdir/"
           overlay_patches+=("$patch_file")
-          printf '%s\n' "${overlay_patches[@]}" >> "$patchdir/series"
+          if [[ "$RELEASE_SMOKE" == true ]]; then
+            scroll_commit=459200b5f8c9bce0ffa6a57d60522b66fc74b571
+            ole32_commit=6ab17d519f2ed112a7369f1a7f51cee1de607383
+            git fetch --no-tags origin "$scroll_commit" "$ole32_commit"
+            scroll=riched20-target-device-scroll
+            ole32=ole32-revokedragdrop-cross-process
+            git show "$scroll_commit:patches/candidates/$scroll/$scroll.patch" > "$patchdir/$scroll.patch"
+            git show "$ole32_commit:patches/candidates/$ole32/$ole32.patch" > "$patchdir/$ole32.patch"
+            overlay_patches+=("$scroll.patch" "$ole32.patch")
+            awk -v tab="$tab_stop_patch" -v nav="$patch_file" -v scroll="$scroll.patch" '
+              { print }
+              $0 == "riched20-textfont-applytmp.patch" { print tab "\n" nav "\n" scroll }
+            ' patches/series > "$patchdir/series"
+            printf '%s\n' "$ole32.patch" >> "$patchdir/series"
+            artifact=winum-11.22-3-riched20-ole32-smoke-overlay
+            dlls+=(ole32)
+          else
+            printf '%s\n' "${overlay_patches[@]}" >> "$patchdir/series"
+          fi
           printf 'OVERLAY_ARTIFACT=%s\n' "$artifact" >> "$GITHUB_ENV"
 
           work=$(mktemp -d)
@@ -77,12 +105,18 @@ jobs:
             --without-wayland --without-vulkan --without-opengl --without-freetype \
             --without-fontconfig --without-alsa --without-pulse > configure.log 2>&1 ||
             { tail -n 60 configure.log; exit 1; }
-          make -j"$(nproc)" dlls/riched20/{x86_64,i386}-windows/riched20.dll > build.log 2>&1 ||
+          targets=()
+          for dll in "${dlls[@]}"; do
+            targets+=("dlls/$dll/"{x86_64,i386}"-windows/$dll.dll")
+          done
+          make -j"$(nproc)" "${targets[@]}" > build.log 2>&1 ||
             { tail -n 80 build.log; exit 1; }
 
           out="$GITHUB_WORKSPACE/overlay"
-          for arch in x86_64 i386; do
-            install -Dm644 "dlls/riched20/$arch-windows/riched20.dll" "$out/$arch-windows/riched20.dll"
+          for dll in "${dlls[@]}"; do
+            for arch in x86_64 i386; do
+              install -Dm644 "dlls/$dll/$arch-windows/$dll.dll" "$out/$arch-windows/$dll.dll"
+            done
           done
           cp "$src"/{COPYING.LIB,PATCHES.txt} "$out/"
           for patch in "${overlay_patches[@]}"; do
@@ -91,7 +125,10 @@ jobs:
           cd "$out"
           printf '%s for winum-11.22-3\nBase %s\nCommit %s\nTab stop commit %s\n' \
             "$artifact" "$base" "$GITHUB_SHA" "${tab_stop_commit:-none}" > BUILDINFO
-          sha256sum BUILDINFO COPYING.LIB PATCHES.txt ./*.patch ./*-windows/riched20.dll > SHA256SUMS
+          if [[ "$RELEASE_SMOKE" == true ]]; then
+            printf 'Target device scroll commit %s\nOle32 commit %s\n' "$scroll_commit" "$ole32_commit" >> BUILDINFO
+          fi
+          sha256sum BUILDINFO COPYING.LIB PATCHES.txt ./*.patch ./*-windows/*.dll > SHA256SUMS
           sha256sum -c SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
