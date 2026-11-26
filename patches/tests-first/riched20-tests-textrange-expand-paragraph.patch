@@ -39,7 +39,7 @@ The previous Expand cases remain part of this test.
 +    HRESULT hr;
 +
 +    hr = ITextRange_Expand(range, tomParagraph, want_delta ? &delta : NULL);
-+    todo_wine
++
 +    ok(hr == expected_hr, "Expand returned %#lx, expected %#lx\n", hr, expected_hr);
 +    if (FAILED(hr)) return;
 +
@@ -94,7 +94,7 @@ The previous Expand cases remain part of this test.
 +            case move_end: hr = ITextRange_MoveEnd(range, tomParagraph, entry->arg, out); break;
 +            default: hr = E_UNEXPECTED; break;
 +            }
-+            todo_wine_if(entry->arg || entry->op == start_of || entry->op == end_of)
++
 +            ok(hr == entry->hr, "returned %#lx, expected %#lx\n", hr, entry->hr);
 +            if (SUCCEEDED(hr))
 +            {
@@ -324,7 +324,7 @@ The previous Expand cases remain part of this test.
 +            {
 +                check_expand_paragraph(duplicate, 0, 2, 0, S_FALSE, FALSE);
 +                hr = ITextRange_MoveEnd(duplicate, tomParagraph, 1, NULL);
-+                todo_wine
++
 +                ok(hr == S_OK, "MoveEnd after Expand returned %#lx\n", hr);
 +                if (SUCCEEDED(hr))
 +                {

@@ -48,8 +48,15 @@ jobs:
           if [[ "$VARIANT" == candidate ]]; then
             cp patches/candidates/riched20-textrange-expand-paragraph/riched20-textrange-expand-paragraph.patch patches/
             printf '%s\n' riched20-textrange-expand-paragraph.patch >> patches/series
-            # That single expected failure is fixed in the candidate.
-            sed -i -e 's/^+ *todo_wine$/+/' -e 's/^+            todo_wine_if(.*)$/+/' "patches/tests-first/$test_patch"
+          else
+            # The archived baseline has the same assertions with Wine todos.
+            baseline=344c579a4e07ba8c24f2adb51ddf76d5ef5928a9
+            git fetch --no-tags origin "$baseline"
+            baseline_test=$(mktemp)
+            git show "$baseline:patches/tests-first/$test_patch" > "$baseline_test"
+            sed -e 's/^+ *todo_wine$/+/' -e 's/^+ *todo_wine_if(.*)$/+/' "$baseline_test" |
+              cmp - "patches/tests-first/$test_patch"
+            cp "$baseline_test" "patches/tests-first/$test_patch"
           fi
           bash scripts/test-series.sh series out
           python3 - <<'PY'
