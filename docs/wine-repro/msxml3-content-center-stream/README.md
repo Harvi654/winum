@@ -46,3 +46,15 @@ parse errors separate from code or document changes. Any candidate test
 and DLL change follow the offline Windows results. The application
 check is Inventor 2027 Content Center → Editor → filter → ISO, then a
 smoke test. Claude will review any resulting candidate.
+
+## winum-11.22-3 baseline
+
+CI completed all 52 cases on both x86_64 and i686 with exit 0. The case
+records match across architectures. For example, DOMDocument60 loaded
+the BOM-prefixed stream with an existing declaration and returned true.
+Appending the new `xml` PI to the document returned `S_OK` and left
+top-level nodes `xml`, `root`, `xml` in that order. The native results
+are pending, so this is a baseline observation.
+
+- [Verified offline VM bundle](https://github.com/Harvi654/winum/actions/runs/45902758084/artifacts/15155758981)
+- [winum baseline results](https://github.com/Harvi654/winum/actions/runs/45902758084/artifacts/15156198839)
