@@ -153,8 +153,11 @@ static DWORD WINAPI owner_main(void *arg)
         goto done;
     }
     snapshot(owner->scenario, "after_caller", &target);
-    measure_call(owner->scenario, "owner_register_again", windows->registered, &target.iface);
-    measure_call(owner->scenario, "owner_revoke", windows->registered, NULL);
+    measure_call(owner->scenario, "owner_revoke_original", windows->registered, NULL);
+    snapshot(owner->scenario, "after_owner_revoke_original", &target);
+    hr = measure_call(owner->scenario, "owner_register_again", windows->registered, &target.iface);
+    if (SUCCEEDED(hr))
+        measure_call(owner->scenario, "owner_revoke_new", windows->registered, NULL);
     snapshot(owner->scenario, "after_owner_cleanup", &target);
     code = 0;
 
@@ -207,16 +210,16 @@ static HANDLE start_child(HANDLE mapping, HANDLE ready, HANDLE proceed)
     return process.hProcess;
 }
 
-static BOOL run_scenario(BOOL cross_process)
+static BOOL run_scenario(BOOL cross_process, BOOL control)
 {
     SECURITY_ATTRIBUTES inherit = {sizeof(inherit), NULL, cross_process};
     struct windows local = {0};
-    struct owner owner = {&local, NULL, NULL, cross_process ? "cross_process" : "same_process_other_thread"};
-    struct target caller = {{&target_vtbl}, 1, 0};
+    const char *scenario = cross_process ? "cross_process"
+                           : control ? "untouched_control" : "same_process_other_thread";
+    struct owner owner = {&local, NULL, NULL, scenario};
     HANDLE mapping = NULL, worker = NULL, handles[2];
     DWORD pid, tid, result, worker_code = 1;
     BOOL passed = FALSE;
-    HRESULT hr;
 
     if (cross_process)
     {
@@ -245,15 +248,9 @@ static BOOL run_scenario(BOOL cross_process)
         goto join;
     }
     printf("case=%s owner=verified\n", owner.scenario);
-    measure_call(owner.scenario, "caller_revoke", owner.windows->registered, NULL);
+    if (!control) measure_call(owner.scenario, "caller_revoke", owner.windows->registered, NULL);
     if (cross_process)
-    {
-        hr = measure_call(owner.scenario, "caller_register_unregistered",
-                          owner.windows->unregistered, &caller.iface);
-        if (SUCCEEDED(hr))
-            measure_call(owner.scenario, "caller_revoke_own_registration",
-                         owner.windows->unregistered, NULL);
-    }
+        measure_call(owner.scenario, "caller_revoke_unregistered", owner.windows->unregistered, NULL);
     passed = TRUE;
 
 join:
@@ -289,7 +286,7 @@ done:
 
 int wmain(int argc, WCHAR **argv)
 {
-    BOOL cross_process, same_process;
+    BOOL cross_process, same_process, control;
     HRESULT hr;
 
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -304,7 +301,7 @@ int wmain(int argc, WCHAR **argv)
                           (HANDLE)(ULONG_PTR)wcstoull(argv[4], NULL, 10));
     if (argc != 1) return 1;
 
-    printf("measure=ole32-revokedragdrop-cross-process bits=%u last_error_seed=0x%08x\n",
+    printf("measure=ole32-revokedragdrop-cross-process round=2 bits=%u last_error_seed=0x%08x\n",
            (unsigned int)(sizeof(void *) * 8), LAST_ERROR_SEED);
     hr = OleInitialize(NULL);
     if (FAILED(hr))
@@ -312,9 +309,10 @@ int wmain(int argc, WCHAR **argv)
         printf("setup=caller_ole_initialize hr=0x%08lx\n", (unsigned long)hr);
         return 1;
     }
-    cross_process = run_scenario(TRUE);
-    same_process = run_scenario(FALSE);
+    cross_process = run_scenario(TRUE, FALSE);
+    same_process = run_scenario(FALSE, FALSE);
+    control = run_scenario(FALSE, TRUE);
     OleUninitialize();
-    printf("measure_complete=%d\n", cross_process && same_process);
-    return cross_process && same_process ? 0 : 1;
+    printf("measure_complete=%d\n", cross_process && same_process && control);
+    return cross_process && same_process && control ? 0 : 1;
 }

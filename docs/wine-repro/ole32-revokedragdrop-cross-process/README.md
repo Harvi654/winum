@@ -12,9 +12,10 @@ pump messages while they wait.
 
 | Case | Sequence |
 | --- | --- |
-| cross_process | A helper process creates two windows, registers its IDropTarget on one and signals the caller. The caller revokes that registration and separately tries to register its own target on the helper's unregistered window. If the latter succeeds, the caller tries to undo it before the helper destroys the window. |
+| cross_process | A helper process creates two windows, registers its IDropTarget on one and signals the caller. The caller revokes on the registered window and separately on the unregistered window. |
 | same_process_other_thread | A second thread creates and registers a window. The main thread calls RevokeDragDrop on it. |
-| Owner follow-up in both cases | The owner records its reference and Release counters before and after the caller's operations. It then tries RegisterDragDrop again on the original window, calls RevokeDragDrop there and records the final counters. |
+| untouched_control | A second thread creates and registers a window. The caller leaves its registration untouched. |
+| Owner follow-up in all cases | The owner records its reference and Release counters before and after the caller's operations. It revokes its original registration, records the counters, then registers again and cleans up. |
 
 Each API result records the HRESULT and GetLastError captured immediately
 after the call. The probe seeds LastError with 0xdeadbeef before every
@@ -33,7 +34,8 @@ run-measure.bat in a normal console. Return these three text files:
 - result-revoke-drag-drop-i686.txt
 - exitcodes.txt
 
-A completed measurement has measure_complete=1 and exit 0 for both
+The follow-up report starts with round=2 in the header. A completed
+measurement has measure_complete=1 and exit 0 for both
 architectures. Record any setup error or missing result line before
 interpreting the API results. Expected HRESULTs, LastError values and
 reference effects will be written after this run.
