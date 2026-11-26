@@ -10,8 +10,8 @@ IDropTarget pointer stored by the other process and the caller crashes.
 | --- | --- |
 | MEASURE | Both rounds agree across x86_64 and i686. The foreign call invalidates the registration, preserves LastError and leaves the owner references unchanged. |
 | L0 | Pending. Apply the candidate after the winum-11.22-3 series with zero fuzz. |
-| L1 | The focused dragdrop test and native bundle build. Windows 10 execution is pending. |
-| L2 | CI pairs ole32, combase and user32 against the same release series. The new cross-process case runs on the patched side. |
+| L1 | The focused dragdrop test and native bundle build. Windows 10 execution is pending. [Verified L1 bundle](https://github.com/Harvi654/winum/actions/runs/45827199214/artifacts/15118964743). |
+| L2 | CI pairs ole32, combase and user32 against the same release series. The new cross-process case runs on the patched side. [Paired L2](https://github.com/Harvi654/winum/actions/runs/45827199191). |
 | L4 | Pending. Verify Revit 2027.4 reaches Home and opens a model on the desktop PC. Smoke test Inventor and AutoCAD, including open, save, reopen and restart. |
 | Cross review | Claude after test and fix. |
 
