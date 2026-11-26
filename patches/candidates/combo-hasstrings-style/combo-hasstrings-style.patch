@@ -1,0 +1,44 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] user32, comctl32_v6: EXPERIMENT - expose CBS_HASSTRINGS in a combo box's style.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream. Experiment only, not for patches/series: it checks a hypothesis
+for Inventor's Content Center filter crash (Inventor-for-Linux #45). The
+window trees of the same Inventor state on Windows 10 and under Wine
+differ in one systematic way: the Content Center dialog's combo boxes
+(not owner-drawn) carry CBS_HASSTRINGS in GWL_STYLE on Windows, not in
+Wine, which keeps the implied flag only in its own copy. A MEASURE
+program decides the real rule before any real patch.
+
+diff --git a/dlls/comctl32_v6/combo.c b/dlls/comctl32_v6/combo.c
+index b497c20..744698d 100644
+--- a/dlls/comctl32_v6/combo.c
++++ b/dlls/comctl32_v6/combo.c
+@@ -140,7 +140,11 @@ static LRESULT COMBO_NCCreate(HWND hwnd, LONG style)
+                         GetWindowLongW( hwnd, GWL_EXSTYLE ) & ~WS_EX_CLIENTEDGE );
+ 
+ 	if( !(style & (CBS_OWNERDRAWFIXED | CBS_OWNERDRAWVARIABLE)) )
++	{
+               lphc->dwStyle |= CBS_HASSTRINGS;
++              /* EXPERIMENT: Windows shows the implied style in GWL_STYLE. */
++              SetWindowLongW( hwnd, GWL_STYLE, GetWindowLongW( hwnd, GWL_STYLE ) | CBS_HASSTRINGS );
++	}
+ 	if( !(GetWindowLongW( hwnd, GWL_EXSTYLE ) & WS_EX_NOPARENTNOTIFY) )
+ 	      lphc->wState |= CBF_NOTIFY;
+ 
+diff --git a/dlls/user32/combo.c b/dlls/user32/combo.c
+index b2958bf..64a7481 100644
+--- a/dlls/user32/combo.c
++++ b/dlls/user32/combo.c
+@@ -141,7 +141,11 @@ static LRESULT COMBO_NCCreate(HWND hwnd, LONG style)
+                         GetWindowLongW( hwnd, GWL_EXSTYLE ) & ~WS_EX_CLIENTEDGE );
+ 
+ 	if( !(style & (CBS_OWNERDRAWFIXED | CBS_OWNERDRAWVARIABLE)) )
++	{
+               lphc->dwStyle |= CBS_HASSTRINGS;
++              /* EXPERIMENT: Windows shows the implied style in GWL_STYLE. */
++              SetWindowLongW( hwnd, GWL_STYLE, GetWindowLongW( hwnd, GWL_STYLE ) | CBS_HASSTRINGS );
++	}
+ 	if( !(GetWindowLongW( hwnd, GWL_EXSTYLE ) & WS_EX_NOPARENTNOTIFY) )
+ 	      lphc->wState |= CBF_NOTIFY;
+ 
