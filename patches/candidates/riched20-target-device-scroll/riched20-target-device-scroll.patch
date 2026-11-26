@@ -1,0 +1,162 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] riched20: Cover the target device line width with the horizontal scroll range.
+
+AI-assisted (Claude), original code; LGPL-2.1-or-later. Not submitted
+upstream.
+
+Windows 10 (x86_64 and i686, offline VM, 96 dpi; winum
+docs/wine-repro/riched20-target-device-width, 2026-11-26): after
+EM_SETTARGETDEVICE with a reference DC (screen, memory, metafile or
+printer) and a line width wider than the window, the text is laid out in
+a line of that width, as Wine already does, and the horizontal scroll
+range covers the whole line - the width rounded to pixels in
+RICHEDIT50W, one pixel more in RichEdit20W - whatever the alignment.
+When the control gets the focus it scrolls the caret into view, so a
+centred letter shows at the right edge of the box.
+
+Wine used the width of the text as the scroll range. Inventor's Format
+Text dialog sets a 42211-twip line and centres its default letter, which
+Wine draws about 1400 pixels to the right of a 630-pixel box with a
+scroll range of one pixel: the letter is invisible and cannot be
+scrolled to. With the range covering the line, Wine's existing
+caret-into-view scroll brings it into the box.
+
+Limited to the range: the text width (nTotalWidth) is still what
+EN_REQUESTRESIZE, ITextServices::TxGetNaturalSize and border painting
+use. Not changed, measured and different: with a NULL DC Windows also
+widens the range (and RichEdit20W lays the line out at the given width),
+Wine keeps wrapping to the window; Windows scrolls the caret into view
+only when the control has the focus, Wine already when the text or the
+selection changes. The zoomed conversion follows ME_twips2pointsX's
+zoom but was not measured.
+
+Needs riched20-scf-word-insertion-point, which records the window class
+(editor->msftedit).
+
+diff --git a/dlls/riched20/editor.c b/dlls/riched20/editor.c
+index e1d99e0..2e8c4b6 100644
+--- a/dlls/riched20/editor.c
++++ b/dlls/riched20/editor.c
+@@ -3032,6 +3032,7 @@ ME_TextEditor *ME_MakeEditor(ITextHost *texthost, BOOL bEmulateVersion10)
+   ed->pCursors[3] = ed->pCursors[1];
+   ed->nLastTotalLength = ed->nTotalLength = 0;
+   ed->nLastTotalWidth = ed->nTotalWidth = 0;
++  ed->target_scroll_width = 0;
+   ed->nUDArrowX = -1;
+   ed->nEventMask = 0;
+   ed->nModifyStep = 0;
+diff --git a/dlls/riched20/editor.h b/dlls/riched20/editor.h
+index 1ad8f4a..c947f17 100644
+--- a/dlls/riched20/editor.h
++++ b/dlls/riched20/editor.h
+@@ -257,6 +257,7 @@ void ME_ScrollDown(ME_TextEditor *editor, int cy);
+ void ME_ScrollLeft(ME_TextEditor *editor, int cx);
+ void ME_ScrollRight(ME_TextEditor *editor, int cx);
+ void ME_UpdateScrollBar(ME_TextEditor *editor);
++int editor_scroll_width(ME_TextEditor *editor);
+ 
+ /* other functions in paint.c */
+ int ME_GetParaBorderWidth(const ME_Context *c, int flags);
+diff --git a/dlls/riched20/editstr.h b/dlls/riched20/editstr.h
+index 5290f5b..b8ee68f 100644
+--- a/dlls/riched20/editstr.h
++++ b/dlls/riched20/editstr.h
+@@ -440,6 +440,7 @@ typedef struct tagME_TextEditor
+ 
+   /* Cache previously set scrollbar info */
+   SCROLLINFO vert_si, horz_si;
++  int target_scroll_width; /* horizontal scroll extent of nAvailWidth, in pixels */
+   unsigned int vert_sb_enabled : 1;
+   unsigned int horz_sb_enabled : 1;
+ 
+diff --git a/dlls/riched20/paint.c b/dlls/riched20/paint.c
+index adeb33d..ef38306 100644
+--- a/dlls/riched20/paint.c
++++ b/dlls/riched20/paint.c
+@@ -1148,17 +1148,26 @@ void ME_ScrollRight(ME_TextEditor *editor, int cx)
+     scroll_h_abs( editor, editor->horz_si.nPos + cx, TRUE );
+ }
+ 
++/* Width the horizontal scroll range covers: the text, or the whole line
++ * when a target device line width is set. */
++int editor_scroll_width(ME_TextEditor *editor)
++{
++  return max(editor->nTotalWidth, editor->target_scroll_width);
++}
++
+ void ME_UpdateScrollBar(ME_TextEditor *editor)
+ {
+   /* Note that this is the only function that should ever call
+    * SetScrollInfo with SIF_PAGE or SIF_RANGE. */
+   BOOL enable;
++  int width;
+ 
+   if (ME_WrapMarkedParagraphs(editor))
+     FIXME("ME_UpdateScrollBar had to call ME_WrapMarkedParagraphs\n");
+ 
+   /* Update horizontal scrollbar */
+-  enable = editor->nTotalWidth > editor->sizeWindow.cx;
++  width = editor_scroll_width(editor);
++  enable = width > editor->sizeWindow.cx;
+   if (editor->horz_si.nPos && !enable)
+   {
+     scroll_h_abs( editor, 0, TRUE );
+@@ -1172,9 +1181,9 @@ void ME_UpdateScrollBar(ME_TextEditor *editor)
+     enable_show_scrollbar( editor, SB_HORZ, enable );
+   }
+ 
+-  if (editor->horz_si.nMax != editor->nTotalWidth || editor->horz_si.nPage != editor->sizeWindow.cx)
++  if (editor->horz_si.nMax != width || editor->horz_si.nPage != editor->sizeWindow.cx)
+   {
+-    editor->horz_si.nMax = editor->nTotalWidth;
++    editor->horz_si.nMax = width;
+     editor->horz_si.nPage = editor->sizeWindow.cx;
+     TRACE( "min = %d max = %d page = %d\n", editor->horz_si.nMin, editor->horz_si.nMax, editor->horz_si.nPage );
+     if ((enable || editor->horz_sb_enabled) && editor->scrollbars & WS_HSCROLL)
+diff --git a/dlls/riched20/txtsrv.c b/dlls/riched20/txtsrv.c
+index 5c63b3d..af9cbcc 100644
+--- a/dlls/riched20/txtsrv.c
++++ b/dlls/riched20/txtsrv.c
+@@ -428,7 +428,7 @@ HRESULT __thiscall fnTextSrv_OnTxPropertyBitsChange( ITextServices *iface, DWORD
+         {
+             if ((services->editor->scrollbars ^ scrollbars) & WS_HSCROLL)
+                 ITextHost_TxShowScrollBar( services->editor->texthost, SB_HORZ, (scrollbars & WS_HSCROLL) &&
+-                                           services->editor->nTotalWidth > services->editor->sizeWindow.cx );
++                                           editor_scroll_width( services->editor ) > services->editor->sizeWindow.cx );
+             if ((services->editor->scrollbars ^ scrollbars) & WS_VSCROLL)
+                 ITextHost_TxShowScrollBar( services->editor->texthost, SB_VERT, (scrollbars & WS_VSCROLL) &&
+                                            services->editor->nTotalLength > services->editor->sizeWindow.cy );
+diff --git a/dlls/riched20/wrap.c b/dlls/riched20/wrap.c
+index a4d638a..7d2f82c 100644
+--- a/dlls/riched20/wrap.c
++++ b/dlls/riched20/wrap.c
+@@ -1029,6 +1029,21 @@ static void adjust_para_y( ME_Paragraph *para, ME_Context *c, struct repaint_ran
+     }
+ }
+ 
++/* EM_SETTARGETDEVICE's line width rounded to pixels; the horizontal scroll
++ * range covers it. RichEdit20W's range is one pixel wider (measured). */
++static int target_scroll_width( ME_TextEditor *editor, const ME_Context *c )
++{
++  int num = c->dpi.cx, den = 1440;
++
++  if (!editor->nAvailWidth) return 0;
++  if (editor->nZoomNumerator)
++  {
++    num *= editor->nZoomNumerator;
++    den *= editor->nZoomDenominator;
++  }
++  return MulDiv( editor->nAvailWidth, num, den ) + (editor->msftedit ? 0 : 1);
++}
++
+ BOOL wrap_marked_paras_dc( ME_TextEditor *editor, HDC hdc, BOOL invalidate )
+ {
+   ME_Paragraph *para, *next;
+@@ -1092,6 +1107,7 @@ BOOL wrap_marked_paras_dc( ME_TextEditor *editor, HDC hdc, BOOL invalidate )
+ 
+   editor->nTotalLength = editor->pBuffer->pLast->member.para.pt.y;
+   editor->nTotalWidth = totalWidth;
++  editor->target_scroll_width = target_scroll_width( editor, &c );
+ 
+   ME_DestroyContext(&c);
+ 
