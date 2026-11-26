@@ -15,3 +15,12 @@ The overlay sets the flag in the window style as well. If Inventor's
 filter then works, a MEASURE program settles the exact rule on Windows
 (which combo styles get the flag, when) and a proper patch with a test
 follows; if not, the hypothesis is dropped.
+
+## Result (2026-11-26, 22:50)
+
+Negative. Inventor 2027 on winum-11.22-3 with this overlay (user32 and
+comctl32_v6, SHA-256 verified) still ends after a standard is picked:
+`EndDialog` on the MDI client, then the uncaught `e06d7363`. The
+hypothesis is dropped; the style difference stays recorded in
+`docs/wine-repro/user32-window-tree` for later (it is real, but not
+this crash's cause). Not to be merged.
