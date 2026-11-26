@@ -1,24 +1,26 @@
-# riched20 ITextRange paragraph expansion
+# riched20 TOM paragraph expansion
 
-Revit 2027.4 reaches TOM while creating its first plan view. Its
-windowless range attempts Expand(tomParagraph) on a duplicate;
-Wine 11.22 currently returns E_NOTIMPL. The following failure is
-a read from 0x10 inside TextEngine.dll. The trace establishes the
-order of the calls. The cause of the crash remains an L4 question.
+On the winum-11.22-3 base, Revit 2027.4 reaches the first plan view and
+its windowless TOM range returns E_NOTIMPL for Expand(tomParagraph).
+The subsequent TextEngine read from 0x10 is the application symptom.
+The measured Windows return for the already complete short range is
+S_FALSE, which is a success HRESULT. The patch expands to the editor's
+paragraph boundaries and reports the measured HRESULT and delta.
 
-[MEASURE program and offline instructions](../../../docs/wine-repro/riched20-textrange-expand-paragraph/README.md).
+[MEASURE results](../../../docs/wine-repro/riched20-textrange-expand-paragraph/README.md#windows-10-results-2026-11-26)
+and [test-first patch](../../tests-first/riched20-tests-textrange-expand-paragraph.patch).
 
-| Level | Evidence |
+| Level | Status |
 | --- | --- |
-| MEASURE | Native Windows 10 reference pending for x86_64 and i686. |
-| L0 | Pending on winum-11.22-3. |
-| L1 | Pending a focused richole test based on the measured outcomes. |
-| L2 | Pending paired riched20 and msftedit suites. |
-| L4 | Pending Revit New Project and a sample project with both riched20 changes in one DLL. Repeat with only Expand to decide whether the default-tab-stop candidate is needed. |
-| Cross review | Claude after test and fix. |
+| MEASURE | Windows 10 offline, 2026-11-26, x86_64 and i686, both window classes and both windowless hosts. |
+| L0 | Overlay workflow builds x86_64 and i386 after zero-fuzz application to winum-11.22-3. |
+| L1 | Offline Windows 10 run pending for the focused Wine test in both architectures. |
+| L2 | Paired winum-11.22-3 versus the Expand candidate, riched20 and msftedit. The baseline expects E_NOTIMPL via todo_wine, while the candidate requires the exact result. |
+| L4 | Revit first plan view and sample project with the combined riched20 overlay and existing ole32 overlay. Then repeat with the Expand-only overlay to test whether the tab-stop change is needed. Inventor and AutoCAD text editing smoke pending. |
+| Cross review | Claude pending. |
 
-Scope depends on the native measurement. If line results depend on
-layout, leave that unit outside this candidate. For application
-validation, build one overlay by applying the default tab stop and
-Expand candidates on top of the release series. Test the Expand-only
-variant before considering either candidate for the series.
+The L4 overlay builds both riched20 changes into a single DLL for each
+architecture. It uses the tab-stop patch from commit
+`5e28f985333d214841ccfd1ad86b5e5fc281b16e`. Verify the extracted overlay
+with `sha256sum -c SHA256SUMS` before using it in a disposable copy of
+the test build.

@@ -55,3 +55,28 @@ bash scripts/build-measure-bundle.sh out/riched-expand \
     docs/wine-repro/riched20-textrange-expand-paragraph/measure.list
 (cd out/riched-expand && sha256sum -c SHA256SUMS)
 ~~~
+
+## Windows 10 results (2026-11-26)
+
+Both offline executables exited 0. Both window classes and both
+CreateTextServices hosts completed. The x86_64 and i686 results agree
+on every recorded call. [Normalized results](results/windows-10/ranges.tsv)
+use `all` where the four sources agree for units 1–4 and list the
+individual source and fixture for line expansion.
+
+| Call | Native result |
+| --- | --- |
+| Paragraph, range (2,5) | (0,18), delta 15, S_OK |
+| Paragraph, range (5,23) | (0,31), delta 13, S_OK |
+| Paragraph, range (6,18) ending at the next paragraph | (0,18), delta 6, S_OK |
+| Paragraph, collapsed (18,18) at the same boundary | (18,31), delta 13, S_OK |
+| Paragraph, collapsed (36,36) at the implicit final mark | (36,37), delta 1, S_OK |
+| Paragraph, already complete (0,18) or (36,37) | Unchanged, delta 0, S_FALSE |
+| Paragraph, duplicate (0,2) of the short story "-\r", null delta | Unchanged, S_FALSE |
+| Line, range (2,5) on the long story | (0,18) in the windowed controls, (0,37) in the windowless hosts |
+
+Passing a null delta pointer gave the same paragraph bounds and return
+code. Wine 11.22 returns E_NOTIMPL for paragraph expansion. The
+candidate implements only paragraph expansion. Character, word, and
+sentence results are retained as reference measurements. The measured
+line result depends on the host and is outside this candidate.

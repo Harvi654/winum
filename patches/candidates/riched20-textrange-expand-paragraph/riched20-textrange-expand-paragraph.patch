@@ -1,0 +1,103 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] riched20: Expand TOM ranges to paragraph boundaries.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+On offline Windows 10, both RichEdit classes and both windowless hosts
+expand to the paragraphs containing the range, with an exclusive end
+for a nonempty range. The implicit terminal mark counts, and unchanged
+ranges return S_FALSE. Wine 11.22 returns E_NOTIMPL.
+
+Use the editor's existing paragraph positions for tomParagraph. Preserve
+tomStory and leave the other unimplemented units outside this change.
+
+--- a/dlls/riched20/richole.c
++++ b/dlls/riched20/richole.c
+@@ -880,34 +880,48 @@
+             textfont_getname_from_range(font->range, &font->props[propid].str);
+         else
+             get_textfont_prop(font, propid, &font->props[propid]);
+     }
+ }
+ 
+-static HRESULT textrange_expand(ITextRange *range, LONG unit, LONG *delta)
+-{
+-    LONG expand_start, expand_end;
++static HRESULT textrange_expand(ITextRange *range, ME_TextEditor *editor, LONG unit, LONG *delta)
++{
++    LONG expand_start, expand_end, start, end;
++
++    if (unit == tomParagraph || delta)
++    {
++        ITextRange_GetStart(range, &start);
++        ITextRange_GetEnd(range, &end);
++    }
+ 
+     switch (unit)
+     {
+     case tomStory:
+         expand_start = 0;
+         ITextRange_GetStoryLength(range, &expand_end);
+         break;
++    case tomParagraph:
++    {
++        ME_Cursor cursor;
++
++        cursor_from_char_ofs(editor, start, &cursor);
++        expand_start = cursor.para->nCharOfs;
++        /* A nonempty range ends after its last included character. */
++        cursor_from_char_ofs(editor, end > start ? end - 1 : end, &cursor);
++        expand_end = para_next(cursor.para)->nCharOfs;
++        break;
++    }
+     default:
+         FIXME("unit %ld is not supported\n", unit);
+         return E_NOTIMPL;
+     }
+ 
+-    if (delta) {
+-        LONG start, end;
+-
+-        ITextRange_GetStart(range, &start);
+-        ITextRange_GetEnd(range, &end);
++    if (delta)
+         *delta = expand_end - expand_start - (end - start);
+-    }
++    if (unit == tomParagraph && start == expand_start && end == expand_end)
++        return S_FALSE;
+ 
+     ITextRange_SetStart(range, expand_start);
+     ITextRange_SetEnd(range, expand_end);
+ 
+     return S_OK;
+ }
+@@ -1915,13 +1929,13 @@
+ 
+     TRACE("(%p)->(%ld %p)\n", This, unit, delta);
+ 
+     if (!This->child.reole)
+         return CO_E_RELEASED;
+ 
+-    return textrange_expand(me, unit, delta);
++    return textrange_expand(me, This->child.reole->editor, unit, delta);
+ }
+ 
+ static HRESULT WINAPI ITextRange_fnGetIndex(ITextRange *me, LONG unit, LONG *index)
+ {
+     ITextRangeImpl *This = impl_from_ITextRange(me);
+ 
+@@ -5008,13 +5022,13 @@
+     TRACE("(%p)->(%ld %p)\n", This, unit, delta);
+ 
+     if (!This->services)
+         return CO_E_RELEASED;
+ 
+     ITextSelection_QueryInterface(me, &IID_ITextRange, (void**)&range);
+-    hr = textrange_expand(range, unit, delta);
++    hr = textrange_expand(range, This->services->editor, unit, delta);
+     ITextRange_Release(range);
+     return hr;
+ }
+ 
+ static HRESULT WINAPI ITextSelection_fnGetIndex(ITextSelection *me, LONG unit, LONG *index)
+ {
