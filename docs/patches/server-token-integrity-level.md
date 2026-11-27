@@ -53,3 +53,7 @@ In `ntdll-token-integrity-level.patch` (`dlls/advapi32/tests/security.c`, `test_
 
 - v1 2026-11-24: candidate, Nastran L3/L4.
 - v2 2026-11-25: no code change; promoted to the series.
+
+## Wine 11.23
+
+v3 (2026-11-27): Rebased to Wine 11.23, context only, logic unchanged. The generated server files come from tools/make_requests and use protocol 989. The Windows test expectations are unchanged. The source series applies with `--fuzz=0`; the L0 build and paired checks are pending.

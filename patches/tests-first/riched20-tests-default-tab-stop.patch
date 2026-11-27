@@ -1,0 +1,157 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] riched20/tests: Test ITextDocument default tab stops.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Use the measured Windows 10 results for both window classes. Check
+twip rounding, the large-value distinction and the tab grid on edits
+and text replacement.
+
+--- a/dlls/riched20/tests/richole.c
++++ b/dlls/riched20/tests/richole.c
+@@ -5566,4 +5566,139 @@
+ }
+ 
++static void check_default_tab(ITextDocument *doc, float expected)
++{
++    float points = -12345.0f;
++    HRESULT hr = ITextDocument_GetDefaultTabStop(doc, &points);
++
++    ok(hr == S_OK, "GetDefaultTabStop returned %#lx.\n", hr);
++    ok(points >= expected - 0.00001f && points <= expected + 0.00001f,
++       "Expected %.9g points, got %.9g.\n", expected, points);
++}
++
++static void check_tab_layout(HWND hwnd, int dpi, int width)
++{
++    POINTL start = {0}, b = {0}, c = {0};
++
++    SendMessageW(hwnd, EM_POSFROMCHAR, (WPARAM)&start, 0);
++    SendMessageW(hwnd, EM_POSFROMCHAR, (WPARAM)&b, 2);
++    SendMessageW(hwnd, EM_POSFROMCHAR, (WPARAM)&c, 4);
++    if (dpi == 96)
++        ok(b.x - start.x == width && c.x - start.x == 2 * width &&
++           b.y == start.y && c.y == start.y,
++           "Expected tabs at %d and %d on one line, got (%ld,%ld) and (%ld,%ld).\n",
++           width, 2 * width, b.x - start.x, b.y - start.y, c.x - start.x, c.y - start.y);
++}
++
++static void test_default_tab_class(const WCHAR *class_name, BOOL modern)
++{
++    static const WCHAR text[] = L"A\tB\tC";
++    static const struct
++    {
++        float input, expected;
++        HRESULT hr;
++    } cases[] =
++    {
++        {36.0f, 36.0f, S_OK},
++        {18.51f, 18.5f, S_OK},
++        {18.526f, 18.55f, S_OK},
++        {0.025f, 0.05f, S_OK},
++        {0.01f, 0.0f, S_OK},
++        {0.0f, 0.0f, E_INVALIDARG},
++        {-12.0f, 0.0f, E_INVALIDARG}
++    };
++    static const IID document_iid =
++        {0x8cc497c0, 0xa1df, 0x11ce, {0x80, 0x98, 0x00, 0xaa, 0x00, 0x47, 0xbe, 0x5d}};
++    IUnknown *richole = NULL;
++    ITextDocument *doc = NULL;
++    PARAFORMAT2 format = {0};
++    HWND hwnd;
++    HDC dc;
++    HRESULT hr;
++    unsigned int i;
++    int dpi = 0;
++
++    hwnd = CreateWindowExW(0, class_name, L"", WS_POPUP | ES_MULTILINE, 0, 0,
++                           1600, 400, NULL, NULL, GetModuleHandleW(NULL), NULL);
++    ok(!!hwnd, "CreateWindowExW failed: %lu.\n", GetLastError());
++    if (!hwnd) return;
++    ok(!!SendMessageW(hwnd, EM_GETOLEINTERFACE, 0, (LPARAM)&richole),
++       "EM_GETOLEINTERFACE failed.\n");
++    if (!richole) goto done;
++    hr = IUnknown_QueryInterface(richole, &document_iid, (void **)&doc);
++    ok(hr == S_OK, "QueryInterface returned %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++
++    check_default_tab(doc, 36.0f);
++    hr = ITextDocument_GetDefaultTabStop(doc, NULL);
++    ok(hr == E_INVALIDARG, "Null output returned %#lx.\n", hr);
++    for (i = 0; i < ARRAYSIZE(cases); ++i)
++    {
++        hr = ITextDocument_SetDefaultTabStop(doc, cases[i].input);
++        ok(hr == cases[i].hr, "Setting %.9g returned %#lx.\n", cases[i].input, hr);
++        check_default_tab(doc, cases[i].expected);
++    }
++
++    hr = ITextDocument_SetDefaultTabStop(doc, 838860.75f);
++    ok(hr == S_OK, "Setting the upper bound returned %#lx.\n", hr);
++    check_default_tab(doc, 838860.75f);
++    hr = ITextDocument_SetDefaultTabStop(doc, 100000000.0f);
++    ok(hr == (modern ? E_INVALIDARG : S_OK), "Setting the large value returned %#lx.\n", hr);
++    check_default_tab(doc, modern ? 838860.75f : 100000000.0f);
++    if (modern)
++    {
++        hr = ITextDocument_SetDefaultTabStop(doc, 838860.8125f);
++        ok(hr == E_INVALIDARG, "Setting the value above the limit returned %#lx.\n", hr);
++        check_default_tab(doc, 838860.75f);
++    }
++
++    dc = GetDC(hwnd);
++    if (dc)
++    {
++        dpi = GetDeviceCaps(dc, LOGPIXELSX);
++        ReleaseDC(hwnd, dc);
++    }
++    SetWindowTextW(hwnd, text);
++    check_default_tab(doc, 36.0f);
++    check_tab_layout(hwnd, dpi, 48);
++    hr = ITextDocument_SetDefaultTabStop(doc, 18.5f);
++    ok(hr == S_OK, "Setting 18.5 returned %#lx.\n", hr);
++    check_tab_layout(hwnd, dpi, 25);
++    format.cbSize = sizeof(format);
++    SendMessageW(hwnd, EM_GETPARAFORMAT, 0, (LPARAM)&format);
++    ok(!format.cTabCount && !format.dxStartIndent, "Got tab count %d, indent %ld.\n",
++       format.cTabCount, format.dxStartIndent);
++
++    SendMessageW(hwnd, EM_SETSEL, 5, 5);
++    SendMessageW(hwnd, EM_REPLACESEL, FALSE, (LPARAM)L"D");
++    check_default_tab(doc, 18.5f);
++    check_tab_layout(hwnd, dpi, 25);
++    SetWindowTextW(hwnd, text);
++    check_default_tab(doc, 36.0f);
++    check_tab_layout(hwnd, dpi, 48);
++
++done:
++    if (doc) ITextDocument_Release(doc);
++    if (richole) IUnknown_Release(richole);
++    DestroyWindow(hwnd);
++}
++
++static void test_default_tab_stop(void)
++{
++    HMODULE module;
++    HRESULT hr = OleInitialize(NULL);
++
++    ok(SUCCEEDED(hr), "OleInitialize returned %#lx.\n", hr);
++    if (FAILED(hr)) return;
++    test_default_tab_class(L"RichEdit20W", FALSE);
++    module = LoadLibraryW(L"msftedit.dll");
++    ok(!!module, "LoadLibraryW failed: %lu.\n", GetLastError());
++    if (module)
++    {
++        test_default_tab_class(L"RICHEDIT50W", TRUE);
++        FreeLibrary(module);
++    }
++    OleUninitialize();
++}
++
+ START_TEST(richole)
+ {
+@@ -5573,4 +5708,5 @@
+   ok(hmoduleRichEdit != NULL, "error: %d\n", (int) GetLastError());
+ 
++  test_default_tab_stop();
+   test_Interfaces();
+   test_ITextDocument_Open();

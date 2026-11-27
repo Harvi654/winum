@@ -69,3 +69,11 @@ below. A changed file alone does not imply a patch conflict.
 - The 11.22 combined overlay [smoke run 45880891853](https://github.com/Harvi654/winum/actions/runs/45880891853) passed in Inventor, AutoCAD, and Revit on the maintainer's machine.
 - The fifth candidate, msxml3-selection-removeall v2 for Content Center #45, passed Inventor L4, [paired L2](https://github.com/Harvi654/winum/actions/runs/45907358527), and maintainer review. Its AutoCAD and Revit L4 remain open. Its release test must drop the removeAll todo marker if promoted.
 - A complete 11.23 series, both-architecture L0, paired L2, and the release PR are pending resolution of the upstream overlaps. Inventor pins must come from the signed published winum release.
+
+### Resolution approved 2026-11-27
+
+The maintainer approved a mechanical rebase of the five failed patches.
+The revised source series passes zero-fuzz application. The existing
+XState fix is retained unchanged. See the
+[release candidate notes](winum-11.23-1.md) for validation and the MSI
+maintenance changes that the L4 plan covers.

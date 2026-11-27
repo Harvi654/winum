@@ -18,11 +18,14 @@ This prevents normalized pre-cost Local requests from becoming unintended
 ADDLOCAL seeds. The unchanged api/none variant pairs assert all before,
 after and published states. Shared v14 conformance, RULE_API.
 
+v2 (2026-11-27): Rebased to Wine 11.23, context only, logic unchanged.
+Keep the reset immediately after feature state lookup.
+
 --- a/dlls/msi/action.c
 +++ b/dlls/msi/action.c
-@@ -2338,6 +2338,15 @@
-     /* read components states from the registry */
-     ACTION_GetComponentInstallStates(package);
+@@ -2354,6 +2354,15 @@
+     get_client_counts( package );
+ 
      ACTION_GetFeatureInstallStates(package);
 +
 +    /* Windows v14: pre-cost API requests do not seed fresh costing. */

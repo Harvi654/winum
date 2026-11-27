@@ -1,0 +1,1 @@
+target-device-width|docs/wine-repro/riched20-target-device-width/measure.c|-lgdi32 -luser32

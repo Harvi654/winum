@@ -54,3 +54,7 @@ Autodesk-Inventor-for-Linux [`docs/arch-hyprland.md`](https://github.com/Harvi65
 ## History
 
 - **2026-11-11, promoted** into `patches/series` for winum-11.20-1 from `server-mousemove-on-show-hide-v5` (maintainer approval of `docs/release/winum-11.20-1.md` at `ef64451`). Open: hidden-window move todo_wine; counts saturate at 16 (P3); host input can add moves (P3).
+
+## Wine 11.23
+
+v6 (2026-11-27): Rebased to Wine 11.23, context only, logic unchanged. The delayed show/hide arm compares the upstream old and new visibility values. The Windows test expectations are unchanged. The source series applies with `--fuzz=0`; the L0 build and paired checks are pending.

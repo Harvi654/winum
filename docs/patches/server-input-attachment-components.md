@@ -92,3 +92,7 @@ so later contexts' attribution needs verification in the final run.
 ## History
 
 - **2026-11-11, promoted** into `patches/series` for winum-11.20-1 from `server-input-attachment-components-v5` (maintainer approval of `docs/release/winum-11.20-1.md` at `ef64451`). Open: absolute inactive-state view not available in CI.
+
+## Wine 11.23
+
+v6 (2026-11-27): Rebased to Wine 11.23, context only, logic unchanged. The input graph split is preserved and the error branch follows the upstream return style. The Windows test expectations are unchanged. The source series applies with `--fuzz=0`; the L0 build and paired checks are pending.

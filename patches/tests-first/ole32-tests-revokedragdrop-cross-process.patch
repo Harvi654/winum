@@ -1,0 +1,140 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] ole32/tests: Check RevokeDragDrop with a foreign window.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+Offline Windows 10 returns RPC_E_WRONG_THREAD for the foreign registered
+window and DRAGDROP_E_NOTREGISTERED for an empty one. The owner observes
+the original registration gone with its reference count intact. Test
+the caller and owner outcomes with windows and targets of our own.
+
+--- a/dlls/ole32/tests/dragdrop.c
++++ b/dlls/ole32/tests/dragdrop.c
+@@ -812,11 +812,110 @@
+     CoUninitialize();
+ }
+ 
++static void test_cross_revoke_caller(HWND registered, HWND empty, DWORD owner)
++{
++    DWORD pid = 0, last_error;
++    HRESULT hr;
++    BOOL valid;
++
++    valid = GetWindowThreadProcessId(registered, &pid) && pid == owner && pid != GetCurrentProcessId();
++    ok(valid, "Expected the test owner's registered window.\n");
++    if (!valid) return;
++    valid = GetWindowThreadProcessId(empty, &pid) && pid == owner;
++    ok(valid, "Expected the test owner's empty window.\n");
++    if (!valid) return;
++    hr = OleInitialize(NULL);
++    ok(SUCCEEDED(hr), "OleInitialize returned %#lx.\n", hr);
++    if (FAILED(hr)) return;
++
++    SetLastError(0xdeadbeef);
++    hr = RevokeDragDrop(registered);
++    last_error = GetLastError();
++    ok(hr == RPC_E_WRONG_THREAD, "Foreign revoke returned %#lx.\n", hr);
++    ok(last_error == 0xdeadbeef, "Foreign revoke set last error to %#lx.\n", last_error);
++
++    SetLastError(0xdeadbeef);
++    hr = RevokeDragDrop(empty);
++    last_error = GetLastError();
++    ok(hr == DRAGDROP_E_NOTREGISTERED, "Foreign empty revoke returned %#lx.\n", hr);
++    ok(last_error == 0xdeadbeef, "Foreign empty revoke set last error to %#lx.\n", last_error);
++
++    OleUninitialize();
++}
++
++static void test_cross_revoke_owner(void)
++{
++    char command[2 * MAX_PATH];
++    STARTUPINFOA startup = {sizeof(startup)};
++    PROCESS_INFORMATION info;
++    HWND registered, empty;
++    DWORD last_error;
++    char **argv;
++    int refs;
++    HRESULT hr;
++    BOOL ret;
++
++    hr = OleInitialize(NULL);
++    ok(SUCCEEDED(hr), "OleInitialize returned %#lx.\n", hr);
++    if (FAILED(hr)) return;
++
++    registered = CreateWindowA("WineOleTestClass", "", WS_POPUP, 0, 0, 1, 1, NULL, NULL, NULL, NULL);
++    empty = CreateWindowA("WineOleTestClass", "", WS_POPUP, 0, 0, 1, 1, NULL, NULL, NULL, NULL);
++    ok(registered && empty, "Failed creating test windows: %lu.\n", GetLastError());
++    if (!registered || !empty) goto done;
++
++    hr = RegisterDragDrop(registered, &DropTarget);
++    ok(hr == S_OK, "RegisterDragDrop returned %#lx.\n", hr);
++    if (FAILED(hr)) goto done;
++    refs = droptarget_refs;
++    winetest_get_mainargs(&argv);
++    ret = snprintf(command, sizeof(command), "\"%s\" dragdrop cross_revoke_caller %p %p %lu",
++                   argv[0], registered, empty, GetCurrentProcessId()) < sizeof(command) &&
++          CreateProcessA(NULL, command, NULL, NULL, TRUE, 0, NULL, NULL, &startup, &info);
++    ok(ret, "Could not launch the test caller: %lu.\n", GetLastError());
++    if (!ret)
++    {
++        RevokeDragDrop(registered);
++        goto done;
++    }
++    wait_child_process(&info);
++
++    ok(droptarget_refs == refs, "Expected %d references, got %d.\n", refs, droptarget_refs);
++    SetLastError(0xdeadbeef);
++    hr = RevokeDragDrop(registered);
++    last_error = GetLastError();
++    ok(hr == DRAGDROP_E_NOTREGISTERED, "Owner revoke returned %#lx.\n", hr);
++    ok(last_error == 0xdeadbeef, "Owner revoke set last error to %#lx.\n", last_error);
++    ok(droptarget_refs == refs, "Expected %d references after owner revoke, got %d.\n",
++       refs, droptarget_refs);
++
++    hr = RegisterDragDrop(registered, &DropTarget);
++    ok(hr == S_OK, "RegisterDragDrop after foreign revoke returned %#lx.\n", hr);
++    if (SUCCEEDED(hr))
++    {
++        hr = RevokeDragDrop(registered);
++        ok(hr == S_OK, "Owner revoke after re-registering returned %#lx.\n", hr);
++        ok(droptarget_refs == refs, "Expected %d references after cleanup, got %d.\n", refs, droptarget_refs);
++    }
++
++done:
++    if (empty) DestroyWindow(empty);
++    if (registered) DestroyWindow(registered);
++    OleUninitialize();
++}
++
+ START_TEST(dragdrop)
+ {
+     int argc;
+     char **argv;
+ 
++#ifdef STANDALONE
++    if (GetProcAddress(GetModuleHandleA("ntdll.dll"), "wine_get_version"))
++    {
++        win_skip("This L1 build requires native Windows.\n");
++        return;
++    }
++#endif
+     register_dummy_class();
+ 
+     argc = winetest_get_mainargs( &argv );
+@@ -824,10 +923,16 @@
+     {
+         if (!strcmp(argv[2], "mismatched_cleanup"))
+             test_mismatched_cleanup();
++        else if (argc == 6 && !strcmp(argv[2], "cross_revoke_caller"))
++            test_cross_revoke_caller((HWND)(UINT_PTR)_strtoui64(argv[3], NULL, 16),
++                                     (HWND)(UINT_PTR)_strtoui64(argv[4], NULL, 16), strtoul(argv[5], NULL, 10));
++        else if (!strcmp(argv[2], "cross_revoke_only"))
++            test_cross_revoke_owner();
+         return;
+     }
+ 
+     test_Register_Revoke();
+     test_DoDragDrop();
+     run_child_test("mismatched_cleanup");
++    test_cross_revoke_owner();
+ }

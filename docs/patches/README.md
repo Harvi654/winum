@@ -1,10 +1,10 @@
 # Patch status overview
 
-One row per patch of `patches/series` (winum-11.22-3, 80 patches), in
+One row per patch of `patches/series` (winum-11.23-1 candidate, 84 patches), in
 series order. Details, dates and evidence are on each patch's page, which
 is authoritative; this table is updated with every release (last:
-winum-11.22-3, 2026-11-25). The L1 column follows the page markers that
-`scripts/check-series.sh` checks (80 of 80: L1 69, L3 only 9, known
+winum-11.23-1 candidate, 2026-11-27). The L1 column follows the page markers that
+`scripts/check-series.sh` checks (84 of 84: L1 73, L3 only 9, known
 deviation 2). "Since" is the first winum release with the patch. Earlier
 versions of this file: `docs/archive/patches-overview-2026-11-06.md` and
 the git history.
@@ -35,69 +35,73 @@ not planned for the patch.
 | 15 | [riched20-caret-rewrap](riched20-caret-rewrap.md) | riched20 | 11.20-1 | yes | yes | - | - | yes | confirm | - |
 | 16 | [riched20-scf-word-insertion-point](riched20-scf-word-insertion-point.md) | riched20 | 11.20-1 | yes | yes | - | - | yes | confirm | - |
 | 17 | [riched20-textfont-applytmp](riched20-textfont-applytmp.md) | riched20 | 11.20-1 | yes | yes | - | - | yes | confirm | - |
-| 18 | [rpcrt4-ndrstubcall3](rpcrt4-ndrstubcall3.md) | rpcrt4 | 11.20-1 | yes | L3 only | - | - | yes | confirm | - |
-| 19 | [server-mousemove-on-show-hide](server-mousemove-on-show-hide.md) | server | 11.20-1 | yes | yes | - | - | yes | confirm | - |
-| 20 | [shell32-folderview-selection](shell32-folderview-selection.md) | shell32 | 11.20-1 | yes | yes | - | - | yes | confirm | - |
-| 21 | [shell32-getimage](shell32-getimage.md) | shell32 | 11.20-1 | yes | yes | - | - | yes | confirm | - |
-| 22 | [urlmon-maptozone-null-terminate](urlmon-maptozone-null-terminate.md) | urlmon | 11.20-1 | yes | L3 only | - | - | yes | confirm | - |
-| 23 | [urlmon-res-zone-local-machine](urlmon-res-zone-local-machine.md) | urlmon | 11.20-1 | yes | yes | - | - | yes | confirm | - |
-| 24 | [wbemprox-timezone](wbemprox-timezone.md) | wbemprox | 11.20-1 | yes | yes | - | - | yes | confirm | - |
-| 25 | [winex11-flush-putimage](winex11-flush-putimage.md) | winex11.drv | 11.20-1 | yes | L3 only | - | - | yes | confirm | - |
-| 26 | [winex11-shape-alpha-xwayland](winex11-shape-alpha-xwayland.md) | winex11.drv | 11.20-1 | yes | L3 only | - | - | yes | confirm | - |
-| 27 | [winex11-xinput-bad-device](winex11-xinput-bad-device.md) | winex11.drv | 11.20-1 | yes | L3 only | - | - | yes | confirm | - |
-| 28 | [server-input-attachment-components](server-input-attachment-components.md) | server | 11.20-1 | yes | yes | - | yes | yes | confirm | - |
-| 29 | [msxml3-parseerror-filepos](msxml3-parseerror-filepos.md) | msxml3 | 11.20-1 | yes | yes | - | yes | yes | confirm | - |
-| 30 | [wininet-http-same-position-seek](wininet-http-same-position-seek.md) | wininet | 11.20-1 | yes | yes | - | yes | yes | confirm | - |
-| 31 | [shell32-automation-zip-copy](shell32-automation-zip-copy.md) | shell32 | 11.20-1 | yes | yes | - | yes | yes | confirm | - |
-| 32 | [msi-selection-tree-directory-property](msi-selection-tree-directory-property.md) | msi | 11.20-1 | yes | L3 only | - | yes | yes | confirm | - |
-| 33 | [comctl32-header-null-layout](comctl32-header-null-layout.md) | comctl32 | 11.20-1 | yes | yes | - | yes | yes | confirm | - |
-| 34 | [msxml3-schema-cache-namespace](msxml3-schema-cache-namespace.md) | msxml3 | 11.20-1 | yes | yes | yes | yes | yes | confirm | - |
-| 35 | [explorer-tasklist-parenting-hosts](explorer-tasklist-parenting-hosts.md) | explorer | 11.20-1 | yes | L3 only | - | yes | yes | confirm | - |
-| 36 | [comctl32-ownerdraw-existing-capture](comctl32-ownerdraw-existing-capture.md) | comctl32 | 11.20-1 | yes | yes | - | yes | yes | confirm | - |
-| 37 | [mshtml-document-open-optional-result](mshtml-document-open-optional-result.md) | mshtml | 11.20-1 | yes | yes | - | yes | yes | confirm | - |
-| 38 | [winex11-owner-managed-async](winex11-owner-managed-async.md) | winex11.drv | 11.20-1 | yes | L3 only | - | yes | yes | confirm | - |
-| 39 | [glu32-nurbs-curves](glu32-nurbs-curves.md) | glu32 | 11.20-1 | yes | yes | yes | yes | yes | confirm | - |
-| 40 | [win32u-fixed-negative-mat2](win32u-fixed-negative-mat2.md) | win32u | 11.20-1 | yes | yes | yes | yes | partly | confirm | - |
-| 41 | [win32u-child-topmost-ignore](win32u-child-topmost-ignore.md) | win32u | 11.20-1 | yes | yes | yes | - | yes | confirm | yes |
-| 42 | [comctl32-themed-checkbox-buffered-paint](comctl32-themed-checkbox-buffered-paint.md) | comctl32 | 11.20-1 | yes | yes | yes | - | yes | confirm | yes |
-| 43 | [winex11-stale-map-activation](winex11-stale-map-activation.md) | winex11.drv | 11.20-1 | yes | yes | yes | yes | yes | confirm | yes |
-| 44 | [msi-addlocal-feature-ancestors](msi-addlocal-feature-ancestors.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 45 | [msi-follow-parent-install-level](msi-follow-parent-install-level.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 46 | [msi-setfeaturestate-post-cost-action](msi-setfeaturestate-post-cost-action.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 47 | [msi-setfeaturestate-post-cost-ancestors](msi-setfeaturestate-post-cost-ancestors.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 48 | [msi-setfeaturestate-required-descendants](msi-setfeaturestate-required-descendants.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 49 | [msi-selection-override-ancestors](msi-selection-override-ancestors.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 50 | [msi-required-feature-source-state](msi-required-feature-source-state.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 51 | [msi-required-feature-advertise-state](msi-required-feature-advertise-state.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 52 | [msi-required-feature-absent-state](msi-required-feature-absent-state.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 53 | [msi-costfinalize-reset-feature-requests](msi-costfinalize-reset-feature-requests.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 54 | [msi-post-cost-local-idempotence](msi-post-cost-local-idempotence.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 55 | [msi-disabled-feature-selection](msi-disabled-feature-selection.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 56 | [msi-reject-cyclic-feature-parents](msi-reject-cyclic-feature-parents.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 57 | [msi-costfinalize-feature-depth](msi-costfinalize-feature-depth.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 58 | [msi-ui-localonly-source-state](msi-ui-localonly-source-state.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 59 | [msi-executeaction-ui-selection-transfer](msi-executeaction-ui-selection-transfer.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 60 | [msi-source-directory-component-state](msi-source-directory-component-state.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
-| 61 | [oleaut32-typelib-keep-released](oleaut32-typelib-keep-released.md) | oleaut32 | 11.20-1 | yes | yes | partly | yes | Inventor | confirm | yes |
-| 62 | [opengl32-window-format-color-bits](opengl32-window-format-color-bits.md) | opengl32 | 11.20-1 | yes | yes | partly | yes | Inventor | confirm | yes |
-| 63 | [ole32-createfromfile-package](ole32-createfromfile-package.md) | ole32 | 11.20-2 | yes | yes | yes | yes | yes | confirm | yes |
-| 64 | [ole32-storage-localdocs](ole32-storage-localdocs.md) | ole32 | 11.20-2 | yes | yes | yes | yes | yes | confirm | yes |
-| 65 | [ole32-propset-null-strings](ole32-propset-null-strings.md) | ole32 | 11.20-2 | yes | yes | yes | yes | yes | confirm | yes |
-| 66 | [packager-save-view-advise](packager-save-view-advise.md) | packager | 11.20-2 | yes | yes | yes | yes | yes | confirm | yes |
-| 67 | [shell32-parentrelativeforui](shell32-parentrelativeforui.md) | shell32 | 11.22-2 | yes | yes | yes | - | yes | - | yes |
-| 68 | [shell32-label-edit-enter](shell32-label-edit-enter.md) | shell32 | 11.22-2 | yes | yes | yes | - | yes | - | yes |
-| 69 | [shell32-background-menu](shell32-background-menu.md) | shell32 | 11.22-2 | yes | yes | yes | - | yes | - | yes |
-| 70 | [shell32-autocomplete-responsive](shell32-autocomplete-responsive.md) | shell32 | 11.22-2 | yes | known deviation | yes | yes | yes | - | yes |
-| 71 | [msxml3-replacechild-same-node](msxml3-replacechild-same-node.md) | msxml3 | 11.22-2 | yes | yes | yes | yes | yes | - | yes |
-| 72 | [ucrtbase-cxx-exception-size](ucrtbase-cxx-exception-size.md) | ucrtbase | 11.22-2 | yes | yes | yes | - | yes | - | yes |
-| 73 | [server-cross-thread-killtimer](server-cross-thread-killtimer.md) | server | 11.22-2 | yes | yes | yes | yes | yes | - | yes |
-| 74 | [server-token-integrity-level](server-token-integrity-level.md) | server | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
-| 75 | [ntdll-token-integrity-level](ntdll-token-integrity-level.md) | ntdll | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
-| 76 | [combase-per-user-classes](combase-per-user-classes.md) | combase | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
-| 77 | [kernelbase-hkcr-class-reads](kernelbase-hkcr-class-reads.md) | kernelbase | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
-| 78 | [wbemdisp-method-invoke](wbemdisp-method-invoke.md) | wbemdisp | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
-| 79 | [msado15-stream-charset](msado15-stream-charset.md) | msado15 | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
-| 80 | [win32u-font-smoothing](win32u-font-smoothing.md) | win32u | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
+| 18 | [riched20-default-tab-stop](riched20-default-tab-stop.md) | riched20 | 11.23-1 | pending | yes | pending | - | yes (11.22 overlay) | - | yes |
+| 19 | [riched20-textrange-expand-paragraph](riched20-textrange-expand-paragraph.md) | riched20 | 11.23-1 | pending | yes | pending | - | yes (11.22 overlay) | - | yes |
+| 20 | [riched20-target-device-scroll](riched20-target-device-scroll.md) | riched20 | 11.23-1 | pending | yes | pending | - | yes (11.22 overlay) | - | yes |
+| 21 | [ole32-revokedragdrop-cross-process](ole32-revokedragdrop-cross-process.md) | ole32 | 11.23-1 | pending | yes | pending | - | yes (11.22 overlay) | - | yes |
+| 22 | [rpcrt4-ndrstubcall3](rpcrt4-ndrstubcall3.md) | rpcrt4 | 11.20-1 | yes | L3 only | - | - | yes | confirm | - |
+| 23 | [server-mousemove-on-show-hide](server-mousemove-on-show-hide.md) | server | 11.20-1 | yes | yes | - | - | yes | confirm | - |
+| 24 | [shell32-folderview-selection](shell32-folderview-selection.md) | shell32 | 11.20-1 | yes | yes | - | - | yes | confirm | - |
+| 25 | [shell32-getimage](shell32-getimage.md) | shell32 | 11.20-1 | yes | yes | - | - | yes | confirm | - |
+| 26 | [urlmon-maptozone-null-terminate](urlmon-maptozone-null-terminate.md) | urlmon | 11.20-1 | yes | L3 only | - | - | yes | confirm | - |
+| 27 | [urlmon-res-zone-local-machine](urlmon-res-zone-local-machine.md) | urlmon | 11.20-1 | yes | yes | - | - | yes | confirm | - |
+| 28 | [wbemprox-timezone](wbemprox-timezone.md) | wbemprox | 11.20-1 | yes | yes | - | - | yes | confirm | - |
+| 29 | [winex11-flush-putimage](winex11-flush-putimage.md) | winex11.drv | 11.20-1 | yes | L3 only | - | - | yes | confirm | - |
+| 30 | [winex11-shape-alpha-xwayland](winex11-shape-alpha-xwayland.md) | winex11.drv | 11.20-1 | yes | L3 only | - | - | yes | confirm | - |
+| 31 | [winex11-xinput-bad-device](winex11-xinput-bad-device.md) | winex11.drv | 11.20-1 | yes | L3 only | - | - | yes | confirm | - |
+| 32 | [server-input-attachment-components](server-input-attachment-components.md) | server | 11.20-1 | yes | yes | - | yes | yes | confirm | - |
+| 33 | [msxml3-parseerror-filepos](msxml3-parseerror-filepos.md) | msxml3 | 11.20-1 | yes | yes | - | yes | yes | confirm | - |
+| 34 | [wininet-http-same-position-seek](wininet-http-same-position-seek.md) | wininet | 11.20-1 | yes | yes | - | yes | yes | confirm | - |
+| 35 | [shell32-automation-zip-copy](shell32-automation-zip-copy.md) | shell32 | 11.20-1 | yes | yes | - | yes | yes | confirm | - |
+| 36 | [msi-selection-tree-directory-property](msi-selection-tree-directory-property.md) | msi | 11.20-1 | yes | L3 only | - | yes | yes | confirm | - |
+| 37 | [comctl32-header-null-layout](comctl32-header-null-layout.md) | comctl32 | 11.20-1 | yes | yes | - | yes | yes | confirm | - |
+| 38 | [msxml3-schema-cache-namespace](msxml3-schema-cache-namespace.md) | msxml3 | 11.20-1 | yes | yes | yes | yes | yes | confirm | - |
+| 39 | [explorer-tasklist-parenting-hosts](explorer-tasklist-parenting-hosts.md) | explorer | 11.20-1 | yes | L3 only | - | yes | yes | confirm | - |
+| 40 | [comctl32-ownerdraw-existing-capture](comctl32-ownerdraw-existing-capture.md) | comctl32 | 11.20-1 | yes | yes | - | yes | yes | confirm | - |
+| 41 | [mshtml-document-open-optional-result](mshtml-document-open-optional-result.md) | mshtml | 11.20-1 | yes | yes | - | yes | yes | confirm | - |
+| 42 | [winex11-owner-managed-async](winex11-owner-managed-async.md) | winex11.drv | 11.20-1 | yes | L3 only | - | yes | yes | confirm | - |
+| 43 | [glu32-nurbs-curves](glu32-nurbs-curves.md) | glu32 | 11.20-1 | yes | yes | yes | yes | yes | confirm | - |
+| 44 | [win32u-fixed-negative-mat2](win32u-fixed-negative-mat2.md) | win32u | 11.20-1 | yes | yes | yes | yes | partly | confirm | - |
+| 45 | [win32u-child-topmost-ignore](win32u-child-topmost-ignore.md) | win32u | 11.20-1 | yes | yes | yes | - | yes | confirm | yes |
+| 46 | [comctl32-themed-checkbox-buffered-paint](comctl32-themed-checkbox-buffered-paint.md) | comctl32 | 11.20-1 | yes | yes | yes | - | yes | confirm | yes |
+| 47 | [winex11-stale-map-activation](winex11-stale-map-activation.md) | winex11.drv | 11.20-1 | yes | yes | yes | yes | yes | confirm | yes |
+| 48 | [msi-addlocal-feature-ancestors](msi-addlocal-feature-ancestors.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 49 | [msi-follow-parent-install-level](msi-follow-parent-install-level.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 50 | [msi-setfeaturestate-post-cost-action](msi-setfeaturestate-post-cost-action.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 51 | [msi-setfeaturestate-post-cost-ancestors](msi-setfeaturestate-post-cost-ancestors.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 52 | [msi-setfeaturestate-required-descendants](msi-setfeaturestate-required-descendants.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 53 | [msi-selection-override-ancestors](msi-selection-override-ancestors.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 54 | [msi-required-feature-source-state](msi-required-feature-source-state.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 55 | [msi-required-feature-advertise-state](msi-required-feature-advertise-state.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 56 | [msi-required-feature-absent-state](msi-required-feature-absent-state.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 57 | [msi-costfinalize-reset-feature-requests](msi-costfinalize-reset-feature-requests.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 58 | [msi-post-cost-local-idempotence](msi-post-cost-local-idempotence.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 59 | [msi-disabled-feature-selection](msi-disabled-feature-selection.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 60 | [msi-reject-cyclic-feature-parents](msi-reject-cyclic-feature-parents.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 61 | [msi-costfinalize-feature-depth](msi-costfinalize-feature-depth.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 62 | [msi-ui-localonly-source-state](msi-ui-localonly-source-state.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 63 | [msi-executeaction-ui-selection-transfer](msi-executeaction-ui-selection-transfer.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 64 | [msi-source-directory-component-state](msi-source-directory-component-state.md) | msi | 11.20-1 | yes | yes | yes | partly | yes | confirm | yes |
+| 65 | [oleaut32-typelib-keep-released](oleaut32-typelib-keep-released.md) | oleaut32 | 11.20-1 | yes | yes | partly | yes | Inventor | confirm | yes |
+| 66 | [opengl32-window-format-color-bits](opengl32-window-format-color-bits.md) | opengl32 | 11.20-1 | yes | yes | partly | yes | Inventor | confirm | yes |
+| 67 | [ole32-createfromfile-package](ole32-createfromfile-package.md) | ole32 | 11.20-2 | yes | yes | yes | yes | yes | confirm | yes |
+| 68 | [ole32-storage-localdocs](ole32-storage-localdocs.md) | ole32 | 11.20-2 | yes | yes | yes | yes | yes | confirm | yes |
+| 69 | [ole32-propset-null-strings](ole32-propset-null-strings.md) | ole32 | 11.20-2 | yes | yes | yes | yes | yes | confirm | yes |
+| 70 | [packager-save-view-advise](packager-save-view-advise.md) | packager | 11.20-2 | yes | yes | yes | yes | yes | confirm | yes |
+| 71 | [shell32-parentrelativeforui](shell32-parentrelativeforui.md) | shell32 | 11.22-2 | yes | yes | yes | - | yes | - | yes |
+| 72 | [shell32-label-edit-enter](shell32-label-edit-enter.md) | shell32 | 11.22-2 | yes | yes | yes | - | yes | - | yes |
+| 73 | [shell32-background-menu](shell32-background-menu.md) | shell32 | 11.22-2 | yes | yes | yes | - | yes | - | yes |
+| 74 | [shell32-autocomplete-responsive](shell32-autocomplete-responsive.md) | shell32 | 11.22-2 | yes | known deviation | yes | yes | yes | - | yes |
+| 75 | [msxml3-replacechild-same-node](msxml3-replacechild-same-node.md) | msxml3 | 11.22-2 | yes | yes | yes | yes | yes | - | yes |
+| 76 | [ucrtbase-cxx-exception-size](ucrtbase-cxx-exception-size.md) | ucrtbase | 11.22-2 | yes | yes | yes | - | yes | - | yes |
+| 77 | [server-cross-thread-killtimer](server-cross-thread-killtimer.md) | server | 11.22-2 | yes | yes | yes | yes | yes | - | yes |
+| 78 | [server-token-integrity-level](server-token-integrity-level.md) | server | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
+| 79 | [ntdll-token-integrity-level](ntdll-token-integrity-level.md) | ntdll | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
+| 80 | [combase-per-user-classes](combase-per-user-classes.md) | combase | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
+| 81 | [kernelbase-hkcr-class-reads](kernelbase-hkcr-class-reads.md) | kernelbase | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
+| 82 | [wbemdisp-method-invoke](wbemdisp-method-invoke.md) | wbemdisp | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
+| 83 | [msado15-stream-charset](msado15-stream-charset.md) | msado15 | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
+| 84 | [win32u-font-smoothing](win32u-font-smoothing.md) | win32u | 11.22-3 | yes | yes | yes | yes | yes | - | yes |
 
 ## By release
 

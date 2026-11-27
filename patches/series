@@ -23,6 +23,10 @@ oleaut32-typedesc-z-offsets.patch
 riched20-caret-rewrap.patch
 riched20-scf-word-insertion-point.patch
 riched20-textfont-applytmp.patch
+riched20-default-tab-stop.patch
+riched20-textrange-expand-paragraph.patch
+riched20-target-device-scroll.patch
+ole32-revokedragdrop-cross-process.patch
 rpcrt4-ndrstubcall3.patch
 server-mousemove-on-show-hide.patch
 shell32-folderview-selection.patch
