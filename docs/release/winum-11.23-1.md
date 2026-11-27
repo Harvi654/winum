@@ -17,7 +17,8 @@ Revit application checks.
 
 All 84 patches apply to the official Wine 11.23 source with `--fuzz=0`.
 Five patches needed mechanical updates. The server protocol files were
-regenerated with the upstream tool, taking protocol 988 to 989.
+regenerated with the upstream tool in the complete source tree, taking
+protocol 988 to 989. The request trace status-name table is preserved.
 `scripts/check-series.sh` passes. Both-architecture L0, paired vanilla
 versus series L2, and the 11.23 maintainer smoke tests are pending.
 
