@@ -1,0 +1,84 @@
+Focused Wine-only check of the two measured CostFinalize behaviors.
+
+--- a/dlls/msi/tests/package.c
++++ b/dlls/msi/tests/package.c
+@@ -9602,6 +9602,71 @@
+     DeleteFileA(msifile);
+ }
+ 
++/* Wine 11.23 paired rebase checks. The Windows observations are recorded
++ * on the winum CostFinalize feature-depth and reset-feature-requests pages.
++ * The package is only costed; no files are installed. */
++static void check_rebase_costfinalize(unsigned int depth, BOOL seed, INSTALLSTATE *action)
++{
++    MSIHANDLE db, package = 0;
++    INSTALLSTATE installed;
++    char row[160], parent[16] = "";
++    unsigned int i;
++    UINT ret;
++
++    db = create_package_db();
++    if (!db) return;
++    add_directory_entry(db, "'TARGETDIR', '', 'SourceDir'");
++    create_feature_table(db);
++    for (i = 0; i < depth; ++i)
++    {
++        sprintf(row, "'F%u', '%s', '', '', 1, 1, '', 0", i, parent);
++        add_feature_entry(db, row);
++        sprintf(parent, "F%u", i);
++    }
++    ret = package_from_db(db, &package);
++    ok(ret == ERROR_SUCCESS, "CostFinalize fixture package returned %u\n", ret);
++    if (ret != ERROR_SUCCESS) goto done;
++
++    ret = MsiDoActionA(package, "CostInitialize");
++    ok(ret == ERROR_SUCCESS, "CostFinalize fixture CostInitialize returned %u\n", ret);
++    if (ret != ERROR_SUCCESS) goto done;
++    ret = MsiDoActionA(package, "FileCost");
++    ok(ret == ERROR_SUCCESS, "CostFinalize fixture FileCost returned %u\n", ret);
++    if (ret != ERROR_SUCCESS) goto done;
++    if (seed)
++    {
++        ret = MsiSetFeatureStateA(package, "F0", INSTALLSTATE_ADVERTISED);
++        ok(ret == ERROR_SUCCESS, "CostFinalize pre-cost request returned %u\n", ret);
++        if (ret != ERROR_SUCCESS) goto done;
++    }
++
++    ret = MsiDoActionA(package, "CostFinalize");
++    ok(ret == (depth > 16 ? ERROR_INSTALL_FAILURE : ERROR_SUCCESS),
++       "CostFinalize depth %u returned %u\n", depth, ret);
++    if (ret == ERROR_SUCCESS && action)
++    {
++        ret = MsiGetFeatureStateA(package, "F0", &installed, action);
++        ok(ret == ERROR_SUCCESS, "CostFinalize fixture feature query returned %u\n", ret);
++    }
++
++done:
++    if (package) MsiCloseHandle(package);
++    DeleteFileA(msifile);
++}
++
++static void test_rebase_costfinalize(void)
++{
++    INSTALLSTATE clean = INSTALLSTATE_INVALIDARG, seeded = INSTALLSTATE_UNKNOWN;
++    INSTALLUILEVEL old_ui = MsiSetInternalUI(INSTALLUILEVEL_NONE, NULL);
++
++    check_rebase_costfinalize(16, FALSE, NULL);
++    check_rebase_costfinalize(17, FALSE, NULL);
++    check_rebase_costfinalize(1, FALSE, &clean);
++    check_rebase_costfinalize(1, TRUE, &seeded);
++    ok(clean == seeded, "CostFinalize retained pre-cost request: control %d, seeded %d\n", clean, seeded);
++    MsiSetInternalUI(old_ui, NULL);
++}
++
+ START_TEST(package)
+ {
+     char temp_path[MAX_PATH], prev_path[MAX_PATH];
+@@ -9640,6 +9705,7 @@
+     test_appsearch_inilocator();
+     test_appsearch_drlocator();
+     test_featureparents();
++    test_rebase_costfinalize();
+     test_installprops();
+     test_launchconditions();
+     test_ccpsearch();

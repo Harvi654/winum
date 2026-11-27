@@ -17,3 +17,4 @@
 # win32u-font-smoothing.patch.
 # The four winum-11.23-1 tests moved into their series patches.
 # The strict versions stay here as the test-first record.
+wine-11.23-msi-costfinalize-checks.patch

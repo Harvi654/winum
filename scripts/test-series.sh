@@ -51,6 +51,10 @@ if [ "$VARIANT" = series ]; then
     source "$HERE/scripts/lib/wine-patches.sh"
     wine_apply_patches "$SRC" "$HERE/patches" "$HERE" HEAD
 fi
+if [ "$VARIANT" = vanilla ]; then
+    say "Adding the existing winum regression tests to vanilla Wine"
+    patch -d "$SRC" -p1 -s --fuzz=0 < "$HERE/patches/tests-first/wine-11.23-baseline-tests.patch"
+fi
 if [ -f "$HERE/patches/tests-first/series" ]; then
     say "Applying patches/tests-first (both variants)"
     while IFS= read -r t; do
