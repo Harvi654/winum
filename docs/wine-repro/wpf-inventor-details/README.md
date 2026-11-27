@@ -24,3 +24,31 @@ The checked-in assembly is built from StartupHook.cs with Roslyn from the
 .NET SDK 10.0.100 targeting .NET 10.0. It is an AnyCPU library. The
 measurement logic was exercised against a synthetic tree. The first
 Inventor run is pending.
+
+## Investigation status (2026-11-27)
+
+The Open dialog in Inventor 2027 on winum-11.22-3 shows the preview, but
+the metadata block under Details is blank. The Windows reference displays
+that block. Live Visual Tree identified the WPF path as
+`FileDialogUI > MoreInfoTabControl > PART_SelectedContentHost > FileProperties`.
+The TextBlock is bound in the `FileDialogData` context. The evaluated Text
+contains the complete formatted block, including labels and values, and
+the control measures 169 by 187 device-independent pixels.
+
+Wine creates and shows the WPF Open window. Forcing WPF software rendering
+did not restore the text. The probe wrote no sample. The .NET host trace
+confirmed .NET 10.0.9 initialized through a runtime delegate and received
+the probe path in STARTUP_HOOKS; this did not confirm that Initialize ran.
+
+In the timed COM trace, selecting a part read structured storage in an
+earlier capture and retried a local-server activation for CLSID
+`{daa52b27-8897-50af-ada5-c6c71bb64e17}` in the timed run. The same CLSID
+was absent from both Windows registry views, where Details worked. The
+click window showed no COM errors. Two earlier MSCOREE errors coincided
+with loading other Inventor add-ins, about 21 seconds before selection.
+These traces do not establish a connection between those errors and Details.
+
+Next: compare the same part's Part Number in iProperties on Wine, then
+measure the WPF TextBlock's evaluated text, visibility and arranged size
+to distinguish a missing data update from layout or rendering. The
+source property of the binding and the cause remain open.
