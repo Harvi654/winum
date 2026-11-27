@@ -14,9 +14,9 @@ sha256sum -c SHA256SUMS
 INV_PREFIX=/path/to/prefix bash run-measure.sh /path/to/inventor-repo
 ```
 
-Use the normal Inventor launcher and existing Wine prefix. The runner
-requires the standard Z: mapping to the Linux filesystem root. Open the
-file dialog, select a part, wait for the preview with Options selected,
+Use the normal Inventor launcher and existing Wine prefix. The runner stages
+the probe and keeps the logs in a new private directory on the prefix C: drive.
+Open the file dialog, select a part, wait for the preview with Options selected,
 then click Details and wait two seconds. Close Inventor and keep the
 short measurement printed by the runner. Keep application logs local.
 

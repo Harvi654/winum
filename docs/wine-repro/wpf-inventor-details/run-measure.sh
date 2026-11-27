@@ -15,8 +15,9 @@ if [[ ! -f "$probe_dll" || ! -f "$inventor_repo/scripts/launch-inventor.sh" ]]; 
     printf 'Missing probe DLL or Inventor launcher.\n' >&2
     exit 1
 fi
-if [[ $(realpath -e -- "$INV_PREFIX/dosdevices/z:" 2>/dev/null) != / ]]; then
-    printf 'This command needs the Wine prefix to map Z: to /.\n' >&2
+drive_c=$(realpath -e -- "$INV_PREFIX/dosdevices/c:" 2>/dev/null || :)
+if [[ -z "$drive_c" || ! -d "$drive_c" || ! -w "$drive_c" ]]; then
+    printf 'The Wine prefix needs a writable C: drive.\n' >&2
     exit 1
 fi
 if [[ -n ${DOTNET_STARTUP_HOOKS:-} ]]; then
@@ -24,16 +25,11 @@ if [[ -n ${DOTNET_STARTUP_HOOKS:-} ]]; then
     exit 1
 fi
 
-work=$(mktemp -d ${TMPDIR:-/tmp}/inventor-wpf-measure.XXXXXXXX)
-windows_path() {
-    local slash=/
-    local backslash=$'\\'
-    printf 'Z:%s' "${1//"$slash"/"$backslash"}"
-}
-export DOTNET_STARTUP_HOOKS
-DOTNET_STARTUP_HOOKS=$(windows_path "$probe_dll")
-export INVENTOR_WPF_DETAILS_LOG
-INVENTOR_WPF_DETAILS_LOG=$(windows_path "$work/details.txt")
+work=$(mktemp -d -- "$drive_c/inventor-wpf-measure.XXXXXXXX")
+cp -- "$probe_dll" "$work/InventorDetailsMeasure.dll"
+printf -v windows_work 'C:\\%s' "${work##*/}"
+export DOTNET_STARTUP_HOOKS="$windows_work\InventorDetailsMeasure.dll"
+export INVENTOR_WPF_DETAILS_LOG="$windows_work\details.txt"
 export INV_LOGDIR="$work"
 unset INV_WINE INV_VDESKTOP WINEDEBUG
 
