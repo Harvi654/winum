@@ -55,7 +55,42 @@ a fresh query can see newly inserted matches.
 | L4 Inventor 2027 | Passed on the maintainer's test copy of winum-11.22-3 with the v2 overlay (run 45907358465). The maintainer verified the runtime path, both SHA256SUMS entries (x86_64 `7d536b5b…`, i386 `289cdc8f…`), and ran with +msxml. ISO refreshed the list without a crash. A changed filter survived restart and was reloaded. The trace recorded 27 removeAll calls, no removeAll stub message, and no e06d7363 exceptions. |
 | L4 AutoCAD | Open. Start, test a drawing, save and reopen. |
 | L4 Revit | Open. Start, test a project, save and reopen. |
-| Review | Maintainer cross review pending. |
+| Review | Cross review (Claude Opus 5.5, 2026-11-27): code and test read in full; approved for the series with one condition. See below. |
+
+## Cross review (2026-11-27)
+
+Read in full: the candidate patch, the test patch, the measurement
+README and this page; `domnode_unlink_child`, `domnode_release`, the
+selection destructor and the attribute list in Wine 11.22's msxml3.
+
+- Reference counting is right. Each selected node is still held by the
+  selection while it is unlinked; `domnode_unlink_child` moves its
+  count off the old parent chain and `domnode_release` then drops the
+  selection's own reference, as the selection destructor does. For an
+  ancestor and a descendant in one selection (measured, test case 4),
+  the ancestor survives its release on the descendant's count and is
+  freed when the descendant is unlinked from it; the descendant is
+  freed by its own release. No use after free.
+- The empty-tag flag is set only when the removed node is the element
+  parent's only child at that moment, so a parent loses its children
+  one by one and is marked on the last, as measured (`<left/>`,
+  `<group/>`).
+- Condition for the series: the test must not keep `todo_wine` on
+  `removeAll` once the fix is in the series (with the fix the call
+  succeeds and a todo block that succeeds is a failure). As with the
+  RichEdit paragraph test, carry the series copy without the todo.
+
+Open points, not blocking (Inventor selects elements only):
+
+- Attribute selections (`selectNodes("@a")`) are not measured. Wine
+  keeps attributes on their own list with the same `entry` link, so the
+  patch would detach the attribute; what Windows does is unknown.
+- A selection holding a document type node is skipped (Wine's existing
+  restriction); not measured.
+- Only `removeAll` sets the empty-tag flag; whether `removeChild` of the
+  last child serializes the same way on Windows is not measured here.
+- `domnode_unlink_child` is no longer static; acceptable for a
+  one-DLL patch.
 
 Series inclusion requires the completed L2 comparison, the AutoCAD and
 Revit L4 checks, and maintainer cross review. The intended release is
