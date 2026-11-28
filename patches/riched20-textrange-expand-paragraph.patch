@@ -1,0 +1,717 @@
+From: Harvi654 <202698022+Harvi654@users.noreply.github.com>
+Subject: [PATCH] riched20: Implement TOM paragraph navigation.
+
+AI-assisted (Codex), original code; LGPL-2.1-or-later. Not submitted upstream.
+
+On offline Windows 10, both RichEdit classes and both windowless hosts
+expand to the paragraphs containing the range, with an exclusive end
+for a nonempty range. The implicit terminal mark counts, and unchanged
+ranges return S_FALSE. Wine 11.22 returns E_NOTIMPL.
+
+Use the editor's paragraph positions for the six tomParagraph methods.
+Leave other units unchanged.
+
+v2 (2026-11-26): Generate the patch context from the 11.22-3 series,
+including textfont-applytmp. The implementation and test are unchanged.
+
+v3 (2026-11-26): Offline Windows 10 results agree for both bitnesses and
+all four hosts. Implement StartOf, EndOf, Move, MoveStart and MoveEnd in
+addition to Expand. Collapse and movement count differ at the terminal
+mark. Only MoveEnd and an extending EndOf can reach it via navigation.
+
+v4 (2026-11-27): Promoted for Wine 11.23 with the verified strict
+Wine test. The implementation is unchanged from the reviewed candidate.
+
+--- a/dlls/riched20/richole.c
++++ b/dlls/riched20/richole.c
+@@ -892,34 +892,79 @@
+ {
+     SysFreeString(font->props[FONT_NAME].str);
+     font->props[FONT_NAME].str = NULL;
+     textfont_cache_range_props(font);
+ }
+ 
+-static HRESULT textrange_expand(ITextRange *range, LONG unit, LONG *delta)
+-{
+-    LONG expand_start, expand_end;
++static ME_Paragraph *textrange_paragraph_at(ME_TextEditor *editor, LONG offset)
++{
++    ME_Cursor cursor;
++
++    cursor_from_char_ofs(editor, offset, &cursor);
++    return cursor.para;
++}
++
++/* Count boundaries reached, with the last legal position set by the endpoint. */
++static LONG textrange_move_paragraphs(ME_TextEditor *editor, LONG *offset, LONG count, LONG limit)
++{
++    ME_Paragraph *para = textrange_paragraph_at(editor, *offset);
++    LONG moved = 0;
++
++    while (count > 0 && *offset < limit)
++    {
++        para = para_next(para);
++        *offset = min(para->nCharOfs, limit);
++        --count;
++        ++moved;
++    }
++
++    while (count < 0)
++    {
++        if (*offset <= para->nCharOfs)
++            para = para_prev(para);
++        if (!para)
++            break;
++        *offset = para->nCharOfs;
++        ++count;
++        --moved;
++    }
++    return moved;
++}
++
++static HRESULT textrange_expand(ITextRange *range, ME_TextEditor *editor, LONG unit, LONG *delta)
++{
++    LONG expand_start, expand_end, start, end;
++
++    if (unit == tomParagraph || delta)
++    {
++        ITextRange_GetStart(range, &start);
++        ITextRange_GetEnd(range, &end);
++    }
+ 
+     switch (unit)
+     {
+     case tomStory:
+         expand_start = 0;
+         ITextRange_GetStoryLength(range, &expand_end);
+         break;
++    case tomParagraph:
++    {
++        expand_start = textrange_paragraph_at(editor, start)->nCharOfs;
++        /* A nonempty range ends after its last included character. */
++        expand_end = para_next(textrange_paragraph_at(editor, end > start ? end - 1 : end))->nCharOfs;
++        break;
++    }
+     default:
+         FIXME("unit %ld is not supported\n", unit);
+         return E_NOTIMPL;
+     }
+ 
+-    if (delta) {
+-        LONG start, end;
+-
+-        ITextRange_GetStart(range, &start);
+-        ITextRange_GetEnd(range, &end);
++    if (delta)
+         *delta = expand_end - expand_start - (end - start);
+-    }
++    if (unit == tomParagraph && start == expand_start && end == expand_end)
++        return S_FALSE;
+ 
+     ITextRange_SetStart(range, expand_start);
+     ITextRange_SetEnd(range, expand_end);
+ 
+     return S_OK;
+ }
+@@ -1927,13 +1972,13 @@
+ 
+     TRACE("(%p)->(%ld %p)\n", This, unit, delta);
+ 
+     if (!This->child.reole)
+         return CO_E_RELEASED;
+ 
+-    return textrange_expand(me, unit, delta);
++    return textrange_expand(me, This->child.reole->editor, unit, delta);
+ }
+ 
+ static HRESULT WINAPI ITextRange_fnGetIndex(ITextRange *me, LONG unit, LONG *index)
+ {
+     ITextRangeImpl *This = impl_from_ITextRange(me);
+ 
+@@ -2082,13 +2127,13 @@
+         return CO_E_RELEASED;
+ 
+     set_selection(This->child.reole->editor, This->start, This->end);
+     return S_OK;
+ }
+ 
+-static HRESULT textrange_startof(ITextRange *range, LONG unit, LONG extend, LONG *delta)
++static HRESULT textrange_startof(ITextRange *range, ME_TextEditor *editor, LONG unit, LONG extend, LONG *delta)
+ {
+     HRESULT hr;
+     LONG start, end;
+     LONG moved;
+ 
+     ITextRange_GetStart(range, &start);
+@@ -2107,12 +2152,28 @@
+         }
+         if (delta)
+             *delta = moved;
+         hr = moved ? S_OK : S_FALSE;
+         break;
+     }
++    case tomParagraph:
++    {
++        LONG new_start = textrange_paragraph_at(editor, start)->nCharOfs;
++
++        moved = new_start - start;
++        ITextRange_SetStart(range, new_start);
++        if (extend == tomMove)
++        {
++            ITextRange_SetEnd(range, new_start);
++            if (start != end)
++                --moved;
++        }
++        if (delta)
++            *delta = moved;
++        return moved ? S_OK : S_FALSE;
++    }
+     default:
+         FIXME("unit %ld is not supported\n", unit);
+         return E_NOTIMPL;
+     }
+     return hr;
+ }
+@@ -2124,13 +2185,13 @@
+ 
+     TRACE("(%p)->(%ld %ld %p)\n", This, unit, extend, delta);
+ 
+     if (!This->child.reole)
+         return CO_E_RELEASED;
+ 
+-    return textrange_startof(me, unit, extend, delta);
++    return textrange_startof(me, This->child.reole->editor, unit, extend, delta);
+ }
+ 
+ static HRESULT textrange_endof(ITextRange *range, ME_TextEditor *editor, LONG unit, LONG extend, LONG *delta)
+ {
+     HRESULT hr;
+     LONG old_start, old_end, new_end;
+@@ -2159,12 +2220,36 @@
+         if (extend == tomMove)
+             ITextRange_SetStart(range, new_end);
+         if (delta)
+             *delta = moved;
+         hr = moved ? S_OK : S_FALSE;
+         break;
++    }
++    case tomParagraph:
++    {
++        ME_Paragraph *para = textrange_paragraph_at(editor, old_end);
++        LONG length = ME_GetTextLength(editor);
++
++        /* An exact boundary is kept, except at the start of the story. */
++        new_end = old_end;
++        if (!old_end || (old_end <= length && old_end != para->nCharOfs))
++            new_end = para_next(para)->nCharOfs;
++        if (extend == tomMove)
++            new_end = min(new_end, length);
++
++        moved = new_end - old_end;
++        ITextRange_SetEnd(range, new_end);
++        if (extend == tomMove)
++        {
++            ITextRange_SetStart(range, new_end);
++            if (old_start != old_end && old_start != new_end)
++                ++moved;
++        }
++        if (delta)
++            *delta = moved;
++        return moved ? S_OK : S_FALSE;
+     }
+     default:
+         FIXME("unit %ld is not supported\n", unit);
+         return E_NOTIMPL;
+     }
+     return hr;
+@@ -2234,12 +2319,35 @@
+             if (old_start != old_end)
+                 --moved;
+         }
+         if (delta) *delta = moved;
+         break;
+     }
++    case tomParagraph:
++    {
++        LONG length = ME_GetTextLength(editor);
++        LONG offset = count > 0 ? old_end : old_start;
++
++        if (count > 0 && old_end > length)
++        {
++            /* A caret cannot remain past the last character. */
++            offset = length;
++            moved = -1;
++        }
++        else
++        {
++            /* Include the starting edge of a nonempty range if it is a boundary. */
++            if (old_start != old_end)
++                offset += count > 0 ? -1 : 1;
++            moved = textrange_move_paragraphs(editor, &offset, count, length);
++        }
++        new_start = new_end = offset;
++        if (delta)
++            *delta = moved;
++        break;
++    }
+     default:
+         FIXME("unit %ld is not supported\n", unit);
+         return E_NOTIMPL;
+     }
+     if (moved == 0)
+         hr = S_FALSE;
+@@ -2285,12 +2393,23 @@
+         cursor_from_char_ofs( editor, old_start, &cursor );
+         moved = ME_MoveCursorChars(editor, &cursor, count, FALSE);
+         new_start = old_start + moved;
+         new_end = old_end;
+         if (new_end < new_start)
+             new_end = new_start;
++        if (delta)
++            *delta = moved;
++        break;
++    }
++    case tomParagraph:
++    {
++        LONG moved;
++
++        new_start = old_start;
++        moved = textrange_move_paragraphs(editor, &new_start, count, ME_GetTextLength(editor));
++        new_end = max(old_end, new_start);
+         if (delta)
+             *delta = moved;
+         break;
+     }
+     default:
+         FIXME("unit %ld is not supported\n", unit);
+@@ -2363,12 +2482,24 @@
+             else if (new_end == old_end)
+                 *delta = 0;
+             else
+                 *delta = 1;
+         }
+         break;
++    case tomParagraph:
++    {
++        LONG limit, moved;
++
++        ITextRange_GetStoryLength(range, &limit);
++        new_end = old_end;
++        moved = textrange_move_paragraphs(editor, &new_end, count, limit);
++        new_start = min(old_start, new_end);
++        if (delta)
++            *delta = moved;
++        break;
++    }
+     default:
+         FIXME("unit %ld is not supported\n", unit);
+         return E_NOTIMPL;
+     }
+     if (new_end == old_end)
+         hr = S_FALSE;
+@@ -5047,13 +5178,13 @@
+     TRACE("(%p)->(%ld %p)\n", This, unit, delta);
+ 
+     if (!This->services)
+         return CO_E_RELEASED;
+ 
+     ITextSelection_QueryInterface(me, &IID_ITextRange, (void**)&range);
+-    hr = textrange_expand(range, unit, delta);
++    hr = textrange_expand(range, This->services->editor, unit, delta);
+     ITextRange_Release(range);
+     return hr;
+ }
+ 
+ static HRESULT WINAPI ITextSelection_fnGetIndex(ITextSelection *me, LONG unit, LONG *index)
+ {
+@@ -5181,13 +5312,13 @@
+     TRACE("(%p)->(%ld %ld %p)\n", This, unit, extend, delta);
+ 
+     if (!This->services)
+         return CO_E_RELEASED;
+ 
+     ITextSelection_QueryInterface(me, &IID_ITextRange, (void**)&range);
+-    hr = textrange_startof(range, unit, extend, delta);
++    hr = textrange_startof(range, This->services->editor, unit, extend, delta);
+     ITextRange_Release(range);
+     return hr;
+ }
+ 
+ static HRESULT WINAPI ITextSelection_fnEndOf(ITextSelection *me, LONG unit, LONG extend,
+     LONG *delta)
+
+--- a/dlls/riched20/tests/richole.c
++++ b/dlls/riched20/tests/richole.c
+@@ -5568,6 +5568,358 @@
++static BOOL set_expand_text(ITextDocument *doc, const WCHAR *text)
++{
++    ITextRange *range;
++    HRESULT hr;
++    BSTR str;
++
++    hr = ITextDocument_Range(doc, 0, 0, &range);
++    ok(hr == S_OK, "Range failed: %#lx\n", hr);
++    if (FAILED(hr)) return FALSE;
++    hr = ITextRange_Expand(range, tomStory, NULL);
++    ok(SUCCEEDED(hr), "Expand story failed: %#lx\n", hr);
++    if (SUCCEEDED(hr))
++    {
++        str = SysAllocString(text);
++        hr = ITextRange_SetText(range, str);
++        SysFreeString(str);
++        ok(hr == S_OK, "SetText failed: %#lx\n", hr);
++    }
++    ITextRange_Release(range);
++    return SUCCEEDED(hr);
++}
++
++static void check_expand_paragraph(ITextRange *range, LONG expected_start, LONG expected_end,
++                                   LONG expected_delta, HRESULT expected_hr, BOOL want_delta)
++{
++    LONG start = -1, end = -1, delta = 0x12345678;
++    HRESULT hr;
++
++    hr = ITextRange_Expand(range, tomParagraph, want_delta ? &delta : NULL);
++
++    ok(hr == expected_hr, "Expand returned %#lx, expected %#lx\n", hr, expected_hr);
++    if (FAILED(hr)) return;
++
++    ITextRange_GetStart(range, &start);
++    ITextRange_GetEnd(range, &end);
++    ok(start == expected_start && end == expected_end, "range %ld,%ld, expected %ld,%ld\n",
++       start, end, expected_start, expected_end);
++    if (want_delta)
++        ok(delta == expected_delta, "delta %ld, expected %ld\n", delta, expected_delta);
++}
++
++enum paragraph_operation
++{
++    start_of, end_of, move, move_start, move_end
++};
++
++struct paragraph_case
++{
++    enum paragraph_operation op;
++    LONG arg, start, end, new_start, new_end, delta;
++    HRESULT hr;
++};
++
++static void run_paragraph_cases(ITextDocument *doc, const WCHAR *text,
++                                const struct paragraph_case *cases, unsigned int count)
++{
++    unsigned int i, want_delta;
++
++    if (!set_expand_text(doc, text)) return;
++    for (i = 0; i < count; ++i)
++    {
++        const struct paragraph_case *entry = cases + i;
++
++        for (want_delta = 0; want_delta <= 1; ++want_delta)
++        {
++            LONG delta = 0x12345678, start = -1, end = -1;
++            LONG *out = want_delta ? &delta : NULL;
++            ITextRange *range;
++            HRESULT hr;
++
++            hr = ITextDocument_Range(doc, entry->start, entry->end, &range);
++            ok(hr == S_OK, "Range failed: %#lx\n", hr);
++            if (FAILED(hr)) continue;
++
++            winetest_push_context("operation %u, case %u, want_delta %u", entry->op, i, want_delta);
++            switch (entry->op)
++            {
++            case start_of: hr = ITextRange_StartOf(range, tomParagraph, entry->arg, out); break;
++            case end_of: hr = ITextRange_EndOf(range, tomParagraph, entry->arg, out); break;
++            case move: hr = ITextRange_Move(range, tomParagraph, entry->arg, out); break;
++            case move_start: hr = ITextRange_MoveStart(range, tomParagraph, entry->arg, out); break;
++            case move_end: hr = ITextRange_MoveEnd(range, tomParagraph, entry->arg, out); break;
++            default: hr = E_UNEXPECTED; break;
++            }
++
++            ok(hr == entry->hr, "returned %#lx, expected %#lx\n", hr, entry->hr);
++            if (SUCCEEDED(hr))
++            {
++                ITextRange_GetStart(range, &start);
++                ITextRange_GetEnd(range, &end);
++                ok(start == entry->new_start && end == entry->new_end,
++                   "range %ld,%ld, expected %ld,%ld\n", start, end, entry->new_start, entry->new_end);
++                if (want_delta)
++                    ok(delta == entry->delta, "delta %ld, expected %ld\n", delta, entry->delta);
++            }
++            ITextRange_Release(range);
++            winetest_pop_context();
++        }
++    }
++}
++
++static void test_paragraph_navigation(ITextDocument *doc)
++{
++    static const struct paragraph_case short_cases[] =
++    {
++        { start_of, tomMove, 0, 0, 0, 0, 0, S_FALSE },
++        { start_of, tomExtend, 0, 0, 0, 0, 0, S_FALSE },
++        { end_of, tomMove, 0, 0, 2, 2, 2, S_OK },
++        { end_of, tomExtend, 0, 0, 0, 2, 2, S_OK },
++        { move, 1, 0, 0, 2, 2, 1, S_OK },
++        { move_start, 1, 0, 0, 2, 2, 1, S_OK },
++        { move_end, 1, 0, 0, 0, 2, 1, S_OK },
++        { start_of, tomMove, 1, 2, 0, 0, -2, S_OK },
++        { start_of, tomExtend, 1, 2, 0, 2, -1, S_OK },
++        { end_of, tomMove, 1, 2, 2, 2, 1, S_OK },
++        { end_of, tomExtend, 1, 2, 1, 2, 0, S_FALSE },
++        { move, -32, 1, 2, 0, 0, -1, S_OK },
++        { move, 1, 1, 2, 2, 2, 1, S_OK },
++        { move, 32, 1, 2, 2, 2, 1, S_OK },
++        { move_start, -32, 1, 2, 0, 2, -1, S_OK },
++        { move_start, 1, 1, 2, 2, 2, 1, S_OK },
++        { move_start, 32, 1, 2, 2, 2, 1, S_OK },
++        { move_end, -32, 1, 2, 0, 0, -1, S_OK },
++        { move_end, 1, 1, 2, 1, 3, 1, S_OK },
++        { move_end, 32, 1, 2, 1, 3, 1, S_OK },
++        { move, -1, 1, 1, 0, 0, -1, S_OK },
++        { move, 1, 1, 1, 2, 2, 1, S_OK },
++        { move_start, -1, 1, 1, 0, 1, -1, S_OK },
++        { move_start, 1, 1, 1, 2, 2, 1, S_OK },
++        { move_end, -1, 1, 1, 0, 0, -1, S_OK },
++        { move_end, 1, 1, 1, 1, 2, 1, S_OK },
++        { start_of, tomMove, 2, 2, 2, 2, 0, S_FALSE },
++        { start_of, tomExtend, 2, 2, 2, 2, 0, S_FALSE },
++        { end_of, tomMove, 2, 2, 2, 2, 0, S_FALSE },
++        { end_of, tomExtend, 2, 2, 2, 2, 0, S_FALSE },
++        { move, 1, 2, 2, 2, 2, 0, S_FALSE },
++        { move_start, 1, 2, 2, 2, 2, 0, S_FALSE },
++        { move_end, 1, 2, 2, 2, 3, 1, S_OK },
++        { start_of, tomMove, 2, 3, 2, 2, -1, S_OK },
++        { start_of, tomExtend, 2, 3, 2, 3, 0, S_FALSE },
++        { end_of, tomMove, 2, 3, 2, 2, -1, S_OK },
++        { end_of, tomExtend, 2, 3, 2, 3, 0, S_FALSE },
++        { move, -32, 2, 3, 0, 0, -2, S_OK },
++        { move, -1, 2, 3, 2, 2, -1, S_OK },
++        { move, 1, 2, 3, 2, 2, -1, S_OK },
++        { move, 32, 2, 3, 2, 2, -1, S_OK },
++        { move_start, -32, 2, 3, 0, 3, -1, S_OK },
++        { move_start, -1, 2, 3, 0, 3, -1, S_OK },
++        { move_start, 1, 2, 3, 2, 3, 0, S_FALSE },
++        { move_start, 32, 2, 3, 2, 3, 0, S_FALSE },
++        { move_end, -32, 2, 3, 0, 0, -2, S_OK },
++        { move_end, -1, 2, 3, 2, 2, -1, S_OK },
++        { move_end, 1, 2, 3, 2, 3, 0, S_FALSE },
++        { move_end, 32, 2, 3, 2, 3, 0, S_FALSE },
++    };
++    static const struct paragraph_case two_paragraphs[] =
++    {
++        { start_of, tomMove, 1, 18, 0, 0, -2, S_OK },
++        { start_of, tomExtend, 1, 18, 0, 18, -1, S_OK },
++        { end_of, tomMove, 1, 18, 18, 18, 1, S_OK },
++        { end_of, tomExtend, 1, 18, 1, 18, 0, S_FALSE },
++        { move, 1, 1, 18, 18, 18, 1, S_OK },
++        { move_start, 1, 1, 18, 18, 18, 1, S_OK },
++        { move_end, 1, 1, 18, 1, 31, 1, S_OK },
++        { start_of, tomMove, 1, 20, 0, 0, -2, S_OK },
++        { start_of, tomExtend, 1, 20, 0, 20, -1, S_OK },
++        { end_of, tomMove, 1, 20, 30, 30, 11, S_OK },
++        { end_of, tomExtend, 1, 20, 1, 31, 11, S_OK },
++        { move, -32, 1, 20, 0, 0, -1, S_OK },
++        { move, 0, 1, 20, 1, 20, 0, S_FALSE },
++        { move, 1, 1, 20, 30, 30, 1, S_OK },
++        { move, 32, 1, 20, 30, 30, 1, S_OK },
++        { move_start, -32, 1, 20, 0, 20, -1, S_OK },
++        { move_start, 0, 1, 20, 1, 20, 0, S_FALSE },
++        { move_start, 1, 1, 20, 18, 20, 1, S_OK },
++        { move_start, 32, 1, 20, 30, 30, 2, S_OK },
++        { move_end, -32, 1, 20, 0, 0, -2, S_OK },
++        { move_end, 0, 1, 20, 1, 20, 0, S_FALSE },
++        { move_end, 1, 1, 20, 1, 31, 1, S_OK },
++        { move_end, 32, 1, 20, 1, 31, 1, S_OK },
++        { move, -1, 18, 18, 0, 0, -1, S_OK },
++        { move, 1, 18, 18, 30, 30, 1, S_OK },
++        { move_start, -1, 18, 18, 0, 18, -1, S_OK },
++        { move_start, 1, 18, 18, 30, 30, 1, S_OK },
++        { move_end, -1, 18, 18, 0, 0, -1, S_OK },
++        { move_end, 1, 18, 18, 18, 31, 1, S_OK },
++        { move, -1, 20, 23, 18, 18, -1, S_OK },
++        { move_start, -1, 20, 23, 18, 23, -1, S_OK },
++        { move_end, -1, 20, 23, 18, 18, -1, S_OK },
++        { start_of, tomMove, 30, 30, 18, 18, -12, S_OK },
++        { start_of, tomExtend, 30, 30, 18, 30, -12, S_OK },
++        { end_of, tomMove, 30, 30, 30, 30, 0, S_FALSE },
++        { end_of, tomExtend, 30, 30, 30, 31, 1, S_OK },
++        { move, 1, 30, 30, 30, 30, 0, S_FALSE },
++        { move_start, 1, 30, 30, 30, 30, 0, S_FALSE },
++        { move_end, 1, 30, 30, 30, 31, 1, S_OK },
++        { start_of, tomMove, 30, 31, 18, 18, -13, S_OK },
++        { start_of, tomExtend, 30, 31, 18, 31, -12, S_OK },
++        { end_of, tomMove, 30, 31, 30, 30, -1, S_OK },
++        { end_of, tomExtend, 30, 31, 30, 31, 0, S_FALSE },
++        { move, -32, 30, 31, 0, 0, -2, S_OK },
++        { move, -1, 30, 31, 18, 18, -1, S_OK },
++        { move, 1, 30, 31, 30, 30, -1, S_OK },
++        { move, 32, 30, 31, 30, 30, -1, S_OK },
++        { move_start, -32, 30, 31, 0, 31, -2, S_OK },
++        { move_start, -1, 30, 31, 18, 31, -1, S_OK },
++        { move_start, 1, 30, 31, 30, 31, 0, S_FALSE },
++        { move_start, 32, 30, 31, 30, 31, 0, S_FALSE },
++        { move_end, -32, 30, 31, 0, 0, -2, S_OK },
++        { move_end, -1, 30, 31, 18, 18, -1, S_OK },
++        { move_end, 1, 30, 31, 30, 31, 0, S_FALSE },
++        { move_end, 32, 30, 31, 30, 31, 0, S_FALSE },
++    };
++    static const struct paragraph_case two_trailing_cr[] =
++    {
++        { move, 1, 30, 31, 31, 31, 1, S_OK },
++        { move_start, 1, 30, 31, 31, 31, 1, S_OK },
++        { move_end, 1, 30, 31, 30, 32, 1, S_OK },
++        { start_of, tomMove, 31, 32, 31, 31, -1, S_OK },
++        { start_of, tomExtend, 31, 32, 31, 32, 0, S_FALSE },
++        { end_of, tomMove, 31, 32, 31, 31, -1, S_OK },
++        { end_of, tomExtend, 31, 32, 31, 32, 0, S_FALSE },
++        { move, -1, 31, 32, 31, 31, -1, S_OK },
++        { move, 1, 31, 32, 31, 31, -1, S_OK },
++        { move_start, -1, 31, 32, 18, 32, -1, S_OK },
++        { move_start, 1, 31, 32, 31, 32, 0, S_FALSE },
++        { move_end, -1, 31, 32, 31, 31, -1, S_OK },
++        { move_end, 1, 31, 32, 31, 32, 0, S_FALSE },
++    };
++
++    run_paragraph_cases(doc, L"-\r", short_cases, ARRAY_SIZE(short_cases));
++    run_paragraph_cases(doc, L"Alpha beta. Next!\rGamma delta.", two_paragraphs, ARRAY_SIZE(two_paragraphs));
++    run_paragraph_cases(doc, L"Alpha beta. Next!\rGamma delta.\r", two_trailing_cr, ARRAY_SIZE(two_trailing_cr));
++}
++
++static void test_expand_paragraph_class(const WCHAR *class_name)
++{
++    static const GUID text_document_iid = {0x8cc497c0,0xa1df,0x11ce,{0x80,0x98,0x00,0xaa,0x00,0x47,0xbe,0x5d}};
++    static const struct
++    {
++        LONG start, end, expanded_start, expanded_end, delta;
++        HRESULT hr;
++    }
++    cases[] =
++    {
++        {  2,  5,  0, 18, 15, S_OK },
++        {  5, 23,  0, 31, 13, S_OK },
++        {  0, 18,  0, 18,  0, S_FALSE },
++        { 18, 31, 18, 31,  0, S_FALSE },
++        {  6, 18,  0, 18,  6, S_OK },
++        {  7,  7,  0, 18, 18, S_OK },
++        { 18, 18, 18, 31, 13, S_OK },
++        { 35, 36, 31, 36,  4, S_OK },
++        { 36, 36, 36, 37,  1, S_OK },
++        { 36, 37, 36, 37,  0, S_FALSE },
++        { 37, 37, 36, 37,  1, S_OK },
++    };
++    ITextRange *range, *duplicate;
++    ITextDocument *doc;
++    IUnknown *ole = NULL;
++    unsigned int i, want_delta;
++    HRESULT hr;
++    HWND hwnd;
++
++    hwnd = CreateWindowExW(0, class_name, NULL, WS_POPUP | ES_MULTILINE,
++                           0, 0, 320, 200, NULL, NULL, NULL, NULL);
++    ok(!!hwnd, "CreateWindowExW failed: %lu\n", GetLastError());
++    if (!hwnd) return;
++    SendMessageW(hwnd, EM_GETOLEINTERFACE, 0, (LPARAM)&ole);
++    ok(!!ole, "EM_GETOLEINTERFACE failed\n");
++    if (!ole) goto done;
++    hr = IUnknown_QueryInterface(ole, &text_document_iid, (void **)&doc);
++    IUnknown_Release(ole);
++    ok(hr == S_OK, "QueryInterface returned %#lx\n", hr);
++    if (FAILED(hr)) goto done;
++
++    if (set_expand_text(doc, L"Alpha beta. Next!\rGamma delta.\rLast\r"))
++    {
++        for (i = 0; i < ARRAY_SIZE(cases); ++i)
++        {
++            for (want_delta = 0; want_delta <= 1; ++want_delta)
++            {
++                winetest_push_context("case %u, want_delta %u", i, want_delta);
++                hr = ITextDocument_Range(doc, cases[i].start, cases[i].end, &range);
++                ok(hr == S_OK, "Range failed: %#lx\n", hr);
++                if (SUCCEEDED(hr))
++                {
++                    check_expand_paragraph(range, cases[i].expanded_start, cases[i].expanded_end,
++                                           cases[i].delta, cases[i].hr, want_delta);
++                    ITextRange_Release(range);
++                }
++                winetest_pop_context();
++            }
++        }
++    }
++
++    if (set_expand_text(doc, L"-\r"))
++    {
++        hr = ITextDocument_Range(doc, 0, 0, &range);
++        ok(hr == S_OK, "Range failed: %#lx\n", hr);
++        if (SUCCEEDED(hr))
++        {
++            hr = ITextRange_Expand(range, tomStory, NULL);
++            ok(SUCCEEDED(hr), "Expand story failed: %#lx\n", hr);
++            hr = ITextRange_SetStart(range, 0);
++            ok(SUCCEEDED(hr), "SetStart failed: %#lx\n", hr);
++            hr = ITextRange_SetEnd(range, 2);
++            ok(SUCCEEDED(hr), "SetEnd failed: %#lx\n", hr);
++            hr = ITextRange_GetDuplicate(range, &duplicate);
++            ok(hr == S_OK, "GetDuplicate failed: %#lx\n", hr);
++            if (SUCCEEDED(hr))
++            {
++                check_expand_paragraph(duplicate, 0, 2, 0, S_FALSE, FALSE);
++                hr = ITextRange_MoveEnd(duplicate, tomParagraph, 1, NULL);
++
++                ok(hr == S_OK, "MoveEnd after Expand returned %#lx\n", hr);
++                if (SUCCEEDED(hr))
++                {
++                    LONG start, end;
++
++                    ITextRange_GetStart(duplicate, &start);
++                    ITextRange_GetEnd(duplicate, &end);
++                    ok(start == 0 && end == 3, "range after MoveEnd %ld,%ld\n", start, end);
++                }
++                ITextRange_Release(duplicate);
++            }
++            ITextRange_Release(range);
++        }
++    }
++    test_paragraph_navigation(doc);
++    ITextDocument_Release(doc);
++done:
++    DestroyWindow(hwnd);
++}
++
++static void test_expand_paragraph(void)
++{
++    HMODULE msftedit = LoadLibraryW(L"msftedit.dll");
++
++    winetest_push_context("RichEdit20W");
++    test_expand_paragraph_class(L"RichEdit20W");
++    winetest_pop_context();
++    if (msftedit)
++    {
++        winetest_push_context("RICHEDIT50W");
++        test_expand_paragraph_class(L"RICHEDIT50W");
++        winetest_pop_context();
++        FreeLibrary(msftedit);
++    }
++    else win_skip("msftedit.dll unavailable\n");
++}
++
+ START_TEST(richole)
+ {
+   /* Must explicitly LoadLibrary(). The test has no references to functions in
+    * RICHED20.DLL, so the linker doesn't actually link to it. */
+   hmoduleRichEdit = LoadLibraryA("riched20.dll");
+   ok(hmoduleRichEdit != NULL, "error: %d\n", (int) GetLastError());
+@@ -5600,12 +5952,13 @@
+   test_GetStoryType();
+   test_SetFont();
+   test_InsertObject();
+   test_GetStoryLength();
+   test_ITextSelection_GetDuplicate();
+   test_Expand();
++  test_expand_paragraph();
+   test_MoveEnd_story();
+   test_character_movement();
+   test_clipboard();
+   test_undo();
+   test_undo_control();
+   test_freeze();

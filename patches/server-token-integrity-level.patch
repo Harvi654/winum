@@ -33,10 +33,15 @@ elevated console, x86_64 and i686) confirmed the level of every derived
 token; L1, paired L2 and the Inventor, Nastran and AutoCAD L4 passed.
 Promoted to the series for winum-11.22-3.
 
-diff --git a/include/wine/server_protocol.h b/include/wine/server_protocol.h
+v3 (2026-11-27): Rebased to Wine 11.23, context only, logic unchanged.
+Regenerate the protocol headers and tracing from protocol.def with make_requests (988 to 989).
+
+v4 (2026-11-28): Regenerate from the complete Wine 11.23 source to
+retain the request trace status-name table. Token logic unchanged.
+
 --- a/include/wine/server_protocol.h
 +++ b/include/wine/server_protocol.h
-@@ -5517,9 +5517,9 @@ struct get_token_info_reply
+@@ -5524,9 +5524,9 @@
      int            impersonation_level;
      int            elevation_type;
      int            is_elevated;
@@ -47,18 +52,17 @@ diff --git a/include/wine/server_protocol.h b/include/wine/server_protocol.h
  };
  
  
-@@ -7197,6 +7197,6 @@ union generic_reply
+@@ -7225,6 +7225,6 @@
      struct alpc_create_port_reply alpc_create_port_reply;
  };
  
--#define SERVER_PROTOCOL_VERSION 979
-+#define SERVER_PROTOCOL_VERSION 980
+-#define SERVER_PROTOCOL_VERSION 988
++#define SERVER_PROTOCOL_VERSION 989
  
  #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
-diff --git a/server/protocol.def b/server/protocol.def
 --- a/server/protocol.def
 +++ b/server/protocol.def
-@@ -3908,6 +3908,7 @@ struct handle_info
+@@ -3915,6 +3915,7 @@
      int            impersonation_level; /* level of impersonation */
      int            elevation_type; /* elevation type (TokenElevation*) */
      int            is_elevated;   /* is the token elevated as per GetTokenInformation(TokenElevation) */
@@ -66,10 +70,9 @@ diff --git a/server/protocol.def b/server/protocol.def
      int            group_count;   /* the number of groups the token is a member of */
      int            privilege_count; /* the number of privileges the token has */
  @END
-diff --git a/server/request_handlers.h b/server/request_handlers.h
 --- a/server/request_handlers.h
 +++ b/server/request_handlers.h
-@@ -2158,8 +2158,9 @@ C_ASSERT( offsetof(struct get_token_info_reply, primary) == 28 );
+@@ -2157,8 +2157,9 @@
  C_ASSERT( offsetof(struct get_token_info_reply, impersonation_level) == 32 );
  C_ASSERT( offsetof(struct get_token_info_reply, elevation_type) == 36 );
  C_ASSERT( offsetof(struct get_token_info_reply, is_elevated) == 40 );
@@ -81,10 +84,9 @@ diff --git a/server/request_handlers.h b/server/request_handlers.h
  C_ASSERT( sizeof(struct get_token_info_reply) == 56 );
  C_ASSERT( offsetof(struct create_linked_token_request, handle) == 12 );
  C_ASSERT( sizeof(struct create_linked_token_request) == 16 );
-diff --git a/server/request_trace.h b/server/request_trace.h
 --- a/server/request_trace.h
 +++ b/server/request_trace.h
-@@ -3071,6 +3071,7 @@ static void dump_get_token_info_reply( const struct get_token_info_reply *req )
+@@ -3072,6 +3072,7 @@
      fprintf( stderr, ", impersonation_level=%d", req->impersonation_level );
      fprintf( stderr, ", elevation_type=%d", req->elevation_type );
      fprintf( stderr, ", is_elevated=%d", req->is_elevated );
@@ -92,10 +94,9 @@ diff --git a/server/request_trace.h b/server/request_trace.h
      fprintf( stderr, ", group_count=%d", req->group_count );
      fprintf( stderr, ", privilege_count=%d", req->privilege_count );
  }
-diff --git a/server/token.c b/server/token.c
 --- a/server/token.c
 +++ b/server/token.c
-@@ -114,6 +114,7 @@ struct token
+@@ -114,6 +114,7 @@
      struct acl    *default_dacl;    /* the default DACL to assign to objects created by this user */
      int            impersonation_level; /* impersonation level this token is capable of if non-primary token */
      int            elevation;       /* elevation type */
@@ -103,7 +104,7 @@ diff --git a/server/token.c b/server/token.c
      struct list    kernel_object;   /* list of kernel object pointers */
  };
  
-@@ -489,6 +490,9 @@ static struct token *create_token( unsigned int primary, unsigned int session_id
+@@ -489,6 +490,9 @@
              token->impersonation_level = impersonation_level;
          token->default_dacl = NULL;
          token->elevation = elevation;
@@ -113,7 +114,7 @@ diff --git a/server/token.c b/server/token.c
  
          /* copy user */
          token->user = memdup( user, sid_len( user ));
-@@ -603,6 +607,7 @@ struct token *token_duplicate( struct token *src_token, unsigned primary,
+@@ -603,6 +607,7 @@
                            src_token->primary_group, NULL, 0, NULL, 0, src_token->default_dacl,
                            modified_id, impersonation_level, src_token->elevation );
      if (!token) return token;
@@ -121,7 +122,7 @@ diff --git a/server/token.c b/server/token.c
  
      /* copy groups */
      LIST_FOR_EACH_ENTRY( group, &src_token->groups, struct group, entry )
-@@ -1562,6 +1567,7 @@ DECL_HANDLER(get_token_info)
+@@ -1562,6 +1567,7 @@
              reply->is_elevated = token_sid_present( token, &builtin_admins_sid, FALSE );
          else
              reply->is_elevated = token->elevation == TokenElevationTypeFull;

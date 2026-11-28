@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: 'Run only this group (g1..g5); empty = all'
+        description: 'Run only this group (g1..g6); empty = all'
         required: false
         default: ''
   push:
@@ -27,7 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         variant: [vanilla, series]
-        group: [g1, g2, g3, g4, g5]
+        group: [g1, g2, g3, g4, g5, g6]
         include:
           - group: g1
             tests: user32
@@ -38,7 +38,9 @@ jobs:
           - group: g4
             tests: msi
           - group: g5
-            tests: msxml3 mspatcha riched20 msftedit shell32 wbemprox wininet mshtml
+            tests: msxml3 mspatcha riched20 msftedit shell32 wininet mshtml
+          - group: g6
+            tests: msado15 msvcrt ucrtbase wbemdisp wbemprox vbscript
     runs-on: ubuntu-24.04
     container: archlinux:base-devel
     timeout-minutes: 350

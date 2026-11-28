@@ -15,3 +15,5 @@
 # wbemdisp-method-invoke.patch, msado15-tests-stream-charset.patch ->
 # msado15-stream-charset.patch, win32u-tests-font-smoothing.patch ->
 # win32u-font-smoothing.patch.
+# The four winum-11.23-1 tests moved into their series patches.
+# The strict versions stay here as the test-first record.

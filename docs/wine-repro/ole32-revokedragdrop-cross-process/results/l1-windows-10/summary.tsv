@@ -1,0 +1,5 @@
+arch	role	checks	todo	flaky	failures	skipped	exit
+x86_64	caller	7	0	0	0	0	0
+x86_64	owner	12	0	0	0	0	0
+i686	caller	7	0	0	0	0	0
+i686	owner	12	0	0	0	0	0

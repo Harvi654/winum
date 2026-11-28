@@ -20,6 +20,9 @@ Apply after msi-reject-cyclic-feature-parents.patch. V15 tests add explicit
 The separate UI request reset requires the measured ExecuteAction transfer
 candidate. This depth patch itself does not implement the UI handoff.
 
+v2 (2026-11-27): Rebased to Wine 11.23, context only, logic unchanged.
+Keep the graph check ahead of component-state and installed-directory lookup.
+
 --- a/dlls/msi/action.c
 +++ b/dlls/msi/action.c
 @@ -1384,13 +1384,14 @@
@@ -69,7 +72,7 @@ candidate. This depth patch itself does not implement the UI handoff.
      load_all_files( package );
      load_all_patches( package );
      mark_patched_components( package );
-@@ -2357,6 +2363,9 @@
+@@ -2371,6 +2377,9 @@
      MSIQUERY *view;
      WCHAR *level, *primary_key, *primary_folder;
      UINT rc;
@@ -77,5 +80,5 @@ candidate. This depth patch itself does not implement the UI handoff.
 +    /* Windows accepts 16 feature levels, rejects the 17th at CostFinalize. */
 +    if ((rc = validate_feature_graph( package, 16 ))) return rc;
  
-     TRACE("Building directory properties\n");
-     msi_resolve_target_folder( package, L"TARGETDIR", TRUE );
+     /* read components states from the registry */
+     ACTION_GetComponentInstallStates(package);

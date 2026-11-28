@@ -1,0 +1,66 @@
+# Offline Windows 10 VM, 2026-11-26, round 2 (focus), centred rows with 42211 twips, x86_64.
+# Columns: count class style dc order EM_POSFROMCHAR(0) GetScrollInfo(SB_HORZ) EM_GETSCROLLPOS | after SetFocus: EM_GETSCROLLPOS EM_POSFROMCHAR(0) GetScrollInfo(SB_HORZ)
+      1 msftedit        plain   memory  order0  pos=1404,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1404,1        focus_hscroll=1:0,0,0,0
+      1 msftedit        plain   memory  order1  pos=1404,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1404,1        focus_hscroll=1:0,0,0,0
+      1 msftedit        plain   metafile        order0  pos=1404,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1404,1        focus_hscroll=1:0,0,0,0
+      1 msftedit        plain   metafile        order1  pos=1404,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1404,1        focus_hscroll=1:0,0,0,0
+      1 msftedit        plain   null    order0  pos=298,1       hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=298,1 focus_hscroll=1:0,0,0,0
+      1 msftedit        plain   null    order1  pos=298,1       hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=298,1 focus_hscroll=1:0,0,0,0
+      1 msftedit        plain   printer order0  pos=1404,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1404,1        focus_hscroll=1:0,0,0,0
+      1 msftedit        plain   printer order1  pos=1404,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1404,1        focus_hscroll=1:0,0,0,0
+      1 msftedit        plain   screen  order0  pos=1404,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1404,1        focus_hscroll=1:0,0,0,0
+      1 msftedit        plain   screen  order1  pos=1404,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1404,1        focus_hscroll=1:0,0,0,0
+      1 msftedit        scroll_auto     memory  order0  pos=1404,1      hscroll=1:0,2814,602,0  scrollpos=0,0   focus_scrollpos=810,0       focus_pos=594,1 focus_hscroll=1:0,2814,602,810
+      1 msftedit        scroll_auto     memory  order1  pos=1404,1      hscroll=1:0,2814,602,0  scrollpos=0,0   focus_scrollpos=810,0       focus_pos=594,1 focus_hscroll=1:0,2814,602,810
+      1 msftedit        scroll_auto     metafile        order0  pos=1404,1      hscroll=1:0,2814,602,0  scrollpos=0,0       focus_scrollpos=810,0   focus_pos=594,1 focus_hscroll=1:0,2814,602,810
+      1 msftedit        scroll_auto     metafile        order1  pos=1404,1      hscroll=1:0,2814,602,0  scrollpos=0,0       focus_scrollpos=810,0   focus_pos=594,1 focus_hscroll=1:0,2814,602,810
+      1 msftedit        scroll_auto     null    order0  pos=298,1       hscroll=1:0,2814,602,0  scrollpos=0,0   focus_scrollpos=0,0 focus_pos=298,1 focus_hscroll=1:0,2814,602,0
+      1 msftedit        scroll_auto     null    order1  pos=298,1       hscroll=1:0,2814,602,0  scrollpos=0,0   focus_scrollpos=0,0 focus_pos=298,1 focus_hscroll=1:0,2814,602,0
+      1 msftedit        scroll_auto     printer order0  pos=1404,1      hscroll=1:0,2814,602,0  scrollpos=0,0   focus_scrollpos=810,0       focus_pos=594,1 focus_hscroll=1:0,2814,602,810
+      1 msftedit        scroll_auto     printer order1  pos=1404,1      hscroll=1:0,2814,602,0  scrollpos=0,0   focus_scrollpos=810,0       focus_pos=594,1 focus_hscroll=1:0,2814,602,810
+      1 msftedit        scroll_auto     screen  order0  pos=1404,1      hscroll=1:0,2814,602,0  scrollpos=0,0   focus_scrollpos=810,0       focus_pos=594,1 focus_hscroll=1:0,2814,602,810
+      1 msftedit        scroll_auto     screen  order1  pos=1404,1      hscroll=1:0,2814,602,0  scrollpos=0,0   focus_scrollpos=810,0       focus_pos=594,1 focus_hscroll=1:0,2814,602,810
+      1 msftedit        scroll_disablenoscroll  memory  order0  pos=1404,1      hscroll=1:0,2814,585,0  scrollpos=0,0       focus_scrollpos=827,0   focus_pos=577,1 focus_hscroll=1:0,2814,585,827
+      1 msftedit        scroll_disablenoscroll  memory  order1  pos=1404,1      hscroll=1:0,2814,585,0  scrollpos=0,0       focus_scrollpos=827,0   focus_pos=577,1 focus_hscroll=1:0,2814,585,827
+      1 msftedit        scroll_disablenoscroll  metafile        order0  pos=1404,1      hscroll=1:0,2814,585,0  scrollpos=0,0       focus_scrollpos=827,0   focus_pos=577,1 focus_hscroll=1:0,2814,585,827
+      1 msftedit        scroll_disablenoscroll  metafile        order1  pos=1404,1      hscroll=1:0,2814,585,0  scrollpos=0,0       focus_scrollpos=827,0   focus_pos=577,1 focus_hscroll=1:0,2814,585,827
+      1 msftedit        scroll_disablenoscroll  null    order0  pos=289,1       hscroll=1:0,2814,585,0  scrollpos=0,0       focus_scrollpos=0,0     focus_pos=289,1 focus_hscroll=1:0,2814,585,0
+      1 msftedit        scroll_disablenoscroll  null    order1  pos=289,1       hscroll=1:0,2814,585,0  scrollpos=0,0       focus_scrollpos=0,0     focus_pos=289,1 focus_hscroll=1:0,2814,585,0
+      1 msftedit        scroll_disablenoscroll  printer order0  pos=1404,1      hscroll=1:0,2814,585,0  scrollpos=0,0       focus_scrollpos=827,0   focus_pos=577,1 focus_hscroll=1:0,2814,585,827
+      1 msftedit        scroll_disablenoscroll  printer order1  pos=1404,1      hscroll=1:0,2814,585,0  scrollpos=0,0       focus_scrollpos=827,0   focus_pos=577,1 focus_hscroll=1:0,2814,585,827
+      1 msftedit        scroll_disablenoscroll  screen  order0  pos=1404,1      hscroll=1:0,2814,585,0  scrollpos=0,0       focus_scrollpos=827,0   focus_pos=577,1 focus_hscroll=1:0,2814,585,827
+      1 msftedit        scroll_disablenoscroll  screen  order1  pos=1404,1      hscroll=1:0,2814,585,0  scrollpos=0,0       focus_scrollpos=827,0   focus_pos=577,1 focus_hscroll=1:0,2814,585,827
+      1 riched20        plain   memory  order0  pos=1403,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1403,1        focus_hscroll=1:0,0,0,0
+      1 riched20        plain   memory  order1  pos=1403,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1403,1        focus_hscroll=1:0,0,0,0
+      1 riched20        plain   metafile        order0  pos=1403,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1403,1        focus_hscroll=1:0,0,0,0
+      1 riched20        plain   metafile        order1  pos=1403,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1403,1        focus_hscroll=1:0,0,0,0
+      1 riched20        plain   null    order0  pos=1403,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1403,1        focus_hscroll=1:0,0,0,0
+      1 riched20        plain   null    order1  pos=1403,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1403,1        focus_hscroll=1:0,0,0,0
+      1 riched20        plain   printer order0  pos=1403,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1403,1        focus_hscroll=1:0,0,0,0
+      1 riched20        plain   printer order1  pos=1403,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1403,1        focus_hscroll=1:0,0,0,0
+      1 riched20        plain   screen  order0  pos=1403,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1403,1        focus_hscroll=1:0,0,0,0
+      1 riched20        plain   screen  order1  pos=1403,1      hscroll=1:0,0,0,0       scrollpos=0,0   focus_scrollpos=0,0 focus_pos=1403,1        focus_hscroll=1:0,0,0,0
+      1 riched20        scroll_auto     memory  order0  pos=1403,1      hscroll=1:0,2815,602,0  scrollpos=0,0   focus_scrollpos=809,0       focus_pos=594,1 focus_hscroll=1:0,2815,602,809
+      1 riched20        scroll_auto     memory  order1  pos=1403,1      hscroll=1:0,2815,602,0  scrollpos=0,0   focus_scrollpos=809,0       focus_pos=594,1 focus_hscroll=1:0,2815,602,809
+      1 riched20        scroll_auto     metafile        order0  pos=1403,1      hscroll=1:0,2815,602,0  scrollpos=0,0       focus_scrollpos=809,0   focus_pos=594,1 focus_hscroll=1:0,2815,602,809
+      1 riched20        scroll_auto     metafile        order1  pos=1403,1      hscroll=1:0,2815,602,0  scrollpos=0,0       focus_scrollpos=809,0   focus_pos=594,1 focus_hscroll=1:0,2815,602,809
+      1 riched20        scroll_auto     null    order0  pos=1403,1      hscroll=1:0,2815,602,0  scrollpos=0,0   focus_scrollpos=809,0       focus_pos=594,1 focus_hscroll=1:0,2815,602,809
+      1 riched20        scroll_auto     null    order1  pos=1403,1      hscroll=1:0,2815,602,0  scrollpos=0,0   focus_scrollpos=809,0       focus_pos=594,1 focus_hscroll=1:0,2815,602,809
+      1 riched20        scroll_auto     printer order0  pos=1403,1      hscroll=1:0,2815,602,0  scrollpos=0,0   focus_scrollpos=809,0       focus_pos=594,1 focus_hscroll=1:0,2815,602,809
+      1 riched20        scroll_auto     printer order1  pos=1403,1      hscroll=1:0,2815,602,0  scrollpos=0,0   focus_scrollpos=809,0       focus_pos=594,1 focus_hscroll=1:0,2815,602,809
+      1 riched20        scroll_auto     screen  order0  pos=1403,1      hscroll=1:0,2815,602,0  scrollpos=0,0   focus_scrollpos=809,0       focus_pos=594,1 focus_hscroll=1:0,2815,602,809
+      1 riched20        scroll_auto     screen  order1  pos=1403,1      hscroll=1:0,2815,602,0  scrollpos=0,0   focus_scrollpos=809,0       focus_pos=594,1 focus_hscroll=1:0,2815,602,809
+      1 riched20        scroll_disablenoscroll  memory  order0  pos=1403,1      hscroll=1:0,2815,585,0  scrollpos=0,0       focus_scrollpos=826,0   focus_pos=577,1 focus_hscroll=1:0,2815,585,826
+      1 riched20        scroll_disablenoscroll  memory  order1  pos=1403,1      hscroll=1:0,2815,585,0  scrollpos=0,0       focus_scrollpos=826,0   focus_pos=577,1 focus_hscroll=1:0,2815,585,826
+      1 riched20        scroll_disablenoscroll  metafile        order0  pos=1403,1      hscroll=1:0,2815,585,0  scrollpos=0,0       focus_scrollpos=826,0   focus_pos=577,1 focus_hscroll=1:0,2815,585,826
+      1 riched20        scroll_disablenoscroll  metafile        order1  pos=1403,1      hscroll=1:0,2815,585,0  scrollpos=0,0       focus_scrollpos=826,0   focus_pos=577,1 focus_hscroll=1:0,2815,585,826
+      1 riched20        scroll_disablenoscroll  null    order0  pos=1403,1      hscroll=1:0,2815,585,0  scrollpos=0,0       focus_scrollpos=826,0   focus_pos=577,1 focus_hscroll=1:0,2815,585,826
+      1 riched20        scroll_disablenoscroll  null    order1  pos=1403,1      hscroll=1:0,2815,585,0  scrollpos=0,0       focus_scrollpos=826,0   focus_pos=577,1 focus_hscroll=1:0,2815,585,826
+      1 riched20        scroll_disablenoscroll  printer order0  pos=1403,1      hscroll=1:0,2815,585,0  scrollpos=0,0       focus_scrollpos=826,0   focus_pos=577,1 focus_hscroll=1:0,2815,585,826
+      1 riched20        scroll_disablenoscroll  printer order1  pos=1403,1      hscroll=1:0,2815,585,0  scrollpos=0,0       focus_scrollpos=826,0   focus_pos=577,1 focus_hscroll=1:0,2815,585,826
+      1 riched20        scroll_disablenoscroll  screen  order0  pos=1403,1      hscroll=1:0,2815,585,0  scrollpos=0,0       focus_scrollpos=826,0   focus_pos=577,1 focus_hscroll=1:0,2815,585,826
+      1 riched20        scroll_disablenoscroll  screen  order1  pos=1403,1      hscroll=1:0,2815,585,0  scrollpos=0,0       focus_scrollpos=826,0   focus_pos=577,1 focus_hscroll=1:0,2815,585,826
+measure_complete cases=612 failed=0
+measure_complete cases=612 failed=0
+target-device-width x86_64=0
+target-device-width i686=0

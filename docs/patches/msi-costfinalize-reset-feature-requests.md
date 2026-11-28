@@ -49,3 +49,7 @@ Maintenance (Modify) behaves as vanilla Wine, which differs from Windows; measur
 
 Solidworks-for-Linux `docs/wine-repro/msi-candidates-evidence.md` (table and sources), `docs/wine-repro/cross-review-2026-11-05-msi.md`, Windows maintenance results `docs/wine-repro/msi-maintenance/windows-2026-11-05/`.
 
+
+## Wine 11.23
+
+v2 (2026-11-27): Rebased to Wine 11.23, context only, logic unchanged. The reset stays immediately after ACTION_GetFeatureInstallStates. The Windows test expectations are unchanged. The source series applies with `--fuzz=0`; the L0 build and paired checks are pending.

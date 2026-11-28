@@ -1,0 +1,1 @@
+riched-tab-stop | docs/wine-repro/riched20-default-tab-stop/measure.c | -lole32 -luser32 -lgdi32

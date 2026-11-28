@@ -1,0 +1,1 @@
+revoke-drag-drop | docs/wine-repro/ole32-revokedragdrop-cross-process/measure.c | -municode -lole32 -luser32 -luuid
