@@ -13,14 +13,14 @@ narrower width leaves it alone, and the focus scrolls the caret after a
 centred or right-aligned letter into view. Wine 11.22 keeps the range at
 the width of the text, so the letter cannot be scrolled to.
 
- dlls/riched20/tests/editor.c | 107 +++++++++++++++++++++++++++++++++++
- 1 file changed, 107 insertions(+)
+ dlls/riched20/tests/editor.c | 109 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 109 insertions(+)
 
 diff --git a/dlls/riched20/tests/editor.c b/dlls/riched20/tests/editor.c
 index 0ba1935..70480be 100644
 --- a/dlls/riched20/tests/editor.c
 +++ b/dlls/riched20/tests/editor.c
-@@ -9617,6 +9617,112 @@ static void test_EM_SETCHARFORMAT_word_point(void)
+@@ -9617,6 +9617,114 @@ static void test_EM_SETCHARFORMAT_word_point(void)
      DestroyWindow(hwnd);
  }
  
@@ -119,6 +119,8 @@ index 0ba1935..70480be 100644
 +            else
 +                ok( scroll.x == 0, "got scroll position %ld\n", scroll.x );
 +            ok( scroll.y == 0, "got vertical scroll position %ld\n", scroll.y );
++            /* Wine's view width still includes the vertical scroll bar. */
++            todo_wine_if( tests[i].scrolls )
 +            ok( pos.x >= 0 && pos.x < client.right, "letter at %ld, client width %ld\n", pos.x, client.right );
 +
 +            DestroyWindow( edit );
@@ -133,7 +135,7 @@ index 0ba1935..70480be 100644
  START_TEST( editor )
  {
    BOOL ret;
-@@ -9697,6 +9803,7 @@ START_TEST( editor )
+@@ -9697,6 +9805,7 @@ START_TEST( editor )
    test_EM_SELECTIONTYPE();
  
    test_EM_SETCHARFORMAT_word_point();

@@ -36,6 +36,10 @@ Needs riched20-scf-word-insertion-point, which records the window class
 v2 (2026-11-27): Promoted for Wine 11.23 with the verified strict
 Wine test. The implementation is unchanged from the reviewed candidate.
 
+v3 (2026-11-28): Mark only the post-focus visibility check as todo on
+Wine in the six cases that scroll. The scroll range and offset checks
+are unchanged, and the implementation is unchanged.
+
 diff --git a/dlls/riched20/editor.c b/dlls/riched20/editor.c
 index e1d99e0..2e8c4b6 100644
 --- a/dlls/riched20/editor.c
@@ -168,7 +172,7 @@ diff --git a/dlls/riched20/tests/editor.c b/dlls/riched20/tests/editor.c
 index 0ba1935..70480be 100644
 --- a/dlls/riched20/tests/editor.c
 +++ b/dlls/riched20/tests/editor.c
-@@ -9617,6 +9617,112 @@ static void test_EM_SETCHARFORMAT_word_point(void)
+@@ -9617,6 +9617,114 @@ static void test_EM_SETCHARFORMAT_word_point(void)
      DestroyWindow(hwnd);
  }
  
@@ -267,6 +271,8 @@ index 0ba1935..70480be 100644
 +            else
 +                ok( scroll.x == 0, "got scroll position %ld\n", scroll.x );
 +            ok( scroll.y == 0, "got vertical scroll position %ld\n", scroll.y );
++            /* Wine's view width still includes the vertical scroll bar. */
++            todo_wine_if( tests[i].scrolls )
 +            ok( pos.x >= 0 && pos.x < client.right, "letter at %ld, client width %ld\n", pos.x, client.right );
 +
 +            DestroyWindow( edit );
@@ -281,7 +287,7 @@ index 0ba1935..70480be 100644
  START_TEST( editor )
  {
    BOOL ret;
-@@ -9697,6 +9803,7 @@ START_TEST( editor )
+@@ -9697,6 +9805,7 @@ START_TEST( editor )
    test_EM_SELECTIONTYPE();
  
    test_EM_SETCHARFORMAT_word_point();
